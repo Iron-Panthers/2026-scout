@@ -23,13 +23,21 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { Plus, ChevronLeft, ChevronRight } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Plus, ChevronLeft, ChevronRight, Calendar, Users } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { getAllProfiles, getMatchesWithProfiles } from "@/lib/matches";
 import { updateMatchAssignment } from "@/lib/matches";
 import DashboardHeader from "@/components/DashboardHeader";
 import UserProfileMenu from "@/components/UserProfileMenu";
-import type { Profile, Role, MatchAssignment, SelectedCell } from "@/types";
+import type {
+  Profile,
+  Role,
+  MatchAssignment,
+  SelectedCell,
+  Scout,
+} from "@/types";
 
 const getRoleCellColor = (role: Role) => {
   if (role.startsWith("red") || role === "qualRed") {
@@ -277,124 +285,282 @@ export default function ManagerDashboard() {
           />
         </div>
 
-        {/* Assignment Table */}
-        <div className="rounded-lg border border-border bg-card">
-          <div className="p-4 border-b border-border">
-            <h2 className="text-2xl font-bold">Match Assignments</h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              Click the checkmark to assign a scout to a role
-            </p>
-          </div>
-          <div className="overflow-auto max-h-[70vh]">
-            <Table noWrapper>
-              <TableHeader className="sticky top-0 bg-card z-20 shadow-sm">
-                <TableRow>
-                  <TableHead className="w-32 font-semibold border-r border-border">
-                    Match
-                  </TableHead>
-                  <TableHead
-                    className={`w-32 font-semibold text-center ${getRoleHeaderColor(
-                      "red1"
-                    )}`}
-                  >
-                    Red 1
-                  </TableHead>
-                  <TableHead
-                    className={`w-32 font-semibold text-center ${getRoleHeaderColor(
-                      "red2"
-                    )}`}
-                  >
-                    Red 2
-                  </TableHead>
-                  <TableHead
-                    className={`w-32 font-semibold text-center ${getRoleHeaderColor(
-                      "red3"
-                    )}`}
-                  >
-                    Red 3
-                  </TableHead>
-                  <TableHead
-                    className={`w-32 font-semibold text-center ${getRoleHeaderColor(
-                      "qualRed"
-                    )}`}
-                  >
-                    Qual Red
-                  </TableHead>
-                  <TableHead
-                    className={`w-32 font-semibold text-center ${getRoleHeaderColor(
-                      "blue1"
-                    )}`}
-                  >
-                    Blue 1
-                  </TableHead>
-                  <TableHead
-                    className={`w-32 font-semibold text-center ${getRoleHeaderColor(
-                      "blue2"
-                    )}`}
-                  >
-                    Blue 2
-                  </TableHead>
-                  <TableHead
-                    className={`w-32 font-semibold text-center ${getRoleHeaderColor(
-                      "blue3"
-                    )}`}
-                  >
-                    Blue 3
-                  </TableHead>
-                  <TableHead
-                    className={`w-32 font-semibold text-center ${getRoleHeaderColor(
-                      "qualBlue"
-                    )}`}
-                  >
-                    Qual Blue
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {paginatedMatches.map((match) => (
-                  <MatchRow
-                    key={match.matchNumber}
-                    match={match}
-                    roles={roles}
-                    onOpenDialog={openAssignmentDialog}
-                  />
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-          {/* Pagination Controls */}
-          <div className="p-4 border-t border-border flex items-center justify-between">
-            <div className="text-sm text-muted-foreground">
-              Showing {startIndex + 1}-{Math.min(endIndex, matches.length)} of{" "}
-              {matches.length} matches
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-              >
-                <ChevronLeft className="h-4 w-4 mr-1" />
-                Previous
-              </Button>
-              <div className="text-sm font-medium">
-                Page {currentPage} of {totalPages}
+        {/* Tabs for Navigation */}
+        <Tabs defaultValue="assignments" className="w-full">
+          <TabsList className="grid w-full max-w-md grid-cols-2 mb-6">
+            <TabsTrigger
+              value="assignments"
+              className="flex items-center gap-2"
+            >
+              <Users className="h-4 w-4" />
+              Match Assignments
+            </TabsTrigger>
+            <TabsTrigger value="events" className="flex items-center gap-2">
+              <Calendar className="h-4 w-4" />
+              Event Information
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Match Assignments Tab */}
+          <TabsContent value="assignments" className="mt-0">
+            {/* Assignment Table */}
+            <div className="rounded-lg border border-border bg-card">
+              <div className="p-4 border-b border-border">
+                <h2 className="text-2xl font-bold">Match Assignments</h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Click the checkmark to assign a scout to a role
+                </p>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  setCurrentPage((p) => Math.min(totalPages, p + 1))
-                }
-                disabled={currentPage === totalPages}
-              >
-                Next
-                <ChevronRight className="h-4 w-4 ml-1" />
-              </Button>
+              <div className="overflow-auto max-h-[70vh]">
+                <Table noWrapper>
+                  <TableHeader className="sticky top-0 bg-card z-20 shadow-sm">
+                    <TableRow>
+                      <TableHead className="w-32 font-semibold border-r border-border">
+                        Match
+                      </TableHead>
+                      <TableHead
+                        className={`w-32 font-semibold text-center ${getRoleHeaderColor(
+                          "red1"
+                        )}`}
+                      >
+                        Red 1
+                      </TableHead>
+                      <TableHead
+                        className={`w-32 font-semibold text-center ${getRoleHeaderColor(
+                          "red2"
+                        )}`}
+                      >
+                        Red 2
+                      </TableHead>
+                      <TableHead
+                        className={`w-32 font-semibold text-center ${getRoleHeaderColor(
+                          "red3"
+                        )}`}
+                      >
+                        Red 3
+                      </TableHead>
+                      <TableHead
+                        className={`w-32 font-semibold text-center ${getRoleHeaderColor(
+                          "qualRed"
+                        )}`}
+                      >
+                        Qual Red
+                      </TableHead>
+                      <TableHead
+                        className={`w-32 font-semibold text-center ${getRoleHeaderColor(
+                          "blue1"
+                        )}`}
+                      >
+                        Blue 1
+                      </TableHead>
+                      <TableHead
+                        className={`w-32 font-semibold text-center ${getRoleHeaderColor(
+                          "blue2"
+                        )}`}
+                      >
+                        Blue 2
+                      </TableHead>
+                      <TableHead
+                        className={`w-32 font-semibold text-center ${getRoleHeaderColor(
+                          "blue3"
+                        )}`}
+                      >
+                        Blue 3
+                      </TableHead>
+                      <TableHead
+                        className={`w-32 font-semibold text-center ${getRoleHeaderColor(
+                          "qualBlue"
+                        )}`}
+                      >
+                        Qual Blue
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedMatches.map((match) => (
+                      <MatchRow
+                        key={match.matchNumber}
+                        match={match}
+                        roles={roles}
+                        onOpenDialog={openAssignmentDialog}
+                      />
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              {/* Pagination Controls */}
+              <div className="p-4 border-t border-border flex items-center justify-between">
+                <div className="text-sm text-muted-foreground">
+                  Showing {startIndex + 1}-{Math.min(endIndex, matches.length)}{" "}
+                  of {matches.length} matches
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4 mr-1" />
+                    Previous
+                  </Button>
+                  <div className="text-sm font-medium">
+                    Page {currentPage} of {totalPages}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      setCurrentPage((p) => Math.min(totalPages, p + 1))
+                    }
+                    disabled={currentPage === totalPages}
+                  >
+                    Next
+                    <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
+          </TabsContent>
+
+          {/* Event Information Tab */}
+          <TabsContent value="events" className="mt-0">
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Current Event</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-sm font-medium text-muted-foreground">
+                        Event Name
+                      </label>
+                      <p className="text-lg font-semibold">
+                        2026 Competition Season
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-sm font-medium text-muted-foreground">
+                          Location
+                        </label>
+                        <p className="text-lg">TBD</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-muted-foreground">
+                          Total Matches
+                        </label>
+                        <p className="text-lg font-semibold">100</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-sm font-medium text-muted-foreground">
+                          Start Date
+                        </label>
+                        <p className="text-lg">TBD</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-muted-foreground">
+                          End Date
+                        </label>
+                        <p className="text-lg">TBD</p>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Team Statistics</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="text-center p-4 rounded-lg bg-primary/10">
+                      <p className="text-3xl font-bold text-primary">
+                        {availableScouts.length}
+                      </p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Total Scouts
+                      </p>
+                    </div>
+                    <div className="text-center p-4 rounded-lg bg-blue-500/10">
+                      <p className="text-3xl font-bold text-blue-400">
+                        {
+                          matches.filter(
+                            (m) => Object.keys(m.assignments).length > 0
+                          ).length
+                        }
+                      </p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Assigned Matches
+                      </p>
+                    </div>
+                    <div className="text-center p-4 rounded-lg bg-yellow-500/10">
+                      <p className="text-3xl font-bold text-yellow-400">
+                        {
+                          matches.filter(
+                            (m) => Object.keys(m.assignments).length === 0
+                          ).length
+                        }
+                      </p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Unassigned Matches
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Scout List</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {availableScouts.length === 0 ? (
+                      <p className="text-muted-foreground text-center py-8">
+                        No scouts available
+                      </p>
+                    ) : (
+                      availableScouts.map((profile) => {
+                        const initials = (profile.name || "U")
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")
+                          .toUpperCase()
+                          .slice(0, 2);
+                        return (
+                          <div
+                            key={profile.id}
+                            className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors"
+                          >
+                            <Avatar className="h-10 w-10">
+                              <AvatarFallback className="text-sm bg-primary/20 text-primary">
+                                {initials}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1">
+                              <p className="font-medium">
+                                {profile.name || "Unknown"}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                {profile.role}{" "}
+                                {profile.is_manager && "• Manager"}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+        </Tabs>
 
         {/* Assignment Dialog */}
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
