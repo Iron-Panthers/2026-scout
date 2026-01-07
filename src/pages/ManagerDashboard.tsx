@@ -25,6 +25,8 @@ import {
 } from "@/components/ui/command";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -32,9 +34,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, ChevronLeft, ChevronRight, Calendar, Users } from "lucide-react";
+import {
+  Plus,
+  ChevronLeft,
+  ChevronRight,
+  Calendar,
+  Users,
+  PlusCircle,
+} from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { getMatchesWithProfiles, getEvents } from "@/lib/matches";
+import {
+  getMatchesWithProfiles,
+  getEvents,
+  createEventWithMatches,
+} from "@/lib/matches";
 import { updateMatchAssignment } from "@/lib/matches";
 import DashboardHeader from "@/components/DashboardHeader";
 import UserProfileMenu from "@/components/UserProfileMenu";
@@ -139,6 +152,12 @@ export default function ManagerDashboard() {
   const [events, setEvents] = useState<Event[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<string>("all");
 
+  // New event form state
+  const [newEventName, setNewEventName] = useState("");
+  const [newEventId, setNewEventId] = useState("");
+  const [numQualMatches, setNumQualMatches] = useState("");
+  const [isCreatingEvent, setIsCreatingEvent] = useState(false);
+
   // Generate 100 matches with empty assignments
   const [matches, setMatches] = useState<MatchAssignment[]>(
     Array.from({ length: 100 }, (_, i) => ({
@@ -156,10 +175,8 @@ export default function ManagerDashboard() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [{ matches: dbMatches, profiles }, eventsData] = await Promise.all([
-          getMatchesWithProfiles(),
-          getEvents(),
-        ]);
+        const [{ matches: dbMatches, profiles }, eventsData] =
+          await Promise.all([getMatchesWithProfiles(), getEvents()]);
         setAvailableScouts(Array.from(profiles.values()));
         setEvents(eventsData);
 
@@ -276,6 +293,93 @@ export default function ManagerDashboard() {
     []
   );
 
+  const handleCreateEvent = async () => {
+    if (!newEventName.trim() || !newEventId.trim() || !numQualMatches) {
+      alert("Please fill in all fields");
+      return;
+    }
+
+    const numMatches = parseInt(numQualMatches);
+    if (isNaN(numMatches) || numMatches <= 0) {
+      alert("Please enter a valid number of matches");
+      return;
+    }
+
+    setIsCreatingEvent(true);
+    try {
+      const result = await createEventWithMatches(
+        newEventName.trim(),
+        newEventId.trim(),
+        numMatches
+      );
+
+      if (result.success) {
+        // Reload events and matches
+        const [eventsData, { matches: dbMatches, profiles }] =
+          await Promise.all([getEvents(), getMatchesWithProfiles()]);
+        setEvents(eventsData);
+
+        // Update matches state
+        const matchAssignmentsMap = new Map<
+          number,
+          Partial<Record<Role, Scout>>
+        >();
+        dbMatches.forEach((match) => {
+          const assignments: Partial<Record<Role, Scout>> = {};
+          const roleMapping: Array<{ role: Role; scouterId: string | null }> = [
+            { role: "red1", scouterId: match.red1_scouter_id },
+            { role: "red2", scouterId: match.red2_scouter_id },
+            { role: "red3", scouterId: match.red3_scouter_id },
+            { role: "qualRed", scouterId: match.qual_red_scouter_id },
+            { role: "blue1", scouterId: match.blue1_scouter_id },
+            { role: "blue2", scouterId: match.blue2_scouter_id },
+            { role: "blue3", scouterId: match.blue3_scouter_id },
+            { role: "qualBlue", scouterId: match.qual_blue_scouter_id },
+          ];
+
+          roleMapping.forEach(({ role, scouterId }) => {
+            if (scouterId && profiles.has(scouterId)) {
+              const profile = profiles.get(scouterId)!;
+              assignments[role] = {
+                id: profile.id,
+                name: profile.name || "Unknown",
+                initials: (profile.name || "U")
+                  .split(" ")
+                  .map((n) => n[0])
+                  .join("")
+                  .toUpperCase()
+                  .slice(0, 2),
+                avatar: "",
+              };
+            }
+          });
+
+          matchAssignmentsMap.set(match.match_number, assignments);
+        });
+
+        setMatches((prevMatches) =>
+          prevMatches.map((match) => ({
+            ...match,
+            assignments: matchAssignmentsMap.get(match.matchNumber) || {},
+          }))
+        );
+
+        // Reset form
+        setNewEventName("");
+        setNewEventId("");
+        setNumQualMatches("");
+        alert(`Event "${newEventName}" created with ${numMatches} matches!`);
+      } else {
+        alert(`Failed to create event: ${result.error}`);
+      }
+    } catch (error) {
+      console.error("Error creating event:", error);
+      alert("An error occurred while creating the event");
+    } finally {
+      setIsCreatingEvent(false);
+    }
+  };
+
   const getRoleHeaderColor = (role: Role) => {
     if (role.startsWith("red") || role === "qualRed") {
       return "bg-red-900/30 text-red-400";
@@ -302,7 +406,7 @@ export default function ManagerDashboard() {
         {/* Tabs for Navigation */}
         <Tabs defaultValue="assignments" className="w-full">
           <div className="flex items-center justify-between mb-6">
-            <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsList className="grid w-full max-w-2xl grid-cols-3">
               <TabsTrigger
                 value="assignments"
                 className="flex items-center gap-2"
@@ -313,6 +417,10 @@ export default function ManagerDashboard() {
               <TabsTrigger value="events" className="flex items-center gap-2">
                 <Calendar className="h-4 w-4" />
                 Event Information
+              </TabsTrigger>
+              <TabsTrigger value="create" className="flex items-center gap-2">
+                <PlusCircle className="h-4 w-4" />
+                Create Event
               </TabsTrigger>
             </TabsList>
             <div className="flex items-center gap-2">
@@ -591,6 +699,89 @@ export default function ManagerDashboard() {
                 </CardContent>
               </Card>
             </div>
+          </TabsContent>
+
+          {/* Create Event Tab */}
+          <TabsContent value="create" className="mt-0">
+            <Card>
+              <CardHeader>
+                <CardTitle>Create New Event</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="eventName">Event Name</Label>
+                    <Input
+                      id="eventName"
+                      placeholder="e.g., 2026 Regional Championship"
+                      value={newEventName}
+                      onChange={(e) => setNewEventName(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="eventId">Event ID</Label>
+                    <Input
+                      id="eventId"
+                      placeholder="e.g., 2026-regional"
+                      value={newEventId}
+                      onChange={(e) => setNewEventId(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      This will be used as a prefix for match names (e.g.,
+                      2026-regional-Q1)
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="numMatches">
+                      Number of Qualification Matches
+                    </Label>
+                    <Input
+                      id="numMatches"
+                      type="number"
+                      min="1"
+                      placeholder="e.g., 100"
+                      value={numQualMatches}
+                      onChange={(e) => setNumQualMatches(e.target.value)}
+                    />
+                  </div>
+
+                  <Button
+                    onClick={handleCreateEvent}
+                    disabled={isCreatingEvent}
+                    className="w-full"
+                    size="lg"
+                  >
+                    {isCreatingEvent ? (
+                      "Creating Event..."
+                    ) : (
+                      <>
+                        <PlusCircle className="h-4 w-4 mr-2" />
+                        Create Event and Matches
+                      </>
+                    )}
+                  </Button>
+
+                  <div className="rounded-lg bg-muted p-4 space-y-2">
+                    <h4 className="font-semibold text-sm">
+                      What happens when you create an event?
+                    </h4>
+                    <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                      <li>A new event entry will be created in the database</li>
+                      <li>
+                        The specified number of qualification matches will be
+                        generated
+                      </li>
+                      <li>Matches will be named: [Event ID]-Q[Match Number]</li>
+                      <li>
+                        The event will appear in the event selector dropdown
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
 

@@ -88,6 +88,50 @@ export async function upsertMatch(matchData: {
   return data;
 }
 
+// Create a new event with matches
+export async function createEventWithMatches(
+  eventName: string,
+  eventId: string,
+  numMatches: number
+): Promise<{ success: boolean; event?: Event; error?: string }> {
+  try {
+    // Create the event (database will generate UUID for id)
+    const { data: eventData, error: eventError } = await supabase
+      .from("events")
+      .insert({
+        name: eventName,
+      })
+      .select()
+      .single();
+
+    if (eventError) {
+      console.error("Error creating event:", eventError);
+      return { success: false, error: eventError.message };
+    }
+
+    // Create matches for the event using the eventId as prefix
+    const matchesToCreate = Array.from({ length: numMatches }, (_, i) => ({
+      name: `${eventId}-Q${i + 1}`,
+      match_number: i + 1,
+      event_id: eventData.id,
+    }));
+
+    const { error: matchesError } = await supabase
+      .from("matches")
+      .insert(matchesToCreate);
+
+    if (matchesError) {
+      console.error("Error creating matches:", matchesError);
+      return { success: false, error: matchesError.message };
+    }
+
+    return { success: true, event: eventData };
+  } catch (error) {
+    console.error("Error in createEventWithMatches:", error);
+    return { success: false, error: "Unknown error occurred" };
+  }
+}
+
 // Update a specific scouter assignment
 export async function updateMatchAssignment(
   matchName: string,
