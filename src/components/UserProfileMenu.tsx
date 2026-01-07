@@ -10,17 +10,24 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Settings, User, LogOut, Users, LayoutDashboard } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import type { UserProfileMenuProps } from "@/types";
 
 export default function UserProfileMenu({
   userName,
   userInitials,
   avatarUrl = "",
-  isManager = false,
-}: UserProfileMenuProps) {
+}: Omit<UserProfileMenuProps, "isManager">) {
   const navigate = useNavigate();
   const location = useLocation();
+  const { profile, signOut } = useAuth();
+  const isManager = profile?.is_manager || false;
   const isOnManagerDashboard = location.pathname === "/manager";
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/login");
+  };
 
   return (
     <DropdownMenu>
@@ -62,7 +69,7 @@ export default function UserProfileMenu({
           </>
         )}
         <DropdownMenuSeparator />
-        <DropdownMenuItem className="text-destructive">
+        <DropdownMenuItem className="text-destructive" onClick={handleSignOut}>
           <LogOut className="mr-2 h-4 w-4" />
           <span>Log out</span>
         </DropdownMenuItem>

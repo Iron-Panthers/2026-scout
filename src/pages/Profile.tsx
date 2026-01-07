@@ -8,10 +8,13 @@ import { useAuth } from "@/contexts/AuthContext";
 
 export default function Profile() {
   const navigate = useNavigate();
-  const { user: authUser } = useAuth();
+  const { user: authUser, profile } = useAuth();
 
   const userName =
-    authUser?.user_metadata?.name || authUser?.email?.split("@")[0] || "User";
+    profile?.name ||
+    authUser?.user_metadata?.name ||
+    authUser?.email?.split("@")[0] ||
+    "User";
   const userInitials = userName
     .split(" ")
     .map((n: string) => n[0])
@@ -20,7 +23,13 @@ export default function Profile() {
     .slice(0, 2);
   const avatarUrl = authUser?.user_metadata?.avatar_url || "";
   const email = authUser?.email || "";
-  const joinDate = authUser?.created_at
+  const userRole = profile?.role || "scout";
+  const joinDate = profile?.created_at
+    ? new Date(profile.created_at).toLocaleDateString("en-US", {
+        month: "long",
+        year: "numeric",
+      })
+    : authUser?.created_at
     ? new Date(authUser.created_at).toLocaleDateString("en-US", {
         month: "long",
         year: "numeric",
@@ -56,7 +65,7 @@ export default function Profile() {
               <div className="flex-1 text-center md:text-left">
                 <h1 className="text-3xl font-bold mb-2">{userName}</h1>
                 <Badge variant="secondary" className="mb-4">
-                  Scout
+                  {userRole.charAt(0).toUpperCase() + userRole.slice(1)}
                 </Badge>
                 <div className="space-y-2 mt-4">
                   <div className="flex items-center justify-center md:justify-start gap-2 text-muted-foreground">

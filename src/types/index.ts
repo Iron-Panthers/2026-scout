@@ -6,6 +6,16 @@ export interface Scout {
   avatar: string;
 }
 
+// Profile Type (from Supabase)
+export interface Profile {
+  id: string;
+  name: string | null;
+  role: "scout" | "manager" | "admin";
+  is_manager: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 // Role Types
 export type Role =
   | "red1"

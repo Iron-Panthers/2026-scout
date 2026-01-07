@@ -45,14 +45,21 @@ export default function Login() {
 
     try {
       if (mode === "signup") {
-        const { error: signUpError } = await supabase.auth.signUp({
-          email: data.email,
-          password: data.password,
-          options: {
-            data: {
-              name: data.name,
+        console.log("Attempting signup with:", data.email);
+        const { data: signUpData, error: signUpError } =
+          await supabase.auth.signUp({
+            email: data.email,
+            password: data.password,
+            options: {
+              data: {
+                name: data.name,
+              },
             },
-          },
+          });
+
+        console.log("Signup response:", {
+          data: signUpData,
+          error: signUpError,
         });
 
         if (signUpError) throw signUpError;
@@ -61,20 +68,34 @@ export default function Login() {
           "Account created successfully! Please check your email to verify your account."
         );
         reset();
+        setLoading(false);
         setTimeout(() => setMode("login"), 3000);
       } else {
-        const { error: signInError } = await supabase.auth.signInWithPassword({
-          email: data.email,
-          password: data.password,
+        console.log("Attempting login with:", data.email);
+        const { data: signInData, error: signInError } =
+          await supabase.auth.signInWithPassword({
+            email: data.email,
+            password: data.password,
+          });
+
+        console.log("Login response:", {
+          data: signInData,
+          error: signInError,
         });
 
-        if (signInError) throw signInError;
+        if (signInError) {
+          console.error("Sign in error:", signInError);
+          throw signInError;
+        }
 
+        console.log("Login successful, session:", signInData.session);
+
+        // Navigation will happen, but don't clear loading yet
         navigate("/dashboard");
       }
     } catch (err: any) {
+      console.error("Auth error:", err);
       setError(err.message || "An error occurred during authentication");
-    } finally {
       setLoading(false);
     }
   };

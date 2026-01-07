@@ -109,7 +109,6 @@ export default function Dashboard() {
             userName={userName}
             userInitials={userInitials}
             avatarUrl={avatarUrl}
-            isManager={false}
           />
         </div>
 
