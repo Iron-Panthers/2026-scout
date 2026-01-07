@@ -1,79 +1,26 @@
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ClipboardList, Wrench } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { getUserMatches } from "@/lib/matches";
 import DashboardHeader from "@/components/DashboardHeader";
 import UserProfileMenu from "@/components/UserProfileMenu";
-import type { ScheduledMatch, PastMatch, Role } from "@/types";
+import type { Match, Role } from "@/types";
 
-// Mock data for scheduled matches
-const scheduledMatches: ScheduledMatch[] = [
-  {
-    id: 1,
-    scouterName: "Alex Chen",
-    matchNumber: "Q-15",
-    team: 5026,
-    role: "red1",
-    time: "10:30 AM",
-  },
-  {
-    id: 2,
-    scouterName: "Alex Chen",
-    matchNumber: "Q-23",
-    team: 1234,
-    role: "blue2",
-    time: "11:45 AM",
-  },
-  {
-    id: 3,
-    scouterName: "Alex Chen",
-    matchNumber: "Q-31",
-    team: 5678,
-    role: "red3",
-    time: "1:15 PM",
-  },
-  {
-    id: 4,
-    scouterName: "Alex Chen",
-    matchNumber: "Q-42",
-    team: 9012,
-    role: "blue1",
-    time: "2:30 PM",
-  },
-];
-
-// Mock data for past matches
-const pastMatches: PastMatch[] = [
-  {
-    id: 5,
-    scouterName: "Alex Chen",
-    matchNumber: "Q-8",
-    team: 3456,
-    role: "red2",
-    time: "9:15 AM",
-  },
-  {
-    id: 6,
-    scouterName: "Alex Chen",
-    matchNumber: "Q-4",
-    team: 7890,
-    role: "blue3",
-    time: "8:30 AM",
-  },
-  {
-    id: 7,
-    scouterName: "Alex Chen",
-    matchNumber: "Q-1",
-    team: 2468,
-    role: "qualRed",
-    time: "8:00 AM",
-  },
-];
+interface UserMatch {
+  matchNumber: string;
+  role: Role;
+  match: Match;
+}
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const [matches, setMatches] = useState<UserMatch[]>([]);
+  const [loading, setLoading] = useState(true);
+
   const userName =
     user?.user_metadata?.name || user?.email?.split("@")[0] || "Scout";
   const userInitials = userName
@@ -83,6 +30,57 @@ export default function Dashboard() {
     .toUpperCase()
     .slice(0, 2);
   const avatarUrl = user?.user_metadata?.avatar_url || "";
+
+  // Load user's assigned matches
+  useEffect(() => {
+    const loadMatches = async () => {
+      if (!user?.id) return;
+
+      try {
+        const { matches: userMatches } = await getUserMatches(user.id);
+
+        // Convert matches to display format with role information
+        const formattedMatches: UserMatch[] = [];
+
+        userMatches.forEach((match) => {
+          // Check each role to find where the user is assigned
+          const roleChecks: Array<{ column: string | null; role: Role }> = [
+            { column: match.red1_scouter_id, role: "red1" },
+            { column: match.red2_scouter_id, role: "red2" },
+            { column: match.red3_scouter_id, role: "red3" },
+            { column: match.qual_red_scouter_id, role: "qualRed" },
+            { column: match.blue1_scouter_id, role: "blue1" },
+            { column: match.blue2_scouter_id, role: "blue2" },
+            { column: match.blue3_scouter_id, role: "blue3" },
+            { column: match.qual_blue_scouter_id, role: "qualBlue" },
+          ];
+
+          roleChecks.forEach(({ column, role }) => {
+            if (column === user.id) {
+              formattedMatches.push({
+                matchNumber: match.name,
+                role,
+                match,
+              });
+            }
+          });
+        });
+
+        // Sort by match number
+        formattedMatches.sort(
+          (a, b) => a.match.match_number - b.match.match_number
+        );
+
+        setMatches(formattedMatches);
+      } catch (error) {
+        console.error("Failed to load matches:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadMatches();
+  }, [user?.id]);
 
   const getRoleColor = (role: string) => {
     if (role.startsWith("red") || role === "qualRed") {
@@ -136,106 +134,70 @@ export default function Dashboard() {
 
         {/* Scheduled Matches Section */}
         <div className="mb-8">
-          <h2 className="text-2xl font-bold mb-4">Scheduled Matches</h2>
-          <div className="overflow-x-auto pb-4">
-            <div className="flex gap-4 min-w-min">
-              {scheduledMatches.map((match) => (
-                <Card
-                  key={match.id}
-                  className={`flex-shrink-0 w-64 h-64 ${getRoleColor(
-                    match.role
-                  )} border-2 hover:scale-105 transition-transform cursor-pointer`}
-                >
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-mono text-2xl font-bold">
-                        {match.matchNumber}
-                      </span>
-                      <Badge
-                        variant="outline"
-                        className={getRoleBadgeColor(match.role)}
-                      >
-                        {match.role.toUpperCase()}
-                      </Badge>
-                    </div>
-                    <CardTitle className="text-lg">Team {match.team}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      <div className="text-sm text-muted-foreground">
-                        <div className="font-semibold text-foreground mb-1">
-                          {match.scouterName}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-mono">
-                            {match.time}
-                          </span>
-                        </div>
+          <h2 className="text-2xl font-bold mb-4">Your Assigned Matches</h2>
+          {loading ? (
+            <div className="text-muted-foreground">Loading matches...</div>
+          ) : matches.length === 0 ? (
+            <Card className="p-8 text-center">
+              <p className="text-muted-foreground">
+                No matches assigned yet. Check back later or contact your
+                manager.
+              </p>
+            </Card>
+          ) : (
+            <div className="overflow-x-auto pb-4">
+              <div className="flex gap-4 min-w-min">
+                {matches.map((userMatch, index) => (
+                  <Card
+                    key={`${userMatch.match.id}-${userMatch.role}`}
+                    className={`flex-shrink-0 w-64 h-64 ${getRoleColor(
+                      userMatch.role
+                    )} border-2 hover:scale-105 transition-transform cursor-pointer`}
+                  >
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-mono text-2xl font-bold">
+                          {userMatch.matchNumber}
+                        </span>
+                        <Badge
+                          variant="outline"
+                          className={getRoleBadgeColor(userMatch.role)}
+                        >
+                          {userMatch.role.toUpperCase()}
+                        </Badge>
                       </div>
-                      <Button className="w-full mt-4" size="sm">
-                        Start Scouting
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                      <CardTitle className="text-lg">
+                        Match #{userMatch.match.match_number}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        <div className="text-sm text-muted-foreground">
+                          <div className="font-semibold text-foreground mb-1">
+                            {userName}
+                          </div>
+                          <div className="text-xs">Role: {userMatch.role}</div>
+                        </div>
+                        <Button className="w-full mt-4" size="sm">
+                          Start Scouting
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
-        {/* Past Matches Section */}
+        {/* Past Matches Section - TODO: Add completed matches tracking */}
         <div>
           <h2 className="text-2xl font-bold mb-4">Past Matches</h2>
-          <div className="overflow-x-auto pb-4">
-            <div className="flex gap-4 min-w-min">
-              {pastMatches.map((match) => (
-                <Card
-                  key={match.id}
-                  className="flex-shrink-0 w-64 h-64 bg-green-900/40 border-2 border-green-700/50 hover:scale-105 transition-transform cursor-pointer"
-                >
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-mono text-2xl font-bold">
-                        {match.matchNumber}
-                      </span>
-                      <Badge
-                        variant="outline"
-                        className="bg-green-600/20 text-green-400 border-green-600/30"
-                      >
-                        COMPLETED
-                      </Badge>
-                    </div>
-                    <CardTitle className="text-lg">Team {match.team}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2 flex flex-col h-full">
-                      <div className="text-sm text-muted-foreground flex-1">
-                        <div className="font-semibold text-foreground mb-1">
-                          {match.scouterName}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-mono">
-                            {match.time}
-                          </span>
-                        </div>
-                        <div className="mt-1">
-                          <Badge
-                            variant="outline"
-                            className={getRoleBadgeColor(match.role)}
-                          >
-                            {match.role.toUpperCase()}
-                          </Badge>
-                        </div>
-                      </div>
-                      <Button className="w-full" size="sm" variant="secondary">
-                        View Report
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
+          <Card className="p-8 text-center">
+            <p className="text-muted-foreground">
+              Completed matches will appear here once you finish scouting.
+            </p>
+          </Card>
         </div>
       </main>
     </div>

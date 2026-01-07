@@ -121,3 +121,36 @@ export async function updateMatchAssignment(
 
   return true;
 }
+
+// Get matches assigned to a specific user
+export async function getUserMatches(userId: string): Promise<{
+  matches: Match[];
+  profile: Profile | null;
+}> {
+  // Fetch user's profile and all matches in parallel
+  const [profileResult, matchesResult] = await Promise.all([
+    supabase.from("profiles").select("*").eq("id", userId).single(),
+    getMatches(),
+  ]);
+
+  const profile = profileResult.data || null;
+  const allMatches = matchesResult;
+
+  // Filter matches where the user is assigned to any role
+  const userMatches = allMatches.filter(
+    (match) =>
+      match.red1_scouter_id === userId ||
+      match.red2_scouter_id === userId ||
+      match.red3_scouter_id === userId ||
+      match.qual_red_scouter_id === userId ||
+      match.blue1_scouter_id === userId ||
+      match.blue2_scouter_id === userId ||
+      match.blue3_scouter_id === userId ||
+      match.qual_blue_scouter_id === userId
+  );
+
+  return {
+    matches: userMatches,
+    profile,
+  };
+}
