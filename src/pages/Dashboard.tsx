@@ -1,19 +1,13 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Settings, ClipboardList, Wrench, User, LogOut } from "lucide-react";
+import { ClipboardList, Wrench } from "lucide-react";
+import DashboardHeader from "@/components/DashboardHeader";
+import UserProfileMenu from "@/components/UserProfileMenu";
+import type { ScheduledMatch, PastMatch, Role } from "@/types";
 
 // Mock data for scheduled matches
-const scheduledMatches = [
+const scheduledMatches: ScheduledMatch[] = [
   {
     id: 1,
     scouterName: "Alex Chen",
@@ -49,7 +43,7 @@ const scheduledMatches = [
 ];
 
 // Mock data for past matches
-const pastMatches = [
+const pastMatches: PastMatch[] = [
   {
     id: 5,
     scouterName: "Alex Chen",
@@ -99,46 +93,12 @@ export default function Dashboard() {
       <main className="container mx-auto p-6 max-w-7xl">
         {/* Header Section */}
         <div className="flex items-start justify-between mb-8">
-          <div>
-            <h1 className="text-4xl font-bold mb-2">
-              Hi, <span className="text-primary">{scouterName}</span>
-            </h1>
-            <p className="text-muted-foreground">
-              Ready to scout for the Iron Panthers
-            </p>
-          </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                className="relative h-10 w-10 rounded-full"
-              >
-                <Avatar className="h-10 w-10">
-                  <AvatarImage src="" alt={scouterName} />
-                  <AvatarFallback className="bg-primary text-primary-foreground">
-                    AC
-                  </AvatarFallback>
-                </Avatar>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel>My Account</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem>
-                <User className="mr-2 h-4 w-4" />
-                <span>Profile</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Settings className="mr-2 h-4 w-4" />
-                <span>Settings</span>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive">
-                <LogOut className="mr-2 h-4 w-4" />
-                <span>Log out</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <DashboardHeader userName={scouterName} />
+          <UserProfileMenu
+            userName={scouterName}
+            userInitials="AC"
+            avatarUrl=""
+          />
         </div>
 
         {/* Action Buttons */}
