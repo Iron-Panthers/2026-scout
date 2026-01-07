@@ -1,6 +1,6 @@
 // Scout/User Types
 export interface Scout {
-  id: number;
+  id: string; // Changed from number to string (UUID from database)
   name: string;
   initials: string;
   avatar: string;
@@ -12,6 +12,35 @@ export interface Profile {
   name: string | null;
   role: "scout" | "manager" | "admin";
   is_manager: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// Event Type
+export interface Event {
+  id: string;
+  name: string;
+  location: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// Match Type (from Supabase)
+export interface Match {
+  id: string;
+  name: string;
+  event_id: string | null;
+  match_number: number;
+  red1_scouter_id: string | null;
+  red2_scouter_id: string | null;
+  red3_scouter_id: string | null;
+  qual_red_scouter_id: string | null;
+  blue1_scouter_id: string | null;
+  blue2_scouter_id: string | null;
+  blue3_scouter_id: string | null;
+  qual_blue_scouter_id: string | null;
   created_at: string;
   updated_at: string;
 }

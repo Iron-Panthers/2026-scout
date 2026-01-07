@@ -1,4 +1,4 @@
-import { useState, useMemo, memo, useCallback } from "react";
+import { useState, memo, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -25,21 +25,11 @@ import {
 } from "@/components/ui/command";
 import { Plus, ChevronLeft, ChevronRight } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { getAllProfiles, getMatchesWithProfiles } from "@/lib/matches";
+import { updateMatchAssignment } from "@/lib/matches";
 import DashboardHeader from "@/components/DashboardHeader";
 import UserProfileMenu from "@/components/UserProfileMenu";
-import type { Scout, Role, MatchAssignment, SelectedCell } from "@/types";
-
-// Mock data for available scouts
-const availableScouts: Scout[] = [
-  { id: 1, name: "Alex Chen", initials: "AC", avatar: "" },
-  { id: 2, name: "Jordan Smith", initials: "JS", avatar: "" },
-  { id: 3, name: "Taylor Johnson", initials: "TJ", avatar: "" },
-  { id: 4, name: "Morgan Davis", initials: "MD", avatar: "" },
-  { id: 5, name: "Casey Wilson", initials: "CW", avatar: "" },
-  { id: 6, name: "Riley Brown", initials: "RB", avatar: "" },
-  { id: 7, name: "Jamie Garcia", initials: "JG", avatar: "" },
-  { id: 8, name: "Quinn Martinez", initials: "QM", avatar: "" },
-];
+import type { Profile, Role, MatchAssignment, SelectedCell } from "@/types";
 
 const getRoleCellColor = (role: Role) => {
   if (role.startsWith("red") || role === "qualRed") {
@@ -128,6 +118,9 @@ export default function ManagerDashboard() {
     "qualBlue",
   ];
 
+  // State for available scouts (converted from Profile to Scout format)
+  const [availableScouts, setAvailableScouts] = useState<Profile[]>([]);
+
   // Generate 100 matches with empty assignments
   const [matches, setMatches] = useState<MatchAssignment[]>(
     Array.from({ length: 100 }, (_, i) => ({
@@ -141,6 +134,68 @@ export default function ManagerDashboard() {
   const [currentPage, setCurrentPage] = useState(1);
   const matchesPerPage = 25;
 
+  // Load available scouts and existing match assignments from database on mount
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const { matches: dbMatches, profiles } = await getMatchesWithProfiles();
+        setAvailableScouts(Array.from(profiles.values()));
+
+        // Create a map of match numbers to their assignments
+        const matchAssignmentsMap = new Map<
+          number,
+          Partial<Record<Role, Scout>>
+        >();
+
+        dbMatches.forEach((match) => {
+          const assignments: Partial<Record<Role, Scout>> = {};
+
+          // Map database columns to roles
+          const roleMapping: Array<{ role: Role; scouterId: string | null }> = [
+            { role: "red1", scouterId: match.red1_scouter_id },
+            { role: "red2", scouterId: match.red2_scouter_id },
+            { role: "red3", scouterId: match.red3_scouter_id },
+            { role: "qualRed", scouterId: match.qual_red_scouter_id },
+            { role: "blue1", scouterId: match.blue1_scouter_id },
+            { role: "blue2", scouterId: match.blue2_scouter_id },
+            { role: "blue3", scouterId: match.blue3_scouter_id },
+            { role: "qualBlue", scouterId: match.qual_blue_scouter_id },
+          ];
+
+          roleMapping.forEach(({ role, scouterId }) => {
+            if (scouterId && profiles.has(scouterId)) {
+              const profile = profiles.get(scouterId)!;
+              assignments[role] = {
+                id: profile.id,
+                name: profile.name || "Unknown",
+                initials: (profile.name || "U")
+                  .split(" ")
+                  .map((n) => n[0])
+                  .join("")
+                  .toUpperCase()
+                  .slice(0, 2),
+                avatar: "",
+              };
+            }
+          });
+
+          matchAssignmentsMap.set(match.match_number, assignments);
+        });
+
+        // Update matches state with loaded assignments
+        setMatches((prevMatches) =>
+          prevMatches.map((match) => ({
+            ...match,
+            assignments: matchAssignmentsMap.get(match.matchNumber) || {},
+          }))
+        );
+      } catch (error) {
+        console.error("Failed to load data:", error);
+      }
+    };
+    loadData();
+  }, []);
+
   // Calculate pagination
   const totalPages = Math.ceil(matches.length / matchesPerPage);
   const startIndex = (currentPage - 1) * matchesPerPage;
@@ -148,9 +203,10 @@ export default function ManagerDashboard() {
   const paginatedMatches = matches.slice(startIndex, endIndex);
 
   const handleAssignScout = useCallback(
-    (scout: Scout) => {
+    async (profile: Profile) => {
       if (!selectedCell) return;
 
+      // Update local state immediately for responsive UI
       setMatches((prevMatches) =>
         prevMatches.map((match) =>
           match.matchNumber === selectedCell.matchNumber
@@ -158,12 +214,31 @@ export default function ManagerDashboard() {
                 ...match,
                 assignments: {
                   ...match.assignments,
-                  [selectedCell.role]: scout,
+                  [selectedCell.role]: {
+                    id: profile.id,
+                    name: profile.name || "Unknown",
+                    initials: (profile.name || "U")
+                      .split(" ")
+                      .map((n) => n[0])
+                      .join("")
+                      .toUpperCase()
+                      .slice(0, 2),
+                    avatar: "",
+                  },
                 },
               }
             : match
         )
       );
+
+      // Persist to database
+      try {
+        const matchName = `Q-${selectedCell.matchNumber}`;
+        await updateMatchAssignment(matchName, selectedCell.role, profile.id);
+      } catch (error) {
+        console.error("Failed to update match assignment:", error);
+        // TODO: Show error toast/notification to user
+      }
 
       setDialogOpen(false);
       setSelectedCell(null);
@@ -341,21 +416,30 @@ export default function ManagerDashboard() {
               <CommandList>
                 <CommandEmpty>No scout found.</CommandEmpty>
                 <CommandGroup heading="Available Scouts">
-                  {availableScouts.map((scout) => (
-                    <CommandItem
-                      key={scout.id}
-                      onSelect={() => handleAssignScout(scout)}
-                      className="flex items-center gap-3 cursor-pointer"
-                    >
-                      <Avatar className="h-8 w-8">
-                        <AvatarImage src={scout.avatar} />
-                        <AvatarFallback className="text-xs bg-primary/20 text-primary">
-                          {scout.initials}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className="font-medium">{scout.name}</span>
-                    </CommandItem>
-                  ))}
+                  {availableScouts.map((profile) => {
+                    const initials = (profile.name || "U")
+                      .split(" ")
+                      .map((n) => n[0])
+                      .join("")
+                      .toUpperCase()
+                      .slice(0, 2);
+                    return (
+                      <CommandItem
+                        key={profile.id}
+                        onSelect={() => handleAssignScout(profile)}
+                        className="flex items-center gap-3 cursor-pointer"
+                      >
+                        <Avatar className="h-8 w-8">
+                          <AvatarFallback className="text-xs bg-primary/20 text-primary">
+                            {initials}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="font-medium">
+                          {profile.name || "Unknown"}
+                        </span>
+                      </CommandItem>
+                    );
+                  })}
                 </CommandGroup>
               </CommandList>
             </Command>
