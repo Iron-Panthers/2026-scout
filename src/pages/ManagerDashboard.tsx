@@ -25,9 +25,16 @@ import {
 } from "@/components/ui/command";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Plus, ChevronLeft, ChevronRight, Calendar, Users } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { getAllProfiles, getMatchesWithProfiles } from "@/lib/matches";
+import { getMatchesWithProfiles, getEvents } from "@/lib/matches";
 import { updateMatchAssignment } from "@/lib/matches";
 import DashboardHeader from "@/components/DashboardHeader";
 import UserProfileMenu from "@/components/UserProfileMenu";
@@ -37,6 +44,7 @@ import type {
   MatchAssignment,
   SelectedCell,
   Scout,
+  Event,
 } from "@/types";
 
 const getRoleCellColor = (role: Role) => {
@@ -128,6 +136,8 @@ export default function ManagerDashboard() {
 
   // State for available scouts (converted from Profile to Scout format)
   const [availableScouts, setAvailableScouts] = useState<Profile[]>([]);
+  const [events, setEvents] = useState<Event[]>([]);
+  const [selectedEvent, setSelectedEvent] = useState<string>("all");
 
   // Generate 100 matches with empty assignments
   const [matches, setMatches] = useState<MatchAssignment[]>(
@@ -146,8 +156,12 @@ export default function ManagerDashboard() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const { matches: dbMatches, profiles } = await getMatchesWithProfiles();
+        const [{ matches: dbMatches, profiles }, eventsData] = await Promise.all([
+          getMatchesWithProfiles(),
+          getEvents(),
+        ]);
         setAvailableScouts(Array.from(profiles.values()));
+        setEvents(eventsData);
 
         // Create a map of match numbers to their assignments
         const matchAssignmentsMap = new Map<
@@ -287,19 +301,37 @@ export default function ManagerDashboard() {
 
         {/* Tabs for Navigation */}
         <Tabs defaultValue="assignments" className="w-full">
-          <TabsList className="grid w-full max-w-md grid-cols-2 mb-6">
-            <TabsTrigger
-              value="assignments"
-              className="flex items-center gap-2"
-            >
-              <Users className="h-4 w-4" />
-              Match Assignments
-            </TabsTrigger>
-            <TabsTrigger value="events" className="flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
-              Event Information
-            </TabsTrigger>
-          </TabsList>
+          <div className="flex items-center justify-between mb-6">
+            <TabsList className="grid w-full max-w-md grid-cols-2">
+              <TabsTrigger
+                value="assignments"
+                className="flex items-center gap-2"
+              >
+                <Users className="h-4 w-4" />
+                Match Assignments
+              </TabsTrigger>
+              <TabsTrigger value="events" className="flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
+                Event Information
+              </TabsTrigger>
+            </TabsList>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Event:</span>
+              <Select value={selectedEvent} onValueChange={setSelectedEvent}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Select event" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Events</SelectItem>
+                  {events.map((event) => (
+                    <SelectItem key={event.id} value={event.id}>
+                      {event.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
 
           {/* Match Assignments Tab */}
           <TabsContent value="assignments" className="mt-0">

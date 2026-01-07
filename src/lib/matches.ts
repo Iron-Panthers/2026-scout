@@ -1,5 +1,20 @@
 import { supabase } from "./supabase";
-import type { Match, Profile } from "@/types";
+import type { Match, Profile, Event } from "@/types";
+
+// Fetch all events
+export async function getEvents(): Promise<Event[]> {
+  const { data, error } = await supabase
+    .from("events")
+    .select("*")
+    .order("start_date", { ascending: false });
+
+  if (error) {
+    console.error("Error fetching events:", error);
+    return [];
+  }
+
+  return data || [];
+}
 
 // Fetch all matches
 export async function getMatches(): Promise<Match[]> {
