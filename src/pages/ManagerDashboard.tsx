@@ -126,16 +126,16 @@ export default function ManagerDashboard() {
         </div>
 
         {/* Assignment Table */}
-        <div className="rounded-lg border border-border bg-card overflow-hidden">
+        <div className="rounded-lg border border-border bg-card">
           <div className="p-4 border-b border-border">
             <h2 className="text-2xl font-bold">Match Assignments</h2>
             <p className="text-sm text-muted-foreground mt-1">
               Click the checkmark to assign a scout to a role
             </p>
           </div>
-          <div className="relative overflow-auto max-h-[calc(100vh-280px)]">
-            <Table>
-              <TableHeader className="sticky top-0 bg-card z-20 shadow-sm after:absolute after:bottom-0 after:left-0 after:right-0 after:h-px after:bg-border">
+          <div className="overflow-auto max-h-[calc(100vh-280px)]">
+            <Table noWrapper>
+              <TableHeader className="sticky top-0 bg-card z-20 shadow-sm">
                 <TableRow>
                   <TableHead className="w-32 font-semibold border-r border-border">
                     Match
