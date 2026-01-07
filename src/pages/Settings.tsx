@@ -11,9 +11,15 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function Settings() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const userName = user?.user_metadata?.name || "";
+  const email = user?.email || "";
+  const phone = user?.user_metadata?.phone || "";
 
   return (
     <div className="min-h-screen bg-background">
@@ -37,19 +43,15 @@ export default function Settings() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="name">Full Name</Label>
-              <Input id="name" defaultValue="Alex Chen" />
+              <Input id="name" defaultValue={userName} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                defaultValue="alex.chen@ironpanthers.org"
-              />
+              <Input id="email" type="email" defaultValue={email} disabled />
             </div>
             <div className="space-y-2">
               <Label htmlFor="phone">Phone Number</Label>
-              <Input id="phone" type="tel" defaultValue="+1 (555) 123-4567" />
+              <Input id="phone" type="tel" defaultValue={phone} />
             </div>
             <Button>Save Changes</Button>
           </CardContent>

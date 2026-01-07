@@ -24,6 +24,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Plus, ChevronLeft, ChevronRight } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 import DashboardHeader from "@/components/DashboardHeader";
 import UserProfileMenu from "@/components/UserProfileMenu";
 import type { Scout, Role, MatchAssignment, SelectedCell } from "@/types";
@@ -105,7 +106,17 @@ const MatchRow = memo(
 MatchRow.displayName = "MatchRow";
 
 export default function ManagerDashboard() {
-  const managerName = "Sarah Mitchell";
+  const { user } = useAuth();
+  const userName =
+    user?.user_metadata?.name || user?.email?.split("@")[0] || "Manager";
+  const userInitials = userName
+    .split(" ")
+    .map((n: string) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+  const avatarUrl = user?.user_metadata?.avatar_url || "";
+
   const roles: Role[] = [
     "red1",
     "red2",
@@ -181,13 +192,13 @@ export default function ManagerDashboard() {
         {/* Header Section */}
         <div className="flex items-start justify-between mb-8">
           <DashboardHeader
-            userName={managerName}
+            userName={userName}
             subtitle="Manage scout assignments for the competition"
           />
           <UserProfileMenu
-            userName={managerName}
-            userInitials="SM"
-            avatarUrl=""
+            userName={userName}
+            userInitials={userInitials}
+            avatarUrl={avatarUrl}
             isManager={true}
           />
         </div>

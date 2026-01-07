@@ -4,18 +4,28 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Mail, Phone, Calendar, Award } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function Profile() {
   const navigate = useNavigate();
-  const user = {
-    name: "Alex Chen",
-    initials: "AC",
-    email: "alex.chen@ironpanthers.org",
-    phone: "+1 (555) 123-4567",
-    role: "Scout",
-    joinDate: "January 2025",
-    avatar: "",
-  };
+  const { user: authUser } = useAuth();
+
+  const userName =
+    authUser?.user_metadata?.name || authUser?.email?.split("@")[0] || "User";
+  const userInitials = userName
+    .split(" ")
+    .map((n: string) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+  const avatarUrl = authUser?.user_metadata?.avatar_url || "";
+  const email = authUser?.email || "";
+  const joinDate = authUser?.created_at
+    ? new Date(authUser.created_at).toLocaleDateString("en-US", {
+        month: "long",
+        year: "numeric",
+      })
+    : "Recently";
 
   const stats = [
     { label: "Matches Scouted", value: "47" },
@@ -38,28 +48,32 @@ export default function Profile() {
           <CardContent className="pt-6">
             <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
               <Avatar className="h-32 w-32">
-                <AvatarImage src={user.avatar} alt={user.name} />
+                <AvatarImage src={avatarUrl} alt={userName} />
                 <AvatarFallback className="text-4xl bg-primary text-primary-foreground">
-                  {user.initials}
+                  {userInitials}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 text-center md:text-left">
-                <h1 className="text-3xl font-bold mb-2">{user.name}</h1>
+                <h1 className="text-3xl font-bold mb-2">{userName}</h1>
                 <Badge variant="secondary" className="mb-4">
-                  {user.role}
+                  Scout
                 </Badge>
                 <div className="space-y-2 mt-4">
                   <div className="flex items-center justify-center md:justify-start gap-2 text-muted-foreground">
                     <Mail className="h-4 w-4" />
-                    <span className="text-sm">{user.email}</span>
+                    <span className="text-sm">{email}</span>
                   </div>
-                  <div className="flex items-center justify-center md:justify-start gap-2 text-muted-foreground">
-                    <Phone className="h-4 w-4" />
-                    <span className="text-sm">{user.phone}</span>
-                  </div>
+                  {authUser?.user_metadata?.phone && (
+                    <div className="flex items-center justify-center md:justify-start gap-2 text-muted-foreground">
+                      <Phone className="h-4 w-4" />
+                      <span className="text-sm">
+                        {authUser.user_metadata.phone}
+                      </span>
+                    </div>
+                  )}
                   <div className="flex items-center justify-center md:justify-start gap-2 text-muted-foreground">
                     <Calendar className="h-4 w-4" />
-                    <span className="text-sm">Joined {user.joinDate}</span>
+                    <span className="text-sm">Joined {joinDate}</span>
                   </div>
                 </div>
               </div>

@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ClipboardList, Wrench } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import DashboardHeader from "@/components/DashboardHeader";
 import UserProfileMenu from "@/components/UserProfileMenu";
 import type { ScheduledMatch, PastMatch, Role } from "@/types";
@@ -72,7 +73,16 @@ const pastMatches: PastMatch[] = [
 ];
 
 export default function Dashboard() {
-  const scouterName = "Alex Chen";
+  const { user } = useAuth();
+  const userName =
+    user?.user_metadata?.name || user?.email?.split("@")[0] || "Scout";
+  const userInitials = userName
+    .split(" ")
+    .map((n: string) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+  const avatarUrl = user?.user_metadata?.avatar_url || "";
 
   const getRoleColor = (role: string) => {
     if (role.startsWith("red") || role === "qualRed") {
@@ -94,11 +104,11 @@ export default function Dashboard() {
       <main className="container mx-auto p-6 max-w-7xl">
         {/* Header Section */}
         <div className="flex items-start justify-between mb-8">
-          <DashboardHeader userName={scouterName} />
+          <DashboardHeader userName={userName} />
           <UserProfileMenu
-            userName={scouterName}
-            userInitials="AC"
-            avatarUrl=""
+            userName={userName}
+            userInitials={userInitials}
+            avatarUrl={avatarUrl}
             isManager={false}
           />
         </div>

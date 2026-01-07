@@ -207,7 +207,11 @@ export default function Login() {
               </Alert>
             )}
 
-            <Button type="submit" className="w-full" disabled={loading || googleLoading}>
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={loading || googleLoading}
+            >
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
