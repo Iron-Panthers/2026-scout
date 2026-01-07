@@ -133,7 +133,7 @@ export default function ManagerDashboard() {
               Click the checkmark to assign a scout to a role
             </p>
           </div>
-          <div className="overflow-auto max-h-[calc(100vh-280px)]">
+          <div className="overflow-auto max-h-[70vh]">
             <Table noWrapper>
               <TableHeader className="sticky top-0 bg-card z-20 shadow-sm">
                 <TableRow>
