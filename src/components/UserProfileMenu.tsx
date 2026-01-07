@@ -8,16 +8,19 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Settings, User, LogOut } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Settings, User, LogOut, Users, LayoutDashboard } from "lucide-react";
+import { useNavigate, useLocation } from "react-router-dom";
 import type { UserProfileMenuProps } from "@/types";
 
 export default function UserProfileMenu({
   userName,
   userInitials,
   avatarUrl = "",
+  isManager = false,
 }: UserProfileMenuProps) {
   const navigate = useNavigate();
+  const location = useLocation();
+  const isOnManagerDashboard = location.pathname === "/manager";
 
   return (
     <DropdownMenu>
@@ -42,6 +45,22 @@ export default function UserProfileMenu({
           <Settings className="mr-2 h-4 w-4" />
           <span>Settings</span>
         </DropdownMenuItem>
+        {isManager && (
+          <>
+            <DropdownMenuSeparator />
+            {isOnManagerDashboard ? (
+              <DropdownMenuItem onClick={() => navigate("/dashboard")}>
+                <LayoutDashboard className="mr-2 h-4 w-4" />
+                <span>Scout Dashboard</span>
+              </DropdownMenuItem>
+            ) : (
+              <DropdownMenuItem onClick={() => navigate("/manager")}>
+                <Users className="mr-2 h-4 w-4" />
+                <span>Manager Dashboard</span>
+              </DropdownMenuItem>
+            )}
+          </>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem className="text-destructive">
           <LogOut className="mr-2 h-4 w-4" />

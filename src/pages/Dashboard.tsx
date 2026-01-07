@@ -98,6 +98,7 @@ export default function Dashboard() {
             userName={scouterName}
             userInitials="AC"
             avatarUrl=""
+            isManager={false}
           />
         </div>
 

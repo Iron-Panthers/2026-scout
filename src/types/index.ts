@@ -57,4 +57,5 @@ export interface UserProfileMenuProps {
   userName: string;
   userInitials: string;
   avatarUrl?: string;
+  isManager?: boolean;
 }

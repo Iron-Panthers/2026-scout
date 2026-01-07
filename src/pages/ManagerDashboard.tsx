@@ -122,6 +122,7 @@ export default function ManagerDashboard() {
             userName={managerName}
             userInitials="SM"
             avatarUrl=""
+            isManager={true}
           />
         </div>
 
