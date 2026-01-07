@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Settings, User, LogOut } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import type { UserProfileMenuProps } from "@/types";
 
 export default function UserProfileMenu({
@@ -16,6 +17,8 @@ export default function UserProfileMenu({
   userInitials,
   avatarUrl = "",
 }: UserProfileMenuProps) {
+  const navigate = useNavigate();
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -31,11 +34,11 @@ export default function UserProfileMenu({
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel>My Account</DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem>
+        <DropdownMenuItem onClick={() => navigate("/profile")}>
           <User className="mr-2 h-4 w-4" />
           <span>Profile</span>
         </DropdownMenuItem>
-        <DropdownMenuItem>
+        <DropdownMenuItem onClick={() => navigate("/settings")}>
           <Settings className="mr-2 h-4 w-4" />
           <span>Settings</span>
         </DropdownMenuItem>
