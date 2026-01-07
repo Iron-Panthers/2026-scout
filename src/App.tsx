@@ -3,6 +3,7 @@ import Dashboard from "./pages/Dashboard";
 import ManagerDashboard from "./pages/ManagerDashboard";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
+import PitScouting from "./pages/PitScouting";
 
 function App() {
   return (
@@ -13,6 +14,7 @@ function App() {
         <Route path="/manager" element={<ManagerDashboard />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/pit-scouting" element={<PitScouting />} />
       </Routes>
     </BrowserRouter>
   );

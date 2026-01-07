@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ClipboardList, Wrench } from "lucide-react";
+import { Link } from "react-router-dom";
 import DashboardHeader from "@/components/DashboardHeader";
 import UserProfileMenu from "@/components/UserProfileMenu";
 import type { ScheduledMatch, PastMatch, Role } from "@/types";
@@ -115,9 +116,12 @@ export default function Dashboard() {
             size="lg"
             variant="secondary"
             className="h-24 text-lg font-semibold flex flex-col gap-2"
+            asChild
           >
-            <Wrench className="h-8 w-8" />
-            Pit Scouting
+            <Link to="/pit-scouting">
+              <Wrench className="h-8 w-8" />
+              Pit Scouting
+            </Link>
           </Button>
         </div>
 
