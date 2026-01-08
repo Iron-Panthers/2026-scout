@@ -20,6 +20,7 @@ export interface Profile {
 export interface Event {
   id: string;
   name: string;
+  event_code: string | null; // TBA event code (e.g., "2024cmp", "2024caln")
   location: string | null;
   start_date: string | null;
   end_date: string | null;
