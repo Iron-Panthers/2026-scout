@@ -1,32 +1,13 @@
-import { useState, memo, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Table,
   TableBody,
-  TableCell,
   TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -35,13 +16,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Plus,
   ChevronLeft,
   ChevronRight,
-  Calendar,
   Users,
+  Calendar,
   PlusCircle,
-  X,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -52,6 +31,10 @@ import {
 import { updateMatchAssignment } from "@/lib/matches";
 import DashboardHeader from "@/components/DashboardHeader";
 import UserProfileMenu from "@/components/UserProfileMenu";
+import { MatchRow } from "@/components/manager/MatchRow";
+import { EventInformationTab } from "@/components/manager/EventInformationTab";
+import { CreateEventTab } from "@/components/manager/CreateEventTab";
+import { ScoutAssignmentDialog } from "@/components/manager/ScoutAssignmentDialog";
 import type {
   Profile,
   Role,
@@ -61,84 +44,6 @@ import type {
   Event,
   Match,
 } from "@/types";
-
-const getRoleCellColor = (role: Role) => {
-  if (role.startsWith("red") || role === "qualRed") {
-    return "bg-red-900/10 border-r border-red-900/30";
-  }
-  return "bg-blue-900/10 border-r border-blue-900/30";
-};
-
-// Memoized row component to prevent unnecessary re-renders
-const MatchRow = memo(
-  ({
-    match,
-    roles,
-    onOpenDialog,
-    onClearAssignment,
-  }: {
-    match: MatchAssignment;
-    roles: Role[];
-    onOpenDialog: (matchNumber: number, role: Role) => void;
-    onClearAssignment: (matchNumber: number, role: Role) => void;
-  }) => {
-    return (
-      <TableRow>
-        <TableCell className="font-mono font-semibold border-r border-border">
-          Q-{match.matchNumber}
-        </TableCell>
-        {roles.map((role) => {
-          const assignment = match.assignments[role];
-          return (
-            <TableCell key={role} className={`p-2 ${getRoleCellColor(role)}`}>
-              {assignment ? (
-                <div className="relative group">
-                  <button
-                    onClick={() => onOpenDialog(match.matchNumber, role)}
-                    className="flex flex-col items-center gap-1 hover:bg-accent/50 rounded-md p-2 transition-colors w-full"
-                  >
-                    <Avatar className="h-10 w-10">
-                      <AvatarImage src={assignment.avatar} />
-                      <AvatarFallback className="text-xs bg-primary/20 text-primary">
-                        {assignment.initials}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="text-xs font-medium text-center">
-                      {assignment.name}
-                    </span>
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onClearAssignment(match.matchNumber, role);
-                    }}
-                    className="absolute top-0 right-0 h-5 w-5 rounded-full bg-destructive/90 hover:bg-destructive text-destructive-foreground opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-                    title="Clear assignment"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-              ) : (
-                <div className="flex items-center justify-center w-full">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => onOpenDialog(match.matchNumber, role)}
-                    className="h-10 w-10"
-                  >
-                    <Plus className="h-5 w-5 text-muted-foreground" />
-                  </Button>
-                </div>
-              )}
-            </TableCell>
-          );
-        })}
-      </TableRow>
-    );
-  }
-);
-
-MatchRow.displayName = "MatchRow";
 
 export default function ManagerDashboard() {
   const { user } = useAuth();
@@ -688,304 +593,36 @@ export default function ManagerDashboard() {
 
           {/* Event Information Tab */}
           <TabsContent value="events" className="mt-0">
-            <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>
-                    {selectedEvent === "all"
-                      ? "All Events Overview"
-                      : events.find((e) => e.id === selectedEvent)?.name ||
-                        "Event Information"}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="text-sm font-medium text-muted-foreground">
-                        Event Name
-                      </label>
-                      <p className="text-lg font-semibold">
-                        {selectedEvent === "all"
-                          ? "All Events"
-                          : events.find((e) => e.id === selectedEvent)?.name ||
-                            "Unknown Event"}
-                      </p>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-sm font-medium text-muted-foreground">
-                          Location
-                        </label>
-                        <p className="text-lg">
-                          {selectedEvent === "all"
-                            ? "Multiple Locations"
-                            : events.find((e) => e.id === selectedEvent)
-                                ?.location || "TBD"}
-                        </p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-muted-foreground">
-                          Total Matches
-                        </label>
-                        <p className="text-lg font-semibold">
-                          {matches.length}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-sm font-medium text-muted-foreground">
-                          Start Date
-                        </label>
-                        <p className="text-lg">
-                          {selectedEvent === "all"
-                            ? "Season Long"
-                            : events.find((e) => e.id === selectedEvent)
-                                ?.start_date || "TBD"}
-                        </p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-muted-foreground">
-                          End Date
-                        </label>
-                        <p className="text-lg">
-                          {selectedEvent === "all"
-                            ? "Season Long"
-                            : events.find((e) => e.id === selectedEvent)
-                                ?.end_date || "TBD"}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>
-                    {selectedEvent === "all"
-                      ? "Season Statistics"
-                      : "Event Statistics"}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="text-center p-4 rounded-lg bg-primary/10">
-                      <p className="text-3xl font-bold text-primary">
-                        {availableScouts.length}
-                      </p>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Total Scouts
-                      </p>
-                    </div>
-                    <div className="text-center p-4 rounded-lg bg-blue-500/10">
-                      <p className="text-3xl font-bold text-blue-400">
-                        {
-                          matches.filter(
-                            (m) => Object.keys(m.assignments).length > 0
-                          ).length
-                        }
-                      </p>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Assigned Matches
-                      </p>
-                    </div>
-                    <div className="text-center p-4 rounded-lg bg-yellow-500/10">
-                      <p className="text-3xl font-bold text-yellow-400">
-                        {
-                          matches.filter(
-                            (m) => Object.keys(m.assignments).length === 0
-                          ).length
-                        }
-                      </p>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Unassigned Matches
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Scout List</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    {availableScouts.length === 0 ? (
-                      <p className="text-muted-foreground text-center py-8">
-                        No scouts available
-                      </p>
-                    ) : (
-                      availableScouts.map((profile) => {
-                        const initials = (profile.name || "U")
-                          .split(" ")
-                          .map((n) => n[0])
-                          .join("")
-                          .toUpperCase()
-                          .slice(0, 2);
-                        return (
-                          <div
-                            key={profile.id}
-                            className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors"
-                          >
-                            <Avatar className="h-10 w-10">
-                              <AvatarFallback className="text-sm bg-primary/20 text-primary">
-                                {initials}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1">
-                              <p className="font-medium">
-                                {profile.name || "Unknown"}
-                              </p>
-                              <p className="text-sm text-muted-foreground">
-                                {profile.role}{" "}
-                                {profile.is_manager && "• Manager"}
-                              </p>
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+            <EventInformationTab
+              selectedEvent={selectedEvent}
+              events={events}
+              matches={matches}
+              availableScouts={availableScouts}
+            />
           </TabsContent>
 
           {/* Create Event Tab */}
           <TabsContent value="create" className="mt-0">
-            <Card>
-              <CardHeader>
-                <CardTitle>Create New Event</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="eventName">Event Name</Label>
-                    <Input
-                      id="eventName"
-                      placeholder="e.g., 2026 Regional Championship"
-                      value={newEventName}
-                      onChange={(e) => setNewEventName(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="eventId">Event ID</Label>
-                    <Input
-                      id="eventId"
-                      placeholder="e.g., 2026-regional"
-                      value={newEventId}
-                      onChange={(e) => setNewEventId(e.target.value)}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      This will be used as a prefix for match names (e.g.,
-                      2026-regional-Q1)
-                    </p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="numMatches">
-                      Number of Qualification Matches
-                    </Label>
-                    <Input
-                      id="numMatches"
-                      type="number"
-                      min="1"
-                      placeholder="e.g., 100"
-                      value={numQualMatches}
-                      onChange={(e) => setNumQualMatches(e.target.value)}
-                    />
-                  </div>
-
-                  <Button
-                    onClick={handleCreateEvent}
-                    disabled={isCreatingEvent}
-                    className="w-full"
-                    size="lg"
-                  >
-                    {isCreatingEvent ? (
-                      "Creating Event..."
-                    ) : (
-                      <>
-                        <PlusCircle className="h-4 w-4 mr-2" />
-                        Create Event and Matches
-                      </>
-                    )}
-                  </Button>
-
-                  <div className="rounded-lg bg-muted p-4 space-y-2">
-                    <h4 className="font-semibold text-sm">
-                      What happens when you create an event?
-                    </h4>
-                    <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-                      <li>A new event entry will be created in the database</li>
-                      <li>
-                        The specified number of qualification matches will be
-                        generated
-                      </li>
-                      <li>Matches will be named: [Event ID]-Q[Match Number]</li>
-                      <li>
-                        The event will appear in the event selector dropdown
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <CreateEventTab
+              newEventName={newEventName}
+              setNewEventName={setNewEventName}
+              newEventId={newEventId}
+              setNewEventId={setNewEventId}
+              numQualMatches={numQualMatches}
+              setNumQualMatches={setNumQualMatches}
+              isCreatingEvent={isCreatingEvent}
+              onCreateEvent={handleCreateEvent}
+            />
           </TabsContent>
         </Tabs>
 
         {/* Assignment Dialog */}
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent
-            className="sm:max-w-[425px]"
-            aria-describedby={undefined}
-          >
-            <DialogHeader>
-              <DialogTitle>
-                Assign Scout to{" "}
-                {selectedCell &&
-                  `Q-${
-                    selectedCell.matchNumber
-                  } - ${selectedCell.role.toUpperCase()}`}
-              </DialogTitle>
-            </DialogHeader>
-            <Command className="rounded-lg border">
-              <CommandInput placeholder="Search scouts..." />
-              <CommandList>
-                <CommandEmpty>No scout found.</CommandEmpty>
-                <CommandGroup heading="Available Scouts">
-                  {availableScouts.map((profile) => {
-                    const initials = (profile.name || "U")
-                      .split(" ")
-                      .map((n) => n[0])
-                      .join("")
-                      .toUpperCase()
-                      .slice(0, 2);
-                    return (
-                      <CommandItem
-                        key={profile.id}
-                        onSelect={() => handleAssignScout(profile)}
-                        className="flex items-center gap-3 cursor-pointer"
-                      >
-                        <Avatar className="h-8 w-8">
-                          <AvatarFallback className="text-xs bg-primary/20 text-primary">
-                            {initials}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span className="font-medium">
-                          {profile.name || "Unknown"}
-                        </span>
-                      </CommandItem>
-                    );
-                  })}
-                </CommandGroup>
-              </CommandList>
-            </Command>
-          </DialogContent>
-        </Dialog>
+        <ScoutAssignmentDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          availableScouts={availableScouts}
+          onAssignScout={handleAssignScout}
+        />
       </main>
     </div>
   );
