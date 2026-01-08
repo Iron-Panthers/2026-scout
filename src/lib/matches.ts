@@ -134,7 +134,7 @@ export async function createEventWithMatches(
 
 // Update a specific scouter assignment
 export async function updateMatchAssignment(
-  matchName: string,
+  matchId: string,
   role: string,
   scouterId: string | null
 ): Promise<boolean> {
@@ -158,20 +158,16 @@ export async function updateMatchAssignment(
   }
 
   console.log("Updating assignment:", {
-    matchName,
+    matchId,
     role,
     roleColumn,
     scouterId,
   });
 
-  const { error } = await supabase.from("matches").upsert(
-    {
-      name: matchName,
-      match_number: parseInt(matchName.replace(/\D/g, "")),
-      [roleColumn]: scouterId,
-    },
-    { onConflict: "name" }
-  );
+  const { error } = await supabase
+    .from("matches")
+    .update({ [roleColumn]: scouterId })
+    .eq("id", matchId);
 
   if (error) {
     console.error("Error updating match assignment:", error);

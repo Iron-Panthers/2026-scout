@@ -78,6 +78,7 @@ export interface PastMatch {
 // Manager Assignment Types
 export interface MatchAssignment {
   matchNumber: number;
+  matchId?: string;
   assignments: Partial<Record<Role, Scout | null>>;
 }
 

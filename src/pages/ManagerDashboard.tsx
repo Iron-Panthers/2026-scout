@@ -58,6 +58,7 @@ import type {
   SelectedCell,
   Scout,
   Event,
+  Match,
 } from "@/types";
 
 const getRoleCellColor = (role: Role) => {
@@ -151,6 +152,7 @@ export default function ManagerDashboard() {
   const [availableScouts, setAvailableScouts] = useState<Profile[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<string>("all");
+  const [allDbMatches, setAllDbMatches] = useState<Match[]>([]);
 
   // New event form state
   const [newEventName, setNewEventName] = useState("");
@@ -171,62 +173,101 @@ export default function ManagerDashboard() {
   const [currentPage, setCurrentPage] = useState(1);
   const matchesPerPage = 25;
 
+  // Helper function to convert database match to assignment format
+  const convertMatchToAssignment = useCallback(
+    (match: Match): Partial<Record<Role, Scout>> => {
+      const assignments: Partial<Record<Role, Scout>> = {};
+      const roleMapping: Array<{ role: Role; scouterId: string | null }> = [
+        { role: "red1", scouterId: match.red1_scouter_id },
+        { role: "red2", scouterId: match.red2_scouter_id },
+        { role: "red3", scouterId: match.red3_scouter_id },
+        { role: "qualRed", scouterId: match.qual_red_scouter_id },
+        { role: "blue1", scouterId: match.blue1_scouter_id },
+        { role: "blue2", scouterId: match.blue2_scouter_id },
+        { role: "blue3", scouterId: match.blue3_scouter_id },
+        { role: "qualBlue", scouterId: match.qual_blue_scouter_id },
+      ];
+
+      roleMapping.forEach(({ role, scouterId }) => {
+        if (scouterId) {
+          const profile = availableScouts.find((p) => p.id === scouterId);
+          if (profile) {
+            assignments[role] = {
+              id: profile.id,
+              name: profile.name || "Unknown",
+              initials: (profile.name || "U")
+                .split(" ")
+                .map((n) => n[0])
+                .join("")
+                .toUpperCase()
+                .slice(0, 2),
+              avatar: "",
+            };
+          }
+        }
+      });
+
+      return assignments;
+    },
+    [availableScouts]
+  );
+
   // Load available scouts and existing match assignments from database on mount
   useEffect(() => {
     const loadData = async () => {
       try {
         const [{ matches: dbMatches, profiles }, eventsData] =
           await Promise.all([getMatchesWithProfiles(), getEvents()]);
-        setAvailableScouts(Array.from(profiles.values()));
+        const profilesArray = Array.from(profiles.values());
+        setAvailableScouts(profilesArray);
         setEvents(eventsData);
+        setAllDbMatches(dbMatches);
 
-        // Create a map of match numbers to their assignments
-        const matchAssignmentsMap = new Map<
-          number,
-          Partial<Record<Role, Scout>>
-        >();
+        // Set the most recently created event as default
+        if (eventsData.length > 0) {
+          // Events are already sorted by start_date descending from getEvents()
+          setSelectedEvent(eventsData[0].id);
+        }
 
-        dbMatches.forEach((match) => {
-          const assignments: Partial<Record<Role, Scout>> = {};
+        // Convert database matches to component format inline
+        setMatches(
+          dbMatches.map((match) => {
+            const assignments: Partial<Record<Role, Scout>> = {};
+            const roleMapping: Array<{ role: Role; scouterId: string | null }> =
+              [
+                { role: "red1", scouterId: match.red1_scouter_id },
+                { role: "red2", scouterId: match.red2_scouter_id },
+                { role: "red3", scouterId: match.red3_scouter_id },
+                { role: "qualRed", scouterId: match.qual_red_scouter_id },
+                { role: "blue1", scouterId: match.blue1_scouter_id },
+                { role: "blue2", scouterId: match.blue2_scouter_id },
+                { role: "blue3", scouterId: match.blue3_scouter_id },
+                { role: "qualBlue", scouterId: match.qual_blue_scouter_id },
+              ];
 
-          // Map database columns to roles
-          const roleMapping: Array<{ role: Role; scouterId: string | null }> = [
-            { role: "red1", scouterId: match.red1_scouter_id },
-            { role: "red2", scouterId: match.red2_scouter_id },
-            { role: "red3", scouterId: match.red3_scouter_id },
-            { role: "qualRed", scouterId: match.qual_red_scouter_id },
-            { role: "blue1", scouterId: match.blue1_scouter_id },
-            { role: "blue2", scouterId: match.blue2_scouter_id },
-            { role: "blue3", scouterId: match.blue3_scouter_id },
-            { role: "qualBlue", scouterId: match.qual_blue_scouter_id },
-          ];
+            roleMapping.forEach(({ role, scouterId }) => {
+              if (scouterId && profiles.has(scouterId)) {
+                const profile = profiles.get(scouterId)!;
+                assignments[role] = {
+                  id: profile.id,
+                  name: profile.name || "Unknown",
+                  initials: (profile.name || "U")
+                    .split(" ")
+                    .map((n) => n[0])
+                    .join("")
+                    .toUpperCase()
+                    .slice(0, 2),
+                  avatar: "",
+                };
+              }
+            });
 
-          roleMapping.forEach(({ role, scouterId }) => {
-            if (scouterId && profiles.has(scouterId)) {
-              const profile = profiles.get(scouterId)!;
-              assignments[role] = {
-                id: profile.id,
-                name: profile.name || "Unknown",
-                initials: (profile.name || "U")
-                  .split(" ")
-                  .map((n) => n[0])
-                  .join("")
-                  .toUpperCase()
-                  .slice(0, 2),
-                avatar: "",
-              };
-            }
-          });
-
-          matchAssignmentsMap.set(match.match_number, assignments);
-        });
-
-        // Update matches state with loaded assignments
-        setMatches((prevMatches) =>
-          prevMatches.map((match) => ({
-            ...match,
-            assignments: matchAssignmentsMap.get(match.matchNumber) || {},
-          }))
+            return {
+              matchNumber: match.match_number,
+              matchId: match.id,
+              assignments,
+            };
+          })
         );
       } catch (error) {
         console.error("Failed to load data:", error);
@@ -234,6 +275,25 @@ export default function ManagerDashboard() {
     };
     loadData();
   }, []);
+
+  // Filter matches based on selected event
+  useEffect(() => {
+    const filteredDbMatches =
+      selectedEvent === "all"
+        ? allDbMatches
+        : allDbMatches.filter((match) => match.event_id === selectedEvent);
+
+    setMatches(
+      filteredDbMatches.map((match) => ({
+        matchNumber: match.match_number,
+        matchId: match.id,
+        assignments: convertMatchToAssignment(match),
+      }))
+    );
+
+    // Reset to page 1 when event changes
+    setCurrentPage(1);
+  }, [selectedEvent, allDbMatches, convertMatchToAssignment]);
 
   // Calculate pagination
   const totalPages = Math.ceil(matches.length / matchesPerPage);
@@ -272,8 +332,21 @@ export default function ManagerDashboard() {
 
       // Persist to database
       try {
-        const matchName = `Q-${selectedCell.matchNumber}`;
-        await updateMatchAssignment(matchName, selectedCell.role, profile.id);
+        const currentMatch = matches.find(
+          (m) => m.matchNumber === selectedCell.matchNumber
+        );
+        if (!currentMatch?.matchId) {
+          console.error(
+            "Match ID not found for match number:",
+            selectedCell.matchNumber
+          );
+          return;
+        }
+        await updateMatchAssignment(
+          currentMatch.matchId,
+          selectedCell.role,
+          profile.id
+        );
       } catch (error) {
         console.error("Failed to update match assignment:", error);
         // TODO: Show error toast/notification to user
@@ -517,9 +590,11 @@ export default function ManagerDashboard() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {paginatedMatches.map((match) => (
+                    {paginatedMatches.map((match, index) => (
                       <MatchRow
-                        key={match.matchNumber}
+                        key={`${selectedEvent}-${match.matchNumber}-${
+                          startIndex + index
+                        }`}
                         match={match}
                         roles={roles}
                         onOpenDialog={openAssignmentDialog}
@@ -568,7 +643,12 @@ export default function ManagerDashboard() {
             <div className="space-y-6">
               <Card>
                 <CardHeader>
-                  <CardTitle>Current Event</CardTitle>
+                  <CardTitle>
+                    {selectedEvent === "all"
+                      ? "All Events Overview"
+                      : events.find((e) => e.id === selectedEvent)?.name ||
+                        "Event Information"}
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
@@ -577,7 +657,10 @@ export default function ManagerDashboard() {
                         Event Name
                       </label>
                       <p className="text-lg font-semibold">
-                        2026 Competition Season
+                        {selectedEvent === "all"
+                          ? "All Events"
+                          : events.find((e) => e.id === selectedEvent)?.name ||
+                            "Unknown Event"}
                       </p>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
@@ -585,13 +668,20 @@ export default function ManagerDashboard() {
                         <label className="text-sm font-medium text-muted-foreground">
                           Location
                         </label>
-                        <p className="text-lg">TBD</p>
+                        <p className="text-lg">
+                          {selectedEvent === "all"
+                            ? "Multiple Locations"
+                            : events.find((e) => e.id === selectedEvent)
+                                ?.location || "TBD"}
+                        </p>
                       </div>
                       <div>
                         <label className="text-sm font-medium text-muted-foreground">
                           Total Matches
                         </label>
-                        <p className="text-lg font-semibold">100</p>
+                        <p className="text-lg font-semibold">
+                          {matches.length}
+                        </p>
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
@@ -599,13 +689,23 @@ export default function ManagerDashboard() {
                         <label className="text-sm font-medium text-muted-foreground">
                           Start Date
                         </label>
-                        <p className="text-lg">TBD</p>
+                        <p className="text-lg">
+                          {selectedEvent === "all"
+                            ? "Season Long"
+                            : events.find((e) => e.id === selectedEvent)
+                                ?.start_date || "TBD"}
+                        </p>
                       </div>
                       <div>
                         <label className="text-sm font-medium text-muted-foreground">
                           End Date
                         </label>
-                        <p className="text-lg">TBD</p>
+                        <p className="text-lg">
+                          {selectedEvent === "all"
+                            ? "Season Long"
+                            : events.find((e) => e.id === selectedEvent)
+                                ?.end_date || "TBD"}
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -614,7 +714,11 @@ export default function ManagerDashboard() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Team Statistics</CardTitle>
+                  <CardTitle>
+                    {selectedEvent === "all"
+                      ? "Season Statistics"
+                      : "Event Statistics"}
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-3 gap-4">
