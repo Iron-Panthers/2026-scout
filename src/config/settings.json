@@ -1,0 +1,36 @@
+{
+  "notifications": {
+    "title": "Notifications",
+    "description": "Configure how you receive notifications",
+    "fields": [
+      {
+        "id": "match-notifications",
+        "label": "Match Assignments",
+        "description": "Get notified when you're assigned to a match",
+        "type": "switch",
+        "defaultValue": true
+      },
+      {
+        "id": "reminder-notifications",
+        "label": "Match Reminders",
+        "description": "Receive reminders before your scheduled matches",
+        "type": "switch",
+        "defaultValue": true
+      }
+    ]
+  },
+  "appearance": {
+    "title": "Appearance",
+    "description": "Customize how the app looks and feels",
+    "fields": [
+      {
+        "id": "dark-mode",
+        "label": "Dark Mode",
+        "description": "Always use dark mode (recommended)",
+        "type": "switch",
+        "defaultValue": true,
+        "editable": false
+      }
+    ]
+  }
+}

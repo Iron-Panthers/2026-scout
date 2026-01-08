@@ -12,14 +12,16 @@ import { Switch } from "@/components/ui/switch";
 import { ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSettings } from "@/contexts/SettingsContext";
+import settingsConfig from "@/config/settings.json";
 
 export default function Settings() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { settings, updateSetting } = useSettings();
 
   const userName = user?.user_metadata?.name || "";
   const email = user?.email || "";
-  const phone = user?.user_metadata?.phone || "";
 
   return (
     <div className="min-h-screen bg-background">
@@ -32,124 +34,69 @@ export default function Settings() {
 
         <h1 className="text-3xl font-bold mb-8">Settings</h1>
 
-        {/* Account Settings */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Account Settings</CardTitle>
-            <CardDescription>
-              Manage your account information and preferences
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Full Name</Label>
-              <Input id="name" defaultValue={userName} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" defaultValue={email} disabled />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="phone">Phone Number</Label>
-              <Input id="phone" type="tel" defaultValue={phone} />
-            </div>
-            <Button>Save Changes</Button>
-          </CardContent>
-        </Card>
+        {Object.entries(settingsConfig).map(([key, section]: [string, any]) => (
+          <Card key={key} className="mb-6">
+            <CardHeader>
+              <CardTitle>{section.title}</CardTitle>
+              <CardDescription>{section.description}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {section.fields.map((field: any) => {
+                if (field.type === "text" || field.type === "email") {
+                  const value =
+                    field.id === "name"
+                      ? userName
+                      : field.id === "email"
+                      ? email
+                      : settings[field.id] || field.defaultValue;
+                  return (
+                    <div key={field.id} className="space-y-2">
+                      <Label htmlFor={field.id}>{field.label}</Label>
+                      <Input
+                        id={field.id}
+                        type={field.type}
+                        defaultValue={value}
+                        disabled={field.editable === false}
+                        onChange={(e) =>
+                          updateSetting(field.id, e.target.value)
+                        }
+                      />
+                    </div>
+                  );
+                }
 
-        {/* Notification Settings */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Notifications</CardTitle>
-            <CardDescription>
-              Configure how you receive notifications
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="match-notifications">Match Assignments</Label>
-                <p className="text-sm text-muted-foreground">
-                  Get notified when you're assigned to a match
-                </p>
-              </div>
-              <Switch id="match-notifications" defaultChecked />
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="reminder-notifications">Match Reminders</Label>
-                <p className="text-sm text-muted-foreground">
-                  Receive reminders before your scheduled matches
-                </p>
-              </div>
-              <Switch id="reminder-notifications" defaultChecked />
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="team-notifications">Team Updates</Label>
-                <p className="text-sm text-muted-foreground">
-                  Stay informed about team announcements
-                </p>
-              </div>
-              <Switch id="team-notifications" defaultChecked />
-            </div>
-          </CardContent>
-        </Card>
+                if (field.type === "switch") {
+                  return (
+                    <div
+                      key={field.id}
+                      className="flex items-center justify-between"
+                    >
+                      <div className="space-y-0.5">
+                        <Label htmlFor={field.id}>{field.label}</Label>
+                        {field.description && (
+                          <p className="text-sm text-muted-foreground">
+                            {field.description}
+                          </p>
+                        )}
+                      </div>
+                      <Switch
+                        id={field.id}
+                        checked={settings[field.id] ?? field.defaultValue}
+                        onCheckedChange={(checked) =>
+                          updateSetting(field.id, checked)
+                        }
+                        disabled={field.editable === false}
+                      />
+                    </div>
+                  );
+                }
 
-        {/* Appearance Settings */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Appearance</CardTitle>
-            <CardDescription>
-              Customize how the app looks and feels
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="dark-mode">Dark Mode</Label>
-                <p className="text-sm text-muted-foreground">
-                  Always use dark mode (recommended)
-                </p>
-              </div>
-              <Switch id="dark-mode" defaultChecked disabled />
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="compact-view">Compact View</Label>
-                <p className="text-sm text-muted-foreground">
-                  Show more information in less space
-                </p>
-              </div>
-              <Switch id="compact-view" />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Privacy & Security */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Privacy & Security</CardTitle>
-            <CardDescription>
-              Manage your privacy and security settings
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="current-password">Current Password</Label>
-              <Input id="current-password" type="password" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="new-password">New Password</Label>
-              <Input id="new-password" type="password" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="confirm-password">Confirm New Password</Label>
-              <Input id="confirm-password" type="password" />
-            </div>
-            <Button>Change Password</Button>
-          </CardContent>
-        </Card>
+                return null;
+              })}
+              {key === "account" && <Button>Save Changes</Button>}
+            </CardContent>
+          </Card>
+        ))}
 
         {/* Danger Zone */}
         <Card className="border-destructive">
