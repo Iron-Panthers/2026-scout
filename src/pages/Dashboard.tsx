@@ -2,10 +2,18 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ClipboardList, Wrench } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { ClipboardList, Wrench, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { getUserMatches } from "@/lib/matches";
+import { getUserMatches, removeUserFromMatch } from "@/lib/matches";
 import DashboardHeader from "@/components/DashboardHeader";
 import UserProfileMenu from "@/components/UserProfileMenu";
 import type { Match, Role } from "@/types";
@@ -20,6 +28,8 @@ export default function Dashboard() {
   const { user } = useAuth();
   const [matches, setMatches] = useState<UserMatch[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedMatch, setSelectedMatch] = useState<UserMatch | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   const userName =
     user?.user_metadata?.name || user?.email?.split("@")[0] || "Scout";
@@ -96,6 +106,43 @@ export default function Dashboard() {
     return "bg-blue-600/20 text-blue-400 border-blue-600/30";
   };
 
+  const handleMatchClick = (userMatch: UserMatch) => {
+    setSelectedMatch(userMatch);
+    setDialogOpen(true);
+  };
+
+  const handleStartScouting = () => {
+    // TODO: Navigate to scouting form
+    console.log("Starting scouting for", selectedMatch?.matchNumber);
+    setDialogOpen(false);
+  };
+
+  const handleDecline = async () => {
+    if (!selectedMatch || !user?.id) return;
+
+    const success = await removeUserFromMatch(
+      selectedMatch.match.id,
+      user.id,
+      selectedMatch.role
+    );
+
+    if (success) {
+      // Remove from local state
+      setMatches((prev) =>
+        prev.filter(
+          (m) =>
+            !(
+              m.match.id === selectedMatch.match.id &&
+              m.role === selectedMatch.role
+            )
+        )
+      );
+      setDialogOpen(false);
+    } else {
+      console.error("Failed to decline match");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Main Content */}
@@ -150,18 +197,21 @@ export default function Dashboard() {
                 {matches.map((userMatch, index) => (
                   <Card
                     key={`${userMatch.match.id}-${userMatch.role}`}
-                    className={`flex-shrink-0 w-64 h-64 ${getRoleColor(
+                    className={`flex-shrink-0 w-64 ${getRoleColor(
                       userMatch.role
                     )} border-2 hover:scale-105 transition-transform cursor-pointer`}
+                    onClick={() => handleMatchClick(userMatch)}
                   >
-                    <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between mb-2">
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center justify-between mb-1 gap-2">
                         <span className="font-mono text-2xl font-bold">
                           {userMatch.matchNumber}
                         </span>
                         <Badge
                           variant="outline"
-                          className={getRoleBadgeColor(userMatch.role)}
+                          className={`${getRoleBadgeColor(
+                            userMatch.role
+                          )} whitespace-nowrap text-xs`}
                         >
                           {userMatch.role.toUpperCase()}
                         </Badge>
@@ -176,10 +226,19 @@ export default function Dashboard() {
                           <div className="font-semibold text-foreground mb-1">
                             {userName}
                           </div>
-                          <div className="text-xs">Role: {userMatch.role}</div>
+                          <div className="text-xs break-words">
+                            Role: {userMatch.role}
+                          </div>
                         </div>
-                        <Button className="w-full mt-4" size="sm">
-                          Start Scouting
+                        <Button
+                          className="w-full mt-4"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleMatchClick(userMatch);
+                          }}
+                        >
+                          View Details
                         </Button>
                       </div>
                     </CardContent>
@@ -199,6 +258,81 @@ export default function Dashboard() {
             </p>
           </Card>
         </div>
+
+        {/* Match Details Dialog */}
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle className="text-2xl flex items-center justify-between">
+                <span>{selectedMatch?.matchNumber}</span>
+                <Badge
+                  variant="outline"
+                  className={
+                    selectedMatch ? getRoleBadgeColor(selectedMatch.role) : ""
+                  }
+                >
+                  {selectedMatch?.role.toUpperCase()}
+                </Badge>
+              </DialogTitle>
+              <DialogDescription>
+                Match #{selectedMatch?.match.match_number}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-4">
+              {/* Robot Image Placeholder */}
+              <div className="w-full h-48 bg-muted rounded-lg flex items-center justify-center border-2 border-dashed border-border">
+                <div className="text-center">
+                  <p className="text-muted-foreground font-semibold">
+                    Robot Image
+                  </p>
+                  <p className="text-sm text-muted-foreground">Coming soon</p>
+                </div>
+              </div>
+
+              {/* Match Details */}
+              <div className="space-y-3">
+                <div className="flex justify-between items-center p-3 bg-accent/50 rounded-lg">
+                  <span className="text-sm font-medium text-muted-foreground">
+                    Your Role
+                  </span>
+                  <span className="font-semibold">{selectedMatch?.role}</span>
+                </div>
+                <div className="flex justify-between items-center p-3 bg-accent/50 rounded-lg">
+                  <span className="text-sm font-medium text-muted-foreground">
+                    Match Type
+                  </span>
+                  <span className="font-semibold">Qualification</span>
+                </div>
+                <div className="flex justify-between items-center p-3 bg-accent/50 rounded-lg">
+                  <span className="text-sm font-medium text-muted-foreground">
+                    Alliance
+                  </span>
+                  <span className="font-semibold">
+                    {selectedMatch?.role.toLowerCase().includes("red")
+                      ? "Red"
+                      : "Blue"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button
+                variant="outline"
+                onClick={handleDecline}
+                className="flex-1"
+              >
+                <X className="h-4 w-4 mr-2" />
+                Decline
+              </Button>
+              <Button onClick={handleStartScouting} className="flex-1">
+                <ClipboardList className="h-4 w-4 mr-2" />
+                Start Scouting
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );

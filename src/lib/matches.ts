@@ -209,3 +209,25 @@ export async function getUserMatches(userId: string): Promise<{
     profile,
   };
 }
+
+// Remove a user's assignment from a match
+export async function removeUserFromMatch(
+  matchId: string,
+  userId: string,
+  role: string
+): Promise<boolean> {
+  const roleColumn = `${role.toLowerCase()}_scouter_id`;
+
+  const { error } = await supabase
+    .from("matches")
+    .update({ [roleColumn]: null })
+    .eq("id", matchId)
+    .eq(roleColumn, userId);
+
+  if (error) {
+    console.error("Error removing user from match:", error);
+    return false;
+  }
+
+  return true;
+}
