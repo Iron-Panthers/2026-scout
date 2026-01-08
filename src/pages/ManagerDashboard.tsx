@@ -41,6 +41,7 @@ import {
   Calendar,
   Users,
   PlusCircle,
+  X,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -74,10 +75,12 @@ const MatchRow = memo(
     match,
     roles,
     onOpenDialog,
+    onClearAssignment,
   }: {
     match: MatchAssignment;
     roles: Role[];
     onOpenDialog: (matchNumber: number, role: Role) => void;
+    onClearAssignment: (matchNumber: number, role: Role) => void;
   }) => {
     return (
       <TableRow>
@@ -89,20 +92,32 @@ const MatchRow = memo(
           return (
             <TableCell key={role} className={`p-2 ${getRoleCellColor(role)}`}>
               {assignment ? (
-                <button
-                  onClick={() => onOpenDialog(match.matchNumber, role)}
-                  className="flex flex-col items-center gap-1 hover:bg-accent/50 rounded-md p-2 transition-colors w-full"
-                >
-                  <Avatar className="h-10 w-10">
-                    <AvatarImage src={assignment.avatar} />
-                    <AvatarFallback className="text-xs bg-primary/20 text-primary">
-                      {assignment.initials}
-                    </AvatarFallback>
-                  </Avatar>
-                  <span className="text-xs font-medium text-center">
-                    {assignment.name}
-                  </span>
-                </button>
+                <div className="relative group">
+                  <button
+                    onClick={() => onOpenDialog(match.matchNumber, role)}
+                    className="flex flex-col items-center gap-1 hover:bg-accent/50 rounded-md p-2 transition-colors w-full"
+                  >
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage src={assignment.avatar} />
+                      <AvatarFallback className="text-xs bg-primary/20 text-primary">
+                        {assignment.initials}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="text-xs font-medium text-center">
+                      {assignment.name}
+                    </span>
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onClearAssignment(match.matchNumber, role);
+                    }}
+                    className="absolute top-0 right-0 h-5 w-5 rounded-full bg-destructive/90 hover:bg-destructive text-destructive-foreground opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                    title="Clear assignment"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
               ) : (
                 <div className="flex items-center justify-center w-full">
                   <Button
@@ -366,6 +381,38 @@ export default function ManagerDashboard() {
     []
   );
 
+  const handleClearAssignment = useCallback(
+    async (matchNumber: number, role: Role) => {
+      // Update local state immediately
+      setMatches((prevMatches) =>
+        prevMatches.map((match) =>
+          match.matchNumber === matchNumber
+            ? {
+                ...match,
+                assignments: {
+                  ...match.assignments,
+                  [role]: null,
+                },
+              }
+            : match
+        )
+      );
+
+      // Persist to database
+      try {
+        const currentMatch = matches.find((m) => m.matchNumber === matchNumber);
+        if (!currentMatch?.matchId) {
+          console.error("Match ID not found for match number:", matchNumber);
+          return;
+        }
+        await updateMatchAssignment(currentMatch.matchId, role, null);
+      } catch (error) {
+        console.error("Failed to clear match assignment:", error);
+      }
+    },
+    [matches]
+  );
+
   const handleCreateEvent = async () => {
     if (!newEventName.trim() || !newEventId.trim() || !numQualMatches) {
       alert("Please fill in all fields");
@@ -598,6 +645,7 @@ export default function ManagerDashboard() {
                         match={match}
                         roles={roles}
                         onOpenDialog={openAssignmentDialog}
+                        onClearAssignment={handleClearAssignment}
                       />
                     ))}
                   </TableBody>
