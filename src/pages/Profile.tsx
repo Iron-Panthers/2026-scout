@@ -2,13 +2,29 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Mail, Phone, Calendar, Award } from "lucide-react";
+import { ArrowLeft, Mail, Calendar, CheckCircle2, Clock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useEffect, useState } from "react";
+import { getUserMatches } from "@/lib/matches";
+import type { Match } from "@/types";
 
 export default function Profile() {
   const navigate = useNavigate();
   const { user: authUser, profile } = useAuth();
+  const [userMatches, setUserMatches] = useState<Match[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadMatches = async () => {
+      if (authUser?.id) {
+        const { matches } = await getUserMatches(authUser.id);
+        setUserMatches(matches);
+        setLoading(false);
+      }
+    };
+    loadMatches();
+  }, [authUser?.id]);
 
   const userName =
     profile?.name ||
@@ -24,6 +40,7 @@ export default function Profile() {
   const avatarUrl = authUser?.user_metadata?.avatar_url || "";
   const email = authUser?.email || "";
   const userRole = profile?.role || "scout";
+  const isManager = profile?.is_manager || false;
   const joinDate = profile?.created_at
     ? new Date(profile.created_at).toLocaleDateString("en-US", {
         month: "long",
@@ -36,12 +53,8 @@ export default function Profile() {
       })
     : "Recently";
 
-  const stats = [
-    { label: "Matches Scouted", value: "47" },
-    { label: "Teams Analyzed", value: "32" },
-    { label: "Reports Submitted", value: "89" },
-    { label: "Accuracy Rating", value: "98%" },
-  ];
+  const totalMatches = userMatches.length;
+  const uniqueEvents = new Set(userMatches.map((m) => m.event_id)).size;
 
   return (
     <div className="min-h-screen bg-background">
@@ -64,22 +77,17 @@ export default function Profile() {
               </Avatar>
               <div className="flex-1 text-center md:text-left">
                 <h1 className="text-3xl font-bold mb-2">{userName}</h1>
-                <Badge variant="secondary" className="mb-4">
-                  {userRole.charAt(0).toUpperCase() + userRole.slice(1)}
-                </Badge>
+                <div className="flex gap-2 justify-center md:justify-start mb-4">
+                  <Badge variant="secondary">
+                    {userRole.charAt(0).toUpperCase() + userRole.slice(1)}
+                  </Badge>
+                  {isManager && <Badge variant="default">Manager</Badge>}
+                </div>
                 <div className="space-y-2 mt-4">
                   <div className="flex items-center justify-center md:justify-start gap-2 text-muted-foreground">
                     <Mail className="h-4 w-4" />
                     <span className="text-sm">{email}</span>
                   </div>
-                  {authUser?.user_metadata?.phone && (
-                    <div className="flex items-center justify-center md:justify-start gap-2 text-muted-foreground">
-                      <Phone className="h-4 w-4" />
-                      <span className="text-sm">
-                        {authUser.user_metadata.phone}
-                      </span>
-                    </div>
-                  )}
                   <div className="flex items-center justify-center md:justify-start gap-2 text-muted-foreground">
                     <Calendar className="h-4 w-4" />
                     <span className="text-sm">Joined {joinDate}</span>
@@ -92,64 +100,100 @@ export default function Profile() {
 
         {/* Stats Grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          {stats.map((stat, index) => (
-            <Card key={index}>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  {stat.label}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-3xl font-bold text-primary">{stat.value}</p>
-              </CardContent>
-            </Card>
-          ))}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Assigned Matches
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-3xl font-bold text-primary">
+                {loading ? "..." : totalMatches}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Events
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-3xl font-bold text-primary">
+                {loading ? "..." : uniqueEvents}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Account Status
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-6 w-6 text-green-500" />
+                <p className="text-lg font-semibold">Active</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Next Match
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-2">
+                <Clock className="h-6 w-6 text-blue-500" />
+                <p className="text-lg font-semibold">
+                  {totalMatches > 0 ? "Upcoming" : "None"}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
-        {/* Achievements */}
+        {/* Recent Match Assignments */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Award className="h-5 w-5" />
-              Achievements
-            </CardTitle>
+            <CardTitle>Recent Match Assignments</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-accent/50">
-                <div className="h-12 w-12 rounded-full bg-primary/20 flex items-center justify-center">
-                  <span className="text-2xl">🏆</span>
-                </div>
-                <div>
-                  <p className="font-semibold">Perfect Attendance</p>
-                  <p className="text-sm text-muted-foreground">
-                    Scouted every match in the season
+            {loading ? (
+              <p className="text-muted-foreground text-center py-8">
+                Loading assignments...
+              </p>
+            ) : userMatches.length === 0 ? (
+              <p className="text-muted-foreground text-center py-8">
+                No match assignments yet
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {userMatches.slice(0, 5).map((match) => (
+                  <div
+                    key={match.id}
+                    className="flex items-center justify-between p-3 rounded-lg bg-accent/50"
+                  >
+                    <div>
+                      <p className="font-semibold">{match.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        Match #{match.match_number}
+                      </p>
+                    </div>
+                    <Badge variant="outline">Assigned</Badge>
+                  </div>
+                ))}
+                {userMatches.length > 5 && (
+                  <p className="text-sm text-muted-foreground text-center pt-2">
+                    And {userMatches.length - 5} more...
                   </p>
-                </div>
+                )}
               </div>
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-accent/50">
-                <div className="h-12 w-12 rounded-full bg-primary/20 flex items-center justify-center">
-                  <span className="text-2xl">⭐</span>
-                </div>
-                <div>
-                  <p className="font-semibold">Top Scout</p>
-                  <p className="text-sm text-muted-foreground">
-                    Highest accuracy rating on the team
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-accent/50">
-                <div className="h-12 w-12 rounded-full bg-primary/20 flex items-center justify-center">
-                  <span className="text-2xl">🎯</span>
-                </div>
-                <div>
-                  <p className="font-semibold">Detail Oriented</p>
-                  <p className="text-sm text-muted-foreground">
-                    Completed 50+ detailed reports
-                  </p>
-                </div>
-              </div>
-            </div>
+            )}
           </CardContent>
         </Card>
       </main>
