@@ -147,8 +147,11 @@ export default function ManagerDashboard() {
       // Set the most recently created event as default
       if (eventsData.length > 0) {
         // Events are already sorted by start_date descending from getEvents()
-        eventsData.sort((a, b) => (a.is_active ? 1 : 0));
-        setSelectedEvent(eventsData[0].id);
+        if (eventsData.filter((a) => a.is_active).length > 0) {
+          setSelectedEvent(eventsData.filter((a) => a.is_active)[0].id);
+        } else {
+          setSelectedEvent(eventsData[0].id);
+        }
       }
 
       // Convert database matches to component format inline

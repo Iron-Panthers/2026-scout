@@ -110,7 +110,7 @@ export async function upsertMatch(matchData: {
 // Create a new event with matches
 export async function createEventWithMatches(
   eventName: string,
-  eventId: string,
+  eventCode: string,
   numMatches: number
 ): Promise<{ success: boolean; event?: Event; error?: string }> {
   try {
@@ -119,6 +119,7 @@ export async function createEventWithMatches(
       .from("events")
       .insert({
         name: eventName,
+        event_code: eventCode,
       })
       .select()
       .single();
@@ -128,9 +129,9 @@ export async function createEventWithMatches(
       return { success: false, error: eventError.message };
     }
 
-    // Create matches for the event using the eventId as prefix
+    // Create matches for the event using the eventCode as prefix
     const matchesToCreate = Array.from({ length: numMatches }, (_, i) => ({
-      name: `${eventId}-Q${i + 1}`,
+      name: `${eventCode}-Q${i + 1}`,
       match_number: i + 1,
       event_id: eventData.id,
     }));
