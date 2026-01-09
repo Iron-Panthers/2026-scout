@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -15,14 +15,27 @@ import {
 } from "@/components/ui/select";
 import { ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { getActiveEvent } from "@/lib/matches";
 import { pitScoutingQuestions } from "@/config/pitScoutingConfig";
 import type { PitScoutingQuestion } from "@/config/pitScoutingConfig";
+import type { Event } from "@/types";
 
 export default function PitScouting() {
   const navigate = useNavigate();
   const [scouterName, setScouterName] = useState("");
   const [teamNumber, setTeamNumber] = useState("");
   const [formData, setFormData] = useState<Record<string, any>>({});
+  const [activeEvent, setActiveEvent] = useState<Event | null>(null);
+  const [loadingEvent, setLoadingEvent] = useState(true);
+
+  useEffect(() => {
+    const loadActiveEvent = async () => {
+      const event = await getActiveEvent();
+      setActiveEvent(event);
+      setLoadingEvent(false);
+    };
+    loadActiveEvent();
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -202,15 +215,41 @@ export default function PitScouting() {
         </h1>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Event Map Placeholder */}
+          {/* Event Map */}
           <Card>
             <CardHeader>
-              <CardTitle>Event Map</CardTitle>
+              <CardTitle>
+                {activeEvent?.name || "Event"} Map
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="aspect-video bg-muted rounded-lg flex items-center justify-center border-2 border-dashed border-border">
-                <p className="text-muted-foreground">Event Map Placeholder</p>
-              </div>
+              {loadingEvent ? (
+                <div className="aspect-video bg-muted rounded-lg flex items-center justify-center border-2 border-border">
+                  <p className="text-muted-foreground">Loading map...</p>
+                </div>
+              ) : activeEvent?.scouting_map_url ? (
+                <div className="aspect-video bg-muted rounded-lg overflow-hidden border-2 border-border">
+                  <img
+                    src={activeEvent.scouting_map_url}
+                    alt="Event Scouting Map"
+                    className="w-full h-full object-contain"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                      e.currentTarget.parentElement!.innerHTML = `
+                        <div class="flex items-center justify-center h-full">
+                          <p class="text-muted-foreground">Failed to load map</p>
+                        </div>
+                      `;
+                    }}
+                  />
+                </div>
+              ) : (
+                <div className="aspect-video bg-muted rounded-lg flex items-center justify-center border-2 border-dashed border-border">
+                  <p className="text-muted-foreground">
+                    No scouting map available
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
 
