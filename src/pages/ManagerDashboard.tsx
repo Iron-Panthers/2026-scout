@@ -132,69 +132,72 @@ export default function ManagerDashboard() {
     [availableScouts]
   );
 
-  // Load available scouts and existing match assignments from database on mount
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const [{ matches: dbMatches, profiles }, eventsData] =
-          await Promise.all([getMatchesWithProfiles(), getEvents()]);
-        const profilesArray = Array.from(profiles.values());
-        setAvailableScouts(profilesArray);
-        setEvents(eventsData);
-        setAllDbMatches(dbMatches);
+  // Load available scouts and existing match assignments from database
+  const loadData = useCallback(async () => {
+    try {
+      const [{ matches: dbMatches, profiles }, eventsData] = await Promise.all([
+        getMatchesWithProfiles(),
+        getEvents(),
+      ]);
+      const profilesArray = Array.from(profiles.values());
+      setAvailableScouts(profilesArray);
+      setEvents(eventsData);
+      setAllDbMatches(dbMatches);
 
-        // Set the most recently created event as default
-        if (eventsData.length > 0) {
-          // Events are already sorted by start_date descending from getEvents()
-          setSelectedEvent(eventsData[0].id);
-        }
-
-        // Convert database matches to component format inline
-        setMatches(
-          dbMatches.map((match) => {
-            const assignments: Partial<Record<Role, Scout>> = {};
-            const roleMapping: Array<{ role: Role; scouterId: string | null }> =
-              [
-                { role: "red1", scouterId: match.red1_scouter_id },
-                { role: "red2", scouterId: match.red2_scouter_id },
-                { role: "red3", scouterId: match.red3_scouter_id },
-                { role: "qualRed", scouterId: match.qual_red_scouter_id },
-                { role: "blue1", scouterId: match.blue1_scouter_id },
-                { role: "blue2", scouterId: match.blue2_scouter_id },
-                { role: "blue3", scouterId: match.blue3_scouter_id },
-                { role: "qualBlue", scouterId: match.qual_blue_scouter_id },
-              ];
-
-            roleMapping.forEach(({ role, scouterId }) => {
-              if (scouterId && profiles.has(scouterId)) {
-                const profile = profiles.get(scouterId)!;
-                assignments[role] = {
-                  id: profile.id,
-                  name: profile.name || "Unknown",
-                  initials: (profile.name || "U")
-                    .split(" ")
-                    .map((n) => n[0])
-                    .join("")
-                    .toUpperCase()
-                    .slice(0, 2),
-                  avatar: "",
-                };
-              }
-            });
-
-            return {
-              matchNumber: match.match_number,
-              matchId: match.id,
-              assignments,
-            };
-          })
-        );
-      } catch (error) {
-        console.error("Failed to load data:", error);
+      // Set the most recently created event as default
+      if (eventsData.length > 0) {
+        // Events are already sorted by start_date descending from getEvents()
+        setSelectedEvent(eventsData[0].id);
       }
-    };
-    loadData();
+
+      // Convert database matches to component format inline
+      setMatches(
+        dbMatches.map((match) => {
+          const assignments: Partial<Record<Role, Scout>> = {};
+          const roleMapping: Array<{ role: Role; scouterId: string | null }> = [
+            { role: "red1", scouterId: match.red1_scouter_id },
+            { role: "red2", scouterId: match.red2_scouter_id },
+            { role: "red3", scouterId: match.red3_scouter_id },
+            { role: "qualRed", scouterId: match.qual_red_scouter_id },
+            { role: "blue1", scouterId: match.blue1_scouter_id },
+            { role: "blue2", scouterId: match.blue2_scouter_id },
+            { role: "blue3", scouterId: match.blue3_scouter_id },
+            { role: "qualBlue", scouterId: match.qual_blue_scouter_id },
+          ];
+
+          roleMapping.forEach(({ role, scouterId }) => {
+            if (scouterId && profiles.has(scouterId)) {
+              const profile = profiles.get(scouterId)!;
+              assignments[role] = {
+                id: profile.id,
+                name: profile.name || "Unknown",
+                initials: (profile.name || "U")
+                  .split(" ")
+                  .map((n) => n[0])
+                  .join("")
+                  .toUpperCase()
+                  .slice(0, 2),
+                avatar: "",
+              };
+            }
+          });
+
+          return {
+            matchNumber: match.match_number,
+            matchId: match.id,
+            assignments,
+          };
+        })
+      );
+    } catch (error) {
+      console.error("Failed to load data:", error);
+    }
   }, []);
+
+  // Load data on mount
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   // Filter matches based on selected event
   useEffect(() => {
@@ -598,6 +601,7 @@ export default function ManagerDashboard() {
               events={events}
               matches={matches}
               availableScouts={availableScouts}
+              onEventUpdate={loadData}
             />
           </TabsContent>
 

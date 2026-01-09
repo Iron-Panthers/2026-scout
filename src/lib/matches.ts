@@ -250,3 +250,28 @@ export async function removeUserFromMatch(
 
   return true;
 }
+
+// Update event details
+export async function updateEvent(
+  eventId: string,
+  updates: {
+    name?: string;
+    event_code?: string;
+    location?: string;
+    start_date?: string;
+    end_date?: string;
+    scouting_map_url?: string;
+  }
+): Promise<boolean> {
+  const { error } = await supabase
+    .from("events")
+    .update(updates)
+    .eq("id", eventId);
+
+  if (error) {
+    console.error("Error updating event:", error);
+    return false;
+  }
+
+  return true;
+}

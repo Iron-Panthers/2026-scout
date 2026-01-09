@@ -1,5 +1,18 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { CalendarIcon, Save } from "lucide-react";
+import { format } from "date-fns";
+import { updateEvent } from "@/lib/matches";
 import type { Event, Profile, MatchAssignment } from "@/types";
 
 interface EventInformationTabProps {
@@ -7,6 +20,7 @@ interface EventInformationTabProps {
   events: Event[];
   matches: MatchAssignment[];
   availableScouts: Profile[];
+  onEventUpdate?: () => void;
 }
 
 export function EventInformationTab({
@@ -14,71 +28,298 @@ export function EventInformationTab({
   events,
   matches,
   availableScouts,
+  onEventUpdate,
 }: EventInformationTabProps) {
   const currentEvent = events.find((e) => e.id === selectedEvent);
   const isAllEvents = selectedEvent === "all";
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [editedEvent, setEditedEvent] = useState<Partial<Event>>({
+    name: currentEvent?.name || "",
+    event_code: currentEvent?.event_code || "",
+    location: currentEvent?.location || "",
+    start_date: currentEvent?.start_date || "",
+    end_date: currentEvent?.end_date || "",
+    scouting_map_url: currentEvent?.scouting_map_url || "",
+  });
+
+  const handleSave = async () => {
+    if (!currentEvent || isAllEvents) return;
+
+    setIsSaving(true);
+    const success = await updateEvent(currentEvent.id, {
+      name: editedEvent.name,
+      event_code: editedEvent.event_code || undefined,
+      location: editedEvent.location || undefined,
+      start_date: editedEvent.start_date || undefined,
+      end_date: editedEvent.end_date || undefined,
+      scouting_map_url: editedEvent.scouting_map_url || undefined,
+    });
+
+    if (success) {
+      setIsEditing(false);
+      onEventUpdate?.();
+    }
+    setIsSaving(false);
+  };
+
+  const handleCancel = () => {
+    setEditedEvent({
+      name: currentEvent?.name || "",
+      event_code: currentEvent?.event_code || "",
+      location: currentEvent?.location || "",
+      start_date: currentEvent?.start_date || "",
+      end_date: currentEvent?.end_date || "",
+      scouting_map_url: currentEvent?.scouting_map_url || "",
+    });
+    setIsEditing(false);
+  };
 
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>
-            {isAllEvents
-              ? "All Events Overview"
-              : currentEvent?.name || "Event Information"}
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>
+              {isAllEvents
+                ? "All Events Overview"
+                : currentEvent?.name || "Event Information"}
+            </CardTitle>
+            {!isAllEvents && (
+              <div className="flex gap-2">
+                {isEditing ? (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleCancel}
+                      disabled={isSaving}
+                    >
+                      Cancel
+                    </Button>
+                    <Button size="sm" onClick={handleSave} disabled={isSaving}>
+                      <Save className="h-4 w-4 mr-2" />
+                      {isSaving ? "Saving..." : "Save Changes"}
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsEditing(true)}
+                  >
+                    Edit Event
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium text-muted-foreground">
+              <Label className="text-sm font-medium text-muted-foreground">
                 Event Name
-              </label>
-              <p className="text-lg font-semibold">
-                {isAllEvents
-                  ? "All Events"
-                  : currentEvent?.name || "Unknown Event"}
-              </p>
+              </Label>
+              {isEditing ? (
+                <Input
+                  value={editedEvent.name}
+                  onChange={(e) =>
+                    setEditedEvent({ ...editedEvent, name: e.target.value })
+                  }
+                  className="mt-1"
+                />
+              ) : (
+                <p className="text-lg font-semibold">
+                  {isAllEvents
+                    ? "All Events"
+                    : currentEvent?.name || "Unknown Event"}
+                </p>
+              )}
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">
-                  Location
-                </label>
+
+            <div>
+              <Label className="text-sm font-medium text-muted-foreground">
+                Event Code (TBA)
+              </Label>
+              {isEditing ? (
+                <Input
+                  value={editedEvent.event_code || ""}
+                  onChange={(e) =>
+                    setEditedEvent({
+                      ...editedEvent,
+                      event_code: e.target.value,
+                    })
+                  }
+                  placeholder="e.g., 2024caln"
+                  className="mt-1"
+                />
+              ) : (
                 <p className="text-lg">
                   {isAllEvents
-                    ? "Multiple Locations"
-                    : currentEvent?.location || "TBD"}
+                    ? "Multiple Codes"
+                    : currentEvent?.event_code || "Not set"}
                 </p>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">
+                  Location
+                </Label>
+                {isEditing ? (
+                  <Input
+                    value={editedEvent.location || ""}
+                    onChange={(e) =>
+                      setEditedEvent({
+                        ...editedEvent,
+                        location: e.target.value,
+                      })
+                    }
+                    className="mt-1"
+                  />
+                ) : (
+                  <p className="text-lg">
+                    {isAllEvents
+                      ? "Multiple Locations"
+                      : currentEvent?.location || "TBD"}
+                  </p>
+                )}
               </div>
               <div>
-                <label className="text-sm font-medium text-muted-foreground">
+                <Label className="text-sm font-medium text-muted-foreground">
                   Total Matches
-                </label>
+                </Label>
                 <p className="text-lg font-semibold">{matches.length}</p>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-sm font-medium text-muted-foreground">
+                <Label className="text-sm font-medium text-muted-foreground">
                   Start Date
-                </label>
-                <p className="text-lg">
-                  {isAllEvents
-                    ? "Season Long"
-                    : currentEvent?.start_date || "TBD"}
-                </p>
+                </Label>
+                {isEditing ? (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start text-left font-normal mt-1"
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {editedEvent.start_date
+                          ? format(new Date(editedEvent.start_date), "PPP")
+                          : "Pick a date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={
+                          editedEvent.start_date
+                            ? new Date(editedEvent.start_date)
+                            : undefined
+                        }
+                        onSelect={(date) =>
+                          setEditedEvent({
+                            ...editedEvent,
+                            start_date: date?.toISOString() || "",
+                          })
+                        }
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                ) : (
+                  <p className="text-lg">
+                    {isAllEvents
+                      ? "Season Long"
+                      : currentEvent?.start_date
+                      ? format(new Date(currentEvent.start_date), "PPP")
+                      : "TBD"}
+                  </p>
+                )}
               </div>
               <div>
-                <label className="text-sm font-medium text-muted-foreground">
+                <Label className="text-sm font-medium text-muted-foreground">
                   End Date
-                </label>
-                <p className="text-lg">
-                  {isAllEvents
-                    ? "Season Long"
-                    : currentEvent?.end_date || "TBD"}
-                </p>
+                </Label>
+                {isEditing ? (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start text-left font-normal mt-1"
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {editedEvent.end_date
+                          ? format(new Date(editedEvent.end_date), "PPP")
+                          : "Pick a date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={
+                          editedEvent.end_date
+                            ? new Date(editedEvent.end_date)
+                            : undefined
+                        }
+                        onSelect={(date) =>
+                          setEditedEvent({
+                            ...editedEvent,
+                            end_date: date?.toISOString() || "",
+                          })
+                        }
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                ) : (
+                  <p className="text-lg">
+                    {isAllEvents
+                      ? "Season Long"
+                      : currentEvent?.end_date
+                      ? format(new Date(currentEvent.end_date), "PPP")
+                      : "TBD"}
+                  </p>
+                )}
               </div>
+            </div>
+
+            <div>
+              <Label className="text-sm font-medium text-muted-foreground">
+                Scouting Map URL
+              </Label>
+              {isEditing ? (
+                <Input
+                  value={editedEvent.scouting_map_url || ""}
+                  onChange={(e) =>
+                    setEditedEvent({
+                      ...editedEvent,
+                      scouting_map_url: e.target.value,
+                    })
+                  }
+                  placeholder="https://example.com/map.png"
+                  className="mt-1"
+                />
+              ) : (
+                <p className="text-lg">
+                  {currentEvent?.scouting_map_url ? (
+                    <a
+                      href={currentEvent.scouting_map_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-500 hover:underline"
+                    >
+                      View Map
+                    </a>
+                  ) : (
+                    "Not set"
+                  )}
+                </p>
+              )}
             </div>
           </div>
         </CardContent>

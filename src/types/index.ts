@@ -25,6 +25,7 @@ export interface Event {
   location: string | null;
   start_date: string | null;
   end_date: string | null;
+  scouting_map_url: string | null; // URL to the scouting map image
   created_at: string;
   updated_at: string;
 }
