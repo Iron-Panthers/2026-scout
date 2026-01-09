@@ -218,9 +218,7 @@ export default function PitScouting() {
           {/* Event Map */}
           <Card>
             <CardHeader>
-              <CardTitle>
-                {activeEvent?.name || "Event"} Map
-              </CardTitle>
+              <CardTitle>{activeEvent?.name || "Event"} Map</CardTitle>
             </CardHeader>
             <CardContent>
               {loadingEvent ? (
@@ -234,7 +232,7 @@ export default function PitScouting() {
                     alt="Event Scouting Map"
                     className="w-full h-full object-contain"
                     onError={(e) => {
-                      e.currentTarget.style.display = 'none';
+                      e.currentTarget.style.display = "none";
                       e.currentTarget.parentElement!.innerHTML = `
                         <div class="flex items-center justify-center h-full">
                           <p class="text-muted-foreground">Failed to load map</p>

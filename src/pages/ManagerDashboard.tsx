@@ -76,7 +76,7 @@ export default function ManagerDashboard() {
 
   // New event form state
   const [newEventName, setNewEventName] = useState("");
-  const [newEventId, setNewEventId] = useState("");
+  const [newEventCode, setNewEventCode] = useState("");
   const [numQualMatches, setNumQualMatches] = useState("");
   const [isCreatingEvent, setIsCreatingEvent] = useState(false);
 
@@ -147,6 +147,7 @@ export default function ManagerDashboard() {
       // Set the most recently created event as default
       if (eventsData.length > 0) {
         // Events are already sorted by start_date descending from getEvents()
+        eventsData.sort((a, b) => (a.is_active ? 1 : 0));
         setSelectedEvent(eventsData[0].id);
       }
 
@@ -322,7 +323,7 @@ export default function ManagerDashboard() {
   );
 
   const handleCreateEvent = async () => {
-    if (!newEventName.trim() || !newEventId.trim() || !numQualMatches) {
+    if (!newEventName.trim() || !newEventCode.trim() || !numQualMatches) {
       alert("Please fill in all fields");
       return;
     }
@@ -337,7 +338,7 @@ export default function ManagerDashboard() {
     try {
       const result = await createEventWithMatches(
         newEventName.trim(),
-        newEventId.trim(),
+        newEventCode.trim(),
         numMatches
       );
 
@@ -394,7 +395,7 @@ export default function ManagerDashboard() {
 
         // Reset form
         setNewEventName("");
-        setNewEventId("");
+        setNewEventCode("");
         setNumQualMatches("");
         alert(`Event "${newEventName}" created with ${numMatches} matches!`);
       } else {
@@ -610,8 +611,8 @@ export default function ManagerDashboard() {
             <CreateEventTab
               newEventName={newEventName}
               setNewEventName={setNewEventName}
-              newEventId={newEventId}
-              setNewEventId={setNewEventId}
+              newEventCode={newEventCode}
+              setNewEventCode={setNewEventCode}
               numQualMatches={numQualMatches}
               setNumQualMatches={setNumQualMatches}
               isCreatingEvent={isCreatingEvent}
