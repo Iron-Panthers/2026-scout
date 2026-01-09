@@ -13,10 +13,11 @@ import {
 import { ClipboardList, Wrench, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { getUserMatches, removeUserFromMatch } from "@/lib/matches";
+import { getUserMatches, removeUserFromMatch, getEvents } from "@/lib/matches";
+import { getMatchTeam, getTeamPhoto, CURRENT_YEAR } from "@/lib/blueAlliance";
 import DashboardHeader from "@/components/DashboardHeader";
 import UserProfileMenu from "@/components/UserProfileMenu";
-import type { Match, Role } from "@/types";
+import type { Match, Role, Event } from "@/types";
 
 interface UserMatch {
   matchNumber: string;
@@ -30,6 +31,11 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [selectedMatch, setSelectedMatch] = useState<UserMatch | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [teamNumbers, setTeamNumbers] = useState<Record<string, number | null>>(
+    {}
+  );
+  const [teamPhoto, setTeamPhoto] = useState<string | null>(null);
+  const [loadingPhoto, setLoadingPhoto] = useState(false);
 
   const userName =
     user?.user_metadata?.name || user?.email?.split("@")[0] || "Scout";
@@ -82,6 +88,35 @@ export default function Dashboard() {
         );
 
         setMatches(formattedMatches);
+
+        // Fetch team numbers for each match
+        const events = await getEvents();
+        const teamNumbersMap: Record<string, number | null> = {};
+
+        for (const userMatch of formattedMatches) {
+          // Skip qual roles
+          if (userMatch.role === "qualRed" || userMatch.role === "qualBlue") {
+            continue;
+          }
+
+          // Find the event for this match
+          const event = events.find((e) => e.id === userMatch.match.event_id);
+
+          if (event?.event_code) {
+            const teamNumber = await getMatchTeam(
+              event.event_code,
+              userMatch.match.match_number,
+              userMatch.role
+            );
+
+            if (teamNumber) {
+              teamNumbersMap[`${userMatch.match.id}-${userMatch.role}`] =
+                teamNumber;
+            }
+          }
+        }
+
+        setTeamNumbers(teamNumbersMap);
       } catch (error) {
         console.error("Failed to load matches:", error);
       } finally {
@@ -106,9 +141,23 @@ export default function Dashboard() {
     return "bg-blue-600/20 text-blue-400 border-blue-600/30";
   };
 
-  const handleMatchClick = (userMatch: UserMatch) => {
+  const handleMatchClick = async (userMatch: UserMatch) => {
     setSelectedMatch(userMatch);
     setDialogOpen(true);
+    setTeamPhoto(null);
+    setLoadingPhoto(true);
+
+    // Fetch team photo if not a qual role
+    if (userMatch.role !== "qualRed" && userMatch.role !== "qualBlue") {
+      const teamNumber = teamNumbers[`${userMatch.match.id}-${userMatch.role}`];
+      if (teamNumber) {
+        const photoUrl = await getTeamPhoto(teamNumber, CURRENT_YEAR);
+        console.log(`Photo URL for team ${teamNumber}:`, photoUrl);
+        setTeamPhoto(photoUrl);
+      }
+    }
+
+    setLoadingPhoto(false);
   };
 
   const handleStartScouting = () => {
@@ -229,6 +278,18 @@ export default function Dashboard() {
                           <div className="text-xs break-words">
                             Role: {userMatch.role}
                           </div>
+                          {teamNumbers[
+                            `${userMatch.match.id}-${userMatch.role}`
+                          ] && (
+                            <div className="text-xs font-semibold text-foreground mt-1">
+                              Team:{" "}
+                              {
+                                teamNumbers[
+                                  `${userMatch.match.id}-${userMatch.role}`
+                                ]
+                              }
+                            </div>
+                          )}
                         </div>
                         <Button
                           className="w-full mt-4"
@@ -280,18 +341,61 @@ export default function Dashboard() {
             </DialogHeader>
 
             <div className="space-y-4 py-4">
-              {/* Robot Image Placeholder */}
-              <div className="w-full h-48 bg-muted rounded-lg flex items-center justify-center border-2 border-dashed border-border">
-                <div className="text-center">
-                  <p className="text-muted-foreground font-semibold">
-                    Robot Image
-                  </p>
-                  <p className="text-sm text-muted-foreground">Coming soon</p>
-                </div>
+              {/* Robot Image */}
+              <div className="w-full h-48 bg-muted rounded-lg flex items-center justify-center border-2 border-border overflow-hidden">
+                {loadingPhoto ? (
+                  <div className="text-center">
+                    <p className="text-muted-foreground font-semibold">
+                      Loading...
+                    </p>
+                  </div>
+                ) : teamPhoto ? (
+                  <img
+                    src={teamPhoto}
+                    alt="Robot"
+                    className="w-full h-full object-contain"
+                    onError={(e) => {
+                      console.error("Failed to load image:", teamPhoto);
+                      e.currentTarget.style.display = "none";
+                      e.currentTarget.parentElement!.innerHTML = `
+                        <div class="text-center">
+                          <p class="text-muted-foreground font-semibold">Robot Image</p>
+                          <p class="text-sm text-muted-foreground">Failed to load</p>
+                        </div>
+                      `;
+                    }}
+                  />
+                ) : (
+                  <div className="text-center">
+                    <p className="text-muted-foreground font-semibold">
+                      Robot Image
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Not available
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Match Details */}
               <div className="space-y-3">
+                {selectedMatch &&
+                  teamNumbers[
+                    `${selectedMatch.match.id}-${selectedMatch.role}`
+                  ] && (
+                    <div className="flex justify-between items-center p-3 bg-accent/50 rounded-lg">
+                      <span className="text-sm font-medium text-muted-foreground">
+                        Team Number
+                      </span>
+                      <span className="font-semibold">
+                        {
+                          teamNumbers[
+                            `${selectedMatch.match.id}-${selectedMatch.role}`
+                          ]
+                        }
+                      </span>
+                    </div>
+                  )}
                 <div className="flex justify-between items-center p-3 bg-accent/50 rounded-lg">
                   <span className="text-sm font-medium text-muted-foreground">
                     Your Role

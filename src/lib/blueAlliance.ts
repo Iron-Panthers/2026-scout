@@ -4,6 +4,9 @@
 const TBA_BASE_URL = "https://www.thebluealliance.com/api/v3";
 const TBA_AUTH_KEY = import.meta.env.VITE_TBA_AUTH_KEY;
 
+// Current competition year
+export const CURRENT_YEAR = 2025;
+
 if (!TBA_AUTH_KEY) {
   console.warn("Missing TBA_AUTH_KEY environment variable");
 }
@@ -131,13 +134,29 @@ export async function getTeamPhoto(
     return null;
   }
 
-  // Find the preferred media entry
-  const preferredMedia = media.find((m) => m.preferred === true);
-  const targetMedia = preferredMedia || media[0]; // Fall back to first if no preferred
+  // Filter out unsupported media types like avatar
+  const supportedTypes = ["imgur", "cdphotothread"];
+  const supportedMedia = media.filter(
+    (m) => supportedTypes.includes(m.type) || m.direct_url || m.view_url
+  );
+
+  if (supportedMedia.length === 0) {
+    console.log(
+      `No supported media types found for team ${teamNumber} in ${year}`
+    );
+    return null;
+  }
+
+  // Find the preferred media entry from supported types
+  const preferredMedia = supportedMedia.find((m) => m.preferred === true);
+  const targetMedia = preferredMedia || supportedMedia[0]; // Fall back to first supported if no preferred
+
+  console.log(`Selected media for team ${teamNumber}:`, targetMedia);
 
   // Handle different media types
   if (targetMedia.type === "imgur") {
-    return `https://i.imgur.com/${targetMedia.foreign_key}.png`;
+    // Imgur can be jpg, png, or other formats - try without extension first
+    return `https://i.imgur.com/${targetMedia.foreign_key}.jpg`;
   } else if (targetMedia.type === "cdphotothread") {
     // Chief Delphi photo thread - use direct_url if available
     return targetMedia.direct_url || null;

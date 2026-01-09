@@ -21,6 +21,7 @@ export interface Event {
   id: string;
   name: string;
   event_code: string | null; // TBA event code (e.g., "2024cmp", "2024caln")
+  is_active: boolean; // Only one event should be active at a time
   location: string | null;
   start_date: string | null;
   end_date: string | null;

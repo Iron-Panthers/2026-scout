@@ -16,6 +16,25 @@ export async function getEvents(): Promise<Event[]> {
   return data || [];
 }
 
+// Fetch the currently active event
+export async function getActiveEvent(): Promise<Event | null> {
+  const { data, error } = await supabase
+    .from("events")
+    .select("*")
+    .eq("is_active", true)
+    .single();
+
+  if (error) {
+    if (error.code !== "PGRST116") {
+      // PGRST116 is "no rows returned", which is expected if no active event
+      console.error("Error fetching active event:", error);
+    }
+    return null;
+  }
+
+  return data;
+}
+
 // Fetch all matches
 export async function getMatches(): Promise<Match[]> {
   const { data, error } = await supabase
