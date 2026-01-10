@@ -31,6 +31,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       setProfile(userProfile);
+      setLoading(false); // Loading complete (updated because other loads were sync and triggered early loading false)
+      console.log("Profile loaded")
     } catch (error) {
       console.error("Error loading profile:", error);
       // Don't block auth if profile fails
@@ -56,8 +58,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Load profile but don't block on it
         loadProfile(session.user.id, userName).catch(console.error);
       }
-
-      setLoading(false);
     });
 
     // Listen for auth changes
@@ -75,8 +75,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else {
         setProfile(null);
       }
-
-      setLoading(false);
     });
 
     return () => subscription.unsubscribe();

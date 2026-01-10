@@ -8,6 +8,7 @@ import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
 import PitScouting from "./pages/PitScouting";
 import Login from "./pages/Login";
+import Dev from "./pages/Dev";
 
 function App() {
   return (
@@ -54,6 +55,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <PitScouting />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dev"
+              element={
+                <ProtectedRoute>
+                  <Dev />
                 </ProtectedRoute>
               }
             />
