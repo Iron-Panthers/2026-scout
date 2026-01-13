@@ -7,6 +7,7 @@ import ManagerDashboard from "./pages/ManagerDashboard";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
 import PitScouting from "./pages/PitScouting";
+import Scouting from "./pages/Scouting";
 import Login from "./pages/Login";
 import Dev from "./pages/Dev";
 
@@ -55,6 +56,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <PitScouting />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/scouting"
+              element={
+                <ProtectedRoute>
+                  <Scouting />
                 </ProtectedRoute>
               }
             />
