@@ -10,22 +10,21 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-interface Dot {
-  x: number; // 0-1 normalized coordinates
-  y: number; // 0-1 normalized coordinates
-  color?: string;
-  label?: string;
+interface Shot {
+  x: number;
+  y: number;
+  timestamp: number;
 }
 
 export default function Scouting() {
   const [selected, setSelected] = useState("");
   const [orientation, setOrientation] = useState<0 | 90 | 180 | 270>(0);
-  const [dots, setDots] = useState<Dot[]>([]);
+  const [shots, setShots] = useState<Shot[]>([]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
+  const startTimeRef = useRef<number>(Date.now());
 
-  // Load the field image
   useEffect(() => {
     const img = new Image();
     img.src = fieldImage;
@@ -35,17 +34,15 @@ export default function Scouting() {
     };
   }, []);
 
-  // Redraw canvas when orientation or dots change
   useEffect(() => {
     drawCanvas();
-  }, [orientation, dots]);
+  }, [orientation, shots]);
 
-  // Handle window resize
   useEffect(() => {
     const handleResize = () => drawCanvas();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, [orientation, dots]);
+  }, [orientation, shots]);
 
   const drawCanvas = () => {
     const canvas = canvasRef.current;
@@ -106,47 +103,37 @@ export default function Scouting() {
       ctx.rotate((270 * Math.PI) / 180);
     }
 
-    // Draw the field image
     ctx.drawImage(img, 0, 0, scaledWidth, scaledHeight);
 
-    // Restore context state before drawing dots
     ctx.restore();
 
-    // Draw dots on top (in canvas coordinates, not rotated)
-    dots.forEach((dot) => {
-      // Transform dot coordinates based on rotation
-      let dotX: number, dotY: number;
-      
+    shots.forEach((shot) => {
+      let shotX: number, shotY: number;
+
       if (orientation === 0) {
-        dotX = dot.x * scaledWidth;
-        dotY = dot.y * scaledHeight;
+        shotX = shot.x * scaledWidth;
+        shotY = shot.y * scaledHeight;
       } else if (orientation === 90) {
-        dotX = canvasWidth - (dot.y * scaledHeight);
-        dotY = dot.x * scaledWidth;
+        shotX = canvasWidth - shot.y * scaledHeight;
+        shotY = shot.x * scaledWidth;
       } else if (orientation === 180) {
-        dotX = canvasWidth - (dot.x * scaledWidth);
-        dotY = canvasHeight - (dot.y * scaledHeight);
-      } else { // 270
-        dotX = dot.y * scaledHeight;
-        dotY = canvasHeight - (dot.x * scaledWidth);
+        shotX = canvasWidth - shot.x * scaledWidth;
+        shotY = canvasHeight - shot.y * scaledHeight;
+      } else {
+        shotX = shot.y * scaledHeight;
+        shotY = canvasHeight - shot.x * scaledWidth;
       }
 
-      ctx.fillStyle = dot.color || "red";
+      ctx.fillStyle = "#3b82f6";
       ctx.beginPath();
-      ctx.arc(dotX, dotY, 8, 0, Math.PI * 2);
+      ctx.arc(shotX, shotY, 8, 0, Math.PI * 2);
       ctx.fill();
-
-      // Draw label if present
-      if (dot.label) {
-        ctx.fillStyle = "white";
-        ctx.font = "12px sans-serif";
-        ctx.textAlign = "center";
-        ctx.fillText(dot.label, dotX, dotY + 4);
-      }
     });
   };
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (selected !== "1x" && selected !== "5x" && selected !== "10x") return;
+
     const canvas = canvasRef.current;
     const img = imageRef.current;
     const container = containerRef.current;
@@ -156,13 +143,11 @@ export default function Scouting() {
     const clickX = e.clientX - rect.left;
     const clickY = e.clientY - rect.top;
 
-    // Convert click coordinates based on canvas scaling (display vs actual canvas size)
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
     const canvasClickX = clickX * scaleX;
     const canvasClickY = clickY * scaleY;
 
-    // Get the original image dimensions used in drawing
     const containerWidth = container.clientWidth;
     const containerHeight = container.clientHeight;
     let scale: number;
@@ -179,7 +164,6 @@ export default function Scouting() {
       scaledHeight = img.height * scale;
     }
 
-    // Transform click coordinates back to normalized field coordinates (0-1) based on rotation
     let normalizedX: number, normalizedY: number;
 
     if (orientation === 0) {
@@ -187,28 +171,28 @@ export default function Scouting() {
       normalizedY = canvasClickY / scaledHeight;
     } else if (orientation === 90) {
       normalizedX = canvasClickY / scaledWidth;
-      normalizedY = 1 - (canvasClickX / scaledHeight);
+      normalizedY = 1 - canvasClickX / scaledHeight;
     } else if (orientation === 180) {
-      normalizedX = 1 - (canvasClickX / scaledWidth);
-      normalizedY = 1 - (canvasClickY / scaledHeight);
-    } else { // 270
-      normalizedX = 1 - (canvasClickY / scaledWidth);
+      normalizedX = 1 - canvasClickX / scaledWidth;
+      normalizedY = 1 - canvasClickY / scaledHeight;
+    } else {
+      normalizedX = 1 - canvasClickY / scaledWidth;
       normalizedY = canvasClickX / scaledHeight;
     }
 
-    // Add dot with selected multiplier color
-    const color =
-      selected === "1x"
-        ? "#3b82f6" // blue
-        : selected === "5x"
-        ? "#eab308" // yellow
-        : selected === "10x"
-        ? "#22c55e" // green
-        : selected === "action"
-        ? "#ef4444" // red
-        : "#6b7280"; // gray default
+    const timestamp = Date.now() - startTimeRef.current;
 
-    setDots([...dots, { x: normalizedX, y: normalizedY, color }]);
+    const shotCount = selected === "1x" ? 1 : selected === "5x" ? 5 : 10;
+
+    const newShots = Array.from({ length: shotCount }, () => ({
+      x: normalizedX,
+      y: normalizedY,
+      timestamp,
+    }));
+
+    setShots([...shots, ...newShots]);
+
+    console.log(shots, newShots);
   };
 
   return (
