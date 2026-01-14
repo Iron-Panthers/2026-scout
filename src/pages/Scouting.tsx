@@ -1,198 +1,101 @@
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { MoreVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
-import fieldImage from "@/assets/FE-2026-_REBUILT_Playing_Field_With_Fuel.png";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-
-interface Shot {
-  x: number;
-  y: number;
-  timestamp: number;
-}
+import type { ActionButton, ModalOption } from "@/types/actionButtons";
+import ActionModal from "@/components/scouting/ActionModal";
+import ScoutingCanvas from "@/components/scouting/ScoutingCanvas";
 
 export default function Scouting() {
   const [selected, setSelected] = useState("");
   const [orientation, setOrientation] = useState<0 | 90 | 180 | 270>(0);
-  const [shots, setShots] = useState<Shot[]>([]);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const imageRef = useRef<HTMLImageElement | null>(null);
-  const startTimeRef = useRef<number>(Date.now());
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalConfig, setModalConfig] = useState<{
+    title: string;
+    options: ModalOption[];
+  } | null>(null);
 
-  useEffect(() => {
-    const img = new Image();
-    img.src = fieldImage;
-    img.onload = () => {
-      imageRef.current = img;
-      drawCanvas();
-    };
-  }, []);
+  interface ScoutingData {
+    shots: Array<{ x: number; y: number; timestamp: number }>;
+    events: Array<{ type: string; timestamp: number; data?: any }>;
+    flags: Record<string, boolean>;
+    counters: Record<string, number>;
+    notes: string[];
+  }
+  const [scoutingData, setScoutingData] = useState<ScoutingData>({
+    shots: [],
+    events: [],
+    flags: {},
+    counters: {},
+    notes: [],
+  });
 
-  useEffect(() => {
-    drawCanvas();
-  }, [orientation, shots]);
+  // Define action buttons directly in TypeScript
+  const actionButtons: ActionButton[] = [
+    {
+      id: "depot-intake",
+      title: "Depot",
+      x: 0.05,
+      y: 0.235,
+      w: 0.04,
+      h: 0.11,
+      color: "#ef4444",
+      type: "direct",
+      action: "recordDepotIntake",
+    },
+  ];
 
-  useEffect(() => {
-    const handleResize = () => drawCanvas();
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, [orientation, shots]);
-
-  const drawCanvas = () => {
-    const canvas = canvasRef.current;
-    const container = containerRef.current;
-    const img = imageRef.current;
-
-    if (!canvas || !container || !img) return;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    // Get container dimensions
-    const containerWidth = container.clientWidth;
-    const containerHeight = container.clientHeight;
-
-    let scale: number;
-    let scaledWidth: number;
-    let scaledHeight: number;
-    let canvasWidth: number;
-    let canvasHeight: number;
-
-    // Set canvas size and scaling based on orientation
-    if (orientation === 90 || orientation === 270) {
-      // When rotated 90/270, maximize width (which becomes the rotated image height)
-      scale = containerWidth / img.height;
-      scaledWidth = img.width * scale;
-      scaledHeight = img.height * scale;
-      // Canvas dimensions are swapped for rotation
-      canvasWidth = scaledHeight;
-      canvasHeight = scaledWidth;
-    } else {
-      // When 0/180, maximize height
-      scale = containerHeight / img.height;
-      scaledWidth = img.width * scale;
-      scaledHeight = img.height * scale;
-      canvasWidth = scaledWidth;
-      canvasHeight = scaledHeight;
+  // Action handlers defined inline
+  const handleAction = (actionName: string, button?: ActionButton) => {
+    switch (actionName) {
+      case "recordDepotIntake":
+        console.log("intake depot");
+      default:
+        console.warn(`Action handler not found: ${actionName}`);
     }
-
-    canvas.width = canvasWidth;
-    canvas.height = canvasHeight;
-
-    // Clear canvas
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Save context state
-    ctx.save();
-
-    // Apply rotation transformation
-    if (orientation === 90) {
-      ctx.translate(canvasWidth, 0);
-      ctx.rotate((90 * Math.PI) / 180);
-    } else if (orientation === 180) {
-      ctx.translate(canvasWidth, canvasHeight);
-      ctx.rotate((180 * Math.PI) / 180);
-    } else if (orientation === 270) {
-      ctx.translate(0, canvasHeight);
-      ctx.rotate((270 * Math.PI) / 180);
-    }
-
-    ctx.drawImage(img, 0, 0, scaledWidth, scaledHeight);
-
-    ctx.restore();
-
-    shots.forEach((shot) => {
-      let shotX: number, shotY: number;
-
-      if (orientation === 0) {
-        shotX = shot.x * scaledWidth;
-        shotY = shot.y * scaledHeight;
-      } else if (orientation === 90) {
-        shotX = canvasWidth - shot.y * scaledHeight;
-        shotY = shot.x * scaledWidth;
-      } else if (orientation === 180) {
-        shotX = canvasWidth - shot.x * scaledWidth;
-        shotY = canvasHeight - shot.y * scaledHeight;
-      } else {
-        shotX = shot.y * scaledHeight;
-        shotY = canvasHeight - shot.x * scaledWidth;
-      }
-
-      ctx.fillStyle = "#3b82f6";
-      ctx.beginPath();
-      ctx.arc(shotX, shotY, 8, 0, Math.PI * 2);
-      ctx.fill();
-    });
   };
 
-  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (selected !== "1x" && selected !== "5x" && selected !== "10x") return;
-
-    const canvas = canvasRef.current;
-    const img = imageRef.current;
-    const container = containerRef.current;
-    if (!canvas || !img || !container) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const clickY = e.clientY - rect.top;
-
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    const canvasClickX = clickX * scaleX;
-    const canvasClickY = clickY * scaleY;
-
-    const containerWidth = container.clientWidth;
-    const containerHeight = container.clientHeight;
-    let scale: number;
-    let scaledWidth: number;
-    let scaledHeight: number;
-
-    if (orientation === 90 || orientation === 270) {
-      scale = containerWidth / img.height;
-      scaledWidth = img.width * scale;
-      scaledHeight = img.height * scale;
-    } else {
-      scale = containerHeight / img.height;
-      scaledWidth = img.width * scale;
-      scaledHeight = img.height * scale;
+  const handleButtonClick = (button: ActionButton) => {
+    if (button.type === "direct" && button.action) {
+      handleAction(button.action, button);
+    } else if (button.type === "modal" && button.options) {
+      setModalConfig({
+        title: button.title,
+        options: button.options,
+      });
+      setModalOpen(true);
     }
+  };
 
-    let normalizedX: number, normalizedY: number;
+  const handleModalOptionSelect = (option: ModalOption) => {
+    handleAction(option.action);
+  };
 
-    if (orientation === 0) {
-      normalizedX = canvasClickX / scaledWidth;
-      normalizedY = canvasClickY / scaledHeight;
-    } else if (orientation === 90) {
-      normalizedX = canvasClickY / scaledWidth;
-      normalizedY = 1 - canvasClickX / scaledHeight;
-    } else if (orientation === 180) {
-      normalizedX = 1 - canvasClickX / scaledWidth;
-      normalizedY = 1 - canvasClickY / scaledHeight;
-    } else {
-      normalizedX = 1 - canvasClickY / scaledWidth;
-      normalizedY = canvasClickX / scaledHeight;
-    }
-
-    const timestamp = Date.now() - startTimeRef.current;
-
+  const handleShotClick = (x: number, y: number, timestamp: number) => {
     const shotCount = selected === "1x" ? 1 : selected === "5x" ? 5 : 10;
-
     const newShots = Array.from({ length: shotCount }, () => ({
-      x: normalizedX,
-      y: normalizedY,
+      x,
+      y,
       timestamp,
     }));
 
-    setShots([...shots, ...newShots]);
+    setScoutingData((prev) => ({
+      ...prev,
+      shots: [...prev.shots, ...newShots],
+    }));
+  };
 
-    console.log(shots, newShots);
+  const getShotMultiplier = (): number => {
+    if (selected === "1x") return 1;
+    if (selected === "5x") return 5;
+    if (selected === "10x") return 10;
+    return 0;
   };
 
   return (
@@ -210,13 +113,13 @@ export default function Scouting() {
               0° (Default)
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setOrientation(90)}>
-              90° (Clockwise)
+              90° (Right)
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setOrientation(180)}>
-              180°
+              180° (Flipped)
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setOrientation(270)}>
-              270° (Counter-clockwise)
+              270° (Left)
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -254,24 +157,25 @@ export default function Scouting() {
         </Button>
       </aside>
 
-      {/* Main Content - Field Canvas */}
-      <main className="flex-1 overflow-hidden relative">
-        <div
-          ref={containerRef}
-          className={cn(
-            "w-full h-full",
-            orientation === 0 || orientation === 180
-              ? "overflow-x-auto overflow-y-hidden"
-              : "overflow-y-auto overflow-x-hidden"
-          )}
-        >
-          <canvas
-            ref={canvasRef}
-            onClick={handleCanvasClick}
-            className="cursor-crosshair"
-          />
-        </div>
-      </main>
+      {/* Canvas Area */}
+      <ScoutingCanvas
+        orientation={orientation}
+        shots={scoutingData.shots}
+        actionButtons={actionButtons}
+        showActionButtons={selected === "action"}
+        onButtonClick={handleButtonClick}
+        onShotClick={handleShotClick}
+        shotMultiplier={getShotMultiplier()}
+      />
+
+      {/* Modal */}
+      <ActionModal
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title={modalConfig?.title || ""}
+        options={modalConfig?.options || []}
+        onOptionSelect={handleModalOptionSelect}
+      />
     </div>
   );
 }

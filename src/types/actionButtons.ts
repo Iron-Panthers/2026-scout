@@ -1,0 +1,26 @@
+export interface ModalOption {
+  label: string;
+  action: string;
+  color?: string;
+}
+
+export interface ActionButton {
+  id: string;
+  title: string;
+  x: number; // 0-1 normalized field coordinate
+  y: number; // 0-1 normalized field coordinate
+  w: number; // 0-1 normalized width
+  h: number; // 0-1 normalized height
+  color: string;
+  type: "direct" | "modal";
+  action?: string; // For direct type
+  options?: ModalOption[]; // For modal type
+}
+
+export interface TransformedButton {
+  button: ActionButton;
+  x: number; // Canvas pixel coordinate
+  y: number; // Canvas pixel coordinate
+  width: number; // Canvas pixel width
+  height: number; // Canvas pixel height
+}
