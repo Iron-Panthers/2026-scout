@@ -58,6 +58,7 @@ export default function Scouting() {
     if (!ctx) return;
 
     // Get container dimensions
+    const containerWidth = container.clientWidth;
     const containerHeight = container.clientHeight;
 
     let scale: number;
@@ -68,15 +69,15 @@ export default function Scouting() {
 
     // Set canvas size and scaling based on orientation
     if (orientation === 90 || orientation === 270) {
-      // When rotated 90/270, the image height becomes width, maximize that dimension
-      scale = containerHeight / img.width; // height of container / width of image (which becomes height when rotated)
+      // When rotated 90/270, maximize width (which becomes the rotated image height)
+      scale = containerWidth / img.height;
       scaledWidth = img.width * scale;
       scaledHeight = img.height * scale;
       // Canvas dimensions are swapped for rotation
       canvasWidth = scaledHeight;
       canvasHeight = scaledWidth;
     } else {
-      // When 0/180, maximize height normally
+      // When 0/180, maximize height
       scale = containerHeight / img.height;
       scaledWidth = img.width * scale;
       scaledHeight = img.height * scale;
@@ -148,7 +149,8 @@ export default function Scouting() {
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     const img = imageRef.current;
-    if (!canvas || !img) return;
+    const container = containerRef.current;
+    if (!canvas || !img || !container) return;
 
     const rect = canvas.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
@@ -161,13 +163,14 @@ export default function Scouting() {
     const canvasClickY = clickY * scaleY;
 
     // Get the original image dimensions used in drawing
-    const containerHeight = containerRef.current?.clientHeight || 0;
+    const containerWidth = container.clientWidth;
+    const containerHeight = container.clientHeight;
     let scale: number;
     let scaledWidth: number;
     let scaledHeight: number;
 
     if (orientation === 90 || orientation === 270) {
-      scale = containerHeight / img.width;
+      scale = containerWidth / img.height;
       scaledWidth = img.width * scale;
       scaledHeight = img.height * scale;
     } else {
