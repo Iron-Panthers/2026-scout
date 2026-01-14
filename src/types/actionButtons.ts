@@ -1,6 +1,6 @@
 export interface ModalOption {
   label: string;
-  action: string;
+  payload: string;
   color?: string;
 }
 
@@ -13,7 +13,8 @@ export interface ActionButton {
   h: number; // 0-1 normalized height
   color: string;
   type: "direct" | "modal";
-  action?: string; // For direct type
+  action?: string; // For direct type or modal type
+  payload?: string; // Optional payload for direct actions
   options?: ModalOption[]; // For modal type
 }
 

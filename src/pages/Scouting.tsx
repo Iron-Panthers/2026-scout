@@ -18,6 +18,7 @@ export default function Scouting() {
   const [modalOpen, setModalOpen] = useState(false);
   const [modalConfig, setModalConfig] = useState<{
     title: string;
+    action: string;
     options: ModalOption[];
   } | null>(null);
 
@@ -43,19 +44,57 @@ export default function Scouting() {
       title: "Depot",
       x: 0.05,
       y: 0.235,
-      w: 0.04,
+      w: 0.08,
       h: 0.11,
       color: "#ef4444",
       type: "direct",
       action: "recordDepotIntake",
     },
+    {
+      id: "climb-modal",
+      title: "Climb",
+      x: 0.05,
+      y: 0.45,
+      w: 0.08,
+      h: 0.155,
+      color: "#ef4444",
+      type: "modal",
+      action: "recordClimb",
+      options: [
+        {
+          label: "Climb L3",
+          payload: "L3",
+          color: "#ef4444",
+        },
+        {
+          label: "Climb L2",
+          payload: "L2",
+          color: "#ef4444",
+        },
+        {
+          label: "Climb L1",
+          payload: "L1",
+          color: "#ef4444",
+        },
+      ],
+    },
   ];
 
   // Action handlers defined inline
-  const handleAction = (actionName: string, button?: ActionButton) => {
+  const handleAction = (
+    actionName: string,
+    payload?: string,
+    button?: ActionButton
+  ) => {
     switch (actionName) {
       case "recordDepotIntake":
         console.log("intake depot");
+        break;
+      case "recordClimb":
+        console.log(`climb recorded: ${payload}`);
+        break;
+      case "recordTrench":
+        break;
       default:
         console.warn(`Action handler not found: ${actionName}`);
     }
@@ -63,10 +102,11 @@ export default function Scouting() {
 
   const handleButtonClick = (button: ActionButton) => {
     if (button.type === "direct" && button.action) {
-      handleAction(button.action, button);
-    } else if (button.type === "modal" && button.options) {
+      handleAction(button.action, button.payload, button);
+    } else if (button.type === "modal" && button.options && button.action) {
       setModalConfig({
         title: button.title,
+        action: button.action,
         options: button.options,
       });
       setModalOpen(true);
@@ -74,7 +114,9 @@ export default function Scouting() {
   };
 
   const handleModalOptionSelect = (option: ModalOption) => {
-    handleAction(option.action);
+    if (modalConfig?.action) {
+      handleAction(modalConfig.action, option.payload);
+    }
   };
 
   const handleShotClick = (x: number, y: number, timestamp: number) => {
