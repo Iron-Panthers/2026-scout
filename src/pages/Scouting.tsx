@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { MoreVertical } from "lucide-react";
+import { MoreVertical, Undo } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -11,6 +11,8 @@ import {
 import type { ActionButton, ModalOption } from "@/types/actionButtons";
 import ActionModal from "@/components/scouting/ActionModal";
 import ScoutingCanvas from "@/components/scouting/ScoutingCanvas";
+import { useScoutingReducer } from "@/lib/useScoutingReducer";
+import type { ScoutingData } from "@/lib/ScoutingReducer";
 
 export default function Scouting() {
   const [selected, setSelected] = useState("");
@@ -22,20 +24,15 @@ export default function Scouting() {
     options: ModalOption[];
   } | null>(null);
 
-  interface ScoutingData {
-    shots: Array<{ x: number; y: number; timestamp: number }>;
-    events: Array<{ type: string; timestamp: number; data?: any }>;
-    flags: Record<string, boolean>;
-    counters: Record<string, number>;
-    notes: string[];
-  }
-  const [scoutingData, setScoutingData] = useState<ScoutingData>({
-    shots: [],
-    events: [],
-    flags: {},
-    counters: {},
-    notes: [],
-  });
+  // Use the reducer hook instead of useState
+  const { state, set, increment, undo, canUndo } =
+    useScoutingReducer<ScoutingData>({
+      shots: [],
+      events: [],
+      flags: {},
+      counters: {},
+      notes: [],
+    });
 
   // Define action buttons directly in TypeScript
   const actionButtons: ActionButton[] = [
@@ -86,14 +83,38 @@ export default function Scouting() {
     payload?: string,
     button?: ActionButton
   ) => {
+    console.log(state);
     switch (actionName) {
       case "recordDepotIntake":
+        set("events", [
+          ...state.events,
+          { type: "depot_intake", timestamp: Date.now() },
+        ]);
+        increment("counters.depotIntakes");
         console.log("intake depot");
         break;
       case "recordClimb":
+        set("events", [
+          ...state.events,
+          {
+            type: "climb",
+            timestamp: Date.now(),
+            data: { level: payload },
+          },
+        ]);
+        increment(`counters.climb${payload}`);
         console.log(`climb recorded: ${payload}`);
         break;
       case "recordTrench":
+        set("events", [
+          ...state.events,
+          {
+            type: "trench",
+            timestamp: Date.now(),
+            data: { location: payload },
+          },
+        ]);
+        increment("counters.trenchIntakes");
         break;
       default:
         console.warn(`Action handler not found: ${actionName}`);
@@ -127,10 +148,7 @@ export default function Scouting() {
       timestamp,
     }));
 
-    setScoutingData((prev) => ({
-      ...prev,
-      shots: [...prev.shots, ...newShots],
-    }));
+    set("shots", [...state.shots, ...newShots]);
   };
 
   const getShotMultiplier = (): number => {
@@ -197,12 +215,21 @@ export default function Scouting() {
         >
           Action
         </Button>
+        <Button
+          variant="outline"
+          className="w-full"
+          onClick={undo}
+          disabled={!canUndo}
+        >
+          <Undo className="h-4 w-4 mr-2" />
+          Undo
+        </Button>
       </aside>
 
       {/* Canvas Area */}
       <ScoutingCanvas
         orientation={orientation}
-        shots={scoutingData.shots}
+        shots={state.shots}
         actionButtons={actionButtons}
         showActionButtons={selected === "action"}
         onButtonClick={handleButtonClick}
