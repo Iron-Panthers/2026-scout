@@ -10,6 +10,7 @@ import PitScouting from "./pages/PitScouting";
 import Scouting from "./pages/Scouting";
 import Login from "./pages/Login";
 import Dev from "./pages/Dev";
+import ScoutConfig from "./pages/scouting/ScoutConfig";
 
 function App() {
   return (
@@ -72,6 +73,15 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Dev />
+                </ProtectedRoute>
+              }
+            />
+            {/* Scouting */}
+            <Route
+              path="/scout/config/:match_id"
+              element={
+                <ProtectedRoute>
+                  <ScoutConfig />
                 </ProtectedRoute>
               }
             />

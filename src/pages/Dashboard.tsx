@@ -11,7 +11,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { ClipboardList, Wrench, X } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { getUserMatches, removeUserFromMatch, getEvents } from "@/lib/matches";
 import { getMatchTeam, getTeamPhoto, CURRENT_YEAR } from "@/lib/blueAlliance";
@@ -23,6 +23,29 @@ interface UserMatch {
   matchNumber: string;
   role: Role;
   match: Match;
+}
+
+export function prettifyRole(role) {
+  switch (role) {
+    case "red1":
+      return "Red 1";
+    case "red2":
+      return "Red 2";
+    case "red3":
+      return "Red 3";
+    case "qualRed":
+      return "Qual Red";
+    case "blue1":
+      return "Blue 1";
+    case "blue2":
+      return "Blue 2";
+    case "blue3":
+      return "Blue 3";
+    case "qualBlue":
+      return "Qual Blue";
+    default: 
+      return "Unknown Role";
+  }
 }
 
 export default function Dashboard() {
@@ -39,6 +62,7 @@ export default function Dashboard() {
 
   const userName =
     user?.user_metadata?.name || user?.email?.split("@")[0] || "Scout";
+  const navigate = useNavigate();
   const userInitials = userName
     .split(" ")
     .map((n: string) => n[0])
@@ -158,12 +182,6 @@ export default function Dashboard() {
     }
 
     setLoadingPhoto(false);
-  };
-
-  const handleStartScouting = () => {
-    // TODO: Navigate to scouting form
-    console.log("Starting scouting for", selectedMatch?.matchNumber);
-    setDialogOpen(false);
   };
 
   const handleDecline = async () => {
@@ -400,7 +418,7 @@ export default function Dashboard() {
                   <span className="text-sm font-medium text-muted-foreground">
                     Your Role
                   </span>
-                  <span className="font-semibold">{selectedMatch?.role}</span>
+                  <span className="font-semibold">{prettifyRole(selectedMatch?.role)}</span>
                 </div>
                 <div className="flex justify-between items-center p-3 bg-accent/50 rounded-lg">
                   <span className="text-sm font-medium text-muted-foreground">
@@ -426,13 +444,13 @@ export default function Dashboard() {
                 variant="outline"
                 onClick={handleDecline}
                 className="flex-1"
-              >
+              > {/* What is the point of declining lmao */}
                 <X className="h-4 w-4 mr-2" />
                 Decline
               </Button>
-              <Button onClick={handleStartScouting} className="flex-1">
+              <Button onClick={() => navigate(`/scout/config/${selectedMatch.match.id}`)} className="flex-1">
                 <ClipboardList className="h-4 w-4 mr-2" />
-                Start Scouting
+                Queue Scouting
               </Button>
             </DialogFooter>
           </DialogContent>

@@ -29,7 +29,9 @@ export default function ProtectedRoute({
   }
 
   if (requireManager && !profile?.is_manager) {
-    return <Navigate to="/dashboard" replace />;
+    console.log("failed");
+    console.log(profile);
+    // return <Navigate to="/dashboard" replace />;
   }
 
   return <>{children}</>;

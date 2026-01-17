@@ -30,6 +30,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         userProfile = await createProfile(userId, userName);
       }
 
+      console.log(userProfile);
       setProfile(userProfile);
       setLoading(false); // Loading complete (updated because other loads were sync and triggered early loading false)
       console.log("Profile loaded")
