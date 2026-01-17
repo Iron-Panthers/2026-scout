@@ -11,13 +11,36 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { ClipboardList, Wrench, X } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { getUserMatches, removeUserFromMatch, getEvents } from "@/lib/matches";
 import { getMatchTeam, getTeamPhoto, CURRENT_YEAR } from "@/lib/blueAlliance";
 import DashboardHeader from "@/components/DashboardHeader";
 import UserProfileMenu from "@/components/UserProfileMenu";
 import type { Match, Role, Event } from "@/types";
+
+export function prettifyRole(role) {
+  switch (role) {
+    case "red1":
+      return "Red 1";
+    case "red2":
+      return "Red 2";
+    case "red3":
+      return "Red 3";
+    case "qualRed":
+      return "Qual Red";
+    case "blue1":
+      return "Blue 1";
+    case "blue2":
+      return "Blue 2";
+    case "blue3":
+      return "Blue 3";
+    case "qualBlue":
+      return "Qual Blue";
+    default: 
+      return "Unknown Role";
+  }
+}
 
 interface UserMatch {
   matchNumber: string;
@@ -36,6 +59,8 @@ export default function Dashboard() {
   );
   const [teamPhoto, setTeamPhoto] = useState<string | null>(null);
   const [loadingPhoto, setLoadingPhoto] = useState(false);
+
+  const navigate = useNavigate();
 
   const userName =
     user?.user_metadata?.name || user?.email?.split("@")[0] || "Scout";
@@ -160,12 +185,6 @@ export default function Dashboard() {
     setLoadingPhoto(false);
   };
 
-  const handleStartScouting = () => {
-    // TODO: Navigate to scouting form
-    console.log("Starting scouting for", selectedMatch?.matchNumber);
-    setDialogOpen(false);
-  };
-
   const handleDecline = async () => {
     if (!selectedMatch || !user?.id) return;
 
@@ -191,6 +210,11 @@ export default function Dashboard() {
       console.error("Failed to decline match");
     }
   };
+
+  const handleQueueScouting = async () => {
+    console.log(selectedMatch);
+    navigate(`/config/${selectedMatch.match.id}`);
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -400,7 +424,7 @@ export default function Dashboard() {
                   <span className="text-sm font-medium text-muted-foreground">
                     Your Role
                   </span>
-                  <span className="font-semibold">{selectedMatch?.role}</span>
+                  <span className="font-semibold">{prettifyRole(selectedMatch?.role)}</span>
                 </div>
                 <div className="flex justify-between items-center p-3 bg-accent/50 rounded-lg">
                   <span className="text-sm font-medium text-muted-foreground">
@@ -430,9 +454,9 @@ export default function Dashboard() {
                 <X className="h-4 w-4 mr-2" />
                 Decline
               </Button>
-              <Button onClick={handleStartScouting} className="flex-1">
+              <Button onClick={handleQueueScouting} className="flex-1">
                 <ClipboardList className="h-4 w-4 mr-2" />
-                Start Scouting
+                Queue Scouting
               </Button>
             </DialogFooter>
           </DialogContent>

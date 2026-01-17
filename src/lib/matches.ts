@@ -50,6 +50,22 @@ export async function getMatches(): Promise<Match[]> {
   return data || [];
 }
 
+// Fetch match from id
+export async function getMatch(matchId: string): Promise<Match | null> {
+  const { data, error } = await supabase
+    .from("matches")
+    .select("*")
+    .eq("id", matchId)
+    .single();
+
+  if (error) {
+    console.error("Error fetching matches:", error);
+    return null;
+  }
+
+  return data;
+}
+
 // Fetch all profiles (for scout selection)
 export async function getAllProfiles(): Promise<Profile[]> {
   const { data, error } = await supabase
