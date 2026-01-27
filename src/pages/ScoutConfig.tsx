@@ -1,5 +1,5 @@
 import { useAuth } from '@/contexts/AuthContext';
-import { CURRENT_YEAR, getMatchTeam, getTeamPhoto } from '@/lib/blueAlliance';
+import { CURRENT_YEAR, getEventMatches, getMatchTeam, getTeamPhoto } from '@/lib/blueAlliance';
 import { getEvents, getMatch } from '@/lib/matches';
 import React, { useState, useEffect } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
@@ -14,6 +14,7 @@ export default function ScoutConfig() {
     const { match_id } = useParams();
     const { user } = useAuth();
     const navigate = useNavigate();
+    var currentEvent;
     
     const [matchType, setMatchType] = useState('Qualification');
     const [matchNumber, setMatchNumber] = useState(0);
@@ -22,8 +23,6 @@ export default function ScoutConfig() {
     const [role, setRole] = useState('');
     const [loadingPhoto, setLoadingPhoto] = useState(false);
     const [teamPhoto, setTeamPhoto] = useState<string | null>(null);
-    const [currentEvent, setEvent] = useState<String | null>(null);
-    const [concurrentEvent, setConcurrentEvent] = useState<Event | null>(null);
     const [teamNumbers, setTeamNumbers] = useState<Record<string, number | null>>(
       {}
     );
@@ -88,24 +87,51 @@ export default function ScoutConfig() {
             setMatchNumber(match?.match_number || 0);
             setRole(match_role);
             console.log(event.name);
-            setEvent(event.name);
             setTeamNumbers(teamNumbersMap);
             setTeamNumber(teamNumbersMap[`${match_id}-${match_role}`] || 0);
-            setConcurrentEvent(events.find(event => event.is_active));
         };
 
-        const loadWithoutId = async () => {
-          const events = await getEvents();
-          const event = events.find(event => event.is_active);
-
-          console.log(event);
-          setEvent(event.name);
-          setConcurrentEvent(event);
-        }
-
         if (match_id != 'none') loadMatchData();
-        else loadWithoutId();
     }, [user?.id]);
+
+    const updateMatchID = async () => {
+      const events = await getEvents();
+      const event = events.find(event => event.is_active);
+      const teamNumbersMap: Record<string, number | null> = {};
+
+      const eventMatches = await getEventMatches(event?.event_code || '')
+      const match = eventMatches?.find(m => m.match_number === matchNumber && (m.match_type.toLowerCase() === matchType.toLowerCase()));
+      if (!match || !role) {
+        console.log('Can\' find match');
+        return;
+      }
+
+      match_id = match.match_id;
+
+      if (event?.event_code) {
+        const teamNumber = await getMatchTeam(
+          event.event_code,
+          match?.match_number,
+          role
+        );
+
+        if (teamNumber) {
+          teamNumbersMap[`${match_id}-${role}`] = teamNumber;
+        }
+      }
+
+      // Fetch team photo if not a qual role
+      if (role !== "qualRed" && role !== "qualBlue") {
+        const teamNumber = teamNumbersMap[`${match_id}-${role}`];
+        if (teamNumber) {
+          const photoUrl = await getTeamPhoto(teamNumber, CURRENT_YEAR);
+          console.log(`Photo URL for team ${teamNumber}:`, photoUrl);
+          setTeamPhoto(photoUrl);
+        }
+      }
+      setTeamNumbers(teamNumbersMap);
+      // setTeamNumber(teamNumbersMap[`${match_id}-${match_role}`] || 0);
+    }
 
     const setCurrentEvent = async () => {
       setEvent(concurrentEvent.name);
@@ -162,13 +188,13 @@ export default function ScoutConfig() {
                   <span className="text-sm font-medium text-muted-foreground">
                     Match Number
                   </span>
-                  <Input className="font-semibold w-30 text-right" type='number' placeholder='#####' onInput={(e) => { setMatchNumber(e.currentTarget.value) }} value={matchNumber}/>
+                  <Input className="font-semibold w-30 text-right" type='number' placeholder='#####' onInput={(e) => { setMatchNumber(e.currentTarget.value); updateMatchID(); }} value={matchNumber}/>
                 </div>
                 <div className="flex justify-between items-center pl-3 p-1 bg-accent/50 rounded-lg">
                   <span className="text-sm font-medium text-muted-foreground">
                     Team Number
                   </span>
-                  <Input className="font-semibold w-30 text-right" type='number' placeholder='#####' onInput={(e) => { setTeamNumber(e.currentTarget.value) }} value={teamNumber} />
+                  <Input className="font-semibold w-30 text-right" type='number' placeholder='#####' onInput={(e) => { setTeamNumber(e.currentTarget.value); updateMatchID(); }} value={teamNumber} />
                 </div>
                 { teamNumbers[`${match_id}-${role}`] && ( <div className="flex justify-between items-center p-1 pl-3 bg-accent/50 rounded-lg">
                   <span className="text-sm font-medium text-muted-foreground">
@@ -179,14 +205,14 @@ export default function ScoutConfig() {
                       <p className="px-7 bg-accent-foreground/10 p-2 border-b rounded-lg">{prettifyRole(role)}</p>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent className='w-fit h-fit rounded-lg shadow-md border border-border bg-popover'>
-                      <DropdownMenuItem className="p-2 px-7 bg-primary border-b rounded-lg" onClick={() => setRole('red1')}>Red 1</DropdownMenuItem>
-                      <DropdownMenuItem className="p-2 px-7 bg-primary border-b rounded-lg" onClick={() => setRole('red2')}>Red 2</DropdownMenuItem>
-                      <DropdownMenuItem className="p-2 px-7 bg-primary border-b rounded-lg" onClick={() => setRole('red3')}>Red 3</DropdownMenuItem>
-                      <DropdownMenuItem className="p-2 px-7 bg-primary border-b rounded-lg" onClick={() => setRole('qualRed')}>Qual Red</DropdownMenuItem>
-                      <DropdownMenuItem className="p-2 px-7 bg-chart-5 border-b rounded-lg" onClick={() => setRole('blue1')}>Blue 1</DropdownMenuItem>
-                      <DropdownMenuItem className="p-2 px-7 bg-chart-5 border-b rounded-lg" onClick={() => setRole('blue2')}>Blue 2</DropdownMenuItem>
-                      <DropdownMenuItem className="p-2 px-7 bg-chart-5 border-b rounded-lg" onClick={() => setRole('blue3')}>Blue 3</DropdownMenuItem>
-                      <DropdownMenuItem className="p-2 px-7 bg-chart-5 border-b rounded-lg" onClick={() => setRole('qualBlue')}>Qual Blue</DropdownMenuItem>
+                      <DropdownMenuItem className="p-2 px-7 bg-primary border-b rounded-lg" onClick={() => { setRole('red1'); updateMatchID(); }}>Red 1</DropdownMenuItem>
+                      <DropdownMenuItem className="p-2 px-7 bg-primary border-b rounded-lg" onClick={() => { setRole('red2'); updateMatchID(); }}>Red 2</DropdownMenuItem>
+                      <DropdownMenuItem className="p-2 px-7 bg-primary border-b rounded-lg" onClick={() => { setRole('red3'); updateMatchID(); }}>Red 3</DropdownMenuItem>
+                      <DropdownMenuItem className="p-2 px-7 bg-primary border-b rounded-lg" onClick={() => { setRole('qualRed'); updateMatchID(); }}>Qual Red</DropdownMenuItem>
+                      <DropdownMenuItem className="p-2 px-7 bg-chart-5 border-b rounded-lg" onClick={() => { setRole('blue1'); updateMatchID(); }}>Blue 1</DropdownMenuItem>
+                      <DropdownMenuItem className="p-2 px-7 bg-chart-5 border-b rounded-lg" onClick={() => { setRole('blue2'); updateMatchID(); }}>Blue 2</DropdownMenuItem>
+                      <DropdownMenuItem className="p-2 px-7 bg-chart-5 border-b rounded-lg" onClick={() => { setRole('blue3'); updateMatchID(); }}>Blue 3</DropdownMenuItem>
+                      <DropdownMenuItem className="p-2 px-7 bg-chart-5 border-b rounded-lg" onClick={() => { setRole('qualBlue'); updateMatchID(); }}>Qual Blue</DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div> )}
@@ -199,19 +225,19 @@ export default function ScoutConfig() {
                       <p className="px-7 bg-accent-foreground/10 p-2 border-b rounded-lg">{matchType}</p>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent className='w-fit h-fit rounded-lg shadow-md border border-border bg-popover'>
-                      <DropdownMenuItem className="p-2 px-7 bg-accent-foreground/10 border-b rounded-lg" onClick={() => setMatchType('Qualification')}>Qualification</DropdownMenuItem>
-                      <DropdownMenuItem className="p-2 px-7 bg-accent-foreground/10 border-b rounded-lg" onClick={() => setMatchType('Playoff')}>Playoff</DropdownMenuItem>
-                      <DropdownMenuItem className="p-2 px-7 bg-accent-foreground/10 border-b rounded-lg" onClick={() => setMatchType('Practice')}>Practice</DropdownMenuItem>
+                      <DropdownMenuItem className="p-2 px-7 bg-accent-foreground/10 border-b rounded-lg" onClick={() => { setMatchType('Qualification'); updateMatchID(); }}>Qualification</DropdownMenuItem>
+                      <DropdownMenuItem className="p-2 px-7 bg-accent-foreground/10 border-b rounded-lg" onClick={() => { setMatchType('Playoff'); updateMatchID(); }}>Playoff</DropdownMenuItem>
+                      <DropdownMenuItem className="p-2 px-7 bg-accent-foreground/10 border-b rounded-lg" onClick={() => { setMatchType('Practice'); updateMatchID(); }}>Practice</DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
-                <div className="flex justify-between items-center pl-3 p-1 bg-accent/50 rounded-lg">
+                {/* <div className="flex justify-between items-center pl-3 p-1 bg-accent/50 rounded-lg">
                   <span className="text-sm font-medium text-muted-foreground pr-4">
                     Event
                   </span>
                   <Input type='text' className="font-semibold text-right" onInput={(e) => setEvent(e.currentTarget.value)} value={currentEvent} placeholder='Event Name' />
                 </div>
-                { currentEvent && concurrentEvent && concurrentEvent.name != currentEvent ? <Button className="w-full bg-accent p-3" onClick={() => { setCurrentEvent() }}>Use Current Event</Button> : null}
+                { currentEvent && concurrentEvent && concurrentEvent.name != currentEvent ? <Button className="w-full bg-accent p-3" onClick={() => { setCurrentEvent() }}>Use Current Event</Button> : null} */}
               </div>
             </TabsContent>
             <TabsContent value="game">
