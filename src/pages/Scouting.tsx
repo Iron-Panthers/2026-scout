@@ -13,8 +13,12 @@ import ActionModal from "@/components/scouting/ActionModal";
 import ScoutingCanvas from "@/components/scouting/ScoutingCanvas";
 import { useScoutingReducer } from "@/lib/useScoutingReducer";
 import type { ScoutingData } from "@/lib/ScoutingReducer";
+import { useParams } from "react-router-dom";
 
 export default function Scouting() {
+  const { match_id, role } = useParams();
+  console.log("Loaded from config: ", match_id, role)
+
   const [selected, setSelected] = useState("");
   const [orientation, setOrientation] = useState<0 | 90 | 180 | 270>(0);
   const [modalOpen, setModalOpen] = useState(false);

@@ -62,7 +62,7 @@ function App() {
             />
             {/* Scouting */}
             <Route
-              path="/config/:match_id"
+              path="/config/:match_id?"
               element={
                 <ProtectedRoute>
                   <ScoutConfig />
@@ -70,7 +70,7 @@ function App() {
               }
             />
             <Route
-              path="/scouting"
+              path="/scouting/:match_id/:role"
               element={
                 <ProtectedRoute>
                   <Scouting />

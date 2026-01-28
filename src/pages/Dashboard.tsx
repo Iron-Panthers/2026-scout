@@ -235,6 +235,7 @@ export default function Dashboard() {
           <Button
             size="lg"
             className="h-24 text-lg font-semibold flex flex-col gap-2"
+            onClick={() => navigate('/config/')}
           >
             <ClipboardList className="h-8 w-8" />
             Match Scouting
