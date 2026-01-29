@@ -1,5 +1,5 @@
 import { useCallback, useReducer } from "react";
-import { ScoutingReducer, ActionType } from "./ScoutingReducer";
+import { ScoutingReducer } from "./ScoutingReducer";
 import type { Action, ScoutingData } from "./ScoutingReducer";
 
 /**
@@ -10,7 +10,7 @@ export const actionCreators = {
    * Create a SET action
    */
   set: (path: string, value: any): Action => ({
-    type: ActionType.SET,
+    type: "SET",
     payload: { path, value },
   }),
 
@@ -18,7 +18,7 @@ export const actionCreators = {
    * Create a TOGGLE action
    */
   toggle: (path: string): Action => ({
-    type: ActionType.TOGGLE,
+    type: "TOGGLE",
     payload: { path },
   }),
 
@@ -26,7 +26,7 @@ export const actionCreators = {
    * Create an INCREMENT action
    */
   increment: (path: string, amount: number = 1): Action => ({
-    type: ActionType.INCREMENT,
+    type: "INCREMENT",
     payload: { path, amount },
   }),
 
@@ -34,7 +34,7 @@ export const actionCreators = {
    * Create a DECREMENT action
    */
   decrement: (path: string, amount: number = 1): Action => ({
-    type: ActionType.DECREMENT,
+    type: "DECREMENT",
     payload: { path, amount },
   }),
 
@@ -42,7 +42,7 @@ export const actionCreators = {
    * Create an UNDO action
    */
   undo: (): Action => ({
-    type: ActionType.UNDO,
+    type: "UNDO",
   }),
 };
 

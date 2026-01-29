@@ -8,6 +8,7 @@
 /**
  * Base state structure for scouting data
  */
+
 export interface ScoutingData {
   shots: Array<{ x: number; y: number; timestamp: number }>;
   events: Array<{ type: string; timestamp: number; data?: any }>;
@@ -17,19 +18,13 @@ export interface ScoutingData {
 /**
  * Action types supported by the reducer
  */
-export enum ActionType {
-  SET = "SET",
-  TOGGLE = "TOGGLE",
-  INCREMENT = "INCREMENT",
-  DECREMENT = "DECREMENT",
-  UNDO = "UNDO",
-}
+export type ActionType = "SET" | "TOGGLE" | "INCREMENT" | "DECREMENT" | "UNDO";
 
 /**
  * Action payload definitions
  */
 export interface SetAction {
-  type: ActionType.SET;
+  type: "SET";
   payload: {
     path: string;
     value: any;
@@ -37,14 +32,14 @@ export interface SetAction {
 }
 
 export interface ToggleAction {
-  type: ActionType.TOGGLE;
+  type: "TOGGLE";
   payload: {
     path: string;
   };
 }
 
 export interface IncrementAction {
-  type: ActionType.INCREMENT;
+  type: "INCREMENT";
   payload: {
     path: string;
     amount?: number;
@@ -52,7 +47,7 @@ export interface IncrementAction {
 }
 
 export interface DecrementAction {
-  type: ActionType.DECREMENT;
+  type: "DECREMENT";
   payload: {
     path: string;
     amount?: number;
@@ -60,7 +55,7 @@ export interface DecrementAction {
 }
 
 export interface UndoAction {
-  type: ActionType.UNDO;
+  type: "UNDO";
 }
 
 /**
@@ -138,7 +133,7 @@ export class ScoutingReducer<T extends Record<string, any> = ScoutingData> {
    */
   reduce(action: Action): T {
     // Handle UNDO separately (doesn't add to history)
-    if (action.type === ActionType.UNDO) {
+    if (action.type === "UNDO") {
       return this.handleUndo();
     }
 
@@ -146,16 +141,16 @@ export class ScoutingReducer<T extends Record<string, any> = ScoutingData> {
     this.addToHistory(this.currentState);
 
     switch (action.type) {
-      case ActionType.SET:
+      case "SET":
         return this.handleSet(action.payload.path, action.payload.value);
 
-      case ActionType.TOGGLE:
+      case "TOGGLE":
         return this.handleToggle(action.payload.path);
 
-      case ActionType.INCREMENT:
+      case "INCREMENT":
         return this.handleIncrement(action.payload.path, action.payload.amount);
 
-      case ActionType.DECREMENT:
+      case "DECREMENT":
         return this.handleDecrement(action.payload.path, action.payload.amount);
 
       default:
