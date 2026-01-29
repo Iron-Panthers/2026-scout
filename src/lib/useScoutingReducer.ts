@@ -70,33 +70,27 @@ export interface UseScoutingReducerReturn<T> {
  * @param maxHistorySize - Maximum number of states to keep in history (default: 50)
  * @returns State and dispatch functions
  *
- * @example
- * ```tsx
- * const { state, increment, undo, canUndo } = useScoutingReducer({
- *   shots: [],
- *   events: [],
- *   flags: {},
- *   counters: {},
- *   notes: [],
- * });
- *
- * // Increment a counter
- * increment('counters.speakerShots');
- *
- * // Undo if available
- * if (canUndo) {
- *   undo();
- * }
  * ```
  */
-export function useScoutingReducer<
-  T extends Record<string, any> = ScoutingData
->(initialState: T, maxHistorySize: number = 50): UseScoutingReducerReturn<T> {
+
+export function useScoutingReducer(
+  matchId: string,
+  role: string = "",
+  maxHistorySize: number = 50
+): UseScoutingReducerReturn<ScoutingData> {
   // Create reducer instance (only once)
   const [reducerInstance] = useReducer(
-    () => new ScoutingReducer<T>(initialState, maxHistorySize),
+    () =>
+      new ScoutingReducer<ScoutingData>(
+        ScoutingReducer.createInitialState(matchId, role),
+        maxHistorySize
+      ),
     undefined,
-    () => new ScoutingReducer<T>(initialState, maxHistorySize)
+    () =>
+      new ScoutingReducer<ScoutingData>(
+        ScoutingReducer.createInitialState(matchId, role),
+        maxHistorySize
+      )
   );
 
   // Use React's useReducer to trigger re-renders

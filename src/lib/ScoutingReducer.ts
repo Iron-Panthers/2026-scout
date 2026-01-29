@@ -1,4 +1,19 @@
 /**
+ * List of all counter names for initialization
+ */
+const COUNTER_NAMES = [
+  "trenchLeftHome",
+  "trenchRigthHome",
+  "bumpLeftHome",
+  "bumpRightHome",
+  "trenchLeftAway",
+  "trenchRightAway",
+  "climbl1",
+  "climbl2",
+  "climbl3",
+];
+
+/**
  * ScoutingReducer - A state management system with built-in actions and undo functionality
  *
  * Provides SET, TOGGLE, INCREMENT, DECREMENT actions with path-based state updates
@@ -9,10 +24,20 @@
  * Base state structure for scouting data
  */
 
+export type Phase =
+  | "auto"
+  | "transition-shift"
+  | "phase1"
+  | "phase2"
+  | "phase3"
+  | "phase4"
+  | "endgame";
+
 export interface ScoutingData {
-  shots: Array<{ x: number; y: number; timestamp: number }>;
-  events: Array<{ type: string; timestamp: number; data?: any }>;
-  counters: Record<string, number>;
+  matchId: string;
+  role: string;
+  shots: Record<Phase, Array<{ x: number; y: number; timestamp: number }>>;
+  counters: Record<Phase, Record<string, number>>;
 }
 
 /**
@@ -87,6 +112,42 @@ export class ScoutingReducer<T extends Record<string, any> = ScoutingData> {
     this.currentState = { ...initialState };
     this.history = [];
     this.maxHistorySize = maxHistorySize;
+  }
+
+  /**
+   * Create an initial ScoutingData state object
+   * @param matchId - The match ID for this match
+   * @param role - The role for this match
+   * @returns ScoutingData
+   */
+  static createInitialState(matchId: string, role: string = ""): ScoutingData {
+    const phases: Phase[] = [
+      "auto",
+      "transition-shift",
+      "phase1",
+      "phase2",
+      "phase3",
+      "phase4",
+      "endgame",
+    ];
+    const shots: Record<
+      Phase,
+      Array<{ x: number; y: number; timestamp: number }>
+    > = {} as any;
+    const counters: Record<Phase, Record<string, number>> = {} as any;
+    for (const phase of phases) {
+      shots[phase] = [];
+      counters[phase] = {};
+      for (const name of COUNTER_NAMES) {
+        counters[phase][name] = 0;
+      }
+    }
+    return {
+      matchId,
+      role,
+      shots,
+      counters,
+    };
   }
 
   /**
