@@ -1,4 +1,5 @@
 import { useNavigate, useParams } from "react-router-dom";
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 
@@ -137,6 +138,29 @@ export default function ScoutingReview() {
   const [rawValue, setRawValue] = useState(() =>
     JSON.stringify(initialState, null, 2)
   );
+
+  // Update the base64url in the route when state changes
+  useEffect(() => {
+    if (!state || !encoded) return;
+    try {
+      const json = JSON.stringify(state);
+      const base64 = btoa(
+        encodeURIComponent(json).replace(/%([0-9A-F]{2})/g, (_, p1) =>
+          String.fromCharCode(parseInt(p1, 16))
+        )
+      )
+        .replace(/\+/g, "-")
+        .replace(/\//g, "_")
+        .replace(/=+$/, "");
+      // Only update if different
+      if (base64 !== encoded) {
+        const newUrl = `/review/${base64}`;
+        window.history.replaceState(null, "", newUrl);
+      }
+    } catch {
+      // ignore
+    }
+  }, [state, encoded]);
 
   // Handlers for note fields
   const handleFieldChange = (
