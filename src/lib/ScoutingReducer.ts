@@ -36,6 +36,7 @@ export type Phase =
 export interface ScoutingData {
   matchId: string;
   role: string;
+  currentPhase: Phase;
   shots: Record<Phase, Array<{ x: number; y: number; timestamp: number }>>;
   counters: Record<Phase, Record<string, number>>;
 }
@@ -145,6 +146,7 @@ export class ScoutingReducer<T extends Record<string, any> = ScoutingData> {
     return {
       matchId,
       role,
+      currentPhase: "auto",
       shots,
       counters,
     };

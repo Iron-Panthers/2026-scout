@@ -12,6 +12,7 @@ import type { ActionButton, ModalOption } from "@/types/actionButtons";
 import ActionModal from "@/components/scouting/ActionModal";
 import ScoutingCanvas from "@/components/scouting/ScoutingCanvas";
 import { useScoutingReducer } from "@/lib/useScoutingReducer";
+import type { Phase } from "@/lib/ScoutingReducer";
 // import type { ScoutingData } from "@/lib/ScoutingReducer";
 import { useParams } from "react-router-dom";
 
@@ -29,10 +30,41 @@ export default function Scouting() {
   } | null>(null);
 
   // Use the reducer hook instead of useState
-  const { state, set, increment, undo, canUndo } = useScoutingReducer(
-    match_id || "",
-    role || ""
-  );
+  const { state, set, increment, undo, canUndo, setPhase, currentPhase } =
+    useScoutingReducer(match_id || "", role || "");
+
+  // All phases in order and abbreviations
+  const phases: Phase[] = [
+    "auto",
+    "transition-shift",
+    "phase1",
+    "phase2",
+    "phase3",
+    "phase4",
+    "endgame",
+  ];
+  const phaseAbbr: Record<Phase, string> = {
+    auto: "A",
+    "transition-shift": "TS",
+    phase1: "P1",
+    phase2: "P2",
+    phase3: "P3",
+    phase4: "P4",
+    endgame: "EG",
+  };
+
+  const currentPhaseIndex = phases.indexOf(currentPhase);
+
+  const goToNextPhase = () => {
+    if (currentPhaseIndex < phases.length - 1) {
+      setPhase(phases[currentPhaseIndex + 1]);
+    }
+  };
+  const goToPrevPhase = () => {
+    if (currentPhaseIndex > 0) {
+      setPhase(phases[currentPhaseIndex - 1]);
+    }
+  };
 
   // Define action buttons directly in TypeScript
   const actionButtons: ActionButton[] = [
@@ -86,15 +118,15 @@ export default function Scouting() {
     console.log(state);
     switch (actionName) {
       case "recordDepotIntake":
-        increment("counters.auto.depotIntakes");
+        increment("counters.{path}.depotIntakes");
         console.log("intake depot");
         break;
       case "recordClimb":
-        increment(`counters.auto.climb${payload}`);
+        increment(`counters.climb${payload}`);
         console.log(`climb recorded: ${payload}`);
         break;
       case "recordTrench":
-        increment("counters.auto.trenchIntakes");
+        increment("counters.trenchIntakes");
         break;
       default:
         console.warn(`Action handler not found: ${actionName}`);
@@ -128,7 +160,7 @@ export default function Scouting() {
       timestamp,
     }));
 
-    set("shots.auto", [...state.shots["auto"], ...newShots]);
+    set("shots.{phase}", [...state.shots[currentPhase], ...newShots]);
   };
 
   const getShotMultiplier = (): number => {
@@ -140,6 +172,43 @@ export default function Scouting() {
 
   return (
     <div className="h-screen w-screen bg-background flex overflow-hidden relative">
+      {/* Phase Shifter - Bottom Right */}
+      <div className="fixed bottom-2 right-2 z-50 flex flex-col items-center">
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={goToNextPhase}
+          disabled={currentPhaseIndex === phases.length - 1}
+          style={{
+            opacity: currentPhaseIndex === phases.length - 1 ? 0.5 : 1,
+            marginBottom: 4,
+          }}
+        >
+          &#8593;
+        </Button>
+        <Button
+          variant="default"
+          size="icon"
+          disabled={currentPhaseIndex === phases.length - 1}
+          style={{
+            marginTop: 4,
+          }}
+        >
+          {phaseAbbr[currentPhase]}
+        </Button>
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={goToPrevPhase}
+          disabled={currentPhaseIndex === 0}
+          style={{
+            opacity: currentPhaseIndex === 0 ? 0.5 : 1,
+            marginTop: 4,
+          }}
+        >
+          &#8595;
+        </Button>
+      </div>
       {/* Fixed Orientation Menu */}
       <div className="fixed top-2 right-2 z-50">
         <DropdownMenu>
@@ -209,7 +278,7 @@ export default function Scouting() {
       {/* Canvas Area */}
       <ScoutingCanvas
         orientation={orientation}
-        shots={state.shots["auto"]}
+        shots={state.shots[currentPhase]}
         actionButtons={actionButtons}
         showActionButtons={selected === "action"}
         onButtonClick={handleButtonClick}

@@ -1,6 +1,6 @@
 import { useCallback, useReducer } from "react";
 import { ScoutingReducer } from "./ScoutingReducer";
-import type { Action, ScoutingData } from "./ScoutingReducer";
+import type { Action, ScoutingData, Phase } from "./ScoutingReducer";
 
 /**
  * Action creator functions for common operations
@@ -61,6 +61,8 @@ export interface UseScoutingReducerReturn<T> {
   historySize: number;
   clearHistory: () => void;
   reset: () => void;
+  setPhase: (phase: Phase) => void;
+  currentPhase: Phase;
 }
 
 /**
@@ -108,30 +110,35 @@ export function useScoutingReducer(
   // Convenience methods
   const set = useCallback(
     (path: string, value: any) => {
-      dispatch(actionCreators.set(path, value));
+      const finalPath = path.replace(
+        "{phase}",
+        reducerInstance.state.currentPhase
+      );
+      dispatch(actionCreators.set(finalPath, value));
     },
-    [dispatch]
-  );
-
-  const toggle = useCallback(
-    (path: string) => {
-      dispatch(actionCreators.toggle(path));
-    },
-    [dispatch]
+    [dispatch, reducerInstance]
   );
 
   const increment = useCallback(
     (path: string, amount?: number) => {
-      dispatch(actionCreators.increment(path, amount));
+      const finalPath = path.replace(
+        "{phase}",
+        reducerInstance.state.currentPhase
+      );
+      dispatch(actionCreators.increment(finalPath, amount));
     },
-    [dispatch]
+    [dispatch, reducerInstance]
   );
 
   const decrement = useCallback(
     (path: string, amount?: number) => {
-      dispatch(actionCreators.decrement(path, amount));
+      const finalPath = path.replace(
+        "{phase}",
+        reducerInstance.state.currentPhase
+      );
+      dispatch(actionCreators.decrement(finalPath, amount));
     },
-    [dispatch]
+    [dispatch, reducerInstance]
   );
 
   const undo = useCallback(() => {
@@ -147,6 +154,28 @@ export function useScoutingReducer(
     forceUpdate();
   }, [reducerInstance]);
 
+  const toggle = useCallback(
+    (path: string) => {
+      const finalPath = path.replace(
+        "{phase}",
+        reducerInstance.state.currentPhase
+      );
+      dispatch(actionCreators.toggle(finalPath));
+    },
+    [dispatch, reducerInstance]
+  );
+
+  const setPhase = useCallback(
+    (phase: Phase) => {
+      // Directly update the reducerInstance's state if possible
+      if ("currentPhase" in reducerInstance.state) {
+        reducerInstance.state.currentPhase = phase;
+        forceUpdate();
+      }
+    },
+    [reducerInstance, forceUpdate]
+  );
+
   return {
     state: reducerInstance.state,
     dispatch,
@@ -159,5 +188,7 @@ export function useScoutingReducer(
     historySize: reducerInstance.getHistorySize(),
     clearHistory,
     reset,
+    setPhase,
+    currentPhase: reducerInstance.state.currentPhase,
   };
 }
