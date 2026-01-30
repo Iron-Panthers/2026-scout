@@ -187,7 +187,7 @@ export default function Scouting() {
           &#8593;
         </Button>
         <Button
-          variant="outline"
+          variant="default"
           size="icon"
           disabled={currentPhaseIndex === phases.length - 1}
           style={{
