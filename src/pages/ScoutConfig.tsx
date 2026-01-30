@@ -24,6 +24,7 @@ import type { Match } from "@/types";
 export default function ScoutConfig() {
   var [match_id, setMatchId] = useState("");
   let param_id: string = "";
+
   (function () {
     const { match_id } = useParams();
     param_id = match_id!;
@@ -31,9 +32,8 @@ export default function ScoutConfig() {
 
   const { user } = useAuth();
   const navigate = useNavigate();
-  var currentEvent;
-
-  const [matchType, setMatchType] = useState("Qualification");
+  
+  const [matchType, setMatchType] = useState('Qualification');
   const [matchNumber, setMatchNumber] = useState(0);
   const [teamNumber, setTeamNumber] = useState(0);
 
@@ -117,7 +117,6 @@ export default function ScoutConfig() {
       setMatchType("Qualification"); // TODO: assumes qual match bc Match doesn't store a value for this, will have to talk to Bruce
       setMatchNumber(match?.match_number || 0);
       setRole(match_role);
-      console.log(event!.name);
       setTeamNumbers(teamNumbersMap);
       setTeamNumber(teamNumbersMap[`${match_id}-${match_role}`] || 0);
     };
@@ -126,68 +125,26 @@ export default function ScoutConfig() {
     loadMatchData();
   }, [user?.id]);
 
-  const updateMatchID = async () => {
+  const updateTeamNum = async () => {
+    if (matchType === "Practice" || matchType === "Playoff") return;
+
     const events = await getEvents();
     const event = events.find((event) => event.is_active);
-    const teamNumbersMap: Record<string, number | null> = {};
 
-    const possibleMatches = (await getMatches()).filter((m) => {
-      if (m.match_number !== matchNumber || m.event_id !== event?.id)
-        return false;
-      console.log("Possible:", user?.id, m, role);
-      let found = false;
-      // FIXME: this shouldn't be related to the scouter's id at all it should just get the team num from match and role (very easy to do)
-      if (user?.id === m.blue1_scouter_id)
-        // TODO: Make it so that you can scout matches your not assigned to do
-        found = found || role === "blue1";
-      if (user?.id === m.blue2_scouter_id) found = found || role === "blue2";
-      if (user?.id === m.blue3_scouter_id) found = found || role === "blue3";
-      if (user?.id === m.qual_blue_scouter_id)
-        found = found || role === "qualBlue";
-      if (user?.id === m.red1_scouter_id) found = found || role === "red1";
-      if (user?.id === m.red2_scouter_id) found = found || role === "red2";
-      if (user?.id === m.red3_scouter_id) found = found || role === "red3";
-      if (user?.id === m.qual_red_scouter_id)
-        found = found || role === "qualRed";
-      return found;
-    });
-    if (!possibleMatches || possibleMatches.length <= 0 || !role) {
-      console.log("Can't find match");
-      return;
-    }
+    if (matchNumber === undefined || role === undefined) return;
+    const teamNumber = await getMatchTeam(event?.event_code, matchNumber, role);
 
-    const match = possibleMatches[0];
-    setMatchId(possibleMatches[0].id);
+    if (!teamNumber) { console.log("Could not find match"); return; }
+    setTeamNumber(teamNumber);
 
-    if (event?.event_code) {
-      const teamNumber = await getMatchTeam(
-        event!.event_code!,
-        match?.match_number,
-        role
-      );
-      console.log(teamNumber);
-
-      if (teamNumber) {
-        teamNumbersMap[`${match_id}-${role}`] = teamNumber;
-      }
-    }
-
-    // Fetch team photo if not a qual role
-    if (role !== "qualRed" && role !== "qualBlue") {
-      const teamNumber = teamNumbersMap[`${match_id}-${role}`];
-      if (teamNumber) {
-        const photoUrl = await getTeamPhoto(teamNumber!, CURRENT_YEAR);
-        console.log(`Photo URL for team ${teamNumber}:`, photoUrl);
-        setTeamPhoto(photoUrl);
-      }
-    }
-    setTeamNumbers(teamNumbersMap);
-    setTeamNumber(teamNumbersMap[`${match_id}-${role}`] || 0);
+    const photoUrl = await getTeamPhoto(teamNumber!, CURRENT_YEAR);
+    console.log(`Photo URL for team ${teamNumber}:`, photoUrl);
+    setTeamPhoto(photoUrl);
   };
 
   useEffect(() => {
     console.log(match_id);
-    if (!match_id || match_id.trim() === "") updateMatchID();
+    if (matchNumber !== 0 || role !== "") updateTeamNum();
   }, [matchNumber, teamNumber, role]);
 
   return (
@@ -197,11 +154,11 @@ export default function ScoutConfig() {
     >
       <Button
         onClick={() => {
-          if (match_id && match_id.trim() !== "")
-            navigate(`/scouting/${match_id}/${role}`);
+          if (teamNumber !== 0 && role !== "")
+            navigate(`/scouting/${teamNumber}/${role}`);
         }}
-        size="lg" // TODO: Pass in args to scouting
-        variant={match_id && match_id.trim() !== "" ? "default" : "secondary"}
+        size="lg"
+        variant={teamNumber !== 0 && role !== "" ? "default" : "secondary"}
         className={`h-20 text-lg flex flex-col gap-2 ${
           match_id && match_id.trim() !== ""
             ? "font-semibold"
@@ -209,7 +166,7 @@ export default function ScoutConfig() {
         }`}
         style={{ width: "100%" }}
       >
-        {match_id && match_id.trim() !== ""
+        {teamNumber !== 0 && role !== ""
           ? "Start Scouting"
           : "No Match Found"}
       </Button>
@@ -296,7 +253,6 @@ export default function ScoutConfig() {
                         className="p-2 px-7 bg-primary border-b rounded-lg"
                         onClick={() => {
                           setRole("red1");
-                          updateMatchID();
                         }}
                       >
                         Red 1
@@ -305,7 +261,6 @@ export default function ScoutConfig() {
                         className="p-2 px-7 bg-primary border-b rounded-lg"
                         onClick={() => {
                           setRole("red2");
-                          updateMatchID();
                         }}
                       >
                         Red 2
@@ -314,7 +269,6 @@ export default function ScoutConfig() {
                         className="p-2 px-7 bg-primary border-b rounded-lg"
                         onClick={() => {
                           setRole("red3");
-                          updateMatchID();
                         }}
                       >
                         Red 3
@@ -323,7 +277,6 @@ export default function ScoutConfig() {
                         className="p-2 px-7 bg-primary border-b rounded-lg"
                         onClick={() => {
                           setRole("qualRed");
-                          updateMatchID();
                         }}
                       >
                         Qual Red
@@ -332,7 +285,6 @@ export default function ScoutConfig() {
                         className="p-2 px-7 bg-chart-5 border-b rounded-lg"
                         onClick={() => {
                           setRole("blue1");
-                          updateMatchID();
                         }}
                       >
                         Blue 1
@@ -341,7 +293,6 @@ export default function ScoutConfig() {
                         className="p-2 px-7 bg-chart-5 border-b rounded-lg"
                         onClick={() => {
                           setRole("blue2");
-                          updateMatchID();
                         }}
                       >
                         Blue 2
@@ -350,7 +301,6 @@ export default function ScoutConfig() {
                         className="p-2 px-7 bg-chart-5 border-b rounded-lg"
                         onClick={() => {
                           setRole("blue3");
-                          updateMatchID();
                         }}
                       >
                         Blue 3
@@ -359,7 +309,6 @@ export default function ScoutConfig() {
                         className="p-2 px-7 bg-chart-5 border-b rounded-lg"
                         onClick={() => {
                           setRole("qualBlue");
-                          updateMatchID();
                         }}
                       >
                         Qual Blue
@@ -383,7 +332,6 @@ export default function ScoutConfig() {
                       className="p-2 px-7 bg-accent-foreground/10 border-b rounded-lg"
                       onClick={() => {
                         setMatchType("Qualification");
-                        updateMatchID();
                       }}
                     >
                       Qualification
@@ -392,7 +340,6 @@ export default function ScoutConfig() {
                       className="p-2 px-7 bg-accent-foreground/10 border-b rounded-lg"
                       onClick={() => {
                         setMatchType("Playoff");
-                        updateMatchID();
                       }}
                     >
                       Playoff
@@ -401,7 +348,6 @@ export default function ScoutConfig() {
                       className="p-2 px-7 bg-accent-foreground/10 border-b rounded-lg"
                       onClick={() => {
                         setMatchType("Practice");
-                        updateMatchID();
                       }}
                     >
                       Practice
@@ -409,13 +355,6 @@ export default function ScoutConfig() {
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
-              {/* <div className="flex justify-between items-center pl-3 p-1 bg-accent/50 rounded-lg">
-                  <span className="text-sm font-medium text-muted-foreground pr-4">
-                    Event
-                  </span>
-                  <Input type='text' className="font-semibold text-right" onInput={(e) => setEvent(e.currentTarget.value)} value={currentEvent} placeholder='Event Name' />
-                </div>
-                { currentEvent && concurrentEvent && concurrentEvent.name != currentEvent ? <Button className="w-full bg-accent p-3" onClick={() => { setCurrentEvent() }}>Use Current Event</Button> : null} */}
             </div>
           </TabsContent>
           <TabsContent value="game">

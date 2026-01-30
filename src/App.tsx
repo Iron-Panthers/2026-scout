@@ -70,7 +70,7 @@ function App() {
               }
             />
             <Route
-              path="/scouting/:match_id/:role"
+              path="/scouting/:team/:role"
               element={
                 <ProtectedRoute>
                   <Scouting />
