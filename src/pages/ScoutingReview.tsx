@@ -1,7 +1,12 @@
 import { useNavigate, useParams } from "react-router-dom";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import {
+  Collapsible,
+  CollapsibleTrigger,
+  CollapsibleContent,
+} from "@/components/ui/collapsible";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
 
 // Recursive JSON editor for objects/arrays
 function RecursiveJsonEditor({ value, onChange, path = [] }) {
@@ -18,63 +23,100 @@ function RecursiveJsonEditor({ value, onChange, path = [] }) {
     ].includes(k);
 
   if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+    const entries = Object.entries(value);
+    const shouldAutoCollapse = entries.length > 20;
+    const [isCollapsed, setIsCollapsed] = useState(shouldAutoCollapse);
+
     return (
-      <div className="space-y-2 pl-6 border-l-2 border-border">
-        {Object.entries(value).map(([key, val], idx, arr) => {
-          const isPrimitive =
-            val === null ||
-            ["string", "number", "boolean"].includes(typeof val);
-          const isObjOrArr = typeof val === "object" && val !== null;
-          return (
-            <div
-              key={key}
-              className={isObjOrArr ? "mb-2" : "flex items-center gap-2"}
-            >
-              {isPhaseKey(key) && idx !== 0 && (
-                <div className="my-4 border-t-2 border-primary/60 opacity-80" />
-              )}
-              {isObjOrArr && (
-                <div className="block font-mono text-xs text-muted-foreground min-w-[120px] break-all select-none mb-1 mt-2">
-                  {key}
-                </div>
-              )}
-              {isPrimitive && (
-                <label className="block font-mono text-xs text-muted-foreground min-w-[120px] break-all select-none">
-                  {key}
-                </label>
-              )}
-              <RecursiveJsonEditor
-                value={val}
-                onChange={(newVal) => {
-                  const updated = { ...value, [key]: newVal };
-                  onChange(updated);
-                }}
-                path={[...path, key]}
-              />
-            </div>
-          );
-        })}
+      <div className="space-y-2 pl-6 border-l-2 border-border relative">
+        {entries.length > 5 && (
+          <button
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="absolute -top-6 right-0 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            type="button"
+          >
+            {isCollapsed ? (
+              <ChevronRight size={14} />
+            ) : (
+              <ChevronDown size={14} />
+            )}
+            <span>{entries.length} properties</span>
+          </button>
+        )}
+        {!isCollapsed &&
+          entries.map(([key, val], idx, arr) => {
+            const isPrimitive =
+              val === null ||
+              ["string", "number", "boolean"].includes(typeof val);
+            const isObjOrArr = typeof val === "object" && val !== null;
+            return (
+              <div
+                key={key}
+                className={isObjOrArr ? "mb-2" : "flex items-center gap-2"}
+              >
+                {isPhaseKey(key) && idx !== 0 && (
+                  <div className="my-4 border-t-2 border-primary/60 opacity-80" />
+                )}
+                {isObjOrArr && (
+                  <div className="block font-mono text-xs text-muted-foreground min-w-[120px] break-all select-none mb-1 mt-2">
+                    {key}
+                  </div>
+                )}
+                {isPrimitive && (
+                  <label className="block font-mono text-xs text-muted-foreground min-w-[120px] break-all select-none">
+                    {key}
+                  </label>
+                )}
+                <RecursiveJsonEditor
+                  value={val}
+                  onChange={(newVal) => {
+                    const updated = { ...value, [key]: newVal };
+                    onChange(updated);
+                  }}
+                  path={[...path, key]}
+                />
+              </div>
+            );
+          })}
       </div>
     );
   } else if (Array.isArray(value)) {
+    const shouldAutoCollapse = value.length > 20;
+    const [isCollapsed, setIsCollapsed] = useState(shouldAutoCollapse);
+
     return (
-      <div className="space-y-2 pl-6 border-l-2 border-border">
-        {value.map((item, idx) => (
-          <div key={idx} className="flex items-center gap-2">
-            <label className="block font-mono text-xs text-muted-foreground min-w-[40px] select-none">
-              [{idx}]
-            </label>
-            <RecursiveJsonEditor
-              value={item}
-              onChange={(newVal) => {
-                const updated = value.slice();
-                updated[idx] = newVal;
-                onChange(updated);
-              }}
-              path={[...path, idx]}
-            />
-          </div>
-        ))}
+      <div className="space-y-2 pl-6 border-l-2 border-border relative">
+        {value.length > 5 && (
+          <button
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="absolute -top-6 right-0 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            type="button"
+          >
+            {isCollapsed ? (
+              <ChevronRight size={14} />
+            ) : (
+              <ChevronDown size={14} />
+            )}
+            <span>{value.length} items</span>
+          </button>
+        )}
+        {!isCollapsed &&
+          value.map((item, idx) => (
+            <div key={idx} className="flex items-center gap-2">
+              <label className="block font-mono text-xs text-muted-foreground min-w-[40px] select-none">
+                [{idx}]
+              </label>
+              <RecursiveJsonEditor
+                value={item}
+                onChange={(newVal) => {
+                  const updated = value.slice();
+                  updated[idx] = newVal;
+                  onChange(updated);
+                }}
+                path={[...path, idx]}
+              />
+            </div>
+          ))}
       </div>
     );
   } else if (typeof value === "string") {
@@ -135,6 +177,7 @@ export default function ScoutingReview() {
 
   const [state, setState] = useState<any>(initialState);
   const [rawEdit, setRawEdit] = useState(false);
+  const [rawEditOpen, setRawEditOpen] = useState(true);
   const [rawValue, setRawValue] = useState(() =>
     JSON.stringify(initialState, null, 2)
   );
@@ -253,37 +296,59 @@ export default function ScoutingReview() {
 
         {/* Raw Data Section */}
         <section className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg md:text-xl font-semibold text-primary">
-              Raw Scouting Data
-            </h2>
-            <button
-              className={`text-xs font-medium px-3 py-1 rounded border border-border transition-colors ${
-                rawEdit
-                  ? "bg-primary text-white hover:bg-primary/90"
-                  : "bg-surface-elevated text-muted-foreground hover:bg-surface"
-              }`}
-              onClick={() => setRawEdit((e) => !e)}
-              type="button"
-            >
-              {rawEdit ? "Done Editing" : "Edit"}
-            </button>
-          </div>
-          <div className="bg-surface-elevated border border-subtle rounded-lg p-5 overflow-x-auto">
-            {rawEdit ? (
-              <RecursiveJsonEditor
-                value={state}
-                onChange={(newVal) => {
-                  setState(newVal);
-                  setRawValue(JSON.stringify(newVal, null, 2));
-                }}
-              />
-            ) : (
-              <pre className="text-[0.93rem] leading-6 font-mono text-foreground whitespace-pre select-all overflow-x-auto">
-                {rawValue}
-              </pre>
-            )}
-          </div>
+          <h2 className="text-lg md:text-xl font-semibold text-primary mb-4">
+            Raw Scouting Data
+          </h2>
+          <Collapsible open={rawEditOpen} onOpenChange={setRawEditOpen}>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <CollapsibleTrigger asChild>
+                  <button
+                    className="flex items-center justify-center w-8 h-8 rounded border border-border transition-colors"
+                    type="button"
+                    aria-label={rawEditOpen ? "Collapse" : "Expand"}
+                  >
+                    {rawEditOpen ? (
+                      <ChevronDown size={16} />
+                    ) : (
+                      <ChevronRight size={16} />
+                    )}
+                  </button>
+                </CollapsibleTrigger>
+                <span className="text-xs font-semibold text-muted-foreground">
+                  Edit Raw Data
+                </span>
+              </div>
+              <button
+                className={`ml-2 text-xs font-medium px-3 py-1 rounded border border-border transition-colors ${
+                  rawEdit
+                    ? "bg-primary text-white hover:bg-primary/90"
+                    : "bg-surface-elevated text-muted-foreground hover:bg-surface"
+                }`}
+                onClick={() => setRawEdit((e) => !e)}
+                type="button"
+              >
+                {rawEdit ? "Done Editing" : "Edit"}
+              </button>
+            </div>
+            <CollapsibleContent>
+              <div className="bg-surface-elevated border border-subtle rounded-lg p-5 py-8 overflow-x-auto">
+                {rawEdit ? (
+                  <RecursiveJsonEditor
+                    value={state}
+                    onChange={(newVal) => {
+                      setState(newVal);
+                      setRawValue(JSON.stringify(newVal, null, 2));
+                    }}
+                  />
+                ) : (
+                  <pre className="text-[0.93rem] leading-6 font-mono text-foreground whitespace-pre select-all overflow-x-auto">
+                    {rawValue}
+                  </pre>
+                )}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
         </section>
 
         {/* Actions */}

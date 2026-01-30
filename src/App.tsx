@@ -71,7 +71,7 @@ function App() {
               }
             />
             <Route
-              path="/scouting/:team/:role"
+              path="/scouting/:match_id/:role"
               element={
                 <ProtectedRoute>
                   <Scouting />
@@ -86,14 +86,7 @@ function App() {
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="/review/:encoded"
-              element={
-                <ProtectedRoute>
-                  <ScoutingReview />
-                </ProtectedRoute>
-              }
-            />
+            <Route path="/review/:encoded" element={<ScoutingReview />} />
           </Routes>
         </BrowserRouter>
       </SettingsProvider>
