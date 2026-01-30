@@ -52,22 +52,10 @@ export const actionCreators = {
 export interface UseScoutingReducerReturn<T> {
   state: T;
   dispatch: (action: Action) => void;
-  set: (
-    path: string,
-    value: any,
-    options?: { useCurrentPhase?: boolean }
-  ) => void;
-  toggle: (path: string, options?: { useCurrentPhase?: boolean }) => void;
-  increment: (
-    path: string,
-    amount?: number,
-    options?: { useCurrentPhase?: boolean }
-  ) => void;
-  decrement: (
-    path: string,
-    amount?: number,
-    options?: { useCurrentPhase?: boolean }
-  ) => void;
+  set: (path: string, value: any) => void;
+  toggle: (path: string) => void;
+  increment: (path: string, amount?: number) => void;
+  decrement: (path: string, amount?: number) => void;
   undo: () => void;
   canUndo: boolean;
   historySize: number;
@@ -121,41 +109,33 @@ export function useScoutingReducer(
 
   // Convenience methods
   const set = useCallback(
-    (path: string, value: any, options?: { useCurrentPhase?: boolean }) => {
-      let finalPath = path;
-      if (options?.useCurrentPhase) {
-        finalPath = `${reducerInstance.state.currentPhase}.${path}`;
-      }
+    (path: string, value: any) => {
+      const finalPath = path.replace(
+        "{phase}",
+        reducerInstance.state.currentPhase
+      );
       dispatch(actionCreators.set(finalPath, value));
     },
     [dispatch, reducerInstance]
   );
 
   const increment = useCallback(
-    (
-      path: string,
-      amount?: number,
-      options?: { useCurrentPhase?: boolean }
-    ) => {
-      let finalPath = path;
-      if (options?.useCurrentPhase) {
-        finalPath = `${reducerInstance.state.currentPhase}.${path}`;
-      }
+    (path: string, amount?: number) => {
+      const finalPath = path.replace(
+        "{phase}",
+        reducerInstance.state.currentPhase
+      );
       dispatch(actionCreators.increment(finalPath, amount));
     },
     [dispatch, reducerInstance]
   );
 
   const decrement = useCallback(
-    (
-      path: string,
-      amount?: number,
-      options?: { useCurrentPhase?: boolean }
-    ) => {
-      let finalPath = path;
-      if (options?.useCurrentPhase) {
-        finalPath = `${reducerInstance.state.currentPhase}.${path}`;
-      }
+    (path: string, amount?: number) => {
+      const finalPath = path.replace(
+        "{phase}",
+        reducerInstance.state.currentPhase
+      );
       dispatch(actionCreators.decrement(finalPath, amount));
     },
     [dispatch, reducerInstance]
@@ -175,11 +155,11 @@ export function useScoutingReducer(
   }, [reducerInstance]);
 
   const toggle = useCallback(
-    (path: string, options?: { useCurrentPhase?: boolean }) => {
-      let finalPath = path;
-      if (options?.useCurrentPhase) {
-        finalPath = `${reducerInstance.state.currentPhase}.${path}`;
-      }
+    (path: string) => {
+      const finalPath = path.replace(
+        "{phase}",
+        reducerInstance.state.currentPhase
+      );
       dispatch(actionCreators.toggle(finalPath));
     },
     [dispatch, reducerInstance]

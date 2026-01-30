@@ -118,15 +118,15 @@ export default function Scouting() {
     console.log(state);
     switch (actionName) {
       case "recordDepotIntake":
-        increment("counters.auto.depotIntakes");
+        increment("counters.{path}.depotIntakes");
         console.log("intake depot");
         break;
       case "recordClimb":
-        increment(`counters.auto.climb${payload}`);
+        increment(`counters.climb${payload}`);
         console.log(`climb recorded: ${payload}`);
         break;
       case "recordTrench":
-        increment("counters.auto.trenchIntakes");
+        increment("counters.trenchIntakes");
         break;
       default:
         console.warn(`Action handler not found: ${actionName}`);
@@ -160,7 +160,7 @@ export default function Scouting() {
       timestamp,
     }));
 
-    set("shots.auto", [...state.shots["auto"], ...newShots]);
+    set("shots.{phase}", [...state.shots[currentPhase], ...newShots]);
   };
 
   const getShotMultiplier = (): number => {
@@ -177,10 +177,10 @@ export default function Scouting() {
         <Button
           variant="outline"
           size="icon"
-          onClick={goToPrevPhase}
-          disabled={currentPhaseIndex === 0}
+          onClick={goToNextPhase}
+          disabled={currentPhaseIndex === phases.length - 1}
           style={{
-            opacity: currentPhaseIndex === 0 ? 0.5 : 1,
+            opacity: currentPhaseIndex === phases.length - 1 ? 0.5 : 1,
             marginBottom: 4,
           }}
         >
@@ -199,10 +199,10 @@ export default function Scouting() {
         <Button
           variant="outline"
           size="icon"
-          onClick={goToNextPhase}
-          disabled={currentPhaseIndex === phases.length - 1}
+          onClick={goToPrevPhase}
+          disabled={currentPhaseIndex === 0}
           style={{
-            opacity: currentPhaseIndex === phases.length - 1 ? 0.5 : 1,
+            opacity: currentPhaseIndex === 0 ? 0.5 : 1,
             marginTop: 4,
           }}
         >
@@ -278,7 +278,7 @@ export default function Scouting() {
       {/* Canvas Area */}
       <ScoutingCanvas
         orientation={orientation}
-        shots={state.shots["auto"]}
+        shots={state.shots[currentPhase]}
         actionButtons={actionButtons}
         showActionButtons={selected === "action"}
         onButtonClick={handleButtonClick}
