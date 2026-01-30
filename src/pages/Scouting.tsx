@@ -14,9 +14,10 @@ import ScoutingCanvas from "@/components/scouting/ScoutingCanvas";
 import { useScoutingReducer } from "@/lib/useScoutingReducer";
 import type { Phase } from "@/lib/ScoutingReducer";
 // import type { ScoutingData } from "@/lib/ScoutingReducer";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 
 export default function Scouting() {
+  const navigate = useNavigate();
   const { match_id, role } = useParams();
   console.log("Loaded from config: ", match_id, role);
 
@@ -229,6 +230,23 @@ export default function Scouting() {
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setOrientation(270)}>
               270° (Left)
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => {
+                // Encode state as base64url
+                const json = JSON.stringify(state);
+                const base64url = btoa(
+                  encodeURIComponent(json).replace(/%([0-9A-F]{2})/g, (_, p1) =>
+                    String.fromCharCode(parseInt(p1, 16))
+                  )
+                )
+                  .replace(/\+/g, "-")
+                  .replace(/\//g, "_")
+                  .replace(/=+$/, "");
+                navigate(`/review/${base64url}`);
+              }}
+            >
+              Review &amp; Submit
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

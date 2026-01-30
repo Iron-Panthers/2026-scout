@@ -1,3 +1,4 @@
+import ScoutingReview from "./pages/ScoutingReview";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import { SettingsProvider } from "./contexts/SettingsContext";
@@ -82,6 +83,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Dev />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/review/:encoded"
+              element={
+                <ProtectedRoute>
+                  <ScoutingReview />
                 </ProtectedRoute>
               }
             />
