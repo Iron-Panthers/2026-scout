@@ -109,9 +109,73 @@ Supabase backend with tables:
 - `profiles` - User profiles with role-based access
 - `events` - Competition events (with TBA event codes)
 - `matches` - Match records with scout assignments per role
+- `scouting_submissions` - Submitted scouting data with schema versioning
 - Scout assignments use fields like `red1_scouter_id`, `blue2_scouter_id`, etc.
 
 Database migrations in `supabase/migrations/`.
+
+### Offline Storage System
+
+The app includes a robust offline storage system for scouting data:
+
+**Auto-Save on Review:**
+- When users reach the review page, match data is automatically saved to localStorage
+- Serves as a failsafe backup if internet connection is lost during submission
+- Saved data includes: event code, match number, role, scouter ID, and full scouting data
+
+**Offline Match Management:**
+- Dashboard displays all offline matches in the `OfflineMatches` component
+- Shows pending vs uploaded status with visual indicators
+- Verifies against database to ensure accuracy
+- Network status awareness (online/offline indicators)
+- Storage quota warnings when approaching localStorage limits
+
+**Upload Functionality:**
+- Individual match upload - manually upload specific matches
+- Batch upload - upload all pending matches at once
+- Automatic match_id resolution when missing
+- Disabled when offline (requires internet connection)
+
+**Key Files:**
+- `src/lib/offlineStorage.ts` - Core offline storage service
+- `src/components/OfflineMatches.tsx` - Dashboard UI component
+- `src/hooks/useOnlineStatus.ts` - Network status detection hook
+
+**Storage Structure:**
+```typescript
+{
+  version: 1,
+  matches: {
+    "eventCode_matchNumber_role_timestamp": {
+      eventCode: string,
+      matchNumber: number,
+      role: string,
+      scoutingData: any,
+      uploaded: boolean,
+      timestamp: number,
+      // ... other metadata
+    }
+  }
+}
+```
+
+**Usage:**
+```typescript
+import { saveOfflineMatch, getOfflineMatches, markAsUploaded } from '@/lib/offlineStorage';
+
+// Save a match
+const key = saveOfflineMatch(eventCode, matchNumber, role, scoutingData, {
+  matchId,
+  eventId,
+  scouterId,
+});
+
+// Get all offline matches
+const matches = getOfflineMatches();
+
+// Mark as uploaded after successful submission
+markAsUploaded(key);
+```
 
 ### Key Files
 

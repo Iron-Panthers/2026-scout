@@ -11,6 +11,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { submitScoutingData, resolveMatchId } from "@/lib/scoutingSchema";
 import { useToast } from "@/hooks/use-toast";
 import { SubmissionStatusModal } from "@/components/SubmissionStatusModal";
+import { saveOfflineMatch, markAsUploaded, generateOfflineKey } from "@/lib/offlineStorage";
+import { supabase } from "@/lib/supabase";
 
 // Recursive JSON editor for objects/arrays
 function RecursiveJsonEditor({ value, onChange, path = [] }) {
@@ -196,6 +198,7 @@ export default function ScoutingReview() {
     errorMessage?: string;
   }>>([]);
   const [resolvedMatchId, setResolvedMatchId] = useState<string | null>(null);
+  const [offlineKey, setOfflineKey] = useState<string | null>(null);
 
   // Log the decoded state
   console.log("ScoutingReview state loaded:", {
@@ -204,6 +207,79 @@ export default function ScoutingReview() {
     match_number: state?.match_number,
     role: state?.role,
   });
+
+  // Auto-save to offline storage on component mount
+  useEffect(() => {
+    const saveToOfflineStorage = async () => {
+      if (!state?.event_id || !state?.match_number || !state?.role) {
+        console.warn("Missing required fields for offline storage");
+        return;
+      }
+
+      try {
+        // Fetch event code from event_id
+        const { data: event, error } = await supabase
+          .from("events")
+          .select("event_code")
+          .eq("id", state.event_id)
+          .single();
+
+        if (error || !event?.event_code) {
+          console.warn("Could not fetch event code for offline storage:", error);
+          // Use event_id as fallback if event_code not available
+          const fallbackCode = state.event_id.slice(0, 8);
+          const key = saveOfflineMatch(
+            fallbackCode,
+            state.match_number,
+            state.role,
+            state,
+            {
+              matchId: state.matchId,
+              eventId: state.event_id,
+              scouterId: user?.id,
+            }
+          );
+          if (key) {
+            setOfflineKey(key);
+            console.log("Match saved to offline storage (fallback):", key);
+          }
+          return;
+        }
+
+        // Save to offline storage
+        const key = saveOfflineMatch(
+          event.event_code,
+          state.match_number,
+          state.role,
+          state,
+          {
+            matchId: state.matchId,
+            eventId: state.event_id,
+            scouterId: user?.id,
+          }
+        );
+
+        if (key) {
+          setOfflineKey(key);
+          console.log("Match saved to offline storage:", key);
+          toast({
+            title: "Saved Offline",
+            description: "Match data saved for offline backup",
+            duration: 3000,
+          });
+        } else {
+          console.warn("Failed to save to offline storage");
+        }
+      } catch (error) {
+        console.error("Error saving to offline storage:", error);
+      }
+    };
+
+    // Run once on mount if we have a valid state
+    if (state) {
+      saveToOfflineStorage();
+    }
+  }, []); // Empty deps - run once on mount
 
   // Update the base64url in the route when state changes
   useEffect(() => {
@@ -448,6 +524,14 @@ export default function ScoutingReview() {
         state,
         user?.id
       );
+
+      // Mark as uploaded in offline storage
+      if (offlineKey) {
+        const marked = markAsUploaded(offlineKey);
+        if (marked) {
+          console.log("Marked offline match as uploaded:", offlineKey);
+        }
+      }
 
       toast({
         title: "Success!",

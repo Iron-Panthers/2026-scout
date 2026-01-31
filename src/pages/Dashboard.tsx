@@ -17,6 +17,7 @@ import { getUserMatches, removeUserFromMatch, getEvents } from "@/lib/matches";
 import { getMatchTeam, getTeamPhoto, CURRENT_YEAR } from "@/lib/blueAlliance";
 import DashboardHeader from "@/components/DashboardHeader";
 import UserProfileMenu from "@/components/UserProfileMenu";
+import OfflineMatches from "@/components/OfflineMatches";
 import type { Match, Role, Event } from "@/types";
 
 export function prettifyRole(role) {
@@ -347,6 +348,11 @@ export default function Dashboard() {
               </div>
             </div>
           )}
+        </div>
+
+        {/* Offline Matches Section */}
+        <div className="mb-8">
+          <OfflineMatches />
         </div>
 
         {/* Past Matches Section - TODO: Add completed matches tracking */}
