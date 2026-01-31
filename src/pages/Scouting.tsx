@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { MoreVertical, Undo } from "lucide-react";
+import { MoreVertical, Undo, Play, Pause, RotateCcw } from "lucide-react";
 // import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -11,7 +11,9 @@ import {
 import type { ActionButton, ModalOption } from "@/types/actionButtons";
 import ActionModal from "@/components/scouting/ActionModal";
 import ScoutingCanvas from "@/components/scouting/ScoutingCanvas";
+import PhaseTransitionOverlay from "@/components/scouting/PhaseTransitionOverlay";
 import { useScoutingReducer } from "@/lib/useScoutingReducer";
+import { usePhaseTimer, PHASE_DISPLAY_NAMES } from "@/lib/usePhaseTimer";
 import type { Phase } from "@/lib/ScoutingReducer";
 // import type { ScoutingData } from "@/lib/ScoutingReducer";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -40,6 +42,28 @@ export default function Scouting() {
   // Use the reducer hook instead of useState
   const { state, set, increment, undo, canUndo, setPhase, currentPhase } =
     useScoutingReducer(match_id || "", role || "", event_id, match_number);
+
+  // Phase timer
+  const {
+    timeRemaining,
+    phaseDuration,
+    isRunning,
+    showTransitionAlert,
+    nextPhaseName,
+    start: startTimer,
+    pause: pauseTimer,
+    reset: resetTimer,
+  } = usePhaseTimer(currentPhase);
+
+  // Format seconds as M:SS
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  };
+
+  // Timer progress percentage (for visual indicator)
+  const timerProgress = phaseDuration > 0 ? timeRemaining / phaseDuration : 0;
 
   // Log the initialized state
   console.log("Scouting state initialized:", {
@@ -188,8 +212,75 @@ export default function Scouting() {
 
   return (
     <div className="h-screen w-screen bg-background flex overflow-hidden relative">
-      {/* Phase Shifter - Bottom Right */}
-      <div className="fixed bottom-2 right-2 z-50 flex flex-col items-center">
+      {/* Phase Timer & Shifter - Bottom Right */}
+      <div className="fixed bottom-2 right-2 z-50 flex flex-col items-center gap-1">
+        {/* Timer Display */}
+        <div className="flex flex-col items-center mb-1">
+          <span className="text-[10px] text-muted-foreground font-medium leading-tight">
+            {PHASE_DISPLAY_NAMES[currentPhase]}
+          </span>
+          <div
+            className="relative w-14 h-14 flex items-center justify-center rounded-full border-2"
+            style={{
+              borderColor:
+                timeRemaining <= 5 && timeRemaining > 0 && isRunning
+                  ? "#ef4444"
+                  : timerProgress > 0.5
+                    ? "#22c55e"
+                    : timerProgress > 0.2
+                      ? "#eab308"
+                      : "#ef4444",
+              background: `conic-gradient(${
+                timerProgress > 0.5
+                  ? "#22c55e"
+                  : timerProgress > 0.2
+                    ? "#eab308"
+                    : "#ef4444"
+              } ${timerProgress * 360}deg, transparent ${timerProgress * 360}deg)`,
+              WebkitMask:
+                "radial-gradient(farthest-side, transparent calc(100% - 3px), #fff calc(100% - 2px))",
+              mask: "radial-gradient(farthest-side, transparent calc(100% - 3px), #fff calc(100% - 2px))",
+            }}
+          >
+            <span
+              className="absolute text-sm font-bold tabular-nums"
+              style={{
+                color:
+                  timeRemaining <= 5 && timeRemaining > 0 && isRunning
+                    ? "#ef4444"
+                    : "inherit",
+              }}
+            >
+              {formatTime(timeRemaining)}
+            </span>
+          </div>
+          {/* Timer Controls */}
+          <div className="flex gap-1 mt-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={isRunning ? pauseTimer : startTimer}
+              disabled={timeRemaining === 0}
+            >
+              {isRunning ? (
+                <Pause className="h-3 w-3" />
+              ) : (
+                <Play className="h-3 w-3" />
+              )}
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={resetTimer}
+            >
+              <RotateCcw className="h-3 w-3" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Phase Shifter */}
         <Button
           variant="outline"
           size="icon"
@@ -326,6 +417,12 @@ export default function Scouting() {
         title={modalConfig?.title || ""}
         options={modalConfig?.options || []}
         onOptionSelect={handleModalOptionSelect}
+      />
+
+      {/* Phase Transition Overlay */}
+      <PhaseTransitionOverlay
+        show={showTransitionAlert}
+        nextPhaseName={nextPhaseName}
       />
     </div>
   );
