@@ -17,6 +17,7 @@ import { getUserMatches, removeUserFromMatch, getEvents } from "@/lib/matches";
 import { getMatchTeam, getTeamPhoto, CURRENT_YEAR } from "@/lib/blueAlliance";
 import DashboardHeader from "@/components/DashboardHeader";
 import UserProfileMenu from "@/components/UserProfileMenu";
+import OfflineMatches from "@/components/OfflineMatches";
 import type { Match, Role, Event } from "@/types";
 
 export function prettifyRole(role) {
@@ -349,14 +350,9 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Past Matches Section - TODO: Add completed matches tracking */}
-        <div>
-          <h2 className="text-2xl font-bold mb-4">Past Matches</h2>
-          <Card className="p-8 text-center">
-            <p className="text-muted-foreground">
-              Completed matches will appear here once you finish scouting.
-            </p>
-          </Card>
+        {/* Offline Matches Section */}
+        <div className="mb-8">
+          <OfflineMatches />
         </div>
 
         {/* Match Details Dialog */}

@@ -1,5 +1,5 @@
 import { useNavigate, useParams } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   Collapsible,
   CollapsibleTrigger,
@@ -12,6 +12,8 @@ import { submitScoutingData, resolveMatchId } from "@/lib/scoutingSchema";
 import { useToast } from "@/hooks/use-toast";
 import { SubmissionStatusModal } from "@/components/SubmissionStatusModal";
 import QRCode from "react-qr-code";
+import { saveOfflineMatch, markAsUploaded, generateOfflineKey } from "@/lib/offlineStorage";
+import { supabase } from "@/lib/supabase";
 
 // Recursive JSON editor for objects/arrays
 function RecursiveJsonEditor({ value, onChange, path = [] }) {
@@ -197,6 +199,7 @@ export default function ScoutingReview() {
     errorMessage?: string;
   }>>([]);
   const [resolvedMatchId, setResolvedMatchId] = useState<string | null>(null);
+  const [offlineKey, setOfflineKey] = useState<string | null>(null);
 
   // Log the decoded state
   console.log("ScoutingReview state loaded:", {
@@ -206,27 +209,78 @@ export default function ScoutingReview() {
     role: state?.role,
   });
 
-  // Update the base64url in the route when state changes
+  // Auto-save to offline storage (debounced)
+  const lastSaveRef = useRef<number>(0);
+  useEffect(() => {
+    if (!state?.event_code || !state?.match_number || !state?.role) {
+      return;
+    }
+
+    // Debounce saves to avoid performance issues
+    const timeoutId = setTimeout(async () => {
+      try {
+        // Save to offline storage with event_code directly
+        const key = saveOfflineMatch(
+          state.event_code,
+          state.match_number,
+          state.role,
+          state,
+          {
+            matchId: state.matchId,
+            scouterId: user?.id,
+          }
+        );
+
+        if (key) {
+          setOfflineKey(key);
+          const now = Date.now();
+          // Only show toast if it's been more than 5 seconds since last save
+          if (now - lastSaveRef.current > 5000) {
+            console.log("Match saved to offline storage:", key);
+            toast({
+              title: "Saved",
+              description: "Changes saved to offline storage",
+              duration: 2000,
+            });
+            lastSaveRef.current = now;
+          }
+        }
+      } catch (error) {
+        console.error("Error saving to offline storage:", error);
+      }
+    }, 1000); // Wait 1 second after last change before saving
+
+    return () => clearTimeout(timeoutId);
+  }, [state, user?.id, toast]); // Save whenever state changes
+
+  // Update the base64url in the route when state changes (debounced)
   useEffect(() => {
     if (!state || !encoded) return;
-    try {
-      const json = JSON.stringify(state);
-      const base64 = btoa(
-        encodeURIComponent(json).replace(/%([0-9A-F]{2})/g, (_, p1) =>
-          String.fromCharCode(parseInt(p1, 16))
+
+    // Debounce URL updates to avoid performance issues during editing
+    const timeoutId = setTimeout(() => {
+      try {
+        const json = JSON.stringify(state);
+        const base64 = btoa(
+          encodeURIComponent(json).replace(/%([0-9A-F]{2})/g, (_, p1) =>
+            String.fromCharCode(parseInt(p1, 16))
+          )
         )
-      )
-        .replace(/\+/g, "-")
-        .replace(/\//g, "_")
-        .replace(/=+$/, "");
-      // Only update if different
-      if (base64 !== encoded) {
-        const newUrl = `/review/${base64}`;
-        window.history.replaceState(null, "", newUrl);
+          .replace(/\+/g, "-")
+          .replace(/\//g, "_")
+          .replace(/=+$/, "");
+        // Only update if different
+        if (base64 !== encoded) {
+          const newUrl = `/review/${base64}`;
+          window.history.replaceState(null, "", newUrl);
+        }
+      } catch {
+        // ignore
       }
-    } catch {
-      // ignore
-    }
+    }, 500); // Wait 500ms after last change before updating URL
+
+    // Cleanup timeout on unmount or when deps change
+    return () => clearTimeout(timeoutId);
   }, [state, encoded]);
 
   // Handlers for note fields
@@ -449,6 +503,14 @@ export default function ScoutingReview() {
         state,
         user?.id
       );
+
+      // Mark as uploaded in offline storage
+      if (offlineKey) {
+        const marked = markAsUploaded(offlineKey);
+        if (marked) {
+          console.log("Marked offline match as uploaded:", offlineKey);
+        }
+      }
 
       toast({
         title: "Success!",
