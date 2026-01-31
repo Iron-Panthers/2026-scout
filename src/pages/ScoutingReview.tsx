@@ -11,6 +11,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { submitScoutingData, resolveMatchId } from "@/lib/scoutingSchema";
 import { useToast } from "@/hooks/use-toast";
 import { SubmissionStatusModal } from "@/components/SubmissionStatusModal";
+import QRCode from "react-qr-code";
 
 // Recursive JSON editor for objects/arrays
 function RecursiveJsonEditor({ value, onChange, path = [] }) {
@@ -200,7 +201,7 @@ export default function ScoutingReview() {
   // Log the decoded state
   console.log("ScoutingReview state loaded:", {
     matchId: state?.matchId,
-    event_id: state?.event_id,
+    event_code: state?.event_code,
     match_number: state?.match_number,
     role: state?.role,
   });
@@ -260,7 +261,7 @@ export default function ScoutingReview() {
     console.log("=== CHECK DEPENDENCIES ===");
     console.log("Current state:", state);
     console.log("state.matchId:", state?.matchId, "Type:", typeof state?.matchId);
-    console.log("state.event_id:", state?.event_id, "Type:", typeof state?.event_id);
+    console.log("state.event_code:", state?.event_code, "Type:", typeof state?.event_code);
     console.log("state.match_number:", state?.match_number, "Type:", typeof state?.match_number);
     console.log("state.role:", state?.role, "Type:", typeof state?.role);
 
@@ -271,9 +272,9 @@ export default function ScoutingReview() {
         value: state?.matchId || "Not set",
       },
       {
-        label: "Event ID",
+        label: "Event Code",
         status: "pending" as const,
-        value: state?.event_id || "Not set",
+        value: state?.event_code || "Not set",
       },
       {
         label: "Match Number",
@@ -305,7 +306,7 @@ export default function ScoutingReview() {
         status: "success",
       };
       setResolvedMatchId(state.matchId);
-    } else if (state?.event_id && state?.match_number && state?.role) {
+    } else if (state?.event_code && state?.match_number && state?.role) {
       // Try to resolve matchId
       updatedDeps[0] = {
         ...updatedDeps[0],
@@ -316,7 +317,7 @@ export default function ScoutingReview() {
 
       try {
         const resolved = await resolveMatchId(
-          state.event_id,
+          state.event_code,
           state.match_number,
           state.role
         );
@@ -348,12 +349,12 @@ export default function ScoutingReview() {
       updatedDeps[0] = {
         ...updatedDeps[0],
         status: "error",
-        errorMessage: "Missing event_id, match_number, or role",
+        errorMessage: "Missing event_code, match_number, or role",
       };
     }
 
-    // Check event_id
-    if (state?.event_id && state.event_id.trim() !== "") {
+    // Check event_code
+    if (state?.event_code && state.event_code.trim() !== "") {
       updatedDeps[1] = {
         ...updatedDeps[1],
         status: "success",
@@ -362,7 +363,7 @@ export default function ScoutingReview() {
       updatedDeps[1] = {
         ...updatedDeps[1],
         status: "error",
-        errorMessage: "Event ID is required",
+        errorMessage: "Event code is required",
       };
     }
 
@@ -593,11 +594,11 @@ export default function ScoutingReview() {
             variant="outline"
             className="h-10 px-6 rounded-lg font-medium border border-border text-foreground hover:bg-surface-elevated hover:border-primary transition"
             onClick={() => {
-              if (state?.matchId && state?.role && state?.event_id) {
+              if (state?.matchId && state?.role && state?.event_code) {
                 const params = new URLSearchParams({
                   match_id: state.matchId,
                   role: state.role,
-                  event_id: state.event_id,
+                  event_code: state.event_code,
                   match_number: state.match_number?.toString() || "0",
                 });
                 navigate(`/scouting?${params.toString()}`);
@@ -615,6 +616,20 @@ export default function ScoutingReview() {
           >
             Submit
           </Button>
+        </div>
+
+        {/* QR Code Section */}
+        <div className="flex flex-col items-center mt-8 gap-3">
+          <p className="text-sm text-muted-foreground">
+            Scan to open on another device
+          </p>
+          <div className="bg-white p-4 rounded-lg border border-border">
+            <QRCode
+              value={window.location.href}
+              size={200}
+              level="M"
+            />
+          </div>
         </div>
       </div>
 

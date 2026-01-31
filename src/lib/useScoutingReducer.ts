@@ -78,7 +78,7 @@ export interface UseScoutingReducerReturn<T> {
 export function useScoutingReducer(
   matchId: string,
   role: string = "",
-  event_id: string = "",
+  event_code: string = "",
   match_number: number = 0,
   maxHistorySize: number = 50
 ): UseScoutingReducerReturn<ScoutingData> {
@@ -86,13 +86,13 @@ export function useScoutingReducer(
   const [reducerInstance] = useReducer(
     () =>
       new ScoutingReducer<ScoutingData>(
-        ScoutingReducer.createInitialState(matchId, role, event_id, match_number),
+        ScoutingReducer.createInitialState(matchId, role, event_code, match_number),
         maxHistorySize
       ),
     undefined,
     () =>
       new ScoutingReducer<ScoutingData>(
-        ScoutingReducer.createInitialState(matchId, role, event_id, match_number),
+        ScoutingReducer.createInitialState(matchId, role, event_code, match_number),
         maxHistorySize
       )
   );

@@ -122,14 +122,40 @@ function applyMigration(
 }
 
 /**
- * Resolve matchId from event_id, match_number, and role
+ * Resolve event_code to event_id
+ */
+export async function resolveEventId(event_code: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('events')
+    .select('id')
+    .eq('event_code', event_code)
+    .single();
+
+  if (error) {
+    console.error('Error resolving event_id from event_code:', error);
+    return null;
+  }
+
+  return data?.id || null;
+}
+
+/**
+ * Resolve matchId from event_code, match_number, and role
  * This is useful when matchId is not available but we have event and match info
  */
 export async function resolveMatchId(
-  event_id: string,
+  event_code: string,
   match_number: number,
   role: string
 ): Promise<string | null> {
+  // First resolve event_code to event_id
+  const event_id = await resolveEventId(event_code);
+
+  if (!event_id) {
+    console.error('Could not resolve event_code to event_id:', event_code);
+    return null;
+  }
+
   // Query the matches table to find the match with the given event and match number
   const { data, error } = await supabase
     .from('matches')
