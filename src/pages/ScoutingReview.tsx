@@ -1,5 +1,5 @@
 import { useNavigate, useParams } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   Collapsible,
   CollapsibleTrigger,
@@ -11,6 +11,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { submitScoutingData, resolveMatchId } from "@/lib/scoutingSchema";
 import { useToast } from "@/hooks/use-toast";
 import { SubmissionStatusModal } from "@/components/SubmissionStatusModal";
+import QRCode from "react-qr-code";
+import { saveOfflineMatch, markAsUploaded, generateOfflineKey } from "@/lib/offlineStorage";
+import { supabase } from "@/lib/supabase";
 
 // Recursive JSON editor for objects/arrays
 function RecursiveJsonEditor({ value, onChange, path = [] }) {
@@ -196,36 +199,88 @@ export default function ScoutingReview() {
     errorMessage?: string;
   }>>([]);
   const [resolvedMatchId, setResolvedMatchId] = useState<string | null>(null);
+  const [offlineKey, setOfflineKey] = useState<string | null>(null);
 
   // Log the decoded state
   console.log("ScoutingReview state loaded:", {
     matchId: state?.matchId,
-    event_id: state?.event_id,
+    event_code: state?.event_code,
     match_number: state?.match_number,
     role: state?.role,
   });
 
-  // Update the base64url in the route when state changes
+  // Auto-save to offline storage (debounced)
+  const lastSaveRef = useRef<number>(0);
+  useEffect(() => {
+    if (!state?.event_code || !state?.match_number || !state?.role) {
+      return;
+    }
+
+    // Debounce saves to avoid performance issues
+    const timeoutId = setTimeout(async () => {
+      try {
+        // Save to offline storage with event_code directly
+        const key = saveOfflineMatch(
+          state.event_code,
+          state.match_number,
+          state.role,
+          state,
+          {
+            matchId: state.matchId,
+            scouterId: user?.id,
+          }
+        );
+
+        if (key) {
+          setOfflineKey(key);
+          const now = Date.now();
+          // Only show toast if it's been more than 5 seconds since last save
+          if (now - lastSaveRef.current > 5000) {
+            console.log("Match saved to offline storage:", key);
+            toast({
+              title: "Saved",
+              description: "Changes saved to offline storage",
+              duration: 2000,
+            });
+            lastSaveRef.current = now;
+          }
+        }
+      } catch (error) {
+        console.error("Error saving to offline storage:", error);
+      }
+    }, 1000); // Wait 1 second after last change before saving
+
+    return () => clearTimeout(timeoutId);
+  }, [state, user?.id, toast]); // Save whenever state changes
+
+  // Update the base64url in the route when state changes (debounced)
   useEffect(() => {
     if (!state || !encoded) return;
-    try {
-      const json = JSON.stringify(state);
-      const base64 = btoa(
-        encodeURIComponent(json).replace(/%([0-9A-F]{2})/g, (_, p1) =>
-          String.fromCharCode(parseInt(p1, 16))
+
+    // Debounce URL updates to avoid performance issues during editing
+    const timeoutId = setTimeout(() => {
+      try {
+        const json = JSON.stringify(state);
+        const base64 = btoa(
+          encodeURIComponent(json).replace(/%([0-9A-F]{2})/g, (_, p1) =>
+            String.fromCharCode(parseInt(p1, 16))
+          )
         )
-      )
-        .replace(/\+/g, "-")
-        .replace(/\//g, "_")
-        .replace(/=+$/, "");
-      // Only update if different
-      if (base64 !== encoded) {
-        const newUrl = `/review/${base64}`;
-        window.history.replaceState(null, "", newUrl);
+          .replace(/\+/g, "-")
+          .replace(/\//g, "_")
+          .replace(/=+$/, "");
+        // Only update if different
+        if (base64 !== encoded) {
+          const newUrl = `/review/${base64}`;
+          window.history.replaceState(null, "", newUrl);
+        }
+      } catch {
+        // ignore
       }
-    } catch {
-      // ignore
-    }
+    }, 500); // Wait 500ms after last change before updating URL
+
+    // Cleanup timeout on unmount or when deps change
+    return () => clearTimeout(timeoutId);
   }, [state, encoded]);
 
   // Handlers for note fields
@@ -260,7 +315,7 @@ export default function ScoutingReview() {
     console.log("=== CHECK DEPENDENCIES ===");
     console.log("Current state:", state);
     console.log("state.matchId:", state?.matchId, "Type:", typeof state?.matchId);
-    console.log("state.event_id:", state?.event_id, "Type:", typeof state?.event_id);
+    console.log("state.event_code:", state?.event_code, "Type:", typeof state?.event_code);
     console.log("state.match_number:", state?.match_number, "Type:", typeof state?.match_number);
     console.log("state.role:", state?.role, "Type:", typeof state?.role);
 
@@ -271,9 +326,9 @@ export default function ScoutingReview() {
         value: state?.matchId || "Not set",
       },
       {
-        label: "Event ID",
+        label: "Event Code",
         status: "pending" as const,
-        value: state?.event_id || "Not set",
+        value: state?.event_code || "Not set",
       },
       {
         label: "Match Number",
@@ -305,7 +360,7 @@ export default function ScoutingReview() {
         status: "success",
       };
       setResolvedMatchId(state.matchId);
-    } else if (state?.event_id && state?.match_number && state?.role) {
+    } else if (state?.event_code && state?.match_number && state?.role) {
       // Try to resolve matchId
       updatedDeps[0] = {
         ...updatedDeps[0],
@@ -316,7 +371,7 @@ export default function ScoutingReview() {
 
       try {
         const resolved = await resolveMatchId(
-          state.event_id,
+          state.event_code,
           state.match_number,
           state.role
         );
@@ -348,12 +403,12 @@ export default function ScoutingReview() {
       updatedDeps[0] = {
         ...updatedDeps[0],
         status: "error",
-        errorMessage: "Missing event_id, match_number, or role",
+        errorMessage: "Missing event_code, match_number, or role",
       };
     }
 
-    // Check event_id
-    if (state?.event_id && state.event_id.trim() !== "") {
+    // Check event_code
+    if (state?.event_code && state.event_code.trim() !== "") {
       updatedDeps[1] = {
         ...updatedDeps[1],
         status: "success",
@@ -362,7 +417,7 @@ export default function ScoutingReview() {
       updatedDeps[1] = {
         ...updatedDeps[1],
         status: "error",
-        errorMessage: "Event ID is required",
+        errorMessage: "Event code is required",
       };
     }
 
@@ -448,6 +503,14 @@ export default function ScoutingReview() {
         state,
         user?.id
       );
+
+      // Mark as uploaded in offline storage
+      if (offlineKey) {
+        const marked = markAsUploaded(offlineKey);
+        if (marked) {
+          console.log("Marked offline match as uploaded:", offlineKey);
+        }
+      }
 
       toast({
         title: "Success!",
@@ -593,11 +656,11 @@ export default function ScoutingReview() {
             variant="outline"
             className="h-10 px-6 rounded-lg font-medium border border-border text-foreground hover:bg-surface-elevated hover:border-primary transition"
             onClick={() => {
-              if (state?.matchId && state?.role && state?.event_id) {
+              if (state?.matchId && state?.role && state?.event_code) {
                 const params = new URLSearchParams({
                   match_id: state.matchId,
                   role: state.role,
-                  event_id: state.event_id,
+                  event_code: state.event_code,
                   match_number: state.match_number?.toString() || "0",
                 });
                 navigate(`/scouting?${params.toString()}`);
@@ -615,6 +678,20 @@ export default function ScoutingReview() {
           >
             Submit
           </Button>
+        </div>
+
+        {/* QR Code Section */}
+        <div className="flex flex-col items-center mt-8 gap-3">
+          <p className="text-sm text-muted-foreground">
+            Scan to open on another device
+          </p>
+          <div className="bg-white p-4 rounded-lg border border-border">
+            <QRCode
+              value={window.location.href}
+              size={200}
+              level="M"
+            />
+          </div>
         </div>
       </div>
 
