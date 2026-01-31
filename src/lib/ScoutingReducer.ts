@@ -35,6 +35,8 @@ export type Phase =
 
 export interface ScoutingData {
   matchId: string;
+  event_id: string;
+  match_number: number;
   role: string;
   currentPhase: Phase;
   shots: Record<Phase, Array<{ x: number; y: number; timestamp: number }>>;
@@ -122,9 +124,16 @@ export class ScoutingReducer<T extends Record<string, any> = ScoutingData> {
    * Create an initial ScoutingData state object
    * @param matchId - The match ID for this match
    * @param role - The role for this match
+   * @param event_id - The event ID for this match
+   * @param match_number - The match number
    * @returns ScoutingData
    */
-  static createInitialState(matchId: string, role: string = ""): ScoutingData {
+  static createInitialState(
+    matchId: string,
+    role: string = "",
+    event_id: string = "",
+    match_number: number = 0
+  ): ScoutingData {
     const phases: Phase[] = [
       "auto",
       "transition-shift",
@@ -148,6 +157,8 @@ export class ScoutingReducer<T extends Record<string, any> = ScoutingData> {
     }
     return {
       matchId,
+      event_id,
+      match_number,
       role,
       currentPhase: "auto",
       shots,

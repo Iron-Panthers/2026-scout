@@ -292,3 +292,59 @@ export async function updateEvent(
 
   return true;
 }
+
+// Backfill event_id for matches that don't have it set
+// Uses the active event as the event_id
+export async function backfillMatchEventIds(): Promise<{
+  success: boolean;
+  updated: number;
+  error?: string;
+}> {
+  try {
+    // Get active event
+    const activeEvent = await getActiveEvent();
+
+    if (!activeEvent) {
+      return { success: false, updated: 0, error: "No active event found" };
+    }
+
+    // Get all matches without event_id
+    const { data: matchesWithoutEvent, error: fetchError } = await supabase
+      .from("matches")
+      .select("id")
+      .is("event_id", null);
+
+    if (fetchError) {
+      console.error("Error fetching matches without event_id:", fetchError);
+      return { success: false, updated: 0, error: fetchError.message };
+    }
+
+    if (!matchesWithoutEvent || matchesWithoutEvent.length === 0) {
+      return { success: true, updated: 0 };
+    }
+
+    // Update all matches to have the active event_id
+    const { error: updateError } = await supabase
+      .from("matches")
+      .update({ event_id: activeEvent.id })
+      .is("event_id", null);
+
+    if (updateError) {
+      console.error("Error updating matches:", updateError);
+      return { success: false, updated: 0, error: updateError.message };
+    }
+
+    console.log(
+      `Backfilled event_id for ${matchesWithoutEvent.length} matches with event: ${activeEvent.name}`
+    );
+
+    return { success: true, updated: matchesWithoutEvent.length };
+  } catch (error) {
+    console.error("Error in backfillMatchEventIds:", error);
+    return {
+      success: false,
+      updated: 0,
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}

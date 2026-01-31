@@ -12,6 +12,7 @@ import Scouting from "./pages/Scouting";
 import Login from "./pages/Login";
 import Dev from "./pages/Dev";
 import ScoutConfig from "./pages/ScoutConfig";
+import { Toaster } from "./components/ui/toaster";
 
 function App() {
   return (
@@ -71,7 +72,7 @@ function App() {
               }
             />
             <Route
-              path="/scouting/:match_id/:role"
+              path="/scouting"
               element={
                 <ProtectedRoute>
                   <Scouting />
@@ -88,6 +89,7 @@ function App() {
             />
             <Route path="/review/:encoded" element={<ScoutingReview />} />
           </Routes>
+          <Toaster />
         </BrowserRouter>
       </SettingsProvider>
     </AuthProvider>

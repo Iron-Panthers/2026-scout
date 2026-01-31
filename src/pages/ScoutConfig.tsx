@@ -38,6 +38,7 @@ export default function ScoutConfig() {
   const [teamNumber, setTeamNumber] = useState(0);
 
   const [role, setRole] = useState("");
+  const [eventId, setEventId] = useState("");
   const [loadingPhoto, setLoadingPhoto] = useState(false);
   const [teamPhoto, setTeamPhoto] = useState<string | null>(null);
   const [teamNumbers, setTeamNumbers] = useState<Record<string, number | null>>(
@@ -89,12 +90,18 @@ export default function ScoutConfig() {
       }
 
       const events = await getEvents();
-      const event = events.find((event) => event.id === match?.event_id);
+      // Always use the currently active event
+      const activeEvent = events.find((event) => event.is_active);
+
+      if (!activeEvent) {
+        console.error("No active event found!");
+      }
+
       const teamNumbersMap: Record<string, number | null> = {};
 
-      if (event?.event_code) {
+      if (activeEvent?.event_code) {
         const teamNumber = await getMatchTeam(
-          event.event_code,
+          activeEvent.event_code,
           match!.match_number,
           match_role
         );
@@ -114,9 +121,12 @@ export default function ScoutConfig() {
         }
       }
 
+      console.log("Using active event ID:", activeEvent?.id);
+
       setMatchType("Qualification"); // TODO: assumes qual match bc Match doesn't store a value for this, will have to talk to Bruce
       setMatchNumber(match?.match_number || 0);
       setRole(match_role);
+      setEventId(activeEvent?.id || "");
       setTeamNumbers(teamNumbersMap);
       setTeamNumber(teamNumbersMap[`${match_id}-${match_role}`] || 0);
     };
@@ -129,10 +139,13 @@ export default function ScoutConfig() {
     if (matchType === "Practice" || matchType === "Playoff") return;
 
     const events = await getEvents();
-    const event = events.find((event) => event.is_active);
+    const activeEvent = events.find((event) => event.is_active);
+
+    // Always update eventId to the active event
+    setEventId(activeEvent?.id || "");
 
     if (matchNumber === undefined || role === undefined) return;
-    const teamNumber = await getMatchTeam(event?.event_code, matchNumber, role);
+    const teamNumber = await getMatchTeam(activeEvent?.event_code, matchNumber, role);
 
     if (!teamNumber) { console.log("Could not find match"); return; }
     setTeamNumber(teamNumber);
@@ -154,11 +167,28 @@ export default function ScoutConfig() {
     >
       <Button
         onClick={() => {
-          if (teamNumber !== 0 && role !== "")
-            navigate(`/scouting/${teamNumber}/${role}`);
+          if (match_id && match_id.trim() !== "" && role !== "") {
+            console.log("ScoutConfig navigating with:", {
+              match_id,
+              role,
+              eventId,
+              matchNumber,
+            });
+
+            const params = new URLSearchParams({
+              match_id: match_id,
+              role: role,
+              event_id: eventId,
+              match_number: matchNumber.toString(),
+            });
+
+            const url = `/scouting?${params.toString()}`;
+            console.log("Navigation URL:", url);
+            navigate(url);
+          }
         }}
         size="lg"
-        variant={teamNumber !== 0 && role !== "" ? "default" : "secondary"}
+        variant={match_id && match_id.trim() !== "" && role !== "" ? "default" : "secondary"}
         className={`h-20 text-lg flex flex-col gap-2 ${
           match_id && match_id.trim() !== ""
             ? "font-semibold"
@@ -166,7 +196,7 @@ export default function ScoutConfig() {
         }`}
         style={{ width: "100%" }}
       >
-        {teamNumber !== 0 && role !== ""
+        {match_id && match_id.trim() !== "" && role !== ""
           ? "Start Scouting"
           : "No Match Found"}
       </Button>

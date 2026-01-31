@@ -7,6 +7,10 @@ import {
 } from "@/components/ui/collapsible";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
+import { submitScoutingData, resolveMatchId } from "@/lib/scoutingSchema";
+import { useToast } from "@/hooks/use-toast";
+import { SubmissionStatusModal } from "@/components/SubmissionStatusModal";
 
 // Recursive JSON editor for objects/arrays
 function RecursiveJsonEditor({ value, onChange, path = [] }) {
@@ -155,6 +159,8 @@ function RecursiveJsonEditor({ value, onChange, path = [] }) {
 export default function ScoutingReview() {
   const navigate = useNavigate();
   const { encoded } = useParams();
+  const { user } = useAuth();
+  const { toast } = useToast();
 
   // Decode state from base64url param
   let initialState: any = null;
@@ -181,6 +187,23 @@ export default function ScoutingReview() {
   const [rawValue, setRawValue] = useState(() =>
     JSON.stringify(initialState, null, 2)
   );
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [dependencies, setDependencies] = useState<Array<{
+    label: string;
+    status: "pending" | "checking" | "success" | "error";
+    value?: string | number;
+    errorMessage?: string;
+  }>>([]);
+  const [resolvedMatchId, setResolvedMatchId] = useState<string | null>(null);
+
+  // Log the decoded state
+  console.log("ScoutingReview state loaded:", {
+    matchId: state?.matchId,
+    event_id: state?.event_id,
+    match_number: state?.match_number,
+    role: state?.role,
+  });
 
   // Update the base64url in the route when state changes
   useEffect(() => {
@@ -229,6 +252,219 @@ export default function ScoutingReview() {
       setState(parsed);
     } catch {
       // ignore parse errors, keep editing
+    }
+  };
+
+  // Check dependencies and resolve matchId if needed
+  const checkDependencies = async () => {
+    console.log("=== CHECK DEPENDENCIES ===");
+    console.log("Current state:", state);
+    console.log("state.matchId:", state?.matchId, "Type:", typeof state?.matchId);
+    console.log("state.event_id:", state?.event_id, "Type:", typeof state?.event_id);
+    console.log("state.match_number:", state?.match_number, "Type:", typeof state?.match_number);
+    console.log("state.role:", state?.role, "Type:", typeof state?.role);
+
+    const deps = [
+      {
+        label: "Match ID",
+        status: "pending" as const,
+        value: state?.matchId || "Not set",
+      },
+      {
+        label: "Event ID",
+        status: "pending" as const,
+        value: state?.event_id || "Not set",
+      },
+      {
+        label: "Match Number",
+        status: "pending" as const,
+        value: state?.match_number || "Not set",
+      },
+      {
+        label: "Role",
+        status: "pending" as const,
+        value: state?.role || "Not set",
+      },
+      {
+        label: "Scouter ID",
+        status: "pending" as const,
+        value: user?.id || "Not logged in",
+      },
+    ];
+
+    setDependencies(deps);
+    setShowStatusModal(true);
+
+    // Check each dependency
+    const updatedDeps = [...deps];
+
+    // Check matchId
+    if (state?.matchId && state.matchId.trim() !== "") {
+      updatedDeps[0] = {
+        ...updatedDeps[0],
+        status: "success",
+      };
+      setResolvedMatchId(state.matchId);
+    } else if (state?.event_id && state?.match_number && state?.role) {
+      // Try to resolve matchId
+      updatedDeps[0] = {
+        ...updatedDeps[0],
+        status: "checking",
+        value: "Resolving...",
+      };
+      setDependencies([...updatedDeps]);
+
+      try {
+        const resolved = await resolveMatchId(
+          state.event_id,
+          state.match_number,
+          state.role
+        );
+
+        if (resolved) {
+          updatedDeps[0] = {
+            ...updatedDeps[0],
+            status: "success",
+            value: resolved,
+          };
+          setResolvedMatchId(resolved);
+        } else {
+          updatedDeps[0] = {
+            ...updatedDeps[0],
+            status: "error",
+            value: "Could not resolve",
+            errorMessage: "Match not found in database",
+          };
+        }
+      } catch (error) {
+        updatedDeps[0] = {
+          ...updatedDeps[0],
+          status: "error",
+          value: "Resolution failed",
+          errorMessage: error instanceof Error ? error.message : "Unknown error",
+        };
+      }
+    } else {
+      updatedDeps[0] = {
+        ...updatedDeps[0],
+        status: "error",
+        errorMessage: "Missing event_id, match_number, or role",
+      };
+    }
+
+    // Check event_id
+    if (state?.event_id && state.event_id.trim() !== "") {
+      updatedDeps[1] = {
+        ...updatedDeps[1],
+        status: "success",
+      };
+    } else {
+      updatedDeps[1] = {
+        ...updatedDeps[1],
+        status: "error",
+        errorMessage: "Event ID is required",
+      };
+    }
+
+    // Check match_number
+    if (state?.match_number && state.match_number > 0) {
+      updatedDeps[2] = {
+        ...updatedDeps[2],
+        status: "success",
+      };
+    } else {
+      updatedDeps[2] = {
+        ...updatedDeps[2],
+        status: "error",
+        errorMessage: "Match number must be greater than 0",
+      };
+    }
+
+    // Check role
+    if (state?.role && state.role.trim() !== "") {
+      updatedDeps[3] = {
+        ...updatedDeps[3],
+        status: "success",
+      };
+    } else {
+      updatedDeps[3] = {
+        ...updatedDeps[3],
+        status: "error",
+        errorMessage: "Role is required",
+      };
+    }
+
+    // Check scouter_id
+    if (user?.id) {
+      updatedDeps[4] = {
+        ...updatedDeps[4],
+        status: "success",
+      };
+    } else {
+      updatedDeps[4] = {
+        ...updatedDeps[4],
+        status: "error",
+        errorMessage: "User not logged in",
+      };
+    }
+
+    setDependencies(updatedDeps);
+  };
+
+  // Handle final submission
+  const handleSubmit = async () => {
+    const matchId = resolvedMatchId || state?.matchId;
+
+    console.log("Submitting with matchId:", matchId, "Type:", typeof matchId);
+    console.log("Full state:", state);
+
+    if (!matchId) {
+      toast({
+        title: "Cannot Submit",
+        description: "Match ID could not be determined",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate that matchId is a UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(matchId)) {
+      console.error("Invalid UUID format for matchId:", matchId);
+      toast({
+        title: "Invalid Match ID",
+        description: `Match ID "${matchId}" is not a valid UUID. Expected format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      await submitScoutingData(
+        matchId,
+        state.role,
+        state,
+        user?.id
+      );
+
+      toast({
+        title: "Success!",
+        description: "Scouting data submitted successfully.",
+      });
+
+      setShowStatusModal(false);
+      navigate("/dashboard");
+    } catch (error) {
+      console.error("Error submitting scouting data:", error);
+      toast({
+        title: "Submission Failed",
+        description: error instanceof Error ? error.message : "An error occurred while submitting.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -356,22 +592,40 @@ export default function ScoutingReview() {
           <Button
             variant="outline"
             className="h-10 px-6 rounded-lg font-medium border border-border text-foreground hover:bg-surface-elevated hover:border-primary transition"
-            onClick={() => navigate("/scouting")}
+            onClick={() => {
+              if (state?.matchId && state?.role && state?.event_id) {
+                const params = new URLSearchParams({
+                  match_id: state.matchId,
+                  role: state.role,
+                  event_id: state.event_id,
+                  match_number: state.match_number?.toString() || "0",
+                });
+                navigate(`/scouting?${params.toString()}`);
+              } else {
+                navigate("/dashboard");
+              }
+            }}
           >
             Back to Scouting
           </Button>
           <Button
             variant="default"
             className="h-10 px-6 rounded-lg font-medium bg-primary text-white hover:bg-primary/90 transition"
-            onClick={() => {
-              console.log(state);
-              alert("Submitted!");
-            }}
+            onClick={checkDependencies}
           >
             Submit
           </Button>
         </div>
       </div>
+
+      <SubmissionStatusModal
+        open={showStatusModal}
+        onOpenChange={setShowStatusModal}
+        dependencies={dependencies}
+        onSubmit={handleSubmit}
+        isSubmitting={isSubmitting}
+        canSubmit={dependencies.every((dep) => dep.status === "success")}
+      />
     </main>
   );
 }

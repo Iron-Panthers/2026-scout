@@ -14,12 +14,19 @@ import ScoutingCanvas from "@/components/scouting/ScoutingCanvas";
 import { useScoutingReducer } from "@/lib/useScoutingReducer";
 import type { Phase } from "@/lib/ScoutingReducer";
 // import type { ScoutingData } from "@/lib/ScoutingReducer";
-import { useParams, useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 export default function Scouting() {
   const navigate = useNavigate();
-  const { match_id, role } = useParams();
-  console.log("Loaded from config: ", match_id, role);
+  const [searchParams] = useSearchParams();
+
+  // Read all parameters from query string
+  const match_id = searchParams.get("match_id") || "";
+  const role = searchParams.get("role") || "";
+  const event_id = searchParams.get("event_id") || "";
+  const match_number = parseInt(searchParams.get("match_number") || "0");
+
+  console.log("Scouting page loaded:", { match_id, role, event_id, match_number });
 
   const [selected, setSelected] = useState("");
   const [orientation, setOrientation] = useState<0 | 90 | 180 | 270>(0);
@@ -32,7 +39,15 @@ export default function Scouting() {
 
   // Use the reducer hook instead of useState
   const { state, set, increment, undo, canUndo, setPhase, currentPhase } =
-    useScoutingReducer(match_id || "", role || "");
+    useScoutingReducer(match_id || "", role || "", event_id, match_number);
+
+  // Log the initialized state
+  console.log("Scouting state initialized:", {
+    matchId: state.matchId,
+    event_id: state.event_id,
+    match_number: state.match_number,
+    role: state.role,
+  });
 
   // All phases in order and abbreviations
   const phases: Phase[] = [

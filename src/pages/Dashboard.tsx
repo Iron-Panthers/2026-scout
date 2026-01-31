@@ -212,8 +212,22 @@ export default function Dashboard() {
   };
 
   const handleQueueScouting = async () => {
-    console.log(selectedMatch);
-    navigate(`/config/${selectedMatch.match.id}`);
+    console.log("Selected match:", selectedMatch);
+    console.log("Match ID:", selectedMatch.match.id);
+    console.log("Match Name:", selectedMatch.match.name);
+    console.log("Match object:", selectedMatch.match);
+
+    // Validate that we have a UUID
+    const matchId = selectedMatch.match.id;
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+    if (!matchId || !uuidRegex.test(matchId)) {
+      console.error("Invalid match ID format:", matchId);
+      alert(`Invalid match ID: ${matchId}. Expected UUID format.`);
+      return;
+    }
+
+    navigate(`/config/${matchId}`);
   }
 
   return (

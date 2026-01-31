@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__supabase__apply_migration",
+      "Bash(npx shadcn@latest add:*)",
+      "Bash(npx shadcn-ui@latest add toast)",
+      "Bash(npm install:*)"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "supabase"
+  ]
+}
