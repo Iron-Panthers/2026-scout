@@ -23,10 +23,10 @@ export default function Scouting() {
   // Read all parameters from query string
   const match_id = searchParams.get("match_id") || "";
   const role = searchParams.get("role") || "";
-  const event_id = searchParams.get("event_id") || "";
+  const event_code = searchParams.get("event_code") || "";
   const match_number = parseInt(searchParams.get("match_number") || "0");
 
-  console.log("Scouting page loaded:", { match_id, role, event_id, match_number });
+  console.log("Scouting page loaded:", { match_id, role, event_code, match_number });
 
   const [selected, setSelected] = useState("");
   const [orientation, setOrientation] = useState<0 | 90 | 180 | 270>(0);
@@ -39,12 +39,12 @@ export default function Scouting() {
 
   // Use the reducer hook instead of useState
   const { state, set, increment, undo, canUndo, setPhase, currentPhase } =
-    useScoutingReducer(match_id || "", role || "", event_id, match_number);
+    useScoutingReducer(match_id || "", role || "", event_code, match_number);
 
   // Log the initialized state
   console.log("Scouting state initialized:", {
     matchId: state.matchId,
-    event_id: state.event_id,
+    event_code: state.event_code,
     match_number: state.match_number,
     role: state.role,
   });

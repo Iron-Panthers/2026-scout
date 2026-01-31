@@ -22,143 +22,179 @@ import { Input } from "@/components/ui/input";
 import type { Match } from "@/types";
 
 export default function ScoutConfig() {
-  var [match_id, setMatchId] = useState("");
-  let param_id: string = "";
-
-  (function () {
-    const { match_id } = useParams();
-    param_id = match_id!;
-  })();
-
+  const { match_id: param_match_id } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
-  
+
+  const [match_id, setMatchId] = useState(param_match_id || "");
   const [matchType, setMatchType] = useState('Qualification');
   const [matchNumber, setMatchNumber] = useState(0);
   const [teamNumber, setTeamNumber] = useState(0);
-
   const [role, setRole] = useState("");
   const [eventId, setEventId] = useState("");
+  const [eventCode, setEventCode] = useState("");
+  const [eventName, setEventName] = useState("");
+  const [availableEvents, setAvailableEvents] = useState<any[]>([]);
   const [loadingPhoto, setLoadingPhoto] = useState(false);
   const [teamPhoto, setTeamPhoto] = useState<string | null>(null);
   const [teamNumbers, setTeamNumbers] = useState<Record<string, number | null>>(
     {}
   );
+  const [manualMode, setManualMode] = useState(!param_match_id);
 
+  // Load active event on mount
+  useEffect(() => {
+    const loadActiveEvent = async () => {
+      const events = await getEvents();
+      setAvailableEvents(events);
+
+      const activeEvent = events.find((event) => event.is_active);
+
+      if (activeEvent) {
+        setEventId(activeEvent.id);
+        setEventCode(activeEvent.event_code || "");
+        setEventName(activeEvent.name || "");
+        console.log("Loaded active event:", activeEvent.name, activeEvent.id);
+      } else if (events.length > 0) {
+        // If no active event, use the first one
+        setEventId(events[0].id);
+        setEventCode(events[0].event_code || "");
+        setEventName(events[0].name || "");
+        console.warn("No active event found, using first event");
+      } else {
+        console.warn("No events found");
+      }
+    };
+
+    loadActiveEvent();
+  }, []);
+
+  // Load match data if match_id is provided
   useEffect(() => {
     const loadMatchData = async () => {
-      const match = await getMatch(param_id!);
-      if (!match) {
-        match_id = "";
+      if (!param_match_id) {
+        console.log("No match_id provided, entering manual mode");
+        setManualMode(true);
         return;
       }
 
+      const match = await getMatch(param_match_id);
+      if (!match) {
+        console.log("Match not found, entering manual mode");
+        setManualMode(true);
+        return;
+      }
+
+      // Determine user's role in this match
       let match_role = "";
-      switch (user?.id) {
-        case match?.blue1_scouter_id:
-          match_role = "blue1";
-          break;
-        case match?.blue2_scouter_id:
-          match_role = "blue2";
-          break;
-        case match?.blue3_scouter_id:
-          match_role = "blue3";
-          break;
-        case match?.qual_blue_scouter_id:
-          match_role = "qualBlue";
-          break;
-        case match?.red1_scouter_id:
-          match_role = "red1";
-          break;
-        case match?.red2_scouter_id:
-          match_role = "red2";
-          break;
-        case match?.red3_scouter_id:
-          match_role = "red3";
-          break;
-        case match?.qual_red_scouter_id:
-          match_role = "qualRed";
-          break;
-        default:
-          match_role = "Unknown";
-          break;
+      if (user?.id) {
+        const roleChecks = [
+          { id: match.blue1_scouter_id, role: "blue1" },
+          { id: match.blue2_scouter_id, role: "blue2" },
+          { id: match.blue3_scouter_id, role: "blue3" },
+          { id: match.qual_blue_scouter_id, role: "qualBlue" },
+          { id: match.red1_scouter_id, role: "red1" },
+          { id: match.red2_scouter_id, role: "red2" },
+          { id: match.red3_scouter_id, role: "red3" },
+          { id: match.qual_red_scouter_id, role: "qualRed" },
+        ];
+
+        const assignedRole = roleChecks.find(r => r.id === user.id);
+        match_role = assignedRole?.role || "";
       }
 
-      if (match_role === "Unknown") {
-        console.log("User is not assigned to this match");
-        navigate(-1);
+      if (!match_role) {
+        console.log("User not assigned to match, allowing manual role selection");
       }
 
+      // Get active event
       const events = await getEvents();
-      // Always use the currently active event
       const activeEvent = events.find((event) => event.is_active);
 
-      if (!activeEvent) {
-        console.error("No active event found!");
+      if (activeEvent) {
+        setEventId(activeEvent.id);
+        setEventCode(activeEvent.event_code || "");
       }
 
-      const teamNumbersMap: Record<string, number | null> = {};
+      // Set match data
+      setMatchNumber(match.match_number || 0);
+      if (match_role) {
+        setRole(match_role);
+      }
+      setManualMode(false);
 
-      if (activeEvent?.event_code) {
-        const teamNumber = await getMatchTeam(
-          activeEvent.event_code,
-          match!.match_number,
-          match_role
-        );
+      // Try to fetch team number if we have the data
+      if (activeEvent?.event_code && match.match_number && match_role) {
+        try {
+          const teamNumber = await getMatchTeam(
+            activeEvent.event_code,
+            match.match_number,
+            match_role
+          );
 
-        if (teamNumber) {
-          teamNumbersMap[`${match_id}-${match_role}`] = teamNumber;
+          if (teamNumber) {
+            setTeamNumber(teamNumber);
+
+            // Fetch team photo if not a qual role
+            if (match_role !== "qualRed" && match_role !== "qualBlue") {
+              const photoUrl = await getTeamPhoto(teamNumber, CURRENT_YEAR);
+              if (photoUrl) {
+                setTeamPhoto(photoUrl);
+              }
+            }
+          }
+        } catch (error) {
+          console.log("Could not fetch team info (offline?):", error);
         }
       }
-
-      // Fetch team photo if not a qual role
-      if (match_role !== "qualRed" && match_role !== "qualBlue") {
-        const teamNumber = teamNumbersMap[`${match_id}-${match_role}`];
-        if (teamNumber) {
-          const photoUrl = await getTeamPhoto(teamNumber, CURRENT_YEAR);
-          console.log(`Photo URL for team ${teamNumber}:`, photoUrl);
-          setTeamPhoto(photoUrl);
-        }
-      }
-
-      console.log("Using active event ID:", activeEvent?.id);
-
-      setMatchType("Qualification"); // TODO: assumes qual match bc Match doesn't store a value for this, will have to talk to Bruce
-      setMatchNumber(match?.match_number || 0);
-      setRole(match_role);
-      setEventId(activeEvent?.id || "");
-      setTeamNumbers(teamNumbersMap);
-      setTeamNumber(teamNumbersMap[`${match_id}-${match_role}`] || 0);
     };
 
-    setMatchId(param_id!);
     loadMatchData();
-  }, [user?.id]);
+  }, [param_match_id, user?.id]);
 
   const updateTeamNum = async () => {
     if (matchType === "Practice" || matchType === "Playoff") return;
+    if (!matchNumber || !role || !eventCode) return;
 
-    const events = await getEvents();
-    const activeEvent = events.find((event) => event.is_active);
+    try {
+      setLoadingPhoto(true);
+      const teamNumber = await getMatchTeam(eventCode, matchNumber, role);
 
-    // Always update eventId to the active event
-    setEventId(activeEvent?.id || "");
+      if (teamNumber) {
+        setTeamNumber(teamNumber);
 
-    if (matchNumber === undefined || role === undefined) return;
-    const teamNumber = await getMatchTeam(activeEvent?.event_code, matchNumber, role);
-
-    if (!teamNumber) { console.log("Could not find match"); return; }
-    setTeamNumber(teamNumber);
-
-    const photoUrl = await getTeamPhoto(teamNumber!, CURRENT_YEAR);
-    console.log(`Photo URL for team ${teamNumber}:`, photoUrl);
-    setTeamPhoto(photoUrl);
+        // Fetch team photo if not a qual role
+        if (role !== "qualRed" && role !== "qualBlue") {
+          const photoUrl = await getTeamPhoto(teamNumber, CURRENT_YEAR);
+          if (photoUrl) {
+            setTeamPhoto(photoUrl);
+          }
+        }
+      } else {
+        console.log("Could not find team number (offline or match not in TBA)");
+      }
+    } catch (error) {
+      console.log("Could not fetch team info (offline?):", error);
+    } finally {
+      setLoadingPhoto(false);
+    }
   };
 
+  // Auto-fetch team number when match number or role changes
   useEffect(() => {
-    console.log(match_id);
-    if (matchNumber !== 0 || role !== "") updateTeamNum();
-  }, [matchNumber, teamNumber, role]);
+    if (matchNumber !== 0 && role !== "") {
+      updateTeamNum();
+    }
+  }, [matchNumber, role, eventCode]);
+
+  const canStart = role && eventCode && matchNumber > 0;
+  const getMissingFields = () => {
+    const missing = [];
+    if (!role) missing.push("role");
+    if (!eventCode) missing.push("event");
+    if (matchNumber <= 0) missing.push("match number");
+    return missing;
+  };
 
   return (
     <div
@@ -167,18 +203,19 @@ export default function ScoutConfig() {
     >
       <Button
         onClick={() => {
-          if (match_id && match_id.trim() !== "" && role !== "") {
+          // Require at minimum: role, event_id, and match_number
+          if (canStart) {
             console.log("ScoutConfig navigating with:", {
-              match_id,
+              match_id: match_id || "",
               role,
-              eventId,
+              eventCode,
               matchNumber,
             });
 
             const params = new URLSearchParams({
-              match_id: match_id,
+              match_id: match_id || "", // Can be empty, will be resolved later
               role: role,
-              event_id: eventId,
+              event_code: eventCode,
               match_number: matchNumber.toString(),
             });
 
@@ -188,17 +225,18 @@ export default function ScoutConfig() {
           }
         }}
         size="lg"
-        variant={match_id && match_id.trim() !== "" && role !== "" ? "default" : "secondary"}
+        variant={canStart ? "default" : "secondary"}
         className={`h-20 text-lg flex flex-col gap-2 ${
-          match_id && match_id.trim() !== ""
-            ? "font-semibold"
-            : "text-muted-foreground"
+          canStart ? "font-semibold" : "text-muted-foreground"
         }`}
         style={{ width: "100%" }}
       >
-        {match_id && match_id.trim() !== "" && role !== ""
-          ? "Start Scouting"
-          : "No Match Found"}
+        <span>{canStart ? "Start Scouting" : "Configure Match"}</span>
+        {!canStart && (
+          <span className="text-xs font-normal">
+            Missing: {getMissingFields().join(", ")}
+          </span>
+        )}
       </Button>
       <div className="flex w-full max-w-sm flex-col gap-6">
         <Tabs defaultValue="config" className="">
@@ -267,15 +305,14 @@ export default function ScoutConfig() {
                   value={teamNumber}
                 />
               </div>
-              {(teamNumbers[`${match_id}-${role}`] || true) && (
-                <div className="flex justify-between items-center p-1 pl-3 bg-accent/50 rounded-lg">
-                  <span className="text-sm font-medium text-muted-foreground">
-                    Your Role
-                  </span>
-                  <DropdownMenu>
+              <div className="flex justify-between items-center p-1 pl-3 bg-accent/50 rounded-lg">
+                <span className="text-sm font-medium text-muted-foreground">
+                  Your Role
+                </span>
+                <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <p className="px-7 bg-accent-foreground/10 p-2 border-b rounded-lg">
-                        {prettifyRole(role)}
+                        {role ? prettifyRole(role) : "Select Role"}
                       </p>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent className="w-fit h-fit rounded-lg shadow-md border border-border bg-popover">
@@ -346,7 +383,6 @@ export default function ScoutConfig() {
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
-              )}
               <div className="flex justify-between items-center pl-3 p-1 bg-accent/50 rounded-lg">
                 <span className="text-sm font-medium text-muted-foreground">
                   Match Type
@@ -384,6 +420,46 @@ export default function ScoutConfig() {
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
+              </div>
+              <div className="flex justify-between items-center pl-3 p-1 bg-accent/50 rounded-lg">
+                <span className="text-sm font-medium text-muted-foreground">
+                  Event
+                </span>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <p className="px-7 bg-accent-foreground/10 p-2 border-b rounded-lg truncate max-w-[200px]">
+                      {eventName || "Select Event"}
+                    </p>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-fit max-h-64 overflow-y-auto rounded-lg shadow-md border border-border bg-popover">
+                    {availableEvents.map((event) => (
+                      <DropdownMenuItem
+                        key={event.id}
+                        className="p-2 px-7 bg-accent-foreground/10 border-b rounded-lg"
+                        onClick={() => {
+                          setEventId(event.id);
+                          setEventCode(event.event_code || "");
+                          setEventName(event.name || "");
+                        }}
+                      >
+                        {event.name}
+                        {event.is_active && " (Active)"}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+              <div className="flex justify-between items-center pl-3 p-1 bg-accent/50 rounded-lg">
+                <span className="text-sm font-medium text-muted-foreground">
+                  Event Code
+                </span>
+                <Input
+                  className="font-semibold w-40 text-right"
+                  type="text"
+                  placeholder="2025cave"
+                  value={eventCode}
+                  onChange={(e) => setEventCode(e.target.value)}
+                />
               </div>
             </div>
           </TabsContent>
