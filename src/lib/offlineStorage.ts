@@ -42,15 +42,15 @@ export interface OfflineMatchStorage {
 
 /**
  * Generate unique key for offline match
- * Format: eventCode_matchNumber_role_timestamp
+ * Format: eventCode_matchNumber_role
+ * No timestamp - same match details = same key (allows updates)
  */
 export function generateOfflineKey(
   eventCode: string,
   matchNumber: number,
-  role: string,
-  timestamp: number = Date.now()
+  role: string
 ): string {
-  return `${eventCode}_${matchNumber}_${role}_${timestamp}`;
+  return `${eventCode}_${matchNumber}_${role}`;
 }
 
 /**
@@ -140,6 +140,7 @@ function saveOfflineMatches(matches: Record<string, OfflineMatchData>): boolean 
 
 /**
  * Save a match to offline storage
+ * Updates existing match if same event/match/role, or creates new one
  * @returns The key used to store the match, or null if failed
  */
 export function saveOfflineMatch(
@@ -154,20 +155,23 @@ export function saveOfflineMatch(
   } = {}
 ): string | null {
   const timestamp = Date.now();
-  const key = generateOfflineKey(eventCode, matchNumber, role, timestamp);
+  const key = generateOfflineKey(eventCode, matchNumber, role);
+
+  const matches = getOfflineMatches();
+  const existingMatch = matches[key];
 
   const matchData: OfflineMatchData = {
     eventCode,
     matchNumber,
     role,
-    timestamp,
-    uploaded: false,
+    timestamp, // Last updated timestamp
+    uploaded: existingMatch?.uploaded || false, // Preserve uploaded status
+    uploadedAt: existingMatch?.uploadedAt, // Preserve upload timestamp if exists
     schemaVersion: CURRENT_SCHEMA_VERSION,
     scoutingData,
     ...options,
   };
 
-  const matches = getOfflineMatches();
   matches[key] = matchData;
 
   const success = saveOfflineMatches(matches);

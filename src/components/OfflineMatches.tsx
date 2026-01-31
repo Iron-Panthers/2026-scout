@@ -97,9 +97,9 @@ export default function OfflineMatches() {
       }
 
       // Fallback: try to resolve match_id and check again
-      if (match.eventId && match.matchNumber) {
+      if (match.eventCode && match.matchNumber) {
         const resolvedMatchId = await resolveMatchId(
-          match.eventId,
+          match.eventCode,
           match.matchNumber,
           match.role
         );
@@ -165,9 +165,9 @@ export default function OfflineMatches() {
 
       // Resolve match_id if needed
       let matchId = match.matchId;
-      if (!matchId && match.eventId && match.matchNumber) {
+      if (!matchId && match.eventCode && match.matchNumber) {
         matchId = await resolveMatchId(
-          match.eventId,
+          match.eventCode,
           match.matchNumber,
           match.role
         );

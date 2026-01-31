@@ -355,16 +355,6 @@ export default function Dashboard() {
           <OfflineMatches />
         </div>
 
-        {/* Past Matches Section - TODO: Add completed matches tracking */}
-        <div>
-          <h2 className="text-2xl font-bold mb-4">Past Matches</h2>
-          <Card className="p-8 text-center">
-            <p className="text-muted-foreground">
-              Completed matches will appear here once you finish scouting.
-            </p>
-          </Card>
-        </div>
-
         {/* Match Details Dialog */}
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogContent className="sm:max-w-[500px]">

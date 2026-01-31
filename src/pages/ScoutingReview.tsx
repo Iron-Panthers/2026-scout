@@ -1,5 +1,5 @@
 import { useNavigate, useParams } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   Collapsible,
   CollapsibleTrigger,
@@ -209,100 +209,78 @@ export default function ScoutingReview() {
     role: state?.role,
   });
 
-  // Auto-save to offline storage on component mount
+  // Auto-save to offline storage (debounced)
+  const lastSaveRef = useRef<number>(0);
   useEffect(() => {
-    const saveToOfflineStorage = async () => {
-      if (!state?.event_id || !state?.match_number || !state?.role) {
-        console.warn("Missing required fields for offline storage");
-        return;
-      }
+    if (!state?.event_code || !state?.match_number || !state?.role) {
+      return;
+    }
 
+    // Debounce saves to avoid performance issues
+    const timeoutId = setTimeout(async () => {
       try {
-        // Fetch event code from event_id
-        const { data: event, error } = await supabase
-          .from("events")
-          .select("event_code")
-          .eq("id", state.event_id)
-          .single();
-
-        if (error || !event?.event_code) {
-          console.warn("Could not fetch event code for offline storage:", error);
-          // Use event_id as fallback if event_code not available
-          const fallbackCode = state.event_id.slice(0, 8);
-          const key = saveOfflineMatch(
-            fallbackCode,
-            state.match_number,
-            state.role,
-            state,
-            {
-              matchId: state.matchId,
-              eventId: state.event_id,
-              scouterId: user?.id,
-            }
-          );
-          if (key) {
-            setOfflineKey(key);
-            console.log("Match saved to offline storage (fallback):", key);
-          }
-          return;
-        }
-
-        // Save to offline storage
+        // Save to offline storage with event_code directly
         const key = saveOfflineMatch(
-          event.event_code,
+          state.event_code,
           state.match_number,
           state.role,
           state,
           {
             matchId: state.matchId,
-            eventId: state.event_id,
             scouterId: user?.id,
           }
         );
 
         if (key) {
           setOfflineKey(key);
-          console.log("Match saved to offline storage:", key);
-          toast({
-            title: "Saved Offline",
-            description: "Match data saved for offline backup",
-            duration: 3000,
-          });
-        } else {
-          console.warn("Failed to save to offline storage");
+          const now = Date.now();
+          // Only show toast if it's been more than 5 seconds since last save
+          if (now - lastSaveRef.current > 5000) {
+            console.log("Match saved to offline storage:", key);
+            toast({
+              title: "Saved",
+              description: "Changes saved to offline storage",
+              duration: 2000,
+            });
+            lastSaveRef.current = now;
+          }
         }
       } catch (error) {
         console.error("Error saving to offline storage:", error);
       }
-    };
+    }, 1000); // Wait 1 second after last change before saving
 
-    // Run once on mount if we have a valid state
-    if (state) {
-      saveToOfflineStorage();
-    }
-  }, []); // Empty deps - run once on mount
+    return () => clearTimeout(timeoutId);
+  }, [state, user?.id, toast]); // Save whenever state changes
 
-  // Update the base64url in the route when state changes
+  // Update the base64url in the route when state changes (debounced)
   useEffect(() => {
     if (!state || !encoded) return;
-    try {
-      const json = JSON.stringify(state);
-      const base64 = btoa(
-        encodeURIComponent(json).replace(/%([0-9A-F]{2})/g, (_, p1) =>
-          String.fromCharCode(parseInt(p1, 16))
+
+    // Debounce URL updates to avoid performance issues during editing
+    const timeoutId = setTimeout(() => {
+      try {
+        const json = JSON.stringify(state);
+        const base64 = btoa(
+          encodeURIComponent(json).replace(/%([0-9A-F]{2})/g, (_, p1) =>
+            String.fromCharCode(parseInt(p1, 16))
+          )
         )
-      )
-        .replace(/\+/g, "-")
-        .replace(/\//g, "_")
-        .replace(/=+$/, "");
-      // Only update if different
-      if (base64 !== encoded) {
-        const newUrl = `/review/${base64}`;
-        window.history.replaceState(null, "", newUrl);
+          .replace(/\+/g, "-")
+          .replace(/\//g, "_")
+          .replace(/=+$/, "");
+        // Only update if different
+        if (base64 !== encoded) {
+          const newUrl = `/review/${base64}`;
+          window.history.replaceState(null, "", newUrl);
+        }
+      } catch {
+        // ignore
       }
-    } catch {
-      // ignore
-    }
+    }, 500); // Wait 500ms after last change before updating URL
+
+    // Cleanup timeout on unmount or when deps change
+    return () => clearTimeout(timeoutId);
   }, [state, encoded]);
 
   // Handlers for note fields
