@@ -7,7 +7,7 @@ import {
 } from "@/lib/blueAlliance";
 import { getEvents, getMatch, getMatches, getUserMatches } from "@/lib/matches";
 import React, { useState, useEffect } from "react";
-import { Navigate, useNavigate, useParams } from "react-router-dom";
+import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { prettifyRole } from "./Dashboard";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsTrigger, TabsList } from "@radix-ui/react-tabs";
@@ -23,6 +23,7 @@ import type { Match } from "@/types";
 
 export default function ScoutConfig() {
   const { match_id: param_match_id } = useParams();
+  const [ search_params ] = useSearchParams();
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -30,7 +31,7 @@ export default function ScoutConfig() {
   const [matchType, setMatchType] = useState('Qualification');
   const [matchNumber, setMatchNumber] = useState(0);
   const [teamNumber, setTeamNumber] = useState(0);
-  const [role, setRole] = useState("");
+  const [role, setRole] = useState(search_params.get("role") || "");
   const [eventId, setEventId] = useState("");
   const [eventCode, setEventCode] = useState("");
   const [eventName, setEventName] = useState("");
@@ -87,7 +88,10 @@ export default function ScoutConfig() {
 
       // Determine user's role in this match
       let match_role = "";
-      if (user?.id) {
+      if (role != "") {
+        match_role = role;
+      }
+      else if (user?.id) {
         const roleChecks = [
           { id: match.blue1_scouter_id, role: "blue1" },
           { id: match.blue2_scouter_id, role: "blue2" },

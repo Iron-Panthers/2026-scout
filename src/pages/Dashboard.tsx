@@ -228,7 +228,7 @@ export default function Dashboard() {
       return;
     }
 
-    navigate(`/config/${matchId}`);
+    navigate(`/config/${matchId}?role=${selectedMatch?.role}`);
   }
 
   return (
