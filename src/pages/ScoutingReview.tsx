@@ -1,11 +1,11 @@
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useEffect, useState, useRef } from "react";
 import {
   Collapsible,
   CollapsibleTrigger,
   CollapsibleContent,
 } from "@/components/ui/collapsible";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { submitScoutingData, resolveMatchId } from "@/lib/scoutingSchema";
@@ -162,8 +162,12 @@ function RecursiveJsonEditor({ value, onChange, path = [] }) {
 export default function ScoutingReview() {
   const navigate = useNavigate();
   const { encoded } = useParams();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const { toast } = useToast();
+  
+  // Check if opened with manager parameter
+  const isManagerMode = searchParams.get('forScoutingManager') === 'true';
 
   // Decode state from base64url param
   let initialState: any = null;
@@ -200,6 +204,27 @@ export default function ScoutingReview() {
   }>>([]);
   const [resolvedMatchId, setResolvedMatchId] = useState<string | null>(null);
   const [offlineKey, setOfflineKey] = useState<string | null>(null);
+  const [qrCodeError, setQrCodeError] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+  const [showManagerModal, setShowManagerModal] = useState(false);
+
+  // Check if URL is too large for QR code (QR codes have limits around 2953 bytes for alphanumeric)
+  useEffect(() => {
+    const urlLength = window.location.href.length;
+    // Set a conservative limit of 2000 characters to ensure QR code reliability
+    if (urlLength > 2000) {
+      setQrCodeError(true);
+    } else {
+      setQrCodeError(false);
+    }
+  }, [encoded]);
+
+  // Show manager modal if opened with manager parameter
+  useEffect(() => {
+    if (isManagerMode && state) {
+      setShowManagerModal(true);
+    }
+  }, [isManagerMode, state]);
 
   // Log the decoded state
   console.log("ScoutingReview state loaded:", {
@@ -466,6 +491,34 @@ export default function ScoutingReview() {
     setDependencies(updatedDeps);
   };
 
+  // Handle manager mode quick submission
+  const handleManagerSubmit = async () => {
+    setShowManagerModal(false);
+    // Use existing submission flow
+    await checkDependencies();
+  };
+
+  // Handle copying link with forScoutingManager parameter
+  const handleCopyLink = async () => {
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set('forScoutingManager', 'true');
+      await navigator.clipboard.writeText(url.toString());
+      setLinkCopied(true);
+      toast({
+        title: "Link Copied",
+        description: "Link with manager parameter copied to clipboard",
+      });
+      setTimeout(() => setLinkCopied(false), 2000);
+    } catch (error) {
+      toast({
+        title: "Copy Failed",
+        description: "Failed to copy link to clipboard",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Handle final submission
   const handleSubmit = async () => {
     const matchId = resolvedMatchId || state?.matchId;
@@ -655,19 +708,7 @@ export default function ScoutingReview() {
           <Button
             variant="outline"
             className="h-10 px-6 rounded-lg font-medium border border-border text-foreground hover:bg-surface-elevated hover:border-primary transition"
-            onClick={() => {
-              if (state?.matchId && state?.role && state?.event_code) {
-                const params = new URLSearchParams({
-                  match_id: state.matchId,
-                  role: state.role,
-                  event_code: state.event_code,
-                  match_number: state.match_number?.toString() || "0",
-                });
-                navigate(`/scouting?${params.toString()}`);
-              } else {
-                navigate("/dashboard");
-              }
-            }}
+            onClick={() => navigate("/dashboard")}
           >
             Back to Scouting
           </Button>
@@ -683,15 +724,40 @@ export default function ScoutingReview() {
         {/* QR Code Section */}
         <div className="flex flex-col items-center mt-8 gap-3">
           <p className="text-sm text-muted-foreground">
-            Scan to open on another device
+            Share this scouting data
           </p>
-          <div className="bg-white p-4 rounded-lg border border-border">
-            <QRCode
-              value={window.location.href}
-              size={200}
-              level="M"
-            />
-          </div>
+          {!qrCodeError ? (
+            <div className="bg-white p-4 rounded-lg border border-border">
+              <QRCode
+                value={window.location.href}
+                size={200}
+                level="M"
+              />
+            </div>
+          ) : (
+            <div className="bg-muted/50 p-6 rounded-lg border border-border text-center">
+              <p className="text-sm text-muted-foreground">
+                Data too large for QR code
+              </p>
+            </div>
+          )}
+          <Button
+            variant="outline"
+            className="h-9 px-4 rounded-lg font-medium border border-border text-foreground hover:bg-surface-elevated transition gap-2"
+            onClick={handleCopyLink}
+          >
+            {linkCopied ? (
+              <>
+                <Check size={16} />
+                Copied!
+              </>
+            ) : (
+              <>
+                <Copy size={16} />
+                Copy Link for Manager
+              </>
+            )}
+          </Button>
         </div>
       </div>
 
@@ -703,6 +769,56 @@ export default function ScoutingReview() {
         isSubmitting={isSubmitting}
         canSubmit={dependencies.every((dep) => dep.status === "success")}
       />
+
+      {/* Manager Quick Submit Modal */}
+      {showManagerModal && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-card border-2 border-primary rounded-xl shadow-2xl p-6 max-w-md w-full text-center space-y-4">
+            <div className="flex justify-center">
+              <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center">
+                <Check className="w-8 h-8 text-primary" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-2xl font-bold text-foreground">
+                Manager Mode
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                You're viewing scouting data shared by a scout
+              </p>
+            </div>
+            <div className="bg-muted/50 rounded-lg p-4 space-y-2 text-left">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Match:</span>
+                <span className="font-semibold text-foreground">#{state?.match_number}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Event:</span>
+                <span className="font-semibold text-foreground">{state?.event_code}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Role:</span>
+                <span className="font-semibold text-foreground">{state?.role}</span>
+              </div>
+            </div>
+            <div className="flex flex-col gap-2 pt-2">
+              <Button
+                onClick={handleManagerSubmit}
+                className="w-full h-11 text-base font-semibold"
+              >
+                Submit to Database
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setShowManagerModal(false)}
+                className="w-full h-10 text-sm font-medium"
+              >
+                Review First
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
