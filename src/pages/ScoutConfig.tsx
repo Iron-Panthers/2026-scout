@@ -7,7 +7,12 @@ import {
 } from "@/lib/blueAlliance";
 import { getEvents, getMatch, getMatches, getUserMatches } from "@/lib/matches";
 import React, { useState, useEffect } from "react";
-import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import {
+  Navigate,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from "react-router-dom";
 import { prettifyRole } from "./Dashboard";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsTrigger, TabsList } from "@radix-ui/react-tabs";
@@ -23,12 +28,12 @@ import type { Match } from "@/types";
 
 export default function ScoutConfig() {
   const { match_id: param_match_id } = useParams();
-  const [ search_params ] = useSearchParams();
+  const [search_params] = useSearchParams();
   const { user } = useAuth();
   const navigate = useNavigate();
 
   const [match_id, setMatchId] = useState(param_match_id || "");
-  const [matchType, setMatchType] = useState('Qualification');
+  const [matchType, setMatchType] = useState("Qualification");
   const [matchNumber, setMatchNumber] = useState(0);
   const [teamNumber, setTeamNumber] = useState(0);
   const [role, setRole] = useState(search_params.get("role") || "");
@@ -90,8 +95,7 @@ export default function ScoutConfig() {
       let match_role = "";
       if (role != "") {
         match_role = role;
-      }
-      else if (user?.id) {
+      } else if (user?.id) {
         const roleChecks = [
           { id: match.blue1_scouter_id, role: "blue1" },
           { id: match.blue2_scouter_id, role: "blue2" },
@@ -103,21 +107,36 @@ export default function ScoutConfig() {
           { id: match.qual_red_scouter_id, role: "qualRed" },
         ];
 
-        const assignedRole = roleChecks.find(r => r.id === user.id);
+        const assignedRole = roleChecks.find((r) => r.id === user.id);
         match_role = assignedRole?.role || "";
       }
 
       if (!match_role) {
-        console.log("User not assigned to match, allowing manual role selection");
+        console.log(
+          "User not assigned to match, allowing manual role selection"
+        );
       }
 
-      // Get active event
-      const events = await getEvents();
-      const activeEvent = events.find((event) => event.is_active);
+      // Get the event from the match's event_id
+      let matchEvent = null;
+      if (match.event_id) {
+        const events = await getEvents();
+        matchEvent = events.find((event) => event.id === match.event_id);
 
-      if (activeEvent) {
-        setEventId(activeEvent.id);
-        setEventCode(activeEvent.event_code || "");
+        if (matchEvent) {
+          setEventId(matchEvent.id);
+          setEventCode(matchEvent.event_code || "");
+          setEventName(matchEvent.name || "");
+          console.log(
+            "Loaded event from match:",
+            matchEvent.name,
+            matchEvent.id
+          );
+        } else {
+          console.warn("Event not found for match.event_id:", match.event_id);
+        }
+      } else {
+        console.warn("Match has no event_id");
       }
 
       // Set match data
@@ -128,10 +147,10 @@ export default function ScoutConfig() {
       setManualMode(false);
 
       // Try to fetch team number if we have the data
-      if (activeEvent?.event_code && match.match_number && match_role) {
+      if (matchEvent?.event_code && match.match_number && match_role) {
         try {
           const teamNumber = await getMatchTeam(
-            activeEvent.event_code,
+            matchEvent.event_code,
             match.match_number,
             match_role
           );
@@ -314,79 +333,79 @@ export default function ScoutConfig() {
                   Your Role
                 </span>
                 <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <p className="px-7 bg-accent-foreground/10 p-2 border-b rounded-lg">
-                        {role ? prettifyRole(role) : "Select Role"}
-                      </p>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent className="w-fit h-fit rounded-lg shadow-md border border-border bg-popover">
-                      <DropdownMenuItem
-                        className="p-2 px-7 bg-primary border-b rounded-lg"
-                        onClick={() => {
-                          setRole("red1");
-                        }}
-                      >
-                        Red 1
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="p-2 px-7 bg-primary border-b rounded-lg"
-                        onClick={() => {
-                          setRole("red2");
-                        }}
-                      >
-                        Red 2
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="p-2 px-7 bg-primary border-b rounded-lg"
-                        onClick={() => {
-                          setRole("red3");
-                        }}
-                      >
-                        Red 3
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="p-2 px-7 bg-primary border-b rounded-lg"
-                        onClick={() => {
-                          setRole("qualRed");
-                        }}
-                      >
-                        Qual Red
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="p-2 px-7 bg-chart-5 border-b rounded-lg"
-                        onClick={() => {
-                          setRole("blue1");
-                        }}
-                      >
-                        Blue 1
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="p-2 px-7 bg-chart-5 border-b rounded-lg"
-                        onClick={() => {
-                          setRole("blue2");
-                        }}
-                      >
-                        Blue 2
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="p-2 px-7 bg-chart-5 border-b rounded-lg"
-                        onClick={() => {
-                          setRole("blue3");
-                        }}
-                      >
-                        Blue 3
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="p-2 px-7 bg-chart-5 border-b rounded-lg"
-                        onClick={() => {
-                          setRole("qualBlue");
-                        }}
-                      >
-                        Qual Blue
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
+                  <DropdownMenuTrigger asChild>
+                    <p className="px-7 bg-accent-foreground/10 p-2 border-b rounded-lg">
+                      {role ? prettifyRole(role) : "Select Role"}
+                    </p>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-fit h-fit rounded-lg shadow-md border border-border bg-popover">
+                    <DropdownMenuItem
+                      className="p-2 px-7 bg-primary border-b rounded-lg"
+                      onClick={() => {
+                        setRole("red1");
+                      }}
+                    >
+                      Red 1
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="p-2 px-7 bg-primary border-b rounded-lg"
+                      onClick={() => {
+                        setRole("red2");
+                      }}
+                    >
+                      Red 2
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="p-2 px-7 bg-primary border-b rounded-lg"
+                      onClick={() => {
+                        setRole("red3");
+                      }}
+                    >
+                      Red 3
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="p-2 px-7 bg-primary border-b rounded-lg"
+                      onClick={() => {
+                        setRole("qualRed");
+                      }}
+                    >
+                      Qual Red
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="p-2 px-7 bg-chart-5 border-b rounded-lg"
+                      onClick={() => {
+                        setRole("blue1");
+                      }}
+                    >
+                      Blue 1
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="p-2 px-7 bg-chart-5 border-b rounded-lg"
+                      onClick={() => {
+                        setRole("blue2");
+                      }}
+                    >
+                      Blue 2
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="p-2 px-7 bg-chart-5 border-b rounded-lg"
+                      onClick={() => {
+                        setRole("blue3");
+                      }}
+                    >
+                      Blue 3
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="p-2 px-7 bg-chart-5 border-b rounded-lg"
+                      onClick={() => {
+                        setRole("qualBlue");
+                      }}
+                    >
+                      Qual Blue
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
               <div className="flex justify-between items-center pl-3 p-1 bg-accent/50 rounded-lg">
                 <span className="text-sm font-medium text-muted-foreground">
                   Match Type

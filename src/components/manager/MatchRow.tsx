@@ -21,7 +21,13 @@ interface MatchRowProps {
 }
 
 export const MatchRow = memo(
-  ({ match, roles, onOpenDialog, onClearAssignment, completedSubmissions }: MatchRowProps) => {
+  ({
+    match,
+    roles,
+    onOpenDialog,
+    onClearAssignment,
+    completedSubmissions,
+  }: MatchRowProps) => {
     return (
       <TableRow>
         <TableCell className="font-mono font-semibold border-r border-border">
@@ -29,8 +35,10 @@ export const MatchRow = memo(
         </TableCell>
         {roles.map((role) => {
           const assignment = match.assignments[role];
-          const isCompleted = match.matchId && completedSubmissions.has(`${match.matchId}:${role}`);
-          const cellColorClass = isCompleted 
+          const isCompleted =
+            match.matchId &&
+            completedSubmissions.has(`${match.matchId}:${role}`);
+          const cellColorClass = isCompleted
             ? "bg-green-900/30"
             : getRoleCellColor(role);
           return (
