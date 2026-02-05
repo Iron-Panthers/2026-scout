@@ -1,17 +1,21 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { MoreVertical, Undo } from "lucide-react";
+import { MoreVertical, Undo, RotateCcw } from "lucide-react";
 // import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import type { ActionButton, ModalOption } from "@/types/actionButtons";
 import ActionModal from "@/components/scouting/ActionModal";
 import ScoutingCanvas from "@/components/scouting/ScoutingCanvas";
+import StartMatchOverlay from "@/components/scouting/StartMatchOverlay";
+import PhaseTransitionOverlay from "@/components/scouting/PhaseTransitionOverlay";
 import { useScoutingReducer } from "@/lib/useScoutingReducer";
+import { useMatchTimer } from "@/lib/useMatchTimer";
 import type { Phase } from "@/lib/ScoutingReducer";
 // import type { ScoutingData } from "@/lib/ScoutingReducer";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -26,7 +30,12 @@ export default function Scouting() {
   const event_code = searchParams.get("event_code") || "";
   const match_number = parseInt(searchParams.get("match_number") || "0");
 
-  console.log("Scouting page loaded:", { match_id, role, event_code, match_number });
+  console.log("Scouting page loaded:", {
+    match_id,
+    role,
+    event_code,
+    match_number,
+  });
 
   const [selected, setSelected] = useState("");
   const [orientation, setOrientation] = useState<0 | 90 | 180 | 270>(0);
@@ -40,6 +49,72 @@ export default function Scouting() {
   // Use the reducer hook instead of useState
   const { state, set, increment, undo, canUndo, setPhase, currentPhase } =
     useScoutingReducer(match_id || "", role || "", event_code, match_number);
+
+  // Continuous match timer
+  const {
+    hasStarted,
+    phaseTimeRemaining,
+    phaseDuration,
+    phaseProgress,
+    startMatch,
+    resetMatch,
+  } = useMatchTimer(currentPhase);
+
+  // Track phase transitions for overlay
+  const [showPhaseTransition, setShowPhaseTransition] = useState(false);
+  const prevPhaseTimeRef = useRef(phaseTimeRemaining);
+  const prevPhaseRef = useRef(currentPhase);
+
+  // Detect when phase time hits 0 to show transition overlay
+  useEffect(() => {
+    if (
+      hasStarted &&
+      prevPhaseTimeRef.current > 0 &&
+      phaseTimeRemaining === 0
+    ) {
+      setShowPhaseTransition(true);
+      // Auto-dismiss after 3 seconds
+      const timeout = setTimeout(() => {
+        setShowPhaseTransition(false);
+      }, 3000);
+      return () => clearTimeout(timeout);
+    }
+    prevPhaseTimeRef.current = phaseTimeRemaining;
+  }, [phaseTimeRemaining, hasStarted]);
+
+  // Dismiss overlay when user manually changes phase
+  useEffect(() => {
+    if (prevPhaseRef.current !== currentPhase) {
+      setShowPhaseTransition(false);
+      prevPhaseRef.current = currentPhase;
+    }
+  }, [currentPhase]);
+
+  // Dismiss overlay when match is reset
+  useEffect(() => {
+    if (!hasStarted) {
+      setShowPhaseTransition(false);
+    }
+  }, [hasStarted]);
+
+  // Format seconds as M:SS (whole seconds only)
+  const formatTime = (seconds: number) => {
+    const wholeSeconds = Math.floor(seconds);
+    const m = Math.floor(wholeSeconds / 60);
+    const s = wholeSeconds % 60;
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  };
+
+  // Phase names for display
+  const PHASE_DISPLAY_NAMES: Record<Phase, string> = {
+    auto: "Auto",
+    "transition-shift": "T Shift",
+    phase1: "Shift 1",
+    phase2: "Shift 2",
+    phase3: "Shift 3",
+    phase4: "Shift 4",
+    endgame: "Endgame",
+  };
 
   // Log the initialized state
   console.log("Scouting state initialized:", {
@@ -70,6 +145,12 @@ export default function Scouting() {
   };
 
   const currentPhaseIndex = phases.indexOf(currentPhase);
+
+  // Get next phase name for overlay
+  const nextPhaseName =
+    currentPhaseIndex < phases.length - 1
+      ? PHASE_DISPLAY_NAMES[phases[currentPhaseIndex + 1]]
+      : null;
 
   const goToNextPhase = () => {
     if (currentPhaseIndex < phases.length - 1) {
@@ -188,8 +269,48 @@ export default function Scouting() {
 
   return (
     <div className="h-screen w-screen bg-background flex overflow-hidden relative">
-      {/* Phase Shifter - Bottom Right */}
-      <div className="fixed bottom-2 right-2 z-50 flex flex-col items-center">
+      {/* Phase Timer & Shifter - Bottom Right */}
+      <div className="fixed bottom-2 right-2 z-50 flex flex-col items-center gap-1">
+        {/* Timer Display */}
+        <div className="flex flex-col items-center mb-1">
+          <span className="text-[10px] text-white font-bold leading-tight">
+            {PHASE_DISPLAY_NAMES[currentPhase]}
+          </span>
+          <div
+            className="relative w-12 h-12 flex items-center justify-center rounded-full border-2 bg-black"
+            style={{
+              borderColor:
+                phaseTimeRemaining <= 5 && phaseTimeRemaining > 0 && hasStarted
+                  ? "#ef4444"
+                  : phaseProgress < 0.5
+                  ? "#22c55e"
+                  : phaseProgress < 0.8
+                  ? "#eab308"
+                  : "#ef4444",
+              background: `conic-gradient(${
+                phaseProgress < 0.5
+                  ? "#22c55e"
+                  : phaseProgress < 0.8
+                  ? "#eab308"
+                  : "#ef4444"
+              } ${phaseProgress * 360}deg, black ${phaseProgress * 360}deg)`,
+            }}
+          >
+            <span
+              className="absolute text-sm font-bold text-white"
+              style={{
+                fontFamily:
+                  'ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, "DejaVu Sans Mono", monospace',
+                fontSize: "0.875rem",
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              {formatTime(phaseTimeRemaining)}
+            </span>
+          </div>
+        </div>
+
+        {/* Phase Shifter */}
         <Button
           variant="outline"
           size="icon"
@@ -246,6 +367,15 @@ export default function Scouting() {
             <DropdownMenuItem onClick={() => setOrientation(270)}>
               270° (Left)
             </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={resetMatch}
+              className="text-orange-600 dark:text-orange-400"
+            >
+              <RotateCcw className="mr-2 h-4 w-4" />
+              Reset Match Timer
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={() => {
                 // Encode state as base64url
@@ -326,6 +456,20 @@ export default function Scouting() {
         title={modalConfig?.title || ""}
         options={modalConfig?.options || []}
         onOptionSelect={handleModalOptionSelect}
+      />
+
+      {/* Start Match Overlay */}
+      <StartMatchOverlay
+        show={!hasStarted}
+        onStartMatch={startMatch}
+        matchNumber={match_number}
+        role={role}
+      />
+
+      {/* Phase Transition Overlay */}
+      <PhaseTransitionOverlay
+        show={showPhaseTransition}
+        nextPhaseName={nextPhaseName}
       />
     </div>
   );
