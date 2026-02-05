@@ -29,6 +29,7 @@ import {
   createEventWithMatches,
 } from "@/lib/matches";
 import { updateMatchAssignment } from "@/lib/matches";
+import { supabase } from "@/lib/supabase";
 import DashboardHeader from "@/components/DashboardHeader";
 import UserProfileMenu from "@/components/UserProfileMenu";
 import { MatchRow } from "@/components/manager/MatchRow";
@@ -73,6 +74,9 @@ export default function ManagerDashboard() {
   const [events, setEvents] = useState<Event[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<string>("all");
   const [allDbMatches, setAllDbMatches] = useState<Match[]>([]);
+  const [completedSubmissions, setCompletedSubmissions] = useState<Set<string>>(
+    new Set()
+  );
 
   // New event form state
   const [newEventName, setNewEventName] = useState("");
@@ -220,7 +224,37 @@ export default function ManagerDashboard() {
 
     // Reset to page 1 when event changes
     setCurrentPage(1);
+
+    // Load submission status for filtered matches
+    loadSubmissionStatus(filteredDbMatches);
   }, [selectedEvent, allDbMatches, convertMatchToAssignment]);
+
+  // Load submission status for all match/role combinations
+  const loadSubmissionStatus = async (dbMatches: Match[]) => {
+    if (dbMatches.length === 0) {
+      setCompletedSubmissions(new Set());
+      return;
+    }
+
+    try {
+      const matchIds = dbMatches.map((m) => m.id);
+      const { data: submissions, error } = await supabase
+        .from("scouting_submissions")
+        .select("match_id, role")
+        .in("match_id", matchIds);
+
+      if (error) throw error;
+
+      // Create Set of "matchId:role" strings for quick lookup
+      const completedSet = new Set(
+        (submissions || []).map((s) => `${s.match_id}:${s.role}`)
+      );
+
+      setCompletedSubmissions(completedSet);
+    } catch (error) {
+      console.error("Error loading submission status:", error);
+    }
+  };
 
   // Calculate pagination
   const totalPages = Math.ceil(matches.length / matchesPerPage);
@@ -558,6 +592,7 @@ export default function ManagerDashboard() {
                         roles={roles}
                         onOpenDialog={openAssignmentDialog}
                         onClearAssignment={handleClearAssignment}
+                        completedSubmissions={completedSubmissions}
                       />
                     ))}
                   </TableBody>
