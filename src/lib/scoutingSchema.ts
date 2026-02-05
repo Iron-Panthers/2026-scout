@@ -6,7 +6,7 @@
  * and add a migration function to handle old data formats.
  */
 
-import { supabase } from './supabase';
+import { supabase } from "./supabase";
 
 /**
  * Current schema version - increment when scouting data structure changes
@@ -44,12 +44,12 @@ export interface ScoutingSubmission {
  */
 export async function getSchemaVersions(): Promise<SchemaVersion[]> {
   const { data, error } = await supabase
-    .from('scouting_schema_versions')
-    .select('*')
-    .order('version', { ascending: false });
+    .from("scouting_schema_versions")
+    .select("*")
+    .order("version", { ascending: false });
 
   if (error) {
-    console.error('Error fetching schema versions:', error);
+    console.error("Error fetching schema versions:", error);
     return [];
   }
 
@@ -59,11 +59,13 @@ export async function getSchemaVersions(): Promise<SchemaVersion[]> {
 /**
  * Get a specific schema version
  */
-export async function getSchemaVersion(version: number): Promise<SchemaVersion | null> {
+export async function getSchemaVersion(
+  version: number
+): Promise<SchemaVersion | null> {
   const { data, error } = await supabase
-    .from('scouting_schema_versions')
-    .select('*')
-    .eq('version', version)
+    .from("scouting_schema_versions")
+    .select("*")
+    .eq("version", version)
     .single();
 
   if (error) {
@@ -124,15 +126,17 @@ function applyMigration(
 /**
  * Resolve event_code to event_id
  */
-export async function resolveEventId(event_code: string): Promise<string | null> {
+export async function resolveEventId(
+  event_code: string
+): Promise<string | null> {
   const { data, error } = await supabase
-    .from('events')
-    .select('id')
-    .eq('event_code', event_code)
+    .from("events")
+    .select("id")
+    .eq("event_code", event_code)
     .single();
 
   if (error) {
-    console.error('Error resolving event_id from event_code:', error);
+    console.error("Error resolving event_id from event_code:", error);
     return null;
   }
 
@@ -152,20 +156,20 @@ export async function resolveMatchId(
   const event_id = await resolveEventId(event_code);
 
   if (!event_id) {
-    console.error('Could not resolve event_code to event_id:', event_code);
+    console.error("Could not resolve event_code to event_id:", event_code);
     return null;
   }
 
   // Query the matches table to find the match with the given event and match number
   const { data, error } = await supabase
-    .from('matches')
-    .select('id')
-    .eq('event_id', event_id)
-    .eq('match_number', match_number)
+    .from("matches")
+    .select("id")
+    .eq("event_id", event_id)
+    .eq("match_number", match_number)
     .single();
 
   if (error) {
-    console.error('Error resolving matchId:', error);
+    console.error("Error resolving matchId:", error);
     return null;
   }
 
@@ -182,7 +186,7 @@ export async function submitScoutingData(
   scouterId?: string
 ) {
   const { data, error } = await supabase
-    .from('scouting_submissions')
+    .from("scouting_submissions")
     .insert({
       match_id: matchId,
       role: role,
@@ -194,7 +198,7 @@ export async function submitScoutingData(
     .single();
 
   if (error) {
-    console.error('Error submitting scouting data:', error);
+    console.error("Error submitting scouting data:", error);
     throw error;
   }
 
@@ -209,13 +213,13 @@ export async function getMatchSubmissions(
   autoMigrate: boolean = true
 ): Promise<ScoutingSubmission[]> {
   const { data, error } = await supabase
-    .from('scouting_submissions')
-    .select('*')
-    .eq('match_id', matchId)
-    .order('time', { ascending: false });
+    .from("scouting_submissions")
+    .select("*")
+    .eq("match_id", matchId)
+    .order("time", { ascending: false });
 
   if (error) {
-    console.error('Error fetching match submissions:', error);
+    console.error("Error fetching match submissions:", error);
     throw error;
   }
 
@@ -250,13 +254,13 @@ export async function getScouterSubmissions(
   autoMigrate: boolean = true
 ): Promise<ScoutingSubmission[]> {
   const { data, error } = await supabase
-    .from('scouting_submissions')
-    .select('*')
-    .eq('scouter_id', scouterId)
-    .order('time', { ascending: false });
+    .from("scouting_submissions")
+    .select("*")
+    .eq("scouter_id", scouterId)
+    .order("time", { ascending: false });
 
   if (error) {
-    console.error('Error fetching scouter submissions:', error);
+    console.error("Error fetching scouter submissions:", error);
     throw error;
   }
 
@@ -287,17 +291,17 @@ export async function getScouterSubmissions(
  */
 export async function updateScoutingSubmission(
   submissionId: string,
-  updates: Partial<Pick<ScoutingSubmission, 'scouting_data' | 'role'>>
+  updates: Partial<Pick<ScoutingSubmission, "scouting_data" | "role">>
 ) {
   const { data, error } = await supabase
-    .from('scouting_submissions')
+    .from("scouting_submissions")
     .update(updates)
-    .eq('id', submissionId)
+    .eq("id", submissionId)
     .select()
     .single();
 
   if (error) {
-    console.error('Error updating submission:', error);
+    console.error("Error updating submission:", error);
     throw error;
   }
 
@@ -309,12 +313,76 @@ export async function updateScoutingSubmission(
  */
 export async function deleteScoutingSubmission(submissionId: string) {
   const { error } = await supabase
-    .from('scouting_submissions')
+    .from("scouting_submissions")
     .delete()
-    .eq('id', submissionId);
+    .eq("id", submissionId);
 
   if (error) {
-    console.error('Error deleting submission:', error);
+    console.error("Error deleting submission:", error);
     throw error;
   }
+}
+
+/**
+ * Check if a submission exists for a given match and role
+ * @param matchId - The match ID to check
+ * @param role - The role to check
+ * @returns true if a submission exists, false otherwise
+ */
+export async function hasExistingSubmission(
+  matchId: string,
+  role: string
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("scouting_submissions")
+    .select("id")
+    .eq("match_id", matchId)
+    .eq("role", role)
+    .limit(1);
+
+  if (error) {
+    console.error("Error checking for existing submission:", error);
+    return false;
+  }
+
+  return data !== null && data.length > 0;
+}
+
+/**
+ * Filter matches to exclude those with existing submissions
+ * @param matches - Array of match objects with id and role
+ * @returns Filtered array excluding matches with submissions
+ */
+export async function filterMatchesWithoutSubmissions<
+  T extends { match: { id: string }; role: string }
+>(matches: T[]): Promise<T[]> {
+  if (matches.length === 0) return matches;
+
+  // Build query for all match_id + role combinations
+  const matchRolePairs = matches.map((m) => ({
+    match_id: m.match.id,
+    role: m.role,
+  }));
+
+  // Get all existing submissions for these match_id + role combinations
+  const { data: submissions, error } = await supabase
+    .from("scouting_submissions")
+    .select("match_id, role")
+    .in(
+      "match_id",
+      matches.map((m) => m.match.id)
+    );
+
+  if (error) {
+    console.error("Error fetching submissions:", error);
+    return matches; // Return all matches if there's an error
+  }
+
+  // Create a Set of "matchId:role" strings for quick lookup
+  const submittedSet = new Set(
+    (submissions || []).map((s) => `${s.match_id}:${s.role}`)
+  );
+
+  // Filter out matches that have been submitted
+  return matches.filter((m) => !submittedSet.has(`${m.match.id}:${m.role}`));
 }

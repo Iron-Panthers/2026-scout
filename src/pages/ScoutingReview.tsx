@@ -11,8 +11,12 @@ import { useAuth } from "@/contexts/AuthContext";
 import { submitScoutingData, resolveMatchId } from "@/lib/scoutingSchema";
 import { useToast } from "@/hooks/use-toast";
 import { SubmissionStatusModal } from "@/components/SubmissionStatusModal";
-import QRCode from "react-qr-code";
-import { saveOfflineMatch, markAsUploaded, generateOfflineKey } from "@/lib/offlineStorage";
+import SafeQRCode from "@/components/SafeQRCode";
+import {
+  saveOfflineMatch,
+  markAsUploaded,
+  generateOfflineKey,
+} from "@/lib/offlineStorage";
 import { supabase } from "@/lib/supabase";
 
 // Recursive JSON editor for objects/arrays
@@ -165,9 +169,9 @@ export default function ScoutingReview() {
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const { toast } = useToast();
-  
+
   // Check if opened with manager parameter
-  const isManagerMode = searchParams.get('forScoutingManager') === 'true';
+  const isManagerMode = searchParams.get("forScoutingManager") === "true";
 
   // Decode state from base64url param
   let initialState: any = null;
@@ -196,12 +200,14 @@ export default function ScoutingReview() {
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
-  const [dependencies, setDependencies] = useState<Array<{
-    label: string;
-    status: "pending" | "checking" | "success" | "error";
-    value?: string | number;
-    errorMessage?: string;
-  }>>([]);
+  const [dependencies, setDependencies] = useState<
+    Array<{
+      label: string;
+      status: "pending" | "checking" | "success" | "error";
+      value?: string | number;
+      errorMessage?: string;
+    }>
+  >([]);
   const [resolvedMatchId, setResolvedMatchId] = useState<string | null>(null);
   const [offlineKey, setOfflineKey] = useState<string | null>(null);
   const [qrCodeError, setQrCodeError] = useState(false);
@@ -211,8 +217,9 @@ export default function ScoutingReview() {
   // Check if URL is too large for QR code (QR codes have limits around 2953 bytes for alphanumeric)
   useEffect(() => {
     const urlLength = window.location.href.length;
-    // Set a conservative limit of 2000 characters to ensure QR code reliability
-    if (urlLength > 2000) {
+    // QR Code with error correction level M can handle ~2953 bytes
+    // But the actual data capacity is lower after encoding, so use 1500 as safe limit
+    if (urlLength > 1500) {
       setQrCodeError(true);
     } else {
       setQrCodeError(false);
@@ -339,9 +346,24 @@ export default function ScoutingReview() {
   const checkDependencies = async () => {
     console.log("=== CHECK DEPENDENCIES ===");
     console.log("Current state:", state);
-    console.log("state.matchId:", state?.matchId, "Type:", typeof state?.matchId);
-    console.log("state.event_code:", state?.event_code, "Type:", typeof state?.event_code);
-    console.log("state.match_number:", state?.match_number, "Type:", typeof state?.match_number);
+    console.log(
+      "state.matchId:",
+      state?.matchId,
+      "Type:",
+      typeof state?.matchId
+    );
+    console.log(
+      "state.event_code:",
+      state?.event_code,
+      "Type:",
+      typeof state?.event_code
+    );
+    console.log(
+      "state.match_number:",
+      state?.match_number,
+      "Type:",
+      typeof state?.match_number
+    );
     console.log("state.role:", state?.role, "Type:", typeof state?.role);
 
     const deps = [
@@ -421,7 +443,8 @@ export default function ScoutingReview() {
           ...updatedDeps[0],
           status: "error",
           value: "Resolution failed",
-          errorMessage: error instanceof Error ? error.message : "Unknown error",
+          errorMessage:
+            error instanceof Error ? error.message : "Unknown error",
         };
       }
     } else {
@@ -502,7 +525,7 @@ export default function ScoutingReview() {
   const handleCopyLink = async () => {
     try {
       const url = new URL(window.location.href);
-      url.searchParams.set('forScoutingManager', 'true');
+      url.searchParams.set("forScoutingManager", "true");
       await navigator.clipboard.writeText(url.toString());
       setLinkCopied(true);
       toast({
@@ -536,7 +559,8 @@ export default function ScoutingReview() {
     }
 
     // Validate that matchId is a UUID format
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!uuidRegex.test(matchId)) {
       console.error("Invalid UUID format for matchId:", matchId);
       toast({
@@ -550,12 +574,7 @@ export default function ScoutingReview() {
     setIsSubmitting(true);
 
     try {
-      await submitScoutingData(
-        matchId,
-        state.role,
-        state,
-        user?.id
-      );
+      await submitScoutingData(matchId, state.role, state, user?.id);
 
       // Mark as uploaded in offline storage
       if (offlineKey) {
@@ -576,7 +595,10 @@ export default function ScoutingReview() {
       console.error("Error submitting scouting data:", error);
       toast({
         title: "Submission Failed",
-        description: error instanceof Error ? error.message : "An error occurred while submitting.",
+        description:
+          error instanceof Error
+            ? error.message
+            : "An error occurred while submitting.",
         variant: "destructive",
       });
     } finally {
@@ -728,10 +750,11 @@ export default function ScoutingReview() {
           </p>
           {!qrCodeError ? (
             <div className="bg-white p-4 rounded-lg border border-border">
-              <QRCode
+              <SafeQRCode
                 value={window.location.href}
                 size={200}
                 level="M"
+                onError={() => setQrCodeError(true)}
               />
             </div>
           ) : (
@@ -790,15 +813,21 @@ export default function ScoutingReview() {
             <div className="bg-muted/50 rounded-lg p-4 space-y-2 text-left">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Match:</span>
-                <span className="font-semibold text-foreground">#{state?.match_number}</span>
+                <span className="font-semibold text-foreground">
+                  #{state?.match_number}
+                </span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Event:</span>
-                <span className="font-semibold text-foreground">{state?.event_code}</span>
+                <span className="font-semibold text-foreground">
+                  {state?.event_code}
+                </span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Role:</span>
-                <span className="font-semibold text-foreground">{state?.role}</span>
+                <span className="font-semibold text-foreground">
+                  {state?.role}
+                </span>
               </div>
             </div>
             <div className="flex flex-col gap-2 pt-2">

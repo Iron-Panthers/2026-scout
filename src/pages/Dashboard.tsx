@@ -15,9 +15,11 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { getUserMatches, removeUserFromMatch, getEvents } from "@/lib/matches";
 import { getMatchTeam, getTeamPhoto, CURRENT_YEAR } from "@/lib/blueAlliance";
+import { filterMatchesWithoutSubmissions } from "@/lib/scoutingSchema";
 import DashboardHeader from "@/components/DashboardHeader";
 import UserProfileMenu from "@/components/UserProfileMenu";
 import OfflineMatches from "@/components/OfflineMatches";
+import AnimatedContent from "@/components/AnimatedContent";
 import type { Match, Role, Event } from "@/types";
 
 export function prettifyRole(role) {
@@ -38,7 +40,7 @@ export function prettifyRole(role) {
       return "Blue 3";
     case "qualBlue":
       return "Qual Blue";
-    default: 
+    default:
       return "Unknown Role";
   }
 }
@@ -113,13 +115,18 @@ export default function Dashboard() {
           (a, b) => a.match.match_number - b.match.match_number
         );
 
-        setMatches(formattedMatches);
+        // Filter out matches that already have submissions
+        const matchesWithoutSubmissions = await filterMatchesWithoutSubmissions(
+          formattedMatches
+        );
+
+        setMatches(matchesWithoutSubmissions);
 
         // Fetch team numbers for each match
         const events = await getEvents();
         const teamNumbersMap: Record<string, number | null> = {};
 
-        for (const userMatch of formattedMatches) {
+        for (const userMatch of matchesWithoutSubmissions) {
           // Skip qual roles
           if (userMatch.role === "qualRed" || userMatch.role === "qualBlue") {
             continue;
@@ -220,7 +227,8 @@ export default function Dashboard() {
 
     // Validate that we have a UUID
     const matchId = selectedMatch.match.id;
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
     if (!matchId || !uuidRegex.test(matchId)) {
       console.error("Invalid match ID format:", matchId);
@@ -229,7 +237,7 @@ export default function Dashboard() {
     }
 
     navigate(`/config/${matchId}?role=${selectedMatch?.role}`);
-  }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -250,7 +258,7 @@ export default function Dashboard() {
           <Button
             size="lg"
             className="h-24 text-lg font-semibold flex flex-col gap-2"
-            onClick={() => navigate('/config/')}
+            onClick={() => navigate("/config/")}
           >
             <ClipboardList className="h-8 w-8" />
             Match Scouting
@@ -282,68 +290,77 @@ export default function Dashboard() {
             </Card>
           ) : (
             <div className="overflow-x-auto pb-4">
-              <div className="flex gap-4 min-w-min">
+              <div className="flex gap-4 min-w-min items-stretch">
                 {matches.map((userMatch, index) => (
-                  <Card
+                  <AnimatedContent
                     key={`${userMatch.match.id}-${userMatch.role}`}
-                    className={`flex-shrink-0 w-64 ${getRoleColor(
-                      userMatch.role
-                    )} border-2 hover:scale-105 transition-transform cursor-pointer`}
-                    onClick={() => handleMatchClick(userMatch)}
+                    direction="horizontal"
+                    distance={50}
+                    duration={0.5}
+                    delay={index * 0.1}
+                    threshold={0.2}
+                    className="flex-shrink-0 flex"
                   >
-                    <CardHeader className="pb-2">
-                      <div className="flex items-center justify-between mb-1 gap-2">
-                        <span className="font-mono text-2xl font-bold">
-                          {userMatch.matchNumber}
-                        </span>
-                        <Badge
-                          variant="outline"
-                          className={`${getRoleBadgeColor(
-                            userMatch.role
-                          )} whitespace-nowrap text-xs`}
-                        >
-                          {userMatch.role.toUpperCase()}
-                        </Badge>
-                      </div>
-                      <CardTitle className="text-lg">
-                        Match #{userMatch.match.match_number}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2">
-                        <div className="text-sm text-muted-foreground">
-                          <div className="font-semibold text-foreground mb-1">
-                            {userName}
-                          </div>
-                          <div className="text-xs break-words">
-                            Role: {userMatch.role}
-                          </div>
-                          {teamNumbers[
-                            `${userMatch.match.id}-${userMatch.role}`
-                          ] && (
-                            <div className="text-xs font-semibold text-foreground mt-1">
-                              Team:{" "}
-                              {
-                                teamNumbers[
-                                  `${userMatch.match.id}-${userMatch.role}`
-                                ]
-                              }
-                            </div>
-                          )}
+                    <Card
+                      className={`w-64 flex flex-col ${getRoleColor(
+                        userMatch.role
+                      )} border-2 hover:scale-[1.02] transition-transform cursor-pointer`}
+                      onClick={() => handleMatchClick(userMatch)}
+                    >
+                      <CardHeader className="pb-2">
+                        <div className="flex items-center justify-between mb-1 gap-2">
+                          <span className="font-mono text-2xl font-bold">
+                            {userMatch.matchNumber}
+                          </span>
+                          <Badge
+                            variant="outline"
+                            className={`${getRoleBadgeColor(
+                              userMatch.role
+                            )} whitespace-nowrap text-xs`}
+                          >
+                            {userMatch.role.toUpperCase()}
+                          </Badge>
                         </div>
-                        <Button
-                          className="w-full mt-4"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleMatchClick(userMatch);
-                          }}
-                        >
-                          View Details
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
+                        <CardTitle className="text-lg">
+                          Match #{userMatch.match.match_number}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2">
+                          <div className="text-sm text-muted-foreground">
+                            <div className="font-semibold text-foreground mb-1">
+                              {userName}
+                            </div>
+                            <div className="text-xs break-words">
+                              Role: {userMatch.role}
+                            </div>
+                            {teamNumbers[
+                              `${userMatch.match.id}-${userMatch.role}`
+                            ] && (
+                              <div className="text-xs font-semibold text-foreground mt-1">
+                                Team:{" "}
+                                {
+                                  teamNumbers[
+                                    `${userMatch.match.id}-${userMatch.role}`
+                                  ]
+                                }
+                              </div>
+                            )}
+                          </div>
+                          <Button
+                            className="w-full mt-4"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleMatchClick(userMatch);
+                            }}
+                          >
+                            View Details
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </AnimatedContent>
                 ))}
               </div>
             </div>
@@ -435,7 +452,9 @@ export default function Dashboard() {
                   <span className="text-sm font-medium text-muted-foreground">
                     Your Role
                   </span>
-                  <span className="font-semibold">{prettifyRole(selectedMatch?.role)}</span>
+                  <span className="font-semibold">
+                    {prettifyRole(selectedMatch?.role)}
+                  </span>
                 </div>
                 <div className="flex justify-between items-center p-3 bg-accent/50 rounded-lg">
                   <span className="text-sm font-medium text-muted-foreground">
