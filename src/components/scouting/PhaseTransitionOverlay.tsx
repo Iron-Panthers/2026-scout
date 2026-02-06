@@ -28,9 +28,9 @@ export default function PhaseTransitionOverlay({
       style={{ animation: "phaseFlash 0.5s ease-in-out 6 alternate" }}
     >
       <div className="bg-yellow-400/30 absolute inset-0" />
-      <div className="relative text-center px-8 py-6">
+      <div className="relative text-center px-4 py-3">
         <p
-          className="text-4xl font-black tracking-wide text-white drop-shadow-lg"
+          className="text-2xl sm:text-3xl font-black tracking-wide text-white drop-shadow-lg"
           style={{
             textShadow:
               "0 0 20px rgba(0,0,0,0.8), 0 0 40px rgba(0,0,0,0.5), 2px 2px 4px rgba(0,0,0,0.9)",
@@ -39,7 +39,7 @@ export default function PhaseTransitionOverlay({
           SWITCH TO
         </p>
         <p
-          className="text-6xl font-black tracking-wider text-yellow-300 mt-2 drop-shadow-lg"
+          className="text-4xl sm:text-5xl font-black tracking-wider text-yellow-300 mt-1 drop-shadow-lg"
           style={{
             textShadow:
               "0 0 20px rgba(0,0,0,0.8), 0 0 40px rgba(234,179,8,0.5), 2px 2px 4px rgba(0,0,0,0.9)",
