@@ -450,32 +450,34 @@ export default function Dashboard() {
                         </span>
                       </div>
                     )}
-                <div className="flex justify-between items-center p-2 landscape:p-2 md:p-3 bg-accent/50 rounded-lg">
-                  <span className="text-xs sm:text-sm md:text-sm font-medium text-muted-foreground">
-                    Your Role
-                  </span>
-                  <span className="text-sm sm:text-base md:text-base font-semibold">
-                    {prettifyRole(selectedMatch?.role)}
-                  </span>
+                  <div className="flex justify-between items-center p-2 landscape:p-2 md:p-3 bg-accent/50 rounded-lg">
+                    <span className="text-xs sm:text-sm md:text-sm font-medium text-muted-foreground">
+                      Your Role
+                    </span>
+                    <span className="text-sm sm:text-base md:text-base font-semibold">
+                      {prettifyRole(selectedMatch?.role)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center p-2 landscape:p-2 md:p-3 bg-accent/50 rounded-lg">
+                    <span className="text-xs sm:text-sm md:text-sm font-medium text-muted-foreground">
+                      Match Type
+                    </span>
+                    <span className="text-sm sm:text-base md:text-base font-semibold">
+                      Qualification
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center p-2 landscape:p-2 md:p-3 bg-accent/50 rounded-lg">
+                    <span className="text-xs sm:text-sm font-medium text-muted-foreground">
+                      Alliance
+                    </span>
+                    <span className="text-sm sm:text-base font-semibold">
+                      {selectedMatch?.role.toLowerCase().includes("red")
+                        ? "Red"
+                        : "Blue"}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex justify-between items-center p-2 landscape:p-2 md:p-3 bg-accent/50 rounded-lg">
-                  <span className="text-xs sm:text-sm md:text-sm font-medium text-muted-foreground">
-                    Match Type
-                  </span>
-                  <span className="text-sm sm:text-base md:text-base font-semibold">Qualification</span>
-                </div>
-                <div className="flex justify-between items-center p-2 landscape:p-2 md:p-3 bg-accent/50 rounded-lg">
-                  <span className="text-xs sm:text-sm font-medium text-muted-foreground">
-                    Alliance
-                  </span>
-                  <span className="text-sm sm:text-base font-semibold">
-                    {selectedMatch?.role.toLowerCase().includes("red")
-                      ? "Red"
-                      : "Blue"}
-                  </span>
-                </div>
-                </div>
-                
+
                 {/* Footer buttons in landscape mode only (not desktop) */}
                 <div className="landscape:flex landscape:flex-col landscape:gap-2 landscape:md:hidden hidden">
                   <Button
@@ -504,7 +506,10 @@ export default function Dashboard() {
                 <X className="h-4 w-4 mr-1.5" />
                 <span className="text-sm">Decline</span>
               </Button>
-              <Button onClick={handleQueueScouting} className="w-full sm:flex-1 h-10">
+              <Button
+                onClick={handleQueueScouting}
+                className="w-full sm:flex-1 h-10"
+              >
                 <ClipboardList className="h-4 w-4 mr-1.5" />
                 <span className="text-sm">Queue Scouting</span>
               </Button>
