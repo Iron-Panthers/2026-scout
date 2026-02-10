@@ -2,6 +2,7 @@ import { memo } from "react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { TableRow, TableCell } from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, X } from "lucide-react";
 import type { Role, MatchAssignment } from "@/types";
 
@@ -18,6 +19,8 @@ interface MatchRowProps {
   onOpenDialog: (matchNumber: number, role: Role) => void;
   onClearAssignment: (matchNumber: number, role: Role) => void;
   completedSubmissions: Set<string>;
+  isSelected?: boolean;
+  onToggleSelect?: (matchId: string) => void;
 }
 
 export const MatchRow = memo(
@@ -27,9 +30,18 @@ export const MatchRow = memo(
     onOpenDialog,
     onClearAssignment,
     completedSubmissions,
+    isSelected = false,
+    onToggleSelect,
   }: MatchRowProps) => {
     return (
       <TableRow>
+        <TableCell className="border-r border-border">
+          <Checkbox
+            checked={isSelected}
+            onCheckedChange={() => onToggleSelect?.(match.matchId || "")}
+            disabled={!match.matchId}
+          />
+        </TableCell>
         <TableCell className="font-mono font-semibold border-r border-border">
           Q-{match.matchNumber}
         </TableCell>
@@ -42,20 +54,20 @@ export const MatchRow = memo(
             ? "bg-green-900/30"
             : getRoleCellColor(role);
           return (
-            <TableCell key={role} className={`p-2 ${cellColorClass}`}>
+            <TableCell key={role} className={`p-1.5 md:p-2 ${cellColorClass}`}>
               {assignment ? (
                 <div className="relative group">
                   <button
                     onClick={() => onOpenDialog(match.matchNumber, role)}
-                    className="flex flex-col items-center gap-1 hover:bg-accent/50 rounded-md p-2 transition-colors w-full"
+                    className="flex flex-col items-center gap-0.5 md:gap-1 hover:bg-accent/50 rounded-md p-1.5 md:p-2 transition-colors w-full"
                   >
-                    <Avatar className="h-10 w-10">
+                    <Avatar className="h-8 w-8 md:h-10 md:w-10">
                       <AvatarImage src={assignment.avatar} />
                       <AvatarFallback className="text-xs bg-primary/20 text-primary">
                         {assignment.initials}
                       </AvatarFallback>
                     </Avatar>
-                    <span className="text-xs font-medium text-center">
+                    <span className="text-[10px] leading-tight md:text-xs font-medium text-center">
                       {assignment.name}
                     </span>
                   </button>
@@ -76,9 +88,9 @@ export const MatchRow = memo(
                     variant="ghost"
                     size="icon"
                     onClick={() => onOpenDialog(match.matchNumber, role)}
-                    className="h-10 w-10"
+                    className="h-8 w-8 md:h-10 md:w-10"
                   >
-                    <Plus className="h-5 w-5 text-muted-foreground" />
+                    <Plus className="h-4 w-4 md:h-5 md:w-5 text-muted-foreground" />
                   </Button>
                 </div>
               )}

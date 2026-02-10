@@ -12,7 +12,11 @@ import Scouting from "./pages/Scouting";
 import Login from "./pages/Login";
 import Dev from "./pages/Dev";
 import ScoutConfig from "./pages/ScoutConfig";
+import NotificationTest from "./pages/NotificationTest";
+import RealtimeTest from "./pages/RealtimeTest";
 import { Toaster } from "./components/ui/toaster";
+import UpdateBanner from "./components/UpdateBanner";
+import MatchAssignmentListener from "./components/MatchAssignmentListener";
 
 function App() {
   return (
@@ -87,9 +91,27 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/test-notifications"
+              element={
+                <ProtectedRoute>
+                  <NotificationTest />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/test-realtime"
+              element={
+                <ProtectedRoute>
+                  <RealtimeTest />
+                </ProtectedRoute>
+              }
+            />
             <Route path="/review/:encoded" element={<ScoutingReview />} />
           </Routes>
           <Toaster />
+          <UpdateBanner />
+          <MatchAssignmentListener />
         </BrowserRouter>
       </SettingsProvider>
     </AuthProvider>

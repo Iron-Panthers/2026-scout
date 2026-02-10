@@ -1,0 +1,23 @@
+-- Enable pg_cron extension for scheduled jobs
+CREATE EXTENSION IF NOT EXISTS pg_cron;
+
+-- Note: This migration requires manual configuration after deployment
+-- because it needs your actual Supabase URL and service role key.
+--
+-- After deploying migrations, run this SQL in the Supabase SQL Editor:
+--
+-- SELECT cron.schedule(
+--   'send-match-notifications',
+--   '*/2 * * * *',
+--   $$
+--   SELECT net.http_post(
+--     url := 'https://YOUR_PROJECT_REF.supabase.co/functions/v1/send-match-notifications',
+--     headers := jsonb_build_object(
+--       'Authorization', 'Bearer YOUR_SERVICE_ROLE_KEY'
+--     )
+--   );
+--   $$
+-- );
+--
+-- Replace YOUR_PROJECT_REF and YOUR_SERVICE_ROLE_KEY with actual values
+-- from your Supabase project settings.

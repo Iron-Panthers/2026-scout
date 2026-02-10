@@ -56,9 +56,16 @@ export default function Scouting() {
     phaseTimeRemaining,
     phaseDuration,
     phaseProgress,
-    startMatch,
+    startMatch: startMatchTimer,
     resetMatch,
   } = useMatchTimer(currentPhase);
+
+  // Wrap startMatch to also record the match start time in scouting state
+  const startMatch = () => {
+    const now = Date.now();
+    set("matchStartTime", now);
+    startMatchTimer();
+  };
 
   // Track phase transitions for overlay
   const [showPhaseTransition, setShowPhaseTransition] = useState(false);
@@ -251,10 +258,14 @@ export default function Scouting() {
 
   const handleShotClick = (x: number, y: number, timestamp: number) => {
     const shotCount = selected === "1x" ? 1 : selected === "5x" ? 5 : 10;
+    // Convert absolute timestamp to seconds into the match
+    const relativeTimestamp = state.matchStartTime
+      ? (timestamp - state.matchStartTime) / 1000
+      : timestamp;
     const newShots = Array.from({ length: shotCount }, () => ({
       x,
       y,
-      timestamp,
+      timestamp: relativeTimestamp,
     }));
 
     set("shots.{phase}", [...state.shots[currentPhase], ...newShots]);

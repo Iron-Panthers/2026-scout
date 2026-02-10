@@ -15,12 +15,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   ChevronLeft,
   ChevronRight,
   Users,
   Calendar,
   PlusCircle,
+  ListChecks,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -29,6 +31,7 @@ import {
   createEventWithMatches,
 } from "@/lib/matches";
 import { updateMatchAssignment } from "@/lib/matches";
+import { getRostersForEvent, applyRosterToMatches } from "@/lib/rosters";
 import { supabase } from "@/lib/supabase";
 import DashboardHeader from "@/components/DashboardHeader";
 import UserProfileMenu from "@/components/UserProfileMenu";
@@ -36,6 +39,7 @@ import { MatchRow } from "@/components/manager/MatchRow";
 import { EventInformationTab } from "@/components/manager/EventInformationTab";
 import { CreateEventTab } from "@/components/manager/CreateEventTab";
 import { ScoutAssignmentDialog } from "@/components/manager/ScoutAssignmentDialog";
+import { RosterManagementTab } from "@/components/manager/RosterManagementTab";
 import type {
   Profile,
   Role,
@@ -44,6 +48,7 @@ import type {
   Scout,
   Event,
   Match,
+  Roster,
 } from "@/types";
 
 export default function ManagerDashboard() {
@@ -96,6 +101,10 @@ export default function ManagerDashboard() {
   const [selectedCell, setSelectedCell] = useState<SelectedCell | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const matchesPerPage = 25;
+
+  // Roster state
+  const [rosters, setRosters] = useState<Roster[]>([]);
+  const [selectedMatches, setSelectedMatches] = useState<Set<string>>(new Set());
 
   // Helper function to convert database match to assignment format
   const convertMatchToAssignment = useCallback(
@@ -206,6 +215,20 @@ export default function ManagerDashboard() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Load rosters for selected event
+  const loadRosters = useCallback(async () => {
+    if (selectedEvent === "all") {
+      setRosters([]);
+      return;
+    }
+    const rostersData = await getRostersForEvent(selectedEvent);
+    setRosters(rostersData);
+  }, [selectedEvent]);
+
+  useEffect(() => {
+    loadRosters();
+  }, [loadRosters]);
 
   // Filter matches based on selected event
   useEffect(() => {
@@ -359,6 +382,53 @@ export default function ManagerDashboard() {
     [matches]
   );
 
+  // Match selection handlers
+  const handleToggleMatch = useCallback((matchId: string) => {
+    setSelectedMatches((prev) => {
+      const next = new Set(prev);
+      if (next.has(matchId)) {
+        next.delete(matchId);
+      } else {
+        next.add(matchId);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleToggleAllMatches = useCallback(() => {
+    setSelectedMatches((prev) => {
+      const allMatchIds = paginatedMatches
+        .filter((m) => m.matchId)
+        .map((m) => m.matchId!);
+
+      if (prev.size === allMatchIds.length && allMatchIds.length > 0) {
+        // All selected, deselect all
+        return new Set();
+      } else {
+        // Select all on current page
+        return new Set(allMatchIds);
+      }
+    });
+  }, [paginatedMatches]);
+
+  const handleQuickApplyToSelected = useCallback(
+    async (rosterId: string) => {
+      if (selectedMatches.size === 0) return;
+
+      const matchIds = Array.from(selectedMatches);
+      const result = await applyRosterToMatches(rosterId, matchIds);
+
+      if (result.success) {
+        // Reload data to show updated assignments
+        await loadData();
+        setSelectedMatches(new Set());
+      } else {
+        alert(result.error || "Failed to apply roster");
+      }
+    },
+    [selectedMatches, loadData]
+  );
+
   const handleCreateEvent = async () => {
     if (!newEventName.trim() || !newEventCode.trim() || !numQualMatches) {
       alert("Please fill in all fields");
@@ -455,7 +525,7 @@ export default function ManagerDashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      <main className="container mx-auto p-6 max-w-[1600px]">
+      <main className="container mx-auto p-4 md:p-6 max-w-[1600px]">
         {/* Header Section */}
         <div className="flex items-start justify-between mb-8">
           <DashboardHeader
@@ -472,13 +542,17 @@ export default function ManagerDashboard() {
         {/* Tabs for Navigation */}
         <Tabs defaultValue="assignments" className="w-full">
           <div className="flex items-center justify-between mb-6">
-            <TabsList className="grid w-full max-w-2xl grid-cols-3">
+            <TabsList className="grid w-full max-w-3xl grid-cols-4">
               <TabsTrigger
                 value="assignments"
                 className="flex items-center gap-2"
               >
                 <Users className="h-4 w-4" />
                 Match Assignments
+              </TabsTrigger>
+              <TabsTrigger value="rosters" className="flex items-center gap-2">
+                <ListChecks className="h-4 w-4" />
+                Rosters
               </TabsTrigger>
               <TabsTrigger value="events" className="flex items-center gap-2">
                 <Calendar className="h-4 w-4" />
@@ -517,64 +591,103 @@ export default function ManagerDashboard() {
                   Click the checkmark to assign a scout to a role
                 </p>
               </div>
+
+              {/* Bulk Apply Action Bar */}
+              {selectedMatches.size > 0 && (
+                <div className="p-3 bg-accent/50 border-b flex items-center justify-between">
+                  <span className="text-sm">
+                    {selectedMatches.size} match{selectedMatches.size !== 1 ? "es" : ""} selected
+                  </span>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSelectedMatches(new Set())}
+                    >
+                      Clear Selection
+                    </Button>
+                    <Select onValueChange={handleQuickApplyToSelected}>
+                      <SelectTrigger className="w-[200px]">
+                        <SelectValue placeholder="Apply roster..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {rosters.map((roster) => (
+                          <SelectItem key={roster.id} value={roster.id}>
+                            {roster.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
               <div className="overflow-auto max-h-[70vh]">
                 <Table noWrapper>
                   <TableHeader className="sticky top-0 bg-card z-20 shadow-sm">
                     <TableRow>
-                      <TableHead className="w-32 font-semibold border-r border-border">
+                      <TableHead className="w-12 border-r border-border">
+                        <Checkbox
+                          checked={
+                            selectedMatches.size === paginatedMatches.filter((m) => m.matchId).length &&
+                            paginatedMatches.filter((m) => m.matchId).length > 0
+                          }
+                          onCheckedChange={handleToggleAllMatches}
+                        />
+                      </TableHead>
+                      <TableHead className="w-28 md:w-32 text-xs md:text-sm font-semibold border-r border-border">
                         Match
                       </TableHead>
                       <TableHead
-                        className={`w-32 font-semibold text-center ${getRoleHeaderColor(
+                        className={`w-28 md:w-32 text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
                           "red1"
                         )}`}
                       >
                         Red 1
                       </TableHead>
                       <TableHead
-                        className={`w-32 font-semibold text-center ${getRoleHeaderColor(
+                        className={`w-28 md:w-32 text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
                           "red2"
                         )}`}
                       >
                         Red 2
                       </TableHead>
                       <TableHead
-                        className={`w-32 font-semibold text-center ${getRoleHeaderColor(
+                        className={`w-28 md:w-32 text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
                           "red3"
                         )}`}
                       >
                         Red 3
                       </TableHead>
                       <TableHead
-                        className={`w-32 font-semibold text-center ${getRoleHeaderColor(
+                        className={`w-28 md:w-32 text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
                           "qualRed"
                         )}`}
                       >
                         Qual Red
                       </TableHead>
                       <TableHead
-                        className={`w-32 font-semibold text-center ${getRoleHeaderColor(
+                        className={`w-28 md:w-32 text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
                           "blue1"
                         )}`}
                       >
                         Blue 1
                       </TableHead>
                       <TableHead
-                        className={`w-32 font-semibold text-center ${getRoleHeaderColor(
+                        className={`w-28 md:w-32 text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
                           "blue2"
                         )}`}
                       >
                         Blue 2
                       </TableHead>
                       <TableHead
-                        className={`w-32 font-semibold text-center ${getRoleHeaderColor(
+                        className={`w-28 md:w-32 text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
                           "blue3"
                         )}`}
                       >
                         Blue 3
                       </TableHead>
                       <TableHead
-                        className={`w-32 font-semibold text-center ${getRoleHeaderColor(
+                        className={`w-28 md:w-32 text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
                           "qualBlue"
                         )}`}
                       >
@@ -593,6 +706,8 @@ export default function ManagerDashboard() {
                         onOpenDialog={openAssignmentDialog}
                         onClearAssignment={handleClearAssignment}
                         completedSubmissions={completedSubmissions}
+                        isSelected={selectedMatches.has(match.matchId || "")}
+                        onToggleSelect={handleToggleMatch}
                       />
                     ))}
                   </TableBody>
@@ -611,8 +726,8 @@ export default function ManagerDashboard() {
                     onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                     disabled={currentPage === 1}
                   >
-                    <ChevronLeft className="h-4 w-4 mr-1" />
-                    Previous
+                    <ChevronLeft className="h-4 w-4 md:mr-1" />
+                    <span className="hidden md:inline">Previous</span>
                   </Button>
                   <div className="text-sm font-medium">
                     Page {currentPage} of {totalPages}
@@ -625,12 +740,28 @@ export default function ManagerDashboard() {
                     }
                     disabled={currentPage === totalPages}
                   >
-                    Next
-                    <ChevronRight className="h-4 w-4 ml-1" />
+                    <span className="hidden md:inline">Next</span>
+                    <ChevronRight className="h-4 w-4 md:ml-1" />
                   </Button>
                 </div>
               </div>
             </div>
+          </TabsContent>
+
+          {/* Rosters Tab */}
+          <TabsContent value="rosters" className="mt-0">
+            <RosterManagementTab
+              selectedEvent={selectedEvent}
+              events={events}
+              availableScouts={availableScouts}
+              rosters={rosters}
+              matches={matches}
+              selectedMatches={selectedMatches}
+              onRosterChange={() => {
+                loadRosters();
+                loadData(); // Reload match data to show updated assignments
+              }}
+            />
           </TabsContent>
 
           {/* Event Information Tab */}

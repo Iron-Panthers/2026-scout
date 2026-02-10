@@ -39,6 +39,7 @@ export interface ScoutingData {
   match_number: number;
   role: string;
   currentPhase: Phase;
+  matchStartTime: number | null;
   shots: Record<Phase, Array<{ x: number; y: number; timestamp: number }>>;
   counters: Record<Phase, Record<string, number>>;
   comments: string;
@@ -161,6 +162,7 @@ export class ScoutingReducer<T extends Record<string, any> = ScoutingData> {
       match_number,
       role,
       currentPhase: "auto",
+      matchStartTime: null,
       shots,
       counters,
       comments: "",
