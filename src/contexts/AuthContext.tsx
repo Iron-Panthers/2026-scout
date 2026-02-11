@@ -57,6 +57,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           session.user.user_metadata?.name || session.user.email?.split("@")[0];
         // Load profile but don't block on it
         loadProfile(session.user.id, userName).catch(console.error);
+      } else {
+        // No user - stop loading
+        setLoading(false);
       }
     });
 
@@ -74,6 +77,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         loadProfile(session.user.id, userName).catch(console.error);
       } else {
         setProfile(null);
+        setLoading(false);
       }
     });
 
