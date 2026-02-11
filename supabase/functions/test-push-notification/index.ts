@@ -7,6 +7,7 @@
 // This is for TESTING ONLY - sends a notification immediately without checking matches
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import webpush from "npm:web-push@3.6.7";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -17,15 +18,23 @@ const VAPID_PRIVATE_KEY = Deno.env.get("VAPID_PRIVATE_KEY")!;
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
 Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response(null, { status: 200, headers: corsHeaders });
   }
 
   try {
+    // Debug: Check environment variables
+    console.log("Environment check:", {
+      hasVapidSubject: !!VAPID_SUBJECT,
+      hasVapidPublic: !!VAPID_PUBLIC_KEY,
+      hasVapidPrivate: !!VAPID_PRIVATE_KEY,
+    });
+
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     // Get request body
@@ -114,9 +123,17 @@ async function sendWebPush(
   subscription: { endpoint: string; p256dh: string; auth: string },
   payload: string
 ) {
-  const webpush = await import("https://esm.sh/web-push@3.6.7");
+  console.log("sendWebPush called with:", {
+    endpoint: subscription.endpoint?.substring(0, 50) + "...",
+    hasP256dh: !!subscription.p256dh,
+    hasAuth: !!subscription.auth,
+    payloadLength: payload.length,
+  });
+
+  console.log("Setting VAPID details...");
   webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 
+  console.log("Sending notification...");
   await webpush.sendNotification(
     {
       endpoint: subscription.endpoint,
@@ -127,4 +144,6 @@ async function sendWebPush(
     },
     payload
   );
+
+  console.log("Notification sent successfully!");
 }

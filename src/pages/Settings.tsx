@@ -30,10 +30,17 @@ export default function Settings() {
   const email = user?.email || "";
 
   const handleNotificationToggle = async (fieldId: string, checked: boolean) => {
+    console.log("handleNotificationToggle called:", { fieldId, checked, subscribed });
+
     if (checked && !subscribed) {
+      console.log("Attempting to subscribe to push notifications...");
       // First notification toggle turned on — subscribe to push
       const success = await toggleNotifications(true);
-      if (!success) return; // Permission denied or error
+      console.log("toggleNotifications result:", success);
+      if (!success) {
+        console.error("Failed to toggle notifications");
+        return; // Permission denied or error
+      }
     }
 
     updateSetting(fieldId, checked);
@@ -43,6 +50,7 @@ export default function Settings() {
       const otherNotifFields = NOTIFICATION_FIELD_IDS.filter((id) => id !== fieldId);
       const allOff = otherNotifFields.every((id) => !settings[id]);
       if (allOff) {
+        console.log("All notifications off, unsubscribing...");
         await toggleNotifications(false);
       }
     }
