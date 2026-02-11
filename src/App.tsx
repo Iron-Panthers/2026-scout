@@ -14,6 +14,8 @@ import Dev from "./pages/Dev";
 import ScoutConfig from "./pages/ScoutConfig";
 import NotificationTest from "./pages/NotificationTest";
 import RealtimeTest from "./pages/RealtimeTest";
+import SimpleRealtimeTest from "./pages/SimpleRealtimeTest";
+import PushTest from "./pages/PushTest";
 import { Toaster } from "./components/ui/toaster";
 import UpdateBanner from "./components/UpdateBanner";
 import MatchAssignmentListener from "./components/MatchAssignmentListener";
@@ -104,6 +106,22 @@ function App() {
               element={
                 <ProtectedRoute>
                   <RealtimeTest />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/test-simple"
+              element={
+                <ProtectedRoute>
+                  <SimpleRealtimeTest />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/test-push"
+              element={
+                <ProtectedRoute>
+                  <PushTest />
                 </ProtectedRoute>
               }
             />

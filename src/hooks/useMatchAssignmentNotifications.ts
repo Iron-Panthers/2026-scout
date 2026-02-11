@@ -72,10 +72,16 @@ export function useMatchAssignmentNotifications() {
   );
 
   const markAsNotified = useCallback(async (notificationId: string) => {
-    await supabase
+    const { error } = await supabase
       .from("match_assignment_notifications")
       .update({ notified: true, notified_at: new Date().toISOString() })
       .eq("id", notificationId);
+
+    if (error) {
+      console.error("Failed to mark notification as notified:", error);
+    } else {
+      console.log("✅ Marked notification as notified:", notificationId);
+    }
   }, []);
 
   useEffect(() => {

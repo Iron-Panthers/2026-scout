@@ -9,7 +9,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { ArrowLeft } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSettings } from "@/contexts/SettingsContext";
@@ -22,7 +23,7 @@ export default function Settings() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { settings, updateSetting } = useSettings();
-  const { supported, subscribed, loading, permission, toggleNotifications } =
+  const { supported, subscribed, loading, permission, error, toggleNotifications } =
     usePushNotifications();
 
   const userName = user?.user_metadata?.name || "";
@@ -65,16 +66,56 @@ export default function Settings() {
               <CardDescription>{section.description}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {key === "notifications" && !supported && (
-                <p className="text-sm text-muted-foreground">
-                  Push notifications are not supported in this browser.
-                </p>
-              )}
-              {key === "notifications" && permission === "denied" && (
-                <p className="text-sm text-destructive">
-                  Notification permission was denied. Please enable it in your
-                  browser settings.
-                </p>
+              {key === "notifications" && (
+                <div className="space-y-3">
+                  {/* Push Notification Status */}
+                  <div className="rounded-lg border p-3 bg-muted/50">
+                    <p className="text-sm font-medium mb-1">
+                      Push Notification Status
+                    </p>
+                    {!supported ? (
+                      <p className="text-sm text-muted-foreground">
+                        ❌ Not supported in this browser. Try Chrome, Firefox, or Edge.
+                      </p>
+                    ) : loading ? (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>Setting up push notifications...</span>
+                      </div>
+                    ) : permission === "denied" ? (
+                      <p className="text-sm text-destructive">
+                        ❌ Permission denied
+                      </p>
+                    ) : subscribed ? (
+                      <p className="text-sm text-green-600 dark:text-green-400">
+                        🟢 Active - You'll receive push notifications
+                      </p>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        🔴 Not subscribed - Toggle a notification below to enable
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Error Message */}
+                  {error && (
+                    <Alert variant="destructive">
+                      <AlertDescription>{error}</AlertDescription>
+                    </Alert>
+                  )}
+
+                  {/* Permission Denied Instructions */}
+                  {permission === "denied" && (
+                    <Alert>
+                      <AlertDescription>
+                        <strong>To enable notifications:</strong>
+                        <br />• <strong>Chrome:</strong> Settings → Privacy and security → Site Settings → Notifications
+                        <br />• <strong>Firefox:</strong> Page Info → Permissions → Receive Notifications
+                        <br />• <strong>Edge:</strong> Settings → Cookies and site permissions → Notifications
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </div>
               )}
               {section.fields.map((field: any) => {
                 const isNotificationField = NOTIFICATION_FIELD_IDS.includes(field.id);

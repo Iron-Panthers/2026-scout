@@ -64,3 +64,28 @@ export function applyUpdate() {
 export function getRegistration(): ServiceWorkerRegistration | null {
   return registration;
 }
+
+/**
+ * Wait for the service worker to finish registering.
+ * Polls until registration is complete or timeout is reached.
+ *
+ * @param timeoutMs Maximum time to wait in milliseconds (default 10000)
+ * @returns The SW registration or null if timeout
+ */
+export async function waitForRegistration(
+  timeoutMs = 10000
+): Promise<ServiceWorkerRegistration | null> {
+  const startTime = Date.now();
+
+  // If already registered, return immediately
+  if (registration) return registration;
+
+  // Poll until registration completes or timeout
+  while (Date.now() - startTime < timeoutMs) {
+    if (registration) return registration;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+
+  console.warn("Service worker registration timeout");
+  return null;
+}
