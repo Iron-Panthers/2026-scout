@@ -23,7 +23,16 @@ import {
   DropdownMenuPortal,
   DropdownMenuTrigger,
 } from "@radix-ui/react-dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { ArrowLeft, Lock } from "lucide-react";
 import type { Match } from "@/types";
 
 export default function ScoutConfig() {
@@ -47,6 +56,12 @@ export default function ScoutConfig() {
     {}
   );
   const [manualMode, setManualMode] = useState(!param_match_id);
+
+  // Role locking state
+  const [lockedRole, setLockedRole] = useState<string | null>(null);
+  const [lockedMatchType, setLockedMatchType] = useState<string | null>(null);
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [pendingChange, setPendingChange] = useState<{type: 'role' | 'matchType', value: string} | null>(null);
 
   // Load active event on mount
   useEffect(() => {
@@ -143,6 +158,9 @@ export default function ScoutConfig() {
       setMatchNumber(match.match_number || 0);
       if (match_role) {
         setRole(match_role);
+        // Lock the role since user is assigned
+        setLockedRole(match_role);
+        setLockedMatchType("Qualification");
       }
       setManualMode(false);
 
@@ -176,6 +194,13 @@ export default function ScoutConfig() {
   }, [param_match_id, user?.id]);
 
   const updateTeamNum = async () => {
+    // Skip for qual roles - they don't have specific team numbers
+    if (role === "qualRed" || role === "qualBlue") {
+      setTeamNumber(0);
+      setTeamPhoto(null);
+      return;
+    }
+
     if (matchType === "Practice" || matchType === "Playoff") return;
     if (!matchNumber || !role || !eventCode) return;
 
@@ -186,12 +211,10 @@ export default function ScoutConfig() {
       if (teamNumber) {
         setTeamNumber(teamNumber);
 
-        // Fetch team photo if not a qual role
-        if (role !== "qualRed" && role !== "qualBlue") {
-          const photoUrl = await getTeamPhoto(teamNumber, CURRENT_YEAR);
-          if (photoUrl) {
-            setTeamPhoto(photoUrl);
-          }
+        // Fetch team photo
+        const photoUrl = await getTeamPhoto(teamNumber, CURRENT_YEAR);
+        if (photoUrl) {
+          setTeamPhoto(photoUrl);
         }
       } else {
         console.log("Could not find team number (offline or match not in TBA)");
@@ -219,11 +242,60 @@ export default function ScoutConfig() {
     return missing;
   };
 
+  // Handle role change with confirmation if locked
+  const handleRoleChange = (newRole: string) => {
+    if (lockedRole && newRole !== lockedRole) {
+      setPendingChange({ type: 'role', value: newRole });
+      setConfirmDialogOpen(true);
+    } else {
+      setRole(newRole);
+    }
+  };
+
+  // Handle match type change with confirmation if locked
+  const handleMatchTypeChange = (newMatchType: string) => {
+    if (lockedMatchType && newMatchType !== lockedMatchType) {
+      setPendingChange({ type: 'matchType', value: newMatchType });
+      setConfirmDialogOpen(true);
+    } else {
+      setMatchType(newMatchType);
+    }
+  };
+
+  // Confirm the pending change
+  const confirmChange = () => {
+    if (pendingChange) {
+      if (pendingChange.type === 'role') {
+        setRole(pendingChange.value);
+        setLockedRole(null); // Unlock after manual override
+      } else {
+        setMatchType(pendingChange.value);
+        setLockedMatchType(null); // Unlock after manual override
+      }
+    }
+    setConfirmDialogOpen(false);
+    setPendingChange(null);
+  };
+
+  // Cancel the pending change
+  const cancelChange = () => {
+    setConfirmDialogOpen(false);
+    setPendingChange(null);
+  };
+
   return (
     <div
       className="space-y-3 py-4 grid place-items-center"
       style={{ padding: "20px" }}
     >
+      {/* Back Button */}
+      <div className="w-full max-w-sm mb-2">
+        <Button variant="ghost" onClick={() => navigate("/dashboard")}>
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back
+        </Button>
+      </div>
+
       <Button
         onClick={() => {
           // Require at minimum: role, event_id, and match_number
@@ -323,128 +395,119 @@ export default function ScoutConfig() {
                 <Input
                   className="font-semibold w-30 text-right"
                   type="number"
-                  placeholder="#####"
+                  placeholder={role === "qualRed" || role === "qualBlue" ? "N/A for qual scouting" : "#####"}
                   onInput={(e) => {
                     setTeamNumber(parseInt(e.currentTarget.value));
                   }}
-                  value={teamNumber}
+                  value={role === "qualRed" || role === "qualBlue" ? "" : teamNumber}
+                  disabled={role === "qualRed" || role === "qualBlue"}
                 />
               </div>
               <div className="flex justify-between items-center p-1 pl-3 bg-accent/50 rounded-lg">
                 <span className="text-sm font-medium text-muted-foreground">
                   Your Role
                 </span>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <p className="px-7 bg-accent-foreground/10 p-2 border-b rounded-lg">
-                      {role ? prettifyRole(role) : "Select Role"}
-                    </p>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent className="w-fit h-fit rounded-lg shadow-md border border-border bg-popover">
-                    <DropdownMenuItem
-                      className="p-2 px-7 bg-primary border-b rounded-lg"
-                      onClick={() => {
-                        setRole("red1");
-                      }}
-                    >
-                      Red 1
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      className="p-2 px-7 bg-primary border-b rounded-lg"
-                      onClick={() => {
-                        setRole("red2");
-                      }}
-                    >
-                      Red 2
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      className="p-2 px-7 bg-primary border-b rounded-lg"
-                      onClick={() => {
-                        setRole("red3");
-                      }}
-                    >
-                      Red 3
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      className="p-2 px-7 bg-primary border-b rounded-lg"
-                      onClick={() => {
-                        setRole("qualRed");
-                      }}
-                    >
-                      Qual Red
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      className="p-2 px-7 bg-chart-5 border-b rounded-lg"
-                      onClick={() => {
-                        setRole("blue1");
-                      }}
-                    >
-                      Blue 1
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      className="p-2 px-7 bg-chart-5 border-b rounded-lg"
-                      onClick={() => {
-                        setRole("blue2");
-                      }}
-                    >
-                      Blue 2
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      className="p-2 px-7 bg-chart-5 border-b rounded-lg"
-                      onClick={() => {
-                        setRole("blue3");
-                      }}
-                    >
-                      Blue 3
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      className="p-2 px-7 bg-chart-5 border-b rounded-lg"
-                      onClick={() => {
-                        setRole("qualBlue");
-                      }}
-                    >
-                      Qual Blue
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <div className="flex items-center gap-2">
+                  {lockedRole && (
+                    <Lock className="h-3 w-3 text-muted-foreground" />
+                  )}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <p className="px-7 bg-accent-foreground/10 p-2 border-b rounded-lg">
+                        {role ? prettifyRole(role) : "Select Role"}
+                        {lockedRole && role === lockedRole && " (Assigned)"}
+                      </p>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="w-fit h-fit rounded-lg shadow-md border border-border bg-popover">
+                      <DropdownMenuItem
+                        className="p-2 px-7 bg-primary border-b rounded-lg"
+                        onClick={() => handleRoleChange("red1")}
+                      >
+                        Red 1
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="p-2 px-7 bg-primary border-b rounded-lg"
+                        onClick={() => handleRoleChange("red2")}
+                      >
+                        Red 2
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="p-2 px-7 bg-primary border-b rounded-lg"
+                        onClick={() => handleRoleChange("red3")}
+                      >
+                        Red 3
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="p-2 px-7 bg-primary border-b rounded-lg"
+                        onClick={() => handleRoleChange("qualRed")}
+                      >
+                        Qual Red
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="p-2 px-7 bg-chart-5 border-b rounded-lg"
+                        onClick={() => handleRoleChange("blue1")}
+                      >
+                        Blue 1
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="p-2 px-7 bg-chart-5 border-b rounded-lg"
+                        onClick={() => handleRoleChange("blue2")}
+                      >
+                        Blue 2
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="p-2 px-7 bg-chart-5 border-b rounded-lg"
+                        onClick={() => handleRoleChange("blue3")}
+                      >
+                        Blue 3
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="p-2 px-7 bg-chart-5 border-b rounded-lg"
+                        onClick={() => handleRoleChange("qualBlue")}
+                      >
+                        Qual Blue
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </div>
               <div className="flex justify-between items-center pl-3 p-1 bg-accent/50 rounded-lg">
                 <span className="text-sm font-medium text-muted-foreground">
                   Match Type
                 </span>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <p className="px-7 bg-accent-foreground/10 p-2 border-b rounded-lg">
-                      {matchType}
-                    </p>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent className="w-fit h-fit rounded-lg shadow-md border border-border bg-popover">
-                    <DropdownMenuItem
-                      className="p-2 px-7 bg-accent-foreground/10 border-b rounded-lg"
-                      onClick={() => {
-                        setMatchType("Qualification");
-                      }}
-                    >
-                      Qualification
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      className="p-2 px-7 bg-accent-foreground/10 border-b rounded-lg"
-                      onClick={() => {
-                        setMatchType("Playoff");
-                      }}
-                    >
-                      Playoff
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      className="p-2 px-7 bg-accent-foreground/10 border-b rounded-lg"
-                      onClick={() => {
-                        setMatchType("Practice");
-                      }}
-                    >
-                      Practice
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <div className="flex items-center gap-2">
+                  {lockedMatchType && (
+                    <Lock className="h-3 w-3 text-muted-foreground" />
+                  )}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <p className="px-7 bg-accent-foreground/10 p-2 border-b rounded-lg">
+                        {matchType}
+                        {lockedMatchType && matchType === lockedMatchType && " (Assigned)"}
+                      </p>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="w-fit h-fit rounded-lg shadow-md border border-border bg-popover">
+                      <DropdownMenuItem
+                        className="p-2 px-7 bg-accent-foreground/10 border-b rounded-lg"
+                        onClick={() => handleMatchTypeChange("Qualification")}
+                      >
+                        Qualification
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="p-2 px-7 bg-accent-foreground/10 border-b rounded-lg"
+                        onClick={() => handleMatchTypeChange("Playoff")}
+                      >
+                        Playoff
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="p-2 px-7 bg-accent-foreground/10 border-b rounded-lg"
+                        onClick={() => handleMatchTypeChange("Practice")}
+                      >
+                        Practice
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </div>
               <div className="flex justify-between items-center pl-3 p-1 bg-accent/50 rounded-lg">
                 <span className="text-sm font-medium text-muted-foreground">
@@ -491,7 +554,7 @@ export default function ScoutConfig() {
           <TabsContent value="game">
             <p>:skull:</p>
           </TabsContent>
-          <TabsList className="fixed h-8 left-0 w-full text-center bottom-6">
+          <TabsList className="sticky h-8 left-0 w-full text-center bottom-0 mt-6 bg-background/95 backdrop-blur-sm pb-2">
             <TabsTrigger
               value="config"
               className="w-2/5 pw-10 py-2 data-[state=active]:border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 mx-1"
@@ -507,6 +570,32 @@ export default function ScoutConfig() {
           </TabsList>
         </Tabs>
       </div>
+
+      {/* Confirmation Dialog */}
+      <Dialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Change Assignment?</DialogTitle>
+            <DialogDescription>
+              You're assigned to {lockedRole ? prettifyRole(lockedRole) : ""} for this match.
+              {pendingChange?.type === 'role' && (
+                <> Are you sure you want to change to {prettifyRole(pendingChange.value)}?</>
+              )}
+              {pendingChange?.type === 'matchType' && (
+                <> Are you sure you want to change the match type to {pendingChange.value}?</>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={cancelChange}>
+              Cancel
+            </Button>
+            <Button onClick={confirmChange}>
+              Yes, Change
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -347,6 +347,16 @@ export default function ScoutingReview() {
 
   // Check dependencies and resolve matchId if needed
   const checkDependencies = async () => {
+    // Check comments first before opening modal
+    if (!state?.comments || state.comments.trim() === "") {
+      toast({
+        title: "Comments Required",
+        description: "Please add comments before submitting",
+        variant: "destructive",
+      });
+      return;
+    }
+
     console.log("=== CHECK DEPENDENCIES ===");
     console.log("Current state:", state);
     console.log(
@@ -370,6 +380,11 @@ export default function ScoutingReview() {
     console.log("state.role:", state?.role, "Type:", typeof state?.role);
 
     const deps = [
+      {
+        label: "Comments",
+        status: "pending" as const,
+        value: state?.comments ? "Provided" : "Not set",
+      },
       {
         label: "Match ID",
         status: "pending" as const,
@@ -403,17 +418,31 @@ export default function ScoutingReview() {
     // Check each dependency
     const updatedDeps = [...deps];
 
-    // Check matchId
-    if (state?.matchId && state.matchId.trim() !== "") {
+    // Check comments
+    if (state?.comments && state.comments.trim() !== "") {
       updatedDeps[0] = {
         ...updatedDeps[0],
+        status: "success",
+      };
+    } else {
+      updatedDeps[0] = {
+        ...updatedDeps[0],
+        status: "error",
+        errorMessage: "Comments are required",
+      };
+    }
+
+    // Check matchId
+    if (state?.matchId && state.matchId.trim() !== "") {
+      updatedDeps[1] = {
+        ...updatedDeps[1],
         status: "success",
       };
       setResolvedMatchId(state.matchId);
     } else if (state?.event_code && state?.match_number && state?.role) {
       // Try to resolve matchId
-      updatedDeps[0] = {
-        ...updatedDeps[0],
+      updatedDeps[1] = {
+        ...updatedDeps[1],
         status: "checking",
         value: "Resolving...",
       };
@@ -427,23 +456,23 @@ export default function ScoutingReview() {
         );
 
         if (resolved) {
-          updatedDeps[0] = {
-            ...updatedDeps[0],
+          updatedDeps[1] = {
+            ...updatedDeps[1],
             status: "success",
             value: resolved,
           };
           setResolvedMatchId(resolved);
         } else {
-          updatedDeps[0] = {
-            ...updatedDeps[0],
+          updatedDeps[1] = {
+            ...updatedDeps[1],
             status: "error",
             value: "Could not resolve",
             errorMessage: "Match not found in database",
           };
         }
       } catch (error) {
-        updatedDeps[0] = {
-          ...updatedDeps[0],
+        updatedDeps[1] = {
+          ...updatedDeps[1],
           status: "error",
           value: "Resolution failed",
           errorMessage:
@@ -451,8 +480,8 @@ export default function ScoutingReview() {
         };
       }
     } else {
-      updatedDeps[0] = {
-        ...updatedDeps[0],
+      updatedDeps[1] = {
+        ...updatedDeps[1],
         status: "error",
         errorMessage: "Missing event_code, match_number, or role",
       };
@@ -460,13 +489,13 @@ export default function ScoutingReview() {
 
     // Check event_code
     if (state?.event_code && state.event_code.trim() !== "") {
-      updatedDeps[1] = {
-        ...updatedDeps[1],
+      updatedDeps[2] = {
+        ...updatedDeps[2],
         status: "success",
       };
     } else {
-      updatedDeps[1] = {
-        ...updatedDeps[1],
+      updatedDeps[2] = {
+        ...updatedDeps[2],
         status: "error",
         errorMessage: "Event code is required",
       };
@@ -474,13 +503,13 @@ export default function ScoutingReview() {
 
     // Check match_number
     if (state?.match_number && state.match_number > 0) {
-      updatedDeps[2] = {
-        ...updatedDeps[2],
+      updatedDeps[3] = {
+        ...updatedDeps[3],
         status: "success",
       };
     } else {
-      updatedDeps[2] = {
-        ...updatedDeps[2],
+      updatedDeps[3] = {
+        ...updatedDeps[3],
         status: "error",
         errorMessage: "Match number must be greater than 0",
       };
@@ -488,13 +517,13 @@ export default function ScoutingReview() {
 
     // Check role
     if (state?.role && state.role.trim() !== "") {
-      updatedDeps[3] = {
-        ...updatedDeps[3],
+      updatedDeps[4] = {
+        ...updatedDeps[4],
         status: "success",
       };
     } else {
-      updatedDeps[3] = {
-        ...updatedDeps[3],
+      updatedDeps[4] = {
+        ...updatedDeps[4],
         status: "error",
         errorMessage: "Role is required",
       };
@@ -502,13 +531,13 @@ export default function ScoutingReview() {
 
     // Check scouter_id
     if (user?.id) {
-      updatedDeps[4] = {
-        ...updatedDeps[4],
+      updatedDeps[5] = {
+        ...updatedDeps[5],
         status: "success",
       };
     } else {
-      updatedDeps[4] = {
-        ...updatedDeps[4],
+      updatedDeps[5] = {
+        ...updatedDeps[5],
         status: "error",
         errorMessage: "User not logged in",
       };
@@ -630,15 +659,23 @@ export default function ScoutingReview() {
           </h2>
           <div className="mb-6">
             <label className="block uppercase text-xs font-medium tracking-wider text-muted-foreground mb-2">
-              Comments
+              Comments <span className="text-destructive">*</span>
             </label>
             <textarea
-              className="w-full bg-background border border-border rounded-lg px-4 py-3 text-foreground text-base font-normal focus:outline-none focus:ring-2 focus:ring-primary/80 transition disabled:opacity-60"
+              className={`w-full bg-background rounded-lg px-4 py-3 text-foreground text-base font-normal focus:outline-none transition disabled:opacity-60 ${
+                !state.comments || state.comments.trim() === ""
+                  ? "border-2 border-destructive focus:ring-2 focus:ring-destructive/50"
+                  : "border border-border focus:ring-2 focus:ring-primary/80"
+              }`}
               rows={3}
               value={state.comments}
               onChange={(e) => handleFieldChange("comments", e.target.value)}
               style={{ fontFamily: "inherit", resize: "vertical" }}
+              placeholder="Please describe what happened during this match..."
             />
+            {(!state.comments || state.comments.trim() === "") && (
+              <p className="text-xs text-destructive mt-1">Comments are required before submission</p>
+            )}
           </div>
           <div className="mb-6">
             <label className="block uppercase text-xs font-medium tracking-wider text-muted-foreground m-5 mb-2 flex items-center">

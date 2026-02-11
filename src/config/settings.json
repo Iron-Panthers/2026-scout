@@ -8,14 +8,14 @@
         "label": "Match Assignments",
         "description": "Get notified when you're assigned to a match",
         "type": "switch",
-        "defaultValue": true
+        "defaultValue": false
       },
       {
         "id": "reminder-notifications",
         "label": "Match Reminders",
         "description": "Receive reminders before your scheduled matches",
         "type": "switch",
-        "defaultValue": true
+        "defaultValue": false
       }
     ]
   },
@@ -26,10 +26,10 @@
       {
         "id": "dark-mode",
         "label": "Dark Mode",
-        "description": "Always use dark mode (recommended)",
+        "description": "Use dark mode (recommended)",
         "type": "switch",
         "defaultValue": true,
-        "editable": false
+        "editable": true
       }
     ]
   }
