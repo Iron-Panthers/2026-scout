@@ -18,6 +18,7 @@ import {
   generateOfflineKey,
 } from "@/lib/offlineStorage";
 import { supabase } from "@/lib/supabase";
+import { Checkbox } from "@/components/ui/checkbox";
 
 // Recursive JSON editor for objects/arrays
 function RecursiveJsonEditor({ value, onChange, path = [] }) {
@@ -193,6 +194,7 @@ export default function ScoutingReview() {
   }
 
   const [state, setState] = useState<any>(initialState);
+  const [writtenTempState, setWrittenTempState] = useState<any>({ defense: null, problems: null, errors: null });
   const [rawEdit, setRawEdit] = useState(false);
   const [rawEditOpen, setRawEditOpen] = useState(true);
   const [rawValue, setRawValue] = useState(() =>
@@ -639,35 +641,89 @@ export default function ScoutingReview() {
             />
           </div>
           <div className="mb-6">
-            <label className="block uppercase text-xs font-medium tracking-wider text-muted-foreground mb-2">
-              Errors
+            <label className="block uppercase text-xs font-medium tracking-wider text-muted-foreground m-5 mb-2 flex items-center">
+              Robot Problems?&nbsp;&nbsp;&nbsp;
+              <Checkbox className="w-7 h-7 border-b-gray-500" checked={state.robot_problems !== null} onCheckedChange={(checked) => 
+                handleFieldChange(
+                  "robot_problems",
+                  checked ? writtenTempState.problems || "" : null
+                )
+              }/>
             </label>
-            <textarea
-              className="w-full bg-background border border-border rounded-lg px-4 py-3 text-foreground text-base font-normal focus:outline-none focus:ring-2 focus:ring-primary/80 transition disabled:opacity-60"
-              rows={2}
-              value={state.errors}
-              onChange={(e) => handleFieldChange("errors", e.target.value)}
-              style={{ fontFamily: "inherit", resize: "vertical" }}
-            />
+            {state.robot_problems !== null && 
+              <textarea
+                className="w-full bg-background border border-border rounded-lg px-4 py-3 text-foreground text-base font-normal focus:outline-none focus:ring-2 focus:ring-primary/80 transition disabled:opacity-60"
+                rows={2}
+                value={state.robot_problems}
+                onChange={(e) => { handleFieldChange("robot_problems", e.target.value); writtenTempState.problems = e.target.value; setWrittenTempState(writtenTempState); }}
+                style={{ fontFamily: "inherit", resize: "vertical" }}
+              />
+            }
+          </div>
+          <div className="mb-6">
+            <label className="block uppercase text-xs font-medium tracking-wider text-muted-foreground m-5 mb-2 flex items-center">
+              Scouting Errors?&nbsp;&nbsp;&nbsp;
+              <Checkbox className="w-7 h-7 border-b-gray-500" checked={state.errors !== null} onCheckedChange={(checked) => 
+                handleFieldChange(
+                  "errors",
+                  checked ? writtenTempState.errors || "" : null
+                )
+              }/>
+            </label>
+            {state.errors !== null &&
+              <textarea
+                className="w-full bg-background border border-border rounded-lg px-4 py-3 text-foreground text-base font-normal focus:outline-none focus:ring-2 focus:ring-primary/80 transition disabled:opacity-60"
+                rows={2}
+                value={state.errors}
+                onChange={(e) => { handleFieldChange("errors", e.target.value); writtenTempState.errors = e.target.value; setWrittenTempState(writtenTempState); }}
+                style={{ fontFamily: "inherit", resize: "vertical" }}
+              />
+            }       
           </div>
           <div>
-            <label className="block uppercase text-xs font-medium tracking-wider text-muted-foreground mb-2">
-              Defense Description
+            <label className="block uppercase text-xs font-medium tracking-wider text-muted-foreground m-5 mb-2 flex items-center">
+              Defense?&nbsp;&nbsp;&nbsp;
+              <Checkbox className="w-7 h-7 border-b-gray-500" checked={state.defenseDescription !== null} onCheckedChange={(checked) => 
+                handleFieldChange(
+                  "defenseDescription",
+                  checked ? writtenTempState.defense || "" : null
+                )
+              }/>
             </label>
-            <textarea
-              className="w-full bg-background border border-border rounded-lg px-4 py-3 text-foreground text-base font-normal focus:outline-none focus:ring-2 focus:ring-primary/80 transition disabled:opacity-60"
-              rows={2}
-              value={state.defenseDescription}
-              onChange={(e) =>
-                handleFieldChange("defenseDescription", e.target.value)
-              }
-              style={{ fontFamily: "inherit", resize: "vertical" }}
-            />
+            {state.defenseDescription !== null &&
+              <textarea
+                className="w-full bg-background border border-border rounded-lg px-4 py-3 text-foreground text-base font-normal focus:outline-none focus:ring-2 focus:ring-primary/80 transition disabled:opacity-60"
+                rows={2}
+                value={state.defenseDescription}
+                onChange={(e) =>
+                  { handleFieldChange("defenseDescription", e.target.value); writtenTempState.defense = e.target.value; setWrittenTempState(writtenTempState); }
+                }
+                style={{ fontFamily: "inherit", resize: "vertical" }}
+              />
+      }
           </div>
         </section>
 
+        {/* Actions */}
+        <div className="flex flex-col md:flex-row gap-4 justify-center mb-5">
+          <Button
+            variant="outline"
+            className="h-10 px-6 rounded-lg font-medium border border-border text-foreground hover:bg-surface-elevated hover:border-primary transition"
+            onClick={() => navigate("/dashboard")}
+          >
+            Back to Scouting
+          </Button>
+          <Button
+            variant="default"
+            className="h-10 px-6 rounded-lg font-medium bg-primary text-white hover:bg-primary/90 transition"
+            onClick={checkDependencies}
+          >
+            Submit
+          </Button>
+        </div>
+
         {/* Divider */}
-        <div className="my-10 border-t border-dashed border-border" />
+        <div className="my-5 border-t border-dashed border-border" />
 
         {/* Raw Data Section */}
         <section className="mb-8">
@@ -725,24 +781,6 @@ export default function ScoutingReview() {
             </CollapsibleContent>
           </Collapsible>
         </section>
-
-        {/* Actions */}
-        <div className="flex flex-col md:flex-row gap-4 justify-center mt-10">
-          <Button
-            variant="outline"
-            className="h-10 px-6 rounded-lg font-medium border border-border text-foreground hover:bg-surface-elevated hover:border-primary transition"
-            onClick={() => navigate("/dashboard")}
-          >
-            Back to Scouting
-          </Button>
-          <Button
-            variant="default"
-            className="h-10 px-6 rounded-lg font-medium bg-primary text-white hover:bg-primary/90 transition"
-            onClick={checkDependencies}
-          >
-            Submit
-          </Button>
-        </div>
 
         {/* QR Code Section */}
         <div className="flex flex-col items-center mt-8 gap-3">
@@ -830,21 +868,6 @@ export default function ScoutingReview() {
                   {state?.role}
                 </span>
               </div>
-            </div>
-            <div className="flex flex-col gap-2 pt-2">
-              <Button
-                onClick={handleManagerSubmit}
-                className="w-full h-11 text-base font-semibold"
-              >
-                Submit to Database
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => setShowManagerModal(false)}
-                className="w-full h-10 text-sm font-medium"
-              >
-                Review First
-              </Button>
             </div>
           </div>
         </div>

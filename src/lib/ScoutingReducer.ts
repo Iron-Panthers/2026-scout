@@ -45,8 +45,9 @@ export interface ScoutingData {
   shots: Record<Phase, Array<{ x: number; y: number; timestamp: number }>>;
   counters: Record<Phase, Record<string, number>>;
   comments: string;
-  errors: string;
-  defenseDescription: string;
+  robot_problems: string | null;
+  errors: string | null;
+  defenseDescription: string | null;
 }
 
 /**
@@ -172,8 +173,9 @@ export class ScoutingReducer<T extends Record<string, any> = ScoutingData> {
       shots,
       counters,
       comments: "",
-      errors: "",
-      defenseDescription: "",
+      errors: null,
+      robot_problems: null,
+      defenseDescription: null,
     };
   }
 
