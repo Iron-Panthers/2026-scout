@@ -87,16 +87,20 @@ export function useMatchAssignmentNotifications() {
   useEffect(() => {
     if (!user?.id) return;
 
-    // Check for any unnotified assignments on mount
+    // Check for any unnotified assignments on mount (last 24 hours only)
     const checkUnnotified = async () => {
+      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
       const { data } = await supabase
         .from("match_assignment_notifications")
         .select("*")
         .eq("user_id", user.id)
-        .eq("notified", false)
+        .or("notified.is.null,notified.eq.false")
+        .gte("created_at", oneDayAgo)
         .order("created_at", { ascending: false });
 
       if (data && data.length > 0) {
+        console.log(`Found ${data.length} unnotified match assignments from last 24 hours`);
         // Notify for each unnotified assignment
         for (const notification of data) {
           await sendPushNotification(notification.match_id, notification.role);
