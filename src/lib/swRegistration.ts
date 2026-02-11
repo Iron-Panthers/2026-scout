@@ -15,9 +15,10 @@ export async function registerSW(
   updateCallback = onUpdate || null;
 
   try {
-    registration = await navigator.serviceWorker.register("/sw.js", {
+    const base = import.meta.env.BASE_URL || "/";
+    registration = await navigator.serviceWorker.register(`${base}sw.js`, {
       type: "module",
-      scope: "/",
+      scope: base,
     });
 
     // Check for updates every 60 minutes
