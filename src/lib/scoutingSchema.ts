@@ -33,6 +33,8 @@ export interface ScoutingSubmission {
   role: string;
   scouting_data: Record<string, any>;
   schema_version: number;
+  team_num: number;
+  match_type: string;
   time: string;
   scouter_id?: string;
   created_at: string;
@@ -183,7 +185,9 @@ export async function submitScoutingData(
   matchId: string,
   role: string,
   scoutingData: Record<string, any>,
-  scouterId?: string
+  scouterId?: string,
+  team_num: number,
+  match_type: string = "qual"
 ) {
   const { data, error } = await supabase
     .from("scouting_submissions")
@@ -193,6 +197,8 @@ export async function submitScoutingData(
       scouting_data: scoutingData,
       schema_version: CURRENT_SCHEMA_VERSION,
       scouter_id: scouterId,
+      team_num: team_num,
+      match_type: match_type
     })
     .select()
     .single();

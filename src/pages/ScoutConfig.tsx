@@ -240,6 +240,8 @@ export default function ScoutConfig() {
               role: role,
               event_code: eventCode,
               match_number: matchNumber.toString(),
+              team_number: teamNumber.toString(),
+              match_type: matchType
             });
 
             const url = `/scouting?${params.toString()}`;

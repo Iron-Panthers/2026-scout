@@ -29,12 +29,16 @@ export default function Scouting() {
   const role = searchParams.get("role") || "";
   const event_code = searchParams.get("event_code") || "";
   const match_number = parseInt(searchParams.get("match_number") || "0");
+  const team_number = parseInt(searchParams.get("team_number") || "0");
+  const match_type = parseInt(searchParams.get("type") || "qual");
 
   console.log("Scouting page loaded:", {
     match_id,
     role,
     event_code,
     match_number,
+    team_number,
+    match_type
   });
 
   const [selected, setSelected] = useState("");
@@ -48,7 +52,7 @@ export default function Scouting() {
 
   // Use the reducer hook instead of useState
   const { state, set, increment, undo, canUndo, setPhase, currentPhase } =
-    useScoutingReducer(match_id || "", role || "", event_code, match_number);
+    useScoutingReducer(match_id || "", role || "", event_code, match_number, team_number);
 
   // Continuous match timer
   const {
@@ -215,15 +219,15 @@ export default function Scouting() {
     console.log(state);
     switch (actionName) {
       case "recordDepotIntake":
-        increment("counters.{path}.depotIntakes");
+        increment(`counters.{phase}.depotIntakes`);
         console.log("intake depot");
         break;
       case "recordClimb":
-        increment(`counters.climb${payload}`);
+        increment(`counters.{phase}.climb${payload}`);
         console.log(`climb recorded: ${payload}`);
         break;
       case "recordTrench":
-        increment("counters.trenchIntakes");
+        increment(`counters.{phase}.trenchIntakes`);
         break;
       default:
         console.warn(`Action handler not found: ${actionName}`);
