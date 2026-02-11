@@ -1,21 +1,40 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
+import type { Profile } from "@/types";
 
 export default function PushTest() {
   const { user } = useAuth();
   const [message, setMessage] = useState("Test notification from 2026 Scout!");
   const [result, setResult] = useState<string>("");
   const [loading, setLoading] = useState(false);
+  const [users, setUsers] = useState<Profile[]>([]);
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [sendCount, setSendCount] = useState<number>(1);
+
+  useEffect(() => {
+    loadUsers();
+  }, []);
+
+  const loadUsers = async () => {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .order("name");
+
+    if (!error && data) {
+      setUsers(data);
+      if (user?.id) setSelectedUserIds([user.id]);
+    }
+  };
 
   const sendTestNotification = async () => {
-    if (!user?.id) {
-      setResult("❌ Not logged in");
+    if (selectedUserIds.length === 0) {
+      setResult("❌ Please select at least one user");
       return;
     }
 
@@ -34,28 +53,53 @@ export default function PushTest() {
         return;
       }
 
-      const response = await fetch(
-        `${supabase.supabaseUrl}/functions/v1/test-push-notification`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${serviceRoleKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            user_id: user.id,
-            message: message,
-          }),
+      let totalSent = 0;
+      let totalFailed = 0;
+      const results: string[] = [];
+
+      // Send to each selected user, repeated by sendCount
+      for (let i = 0; i < sendCount; i++) {
+        for (const userId of selectedUserIds) {
+          const response = await fetch(
+            `${supabase.supabaseUrl}/functions/v1/test-push-notification`,
+            {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${serviceRoleKey}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                user_id: userId,
+                message: `${message} ${sendCount > 1 ? `(${i + 1}/${sendCount})` : ""}`,
+              }),
+            }
+          );
+
+          const data = await response.json();
+
+          if (response.ok) {
+            totalSent += data.sent || 0;
+            totalFailed += data.failed || 0;
+          } else {
+            totalFailed++;
+            results.push(`❌ ${users.find(u => u.id === userId)?.name}: ${data.error}`);
+          }
+
+          // Small delay between sends to avoid rate limiting
+          if (selectedUserIds.length > 1 || sendCount > 1) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
         }
-      );
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setResult(`✅ Success!\n\nSent: ${data.sent}\nFailed: ${data.failed}\n\n${data.message}`);
-      } else {
-        setResult(`❌ Error: ${data.error}\n\nHint: ${data.hint || "Check Edge Function logs"}`);
       }
+
+      setResult(
+        `✅ Batch Complete!\n\n` +
+        `Users: ${selectedUserIds.length}\n` +
+        `Sends per user: ${sendCount}\n` +
+        `Total sent: ${totalSent}\n` +
+        `Total failed: ${totalFailed}\n\n` +
+        (results.length > 0 ? `Errors:\n${results.join("\n")}` : "All notifications sent successfully!")
+      );
     } catch (error: any) {
       setResult(`❌ Request failed: ${error.message}`);
     } finally {
@@ -91,13 +135,79 @@ export default function PushTest() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <Label htmlFor="user-id">Your User ID</Label>
-              <Input
-                id="user-id"
-                value={user?.id || "Not logged in"}
-                disabled
-                className="font-mono text-sm"
-              />
+              <Label htmlFor="target-users">Send To Users</Label>
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSelectedUserIds(users.map(u => u.id))}
+                  >
+                    Select All
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSelectedUserIds([])}
+                  >
+                    Clear
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSelectedUserIds(user?.id ? [user.id] : [])}
+                  >
+                    Just Me
+                  </Button>
+                </div>
+                <div className="border rounded-md p-3 max-h-48 overflow-y-auto space-y-2">
+                  {users.map((u) => (
+                    <label key={u.id} className="flex items-center gap-2 cursor-pointer hover:bg-muted p-2 rounded">
+                      <input
+                        type="checkbox"
+                        checked={selectedUserIds.includes(u.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedUserIds([...selectedUserIds, u.id]);
+                          } else {
+                            setSelectedUserIds(selectedUserIds.filter(id => id !== u.id));
+                          }
+                        }}
+                        className="rounded"
+                      />
+                      <span className="text-sm">
+                        {u.name} {u.id === user?.id ? "(You)" : ""}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {selectedUserIds.length} user{selectedUserIds.length !== 1 ? "s" : ""} selected
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="send-count">Notifications per User</Label>
+              <div className="flex gap-2 items-center">
+                <input
+                  type="number"
+                  id="send-count"
+                  min="1"
+                  value={sendCount}
+                  onChange={(e) => setSendCount(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="border rounded px-3 py-2 w-24"
+                />
+                <span className="text-sm text-muted-foreground">
+                  (Total: {selectedUserIds.length * sendCount} notifications)
+                </span>
+              </div>
+              <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                ⚠️ No limit - use with caution for stress testing
+              </p>
             </div>
 
             <div>

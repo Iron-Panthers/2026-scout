@@ -5,8 +5,8 @@ import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 
 // https://vite.dev/config/
-export default defineConfig({
-  base: "/2026-scout/",
+export default defineConfig(({ mode }) => ({
+  base: mode === "production" ? "/2026-scout/" : "/",
   plugins: [
     react(),
     tailwindcss(),
@@ -24,8 +24,8 @@ export default defineConfig({
         background_color: "#0a0a0a",
         display: "standalone",
         orientation: "any",
-        start_url: "/2026-scout/dashboard",
-        scope: "/2026-scout/",
+        start_url: mode === "production" ? "/2026-scout/dashboard" : "/dashboard",
+        scope: mode === "production" ? "/2026-scout/" : "/",
         icons: [
           {
             src: "/icons/icon-192x192.png",
@@ -60,4 +60,4 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-});
+}));
