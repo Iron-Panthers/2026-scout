@@ -21,38 +21,36 @@ export default function StartMatchOverlay({
   if (!show) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-3">
-      <div className="bg-card border-2 border-primary rounded-xl shadow-2xl p-4 sm:p-6 max-w-sm w-full text-center space-y-3 sm:space-y-4">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-2">
+      <div className="bg-card border-2 border-primary rounded-xl shadow-2xl p-3 sm:p-4 max-w-xs w-full text-center space-y-2 sm:space-y-3">
         {/* Icon */}
         <div className="flex justify-center">
-          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-primary/20 flex items-center justify-center">
-            <Play className="w-7 h-7 sm:w-8 sm:h-8 text-primary" />
+          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-primary/20 flex items-center justify-center">
+            <Play className="w-6 h-6 sm:w-7 sm:h-7 text-primary" />
           </div>
         </div>
 
         {/* Title */}
-        <div className="space-y-1 sm:space-y-2">
-          <h2 className="text-xl sm:text-2xl font-bold text-foreground">
+        <div className="space-y-0.5 sm:space-y-1">
+          <h2 className="text-lg sm:text-xl font-bold text-foreground">
             Ready to Scout
           </h2>
           {matchNumber && (
-            <p className="text-base sm:text-lg text-muted-foreground">
+            <p className="text-sm sm:text-base text-muted-foreground">
               Match #{matchNumber}
             </p>
           )}
           {role && (
-            <p className="text-xs sm:text-sm text-muted-foreground">
-              Role: {role}
-            </p>
+            <p className="text-xs text-muted-foreground">Role: {role}</p>
           )}
         </div>
 
         {/* Instructions */}
-        <div className="bg-muted/50 rounded-lg p-3 space-y-1">
-          <p className="text-xs sm:text-sm font-semibold text-foreground">
+        <div className="bg-muted/50 rounded-lg p-2 sm:p-2.5 space-y-0.5 sm:space-y-1">
+          <p className="text-xs font-semibold text-foreground">
             Wait for the match to begin
           </p>
-          <p className="text-[10px] sm:text-xs text-muted-foreground">
+          <p className="text-[10px] text-muted-foreground leading-tight">
             Press the button below as soon as the match starts. The timer will
             run continuously through all phases.
           </p>
@@ -62,14 +60,14 @@ export default function StartMatchOverlay({
         <Button
           onClick={onStartMatch}
           size="lg"
-          className="w-full h-11 sm:h-12 text-base sm:text-lg font-semibold"
+          className="w-full h-10 sm:h-11 text-sm sm:text-base font-semibold"
         >
-          <Play className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
+          <Play className="mr-2 h-4 w-4" />
           Start Match
         </Button>
 
         {/* Disclaimer */}
-        <p className="text-[10px] sm:text-xs text-muted-foreground">
+        <p className="text-[9px] sm:text-[10px] text-muted-foreground leading-tight">
           If you start too early, use the reset option in the top-right menu
         </p>
       </div>

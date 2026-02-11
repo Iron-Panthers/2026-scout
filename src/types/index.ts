@@ -48,6 +48,25 @@ export interface Match {
   updated_at: string;
 }
 
+// Roster Type (from Supabase) - scout assignment templates
+export interface Roster {
+  id: string;
+  name: string;
+  description: string | null;
+  event_id: string;
+  created_by: string;
+  red1_scouter_id: string | null;
+  red2_scouter_id: string | null;
+  red3_scouter_id: string | null;
+  qual_red_scouter_id: string | null;
+  blue1_scouter_id: string | null;
+  blue2_scouter_id: string | null;
+  blue3_scouter_id: string | null;
+  qual_blue_scouter_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 // Role Types
 export type Role =
   | "red1"

@@ -29,16 +29,16 @@ export default function ActionModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
+      <DialogContent className="sm:max-w-md max-h-[85vh] p-4">
+        <DialogHeader className="pb-2">
+          <DialogTitle className="text-lg">{title}</DialogTitle>
         </DialogHeader>
-        <div className="grid gap-3 py-4">
+        <div className="grid gap-2 py-2">
           {options.map((option, index) => (
             <Button
               key={index}
               onClick={() => handleOptionClick(option)}
-              className="w-full h-14 text-lg"
+              className="w-full h-12 text-base"
               style={{
                 backgroundColor: option.color || undefined,
               }}

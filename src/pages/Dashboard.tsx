@@ -374,9 +374,9 @@ export default function Dashboard() {
 
         {/* Match Details Dialog */}
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-              <DialogTitle className="text-2xl flex items-center justify-between">
+          <DialogContent className="max-w-[95vw] sm:max-w-[425px] md:max-w-[600px] p-3 landscape:px-4 landscape:py-2 md:p-6">
+            <DialogHeader className="space-y-1 landscape:space-y-0.5 md:space-y-2">
+              <DialogTitle className="text-lg md:text-2xl flex items-center justify-between pr-6">
                 <span>{selectedMatch?.matchNumber}</span>
                 <Badge
                   variant="outline"
@@ -392,12 +392,13 @@ export default function Dashboard() {
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-4 py-4">
+            {/* Two-column layout on landscape/small screens, stacked on portrait and desktop */}
+            <div className="flex flex-col landscape:flex-row landscape:md:flex-col gap-3 landscape:gap-3 landscape:md:gap-4 py-3 landscape:py-2 landscape:md:py-4">
               {/* Robot Image */}
-              <div className="w-full h-48 bg-muted rounded-lg flex items-center justify-center border-2 border-border overflow-hidden">
+              <div className="w-full landscape:w-44 landscape:md:w-full landscape:flex-shrink-0 landscape:md:flex-shrink h-32 sm:h-40 md:h-48 landscape:h-full landscape:min-h-[180px] landscape:md:min-h-0 landscape:md:h-48 bg-muted rounded-lg flex items-center justify-center border-2 border-border overflow-hidden">
                 {loadingPhoto ? (
                   <div className="text-center">
-                    <p className="text-muted-foreground font-semibold">
+                    <p className="text-xs md:text-sm text-muted-foreground font-semibold">
                       Loading...
                     </p>
                   </div>
@@ -411,82 +412,106 @@ export default function Dashboard() {
                       e.currentTarget.style.display = "none";
                       e.currentTarget.parentElement!.innerHTML = `
                         <div class="text-center">
-                          <p class="text-muted-foreground font-semibold">Robot Image</p>
-                          <p class="text-sm text-muted-foreground">Failed to load</p>
+                          <p class="text-muted-foreground font-semibold text-xs md:text-sm">Robot Image</p>
+                          <p class="text-xs md:text-sm text-muted-foreground">Failed to load</p>
                         </div>
                       `;
                     }}
                   />
                 ) : (
                   <div className="text-center">
-                    <p className="text-muted-foreground font-semibold">
+                    <p className="text-xs md:text-sm text-muted-foreground font-semibold">
                       Robot Image
                     </p>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-xs md:text-sm text-muted-foreground">
                       Not available
                     </p>
                   </div>
                 )}
               </div>
 
-              {/* Match Details */}
-              <div className="space-y-3">
-                {selectedMatch &&
-                  teamNumbers[
-                    `${selectedMatch.match.id}-${selectedMatch.role}`
-                  ] && (
-                    <div className="flex justify-between items-center p-3 bg-accent/50 rounded-lg">
-                      <span className="text-sm font-medium text-muted-foreground">
-                        Team Number
-                      </span>
-                      <span className="font-semibold">
-                        {
-                          teamNumbers[
-                            `${selectedMatch.match.id}-${selectedMatch.role}`
-                          ]
-                        }
-                      </span>
-                    </div>
-                  )}
-                <div className="flex justify-between items-center p-3 bg-accent/50 rounded-lg">
-                  <span className="text-sm font-medium text-muted-foreground">
-                    Your Role
-                  </span>
-                  <span className="font-semibold">
-                    {prettifyRole(selectedMatch?.role)}
-                  </span>
+              {/* Match Details - grows to fill remaining space */}
+              <div className="space-y-2 landscape:space-y-2 landscape:md:space-y-3 flex-1 landscape:flex landscape:flex-col landscape:justify-between landscape:md:block">
+                <div className="space-y-2 landscape:space-y-2 landscape:md:space-y-3">
+                  {selectedMatch &&
+                    teamNumbers[
+                      `${selectedMatch.match.id}-${selectedMatch.role}`
+                    ] && (
+                      <div className="flex justify-between items-center p-2 landscape:p-2 md:p-3 bg-accent/50 rounded-lg">
+                        <span className="text-xs sm:text-sm md:text-sm font-medium text-muted-foreground">
+                          Team Number
+                        </span>
+                        <span className="text-sm sm:text-base md:text-base font-semibold">
+                          {
+                            teamNumbers[
+                              `${selectedMatch.match.id}-${selectedMatch.role}`
+                            ]
+                          }
+                        </span>
+                      </div>
+                    )}
+                  <div className="flex justify-between items-center p-2 landscape:p-2 md:p-3 bg-accent/50 rounded-lg">
+                    <span className="text-xs sm:text-sm md:text-sm font-medium text-muted-foreground">
+                      Your Role
+                    </span>
+                    <span className="text-sm sm:text-base md:text-base font-semibold">
+                      {prettifyRole(selectedMatch?.role)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center p-2 landscape:p-2 md:p-3 bg-accent/50 rounded-lg">
+                    <span className="text-xs sm:text-sm md:text-sm font-medium text-muted-foreground">
+                      Match Type
+                    </span>
+                    <span className="text-sm sm:text-base md:text-base font-semibold">
+                      Qualification
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center p-2 landscape:p-2 md:p-3 bg-accent/50 rounded-lg">
+                    <span className="text-xs sm:text-sm font-medium text-muted-foreground">
+                      Alliance
+                    </span>
+                    <span className="text-sm sm:text-base font-semibold">
+                      {selectedMatch?.role.toLowerCase().includes("red")
+                        ? "Red"
+                        : "Blue"}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex justify-between items-center p-3 bg-accent/50 rounded-lg">
-                  <span className="text-sm font-medium text-muted-foreground">
-                    Match Type
-                  </span>
-                  <span className="font-semibold">Qualification</span>
-                </div>
-                <div className="flex justify-between items-center p-3 bg-accent/50 rounded-lg">
-                  <span className="text-sm font-medium text-muted-foreground">
-                    Alliance
-                  </span>
-                  <span className="font-semibold">
-                    {selectedMatch?.role.toLowerCase().includes("red")
-                      ? "Red"
-                      : "Blue"}
-                  </span>
+
+                {/* Footer buttons in landscape mode only (not desktop) */}
+                <div className="landscape:flex landscape:flex-col landscape:gap-2 landscape:md:hidden hidden">
+                  <Button
+                    variant="outline"
+                    onClick={handleDecline}
+                    className="w-full h-8"
+                  >
+                    <X className="h-3.5 w-3.5 mr-1" />
+                    <span className="text-xs">Decline</span>
+                  </Button>
+                  <Button onClick={handleQueueScouting} className="w-full h-8">
+                    <ClipboardList className="h-3.5 w-3.5 mr-1" />
+                    <span className="text-xs">Queue</span>
+                  </Button>
                 </div>
               </div>
             </div>
 
-            <DialogFooter className="gap-2 sm:gap-0">
+            {/* Footer buttons in portrait mode and desktop */}
+            <DialogFooter className="flex-col sm:flex-row gap-2 landscape:hidden landscape:md:flex">
               <Button
                 variant="outline"
                 onClick={handleDecline}
-                className="flex-1"
+                className="w-full sm:flex-1 h-10"
               >
-                <X className="h-4 w-4 mr-2" />
-                Decline
+                <X className="h-4 w-4 mr-1.5" />
+                <span className="text-sm">Decline</span>
               </Button>
-              <Button onClick={handleQueueScouting} className="flex-1">
-                <ClipboardList className="h-4 w-4 mr-2" />
-                Queue Scouting
+              <Button
+                onClick={handleQueueScouting}
+                className="w-full sm:flex-1 h-10"
+              >
+                <ClipboardList className="h-4 w-4 mr-1.5" />
+                <span className="text-sm">Queue Scouting</span>
               </Button>
             </DialogFooter>
           </DialogContent>

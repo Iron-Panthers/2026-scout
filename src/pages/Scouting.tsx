@@ -60,9 +60,16 @@ export default function Scouting() {
     phaseTimeRemaining,
     phaseDuration,
     phaseProgress,
-    startMatch,
+    startMatch: startMatchTimer,
     resetMatch,
   } = useMatchTimer(currentPhase);
+
+  // Wrap startMatch to also record the match start time in scouting state
+  const startMatch = () => {
+    const now = Date.now();
+    set("matchStartTime", now);
+    startMatchTimer();
+  };
 
   // Track phase transitions for overlay
   const [showPhaseTransition, setShowPhaseTransition] = useState(false);
@@ -255,10 +262,14 @@ export default function Scouting() {
 
   const handleShotClick = (x: number, y: number, timestamp: number) => {
     const shotCount = selected === "1x" ? 1 : selected === "5x" ? 5 : 10;
+    // Convert absolute timestamp to seconds into the match
+    const relativeTimestamp = state.matchStartTime
+      ? (timestamp - state.matchStartTime) / 1000
+      : timestamp;
     const newShots = Array.from({ length: shotCount }, () => ({
       x,
       y,
-      timestamp,
+      timestamp: relativeTimestamp,
     }));
 
     set("shots.{phase}", [...state.shots[currentPhase], ...newShots]);
@@ -274,14 +285,14 @@ export default function Scouting() {
   return (
     <div className="h-screen w-screen bg-background flex overflow-hidden relative">
       {/* Phase Timer & Shifter - Bottom Right */}
-      <div className="fixed bottom-2 right-2 z-50 flex flex-col items-center gap-1">
+      <div className="fixed bottom-1 right-1 z-50 flex flex-col items-center gap-0.5">
         {/* Timer Display */}
-        <div className="flex flex-col items-center mb-1">
-          <span className="text-[10px] text-white font-bold leading-tight">
+        <div className="flex flex-col items-center mb-0.5">
+          <span className="text-[9px] text-white font-bold leading-none mb-0.5">
             {PHASE_DISPLAY_NAMES[currentPhase]}
           </span>
           <div
-            className="relative w-12 h-12 flex items-center justify-center rounded-full border-2 bg-black"
+            className="relative w-11 h-11 flex items-center justify-center rounded-full border-2 bg-black"
             style={{
               borderColor:
                 phaseTimeRemaining <= 5 && phaseTimeRemaining > 0 && hasStarted
@@ -301,11 +312,11 @@ export default function Scouting() {
             }}
           >
             <span
-              className="absolute text-sm font-bold text-white"
+              className="absolute text-xs font-bold text-white"
               style={{
                 fontFamily:
                   'ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, "DejaVu Sans Mono", monospace',
-                fontSize: "0.875rem",
+                fontSize: "0.75rem",
                 fontVariantNumeric: "tabular-nums",
               }}
             >
@@ -317,45 +328,43 @@ export default function Scouting() {
         {/* Phase Shifter */}
         <Button
           variant="outline"
-          size="icon"
+          size="sm"
           onClick={goToNextPhase}
           disabled={currentPhaseIndex === phases.length - 1}
+          className="h-9 w-9 p-0 text-base"
           style={{
             opacity: currentPhaseIndex === phases.length - 1 ? 0.5 : 1,
-            marginBottom: 4,
           }}
         >
           &#8593;
         </Button>
         <Button
           variant="default"
-          size="icon"
+          size="sm"
           disabled={currentPhaseIndex === phases.length - 1}
-          style={{
-            marginTop: 4,
-          }}
+          className="h-9 w-9 p-0 text-[10px] font-bold"
         >
           {phaseAbbr[currentPhase]}
         </Button>
         <Button
           variant="outline"
-          size="icon"
+          size="sm"
           onClick={goToPrevPhase}
           disabled={currentPhaseIndex === 0}
+          className="h-9 w-9 p-0 text-base"
           style={{
             opacity: currentPhaseIndex === 0 ? 0.5 : 1,
-            marginTop: 4,
           }}
         >
           &#8595;
         </Button>
       </div>
       {/* Fixed Orientation Menu */}
-      <div className="fixed top-2 right-2 z-50">
+      <div className="fixed top-1 right-1 z-50">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="icon">
-              <MoreVertical className="h-4 w-4" />
+            <Button variant="outline" size="sm" className="h-8 w-8 p-0">
+              <MoreVertical className="h-3.5 w-3.5" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
@@ -402,43 +411,43 @@ export default function Scouting() {
       </div>
 
       {/* Sidebar */}
-      <aside className="w-32 border-r border-border bg-card p-2 flex flex-col gap-2">
+      <aside className="w-16 border-r border-border bg-card p-1 flex flex-col gap-1">
         <Button
           variant={selected === "1x" ? "default" : "outline"}
-          className="w-full flex-1"
+          className="w-full flex-1 text-sm font-bold px-0"
           onClick={() => setSelected("1x")}
         >
           1x
         </Button>
         <Button
           variant={selected === "5x" ? "default" : "outline"}
-          className="w-full flex-1"
+          className="w-full flex-1 text-sm font-bold px-0"
           onClick={() => setSelected("5x")}
         >
           5x
         </Button>
         <Button
           variant={selected === "10x" ? "default" : "outline"}
-          className="w-full flex-1"
+          className="w-full flex-1 text-xs font-bold px-0"
           onClick={() => setSelected("10x")}
         >
           10x
         </Button>
         <Button
           variant={selected === "action" ? "default" : "outline"}
-          className="w-full flex-1"
+          className="w-full flex-1 text-[10px] font-bold px-0 leading-tight"
           onClick={() => setSelected("action")}
         >
-          Action
+          ACT
         </Button>
         <Button
           variant="outline"
-          className="w-full"
+          className="w-full h-9 p-0"
           onClick={undo}
           disabled={!canUndo}
+          title="Undo"
         >
-          <Undo className="h-4 w-4 mr-2" />
-          Undo
+          <Undo className="h-4 w-4" />
         </Button>
       </aside>
 
