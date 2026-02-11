@@ -58,9 +58,14 @@ export async function subscribeToPush(userId: string): Promise<boolean> {
     console.log("Creating push subscription with VAPID key...");
     const subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY) as BufferSource,
+      applicationServerKey: urlBase64ToUint8Array(
+        VAPID_PUBLIC_KEY
+      ) as BufferSource,
     });
-    console.log("✓ Push subscription created:", subscription.endpoint.substring(0, 50) + "...");
+    console.log(
+      "✓ Push subscription created:",
+      subscription.endpoint.substring(0, 50) + "..."
+    );
 
     const subscriptionJson = subscription.toJSON();
     const p256dh = subscriptionJson.keys?.p256dh;
@@ -99,9 +104,11 @@ export async function subscribeToPush(userId: string): Promise<boolean> {
   } catch (error: any) {
     console.error("subscribeToPush failed:", error);
     // Re-throw with better message if it's not already our error
-    if (error.message?.includes("Service worker") ||
-        error.message?.includes("permission") ||
-        error.message?.includes("subscription")) {
+    if (
+      error.message?.includes("Service worker") ||
+      error.message?.includes("permission") ||
+      error.message?.includes("subscription")
+    ) {
       throw error;
     }
     throw new Error("Failed to subscribe to push notifications");
@@ -147,9 +154,7 @@ export async function isSubscribed(): Promise<boolean> {
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding)
-    .replace(/-/g, "+")
-    .replace(/_/g, "/");
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
   const rawData = window.atob(base64);
   const outputArray = new Uint8Array(rawData.length);
   for (let i = 0; i < rawData.length; ++i) {
