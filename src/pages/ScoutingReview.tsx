@@ -238,6 +238,7 @@ export default function ScoutingReview() {
     matchId: state?.matchId,
     event_code: state?.event_code,
     match_number: state?.match_number,
+    match_type: state?.match_type,
     role: state?.role,
   });
 
@@ -574,7 +575,7 @@ export default function ScoutingReview() {
     setIsSubmitting(true);
 
     try {
-      await submitScoutingData(matchId, state.role, state, user?.id);
+      await submitScoutingData(matchId, state.role, state, user?.id, state.team_number, state.match_type);
 
       // Mark as uploaded in offline storage
       if (offlineKey) {

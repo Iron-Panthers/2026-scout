@@ -37,6 +37,8 @@ export interface ScoutingData {
   matchId: string;
   event_code: string;
   match_number: number;
+  team_number: number;
+  match_type: string;
   role: string;
   currentPhase: Phase;
   matchStartTime: number | null;
@@ -133,7 +135,9 @@ export class ScoutingReducer<T extends Record<string, any> = ScoutingData> {
     matchId: string,
     role: string = "",
     event_code: string = "",
-    match_number: number = 0
+    match_number: number = 0,
+    team_number: number = 0,
+    match_type: string = "qual"
   ): ScoutingData {
     const phases: Phase[] = [
       "auto",
@@ -160,6 +164,8 @@ export class ScoutingReducer<T extends Record<string, any> = ScoutingData> {
       matchId,
       event_code,
       match_number,
+      team_number,
+      match_type,
       role,
       currentPhase: "auto",
       matchStartTime: null,
