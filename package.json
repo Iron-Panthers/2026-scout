@@ -9,7 +9,8 @@
     "build:quick": "vite build",
     "pwa": "npm run build:quick && vite preview",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deploy": "npm run build:quick && gh-pages -d dist"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
