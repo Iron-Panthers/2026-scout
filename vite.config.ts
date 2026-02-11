@@ -24,8 +24,8 @@ export default defineConfig({
         background_color: "#0a0a0a",
         display: "standalone",
         orientation: "any",
-        start_url: "/dashboard",
-        scope: "/",
+        start_url: "/2026-scout/dashboard",
+        scope: "/2026-scout/",
         icons: [
           {
             src: "/icons/icon-192x192.png",
