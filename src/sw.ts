@@ -112,7 +112,19 @@ self.addEventListener("notificationclick", (event) => {
   event.notification.close();
 
   const url = event.notification.data?.url || "/dashboard";
-  const fullUrl = new URL(url, self.location.origin).href;
+
+  // Detect base URL from service worker scope
+  // In production: scope = /2026-scout/, in dev: scope = /
+  const scope = self.registration.scope;
+  const basePath = new URL(scope).pathname;
+
+  // Build full URL with base path
+  let targetPath = url;
+  if (!url.startsWith(basePath) && !url.startsWith('http')) {
+    targetPath = basePath.replace(/\/$/, '') + url;
+  }
+
+  const fullUrl = new URL(targetPath, self.location.origin).href;
 
   event.waitUntil(
     self.clients
@@ -122,10 +134,10 @@ self.addEventListener("notificationclick", (event) => {
         for (const client of clients) {
           if ("focus" in client) {
             return client.focus().then(() => {
-              // Send navigation message to the client
+              // Send navigation message to the client with base path
               client.postMessage({
                 type: "NAVIGATE",
-                url: url,
+                url: targetPath,
               });
             });
           }
