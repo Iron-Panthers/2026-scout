@@ -113,20 +113,37 @@ self.addEventListener("notificationclick", (event) => {
 
   const url = event.notification.data?.url || "/dashboard";
 
+  // Detect base URL from service worker scope
+  // In production: scope = /2026-scout/, in dev: scope = /
+  const scope = self.registration.scope;
+  const basePath = new URL(scope).pathname;
+
+  // Build full URL with base path
+  let targetPath = url;
+  if (!url.startsWith(basePath) && !url.startsWith('http')) {
+    targetPath = basePath.replace(/\/$/, '') + url;
+  }
+
+  const fullUrl = new URL(targetPath, self.location.origin).href;
+
   event.waitUntil(
     self.clients
       .matchAll({ type: "window", includeUncontrolled: true })
       .then((clients) => {
-        // If a window is already open, focus it and navigate
+        // If a window is already open, focus it and send navigation message
         for (const client of clients) {
           if ("focus" in client) {
-            client.focus();
-            client.navigate(url);
-            return;
+            return client.focus().then(() => {
+              // Send navigation message to the client with base path
+              client.postMessage({
+                type: "NAVIGATE",
+                url: targetPath,
+              });
+            });
           }
         }
         // Otherwise open a new window
-        return self.clients.openWindow(url);
+        return self.clients.openWindow(fullUrl);
       })
   );
 });

@@ -48,16 +48,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Get initial session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    console.log("=== AUTH CONTEXT: Getting initial session ===");
+    supabase.auth.getSession().then(async ({ data: { session }, error }) => {
+      console.log("Initial session:", session);
+      console.log("Session error:", error);
+
       setSession(session);
       setUser(session?.user ?? null);
 
       if (session?.user) {
+        console.log("User found in session:", session.user.id);
         const userName =
           session.user.user_metadata?.name || session.user.email?.split("@")[0];
         // Load profile but don't block on it
         loadProfile(session.user.id, userName).catch(console.error);
       } else {
+        console.log("No user in session");
         // No user - stop loading
         setLoading(false);
       }
@@ -66,16 +72,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("=== AUTH STATE CHANGE ===");
+      console.log("Event:", event);
+      console.log("Session:", session);
+
       setSession(session);
       setUser(session?.user ?? null);
 
       if (session?.user) {
+        console.log("User authenticated:", session.user.id);
         const userName =
           session.user.user_metadata?.name || session.user.email?.split("@")[0];
         // Load profile but don't block on it
         loadProfile(session.user.id, userName).catch(console.error);
       } else {
+        console.log("User signed out or no session");
         setProfile(null);
         setLoading(false);
       }

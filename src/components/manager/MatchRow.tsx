@@ -3,8 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { TableRow, TableCell } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, X } from "lucide-react";
-import type { Role, MatchAssignment } from "@/types";
+import { Plus, X, Check } from "lucide-react";
+import type { Role, MatchAssignment, Profile } from "@/types";
 
 const getRoleCellColor = (role: Role) => {
   if (role.startsWith("red") || role === "qualRed") {
@@ -19,6 +19,8 @@ interface MatchRowProps {
   onOpenDialog: (matchNumber: number, role: Role) => void;
   onClearAssignment: (matchNumber: number, role: Role) => void;
   completedSubmissions: Set<string>;
+  actualScouters: Map<string, string>; // Map of "matchId:role" -> scouter_id
+  availableScouts: Profile[]; // All profiles to look up names
   isSelected?: boolean;
   onToggleSelect?: (matchId: string) => void;
 }
@@ -30,6 +32,8 @@ export const MatchRow = memo(
     onOpenDialog,
     onClearAssignment,
     completedSubmissions,
+    actualScouters,
+    availableScouts,
     isSelected = false,
     onToggleSelect,
   }: MatchRowProps) => {
@@ -50,9 +54,22 @@ export const MatchRow = memo(
           const isCompleted =
             match.matchId &&
             completedSubmissions.has(`${match.matchId}:${role}`);
+
+          // Get actual scouter if submission exists
+          const actualScouterId = match.matchId
+            ? actualScouters.get(`${match.matchId}:${role}`)
+            : null;
+          const actualScouter = actualScouterId
+            ? availableScouts.find((s) => s.id === actualScouterId)
+            : null;
+
+          // Check if actual scouter is different from assigned
+          const isDifferentScouter = actualScouter && assignment && actualScouter.id !== assignment.id;
+
           const cellColorClass = isCompleted
             ? "bg-green-900/30"
             : getRoleCellColor(role);
+
           return (
             <TableCell key={role} className={`p-1.5 md:p-2 ${cellColorClass}`}>
               {assignment ? (
@@ -70,6 +87,14 @@ export const MatchRow = memo(
                     <span className="text-[10px] leading-tight md:text-xs font-medium text-center">
                       {assignment.name}
                     </span>
+                    {isCompleted && !isDifferentScouter && (
+                      <Check className="h-3 w-3 text-green-400" />
+                    )}
+                    {isDifferentScouter && actualScouter && (
+                      <span className="text-[9px] text-orange-400 font-semibold">
+                        ✓ by {actualScouter.name?.split(' ')[0] || 'Other'}
+                      </span>
+                    )}
                   </button>
                   <button
                     onClick={(e) => {

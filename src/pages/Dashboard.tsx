@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +16,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { getUserMatches, removeUserFromMatch, getEvents } from "@/lib/matches";
 import { getMatchTeam, getTeamPhoto, CURRENT_YEAR } from "@/lib/blueAlliance";
 import { filterMatchesWithoutSubmissions } from "@/lib/scoutingSchema";
+import { supabase } from "@/lib/supabase";
 import DashboardHeader from "@/components/DashboardHeader";
 import UserProfileMenu from "@/components/UserProfileMenu";
 import OfflineMatches from "@/components/OfflineMatches";
@@ -76,89 +77,119 @@ export default function Dashboard() {
   const avatarUrl = user?.user_metadata?.avatar_url || "";
 
   // Load user's assigned matches
-  useEffect(() => {
-    const loadMatches = async () => {
-      if (!user?.id) return;
+  const loadMatches = useCallback(async () => {
+    if (!user?.id) return;
 
-      try {
-        const { matches: userMatches } = await getUserMatches(user.id);
+    try {
+      const { matches: userMatches } = await getUserMatches(user.id);
 
-        // Convert matches to display format with role information
-        const formattedMatches: UserMatch[] = [];
+      // Convert matches to display format with role information
+      const formattedMatches: UserMatch[] = [];
 
-        userMatches.forEach((match) => {
-          // Check each role to find where the user is assigned
-          const roleChecks: Array<{ column: string | null; role: Role }> = [
-            { column: match.red1_scouter_id, role: "red1" },
-            { column: match.red2_scouter_id, role: "red2" },
-            { column: match.red3_scouter_id, role: "red3" },
-            { column: match.qual_red_scouter_id, role: "qualRed" },
-            { column: match.blue1_scouter_id, role: "blue1" },
-            { column: match.blue2_scouter_id, role: "blue2" },
-            { column: match.blue3_scouter_id, role: "blue3" },
-            { column: match.qual_blue_scouter_id, role: "qualBlue" },
-          ];
+      userMatches.forEach((match) => {
+        // Check each role to find where the user is assigned
+        const roleChecks: Array<{ column: string | null; role: Role }> = [
+          { column: match.red1_scouter_id, role: "red1" },
+          { column: match.red2_scouter_id, role: "red2" },
+          { column: match.red3_scouter_id, role: "red3" },
+          { column: match.qual_red_scouter_id, role: "qualRed" },
+          { column: match.blue1_scouter_id, role: "blue1" },
+          { column: match.blue2_scouter_id, role: "blue2" },
+          { column: match.blue3_scouter_id, role: "blue3" },
+          { column: match.qual_blue_scouter_id, role: "qualBlue" },
+        ];
 
-          roleChecks.forEach(({ column, role }) => {
-            if (column === user.id) {
-              formattedMatches.push({
-                matchNumber: match.name,
-                role,
-                match,
-              });
-            }
-          });
+        roleChecks.forEach(({ column, role }) => {
+          if (column === user.id) {
+            formattedMatches.push({
+              matchNumber: match.name,
+              role,
+              match,
+            });
+          }
         });
+      });
 
-        // Sort by match number
-        formattedMatches.sort(
-          (a, b) => a.match.match_number - b.match.match_number
-        );
+      // Sort by match number
+      formattedMatches.sort(
+        (a, b) => a.match.match_number - b.match.match_number
+      );
 
-        // Filter out matches that already have submissions
-        const matchesWithoutSubmissions = await filterMatchesWithoutSubmissions(
-          formattedMatches
-        );
+      // Filter out matches that already have submissions
+      const matchesWithoutSubmissions = await filterMatchesWithoutSubmissions(
+        formattedMatches
+      );
 
-        setMatches(matchesWithoutSubmissions);
+      setMatches(matchesWithoutSubmissions);
 
-        // Fetch team numbers for each match
-        const events = await getEvents();
-        const teamNumbersMap: Record<string, number | null> = {};
+      // Fetch team numbers for each match
+      const events = await getEvents();
+      const teamNumbersMap: Record<string, number | null> = {};
 
-        for (const userMatch of matchesWithoutSubmissions) {
-          // Skip qual roles
-          if (userMatch.role === "qualRed" || userMatch.role === "qualBlue") {
-            continue;
-          }
-
-          // Find the event for this match
-          const event = events.find((e) => e.id === userMatch.match.event_id);
-
-          if (event?.event_code) {
-            const teamNumber = await getMatchTeam(
-              event.event_code,
-              userMatch.match.match_number,
-              userMatch.role
-            );
-
-            if (teamNumber) {
-              teamNumbersMap[`${userMatch.match.id}-${userMatch.role}`] =
-                teamNumber;
-            }
-          }
+      for (const userMatch of matchesWithoutSubmissions) {
+        // Skip qual roles
+        if (userMatch.role === "qualRed" || userMatch.role === "qualBlue") {
+          continue;
         }
 
-        setTeamNumbers(teamNumbersMap);
-      } catch (error) {
-        console.error("Failed to load matches:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
+        // Find the event for this match
+        const event = events.find((e) => e.id === userMatch.match.event_id);
 
-    loadMatches();
+        if (event?.event_code) {
+          const teamNumber = await getMatchTeam(
+            event.event_code,
+            userMatch.match.match_number,
+            userMatch.role
+          );
+
+          if (teamNumber) {
+            teamNumbersMap[`${userMatch.match.id}-${userMatch.role}`] =
+              teamNumber;
+          }
+        }
+      }
+
+      setTeamNumbers(teamNumbersMap);
+    } catch (error) {
+      console.error("Failed to load matches:", error);
+    } finally {
+      setLoading(false);
+    }
   }, [user?.id]);
+
+  useEffect(() => {
+    loadMatches();
+  }, [loadMatches]);
+
+  // Subscribe to real-time updates for match assignments
+  useEffect(() => {
+    if (!user?.id) return;
+
+    console.log("Setting up realtime subscription for matches...");
+
+    // Subscribe to changes in matches table
+    const channel = supabase
+      .channel("match-assignments")
+      .on(
+        "postgres_changes",
+        {
+          event: "*", // Listen to all events (INSERT, UPDATE, DELETE)
+          schema: "public",
+          table: "matches",
+        },
+        (payload) => {
+          console.log("Match assignment changed:", payload);
+          // Reload matches when any match is updated
+          loadMatches();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      console.log("Cleaning up realtime subscription...");
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, loadMatches]);
 
   const getRoleColor = (role: string) => {
     if (role.startsWith("red") || role === "qualRed") {

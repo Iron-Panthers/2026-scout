@@ -82,6 +82,9 @@ export default function ManagerDashboard() {
   const [completedSubmissions, setCompletedSubmissions] = useState<Set<string>>(
     new Set()
   );
+  const [actualScouters, setActualScouters] = useState<Map<string, string>>(
+    new Map()
+  ); // Map of "matchId:role" -> scouter_id
 
   // New event form state
   const [newEventName, setNewEventName] = useState("");
@@ -105,6 +108,9 @@ export default function ManagerDashboard() {
   // Roster state
   const [rosters, setRosters] = useState<Roster[]>([]);
   const [selectedMatches, setSelectedMatches] = useState<Set<string>>(new Set());
+
+  // Active tab state for mobile dropdown
+  const [activeTab, setActiveTab] = useState<string>("assignments");
 
   // Helper function to convert database match to assignment format
   const convertMatchToAssignment = useCallback(
@@ -256,6 +262,7 @@ export default function ManagerDashboard() {
   const loadSubmissionStatus = async (dbMatches: Match[]) => {
     if (dbMatches.length === 0) {
       setCompletedSubmissions(new Set());
+      setActualScouters(new Map());
       return;
     }
 
@@ -263,7 +270,7 @@ export default function ManagerDashboard() {
       const matchIds = dbMatches.map((m) => m.id);
       const { data: submissions, error } = await supabase
         .from("scouting_submissions")
-        .select("match_id, role")
+        .select("match_id, role, scouter_id")
         .in("match_id", matchIds);
 
       if (error) throw error;
@@ -273,7 +280,13 @@ export default function ManagerDashboard() {
         (submissions || []).map((s) => `${s.match_id}:${s.role}`)
       );
 
+      // Create Map of "matchId:role" -> scouter_id
+      const scoutersMap = new Map(
+        (submissions || []).map((s) => [`${s.match_id}:${s.role}`, s.scouter_id])
+      );
+
       setCompletedSubmissions(completedSet);
+      setActualScouters(scoutersMap);
     } catch (error) {
       console.error("Error loading submission status:", error);
     }
@@ -540,29 +553,91 @@ export default function ManagerDashboard() {
         </div>
 
         {/* Tabs for Navigation */}
-        <Tabs defaultValue="assignments" className="w-full">
-          <div className="flex items-center justify-between mb-6">
-            <TabsList className="grid w-full max-w-3xl grid-cols-4">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+            {/* Mobile: Dropdown Menu */}
+            <div className="md:hidden w-full">
+              <Select value={activeTab} onValueChange={setActiveTab}>
+                <SelectTrigger className="w-full">
+                  <SelectValue>
+                    {activeTab === "assignments" && (
+                      <div className="flex items-center gap-2">
+                        <Users className="h-4 w-4" />
+                        Match Assignments
+                      </div>
+                    )}
+                    {activeTab === "rosters" && (
+                      <div className="flex items-center gap-2">
+                        <ListChecks className="h-4 w-4" />
+                        Rosters
+                      </div>
+                    )}
+                    {activeTab === "events" && (
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4" />
+                        Event Information
+                      </div>
+                    )}
+                    {activeTab === "create" && (
+                      <div className="flex items-center gap-2">
+                        <PlusCircle className="h-4 w-4" />
+                        Create Event
+                      </div>
+                    )}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="assignments">
+                    <div className="flex items-center gap-2">
+                      <Users className="h-4 w-4" />
+                      Match Assignments
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="rosters">
+                    <div className="flex items-center gap-2">
+                      <ListChecks className="h-4 w-4" />
+                      Rosters
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="events">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4" />
+                      Event Information
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="create">
+                    <div className="flex items-center gap-2">
+                      <PlusCircle className="h-4 w-4" />
+                      Create Event
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Desktop: Tab Buttons */}
+            <TabsList className="hidden md:grid w-full max-w-3xl grid-cols-4 gap-1">
               <TabsTrigger
                 value="assignments"
-                className="flex items-center gap-2"
+                className="flex items-center justify-center gap-2"
               >
                 <Users className="h-4 w-4" />
                 Match Assignments
               </TabsTrigger>
-              <TabsTrigger value="rosters" className="flex items-center gap-2">
+              <TabsTrigger value="rosters" className="flex items-center justify-center gap-2">
                 <ListChecks className="h-4 w-4" />
                 Rosters
               </TabsTrigger>
-              <TabsTrigger value="events" className="flex items-center gap-2">
+              <TabsTrigger value="events" className="flex items-center justify-center gap-2">
                 <Calendar className="h-4 w-4" />
                 Event Information
               </TabsTrigger>
-              <TabsTrigger value="create" className="flex items-center gap-2">
+              <TabsTrigger value="create" className="flex items-center justify-center gap-2">
                 <PlusCircle className="h-4 w-4" />
                 Create Event
               </TabsTrigger>
             </TabsList>
+
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">Event:</span>
               <Select value={selectedEvent} onValueChange={setSelectedEvent}>
@@ -706,6 +781,8 @@ export default function ManagerDashboard() {
                         onOpenDialog={openAssignmentDialog}
                         onClearAssignment={handleClearAssignment}
                         completedSubmissions={completedSubmissions}
+                        actualScouters={actualScouters}
+                        availableScouts={availableScouts}
                         isSelected={selectedMatches.has(match.matchId || "")}
                         onToggleSelect={handleToggleMatch}
                       />

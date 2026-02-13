@@ -186,6 +186,18 @@ export async function updateMatchAssignment(
     qualBlue: "qual_blue_scouter_id",
   };
 
+  // Map role names to display names
+  const roleToDisplay: Record<string, string> = {
+    red1: "Red 1",
+    red2: "Red 2",
+    red3: "Red 3",
+    qualRed: "Qual Red",
+    blue1: "Blue 1",
+    blue2: "Blue 2",
+    blue3: "Blue 3",
+    qualBlue: "Qual Blue",
+  };
+
   const roleColumn = roleToColumn[role];
 
   if (!roleColumn) {
@@ -200,6 +212,16 @@ export async function updateMatchAssignment(
     scouterId,
   });
 
+  // Get current assignment before updating (for unassignment notifications)
+  const { data: currentMatch } = await supabase
+    .from("matches")
+    .select("*, events(name)")
+    .eq("id", matchId)
+    .single();
+
+  const previousScouterId = currentMatch?.[roleColumn];
+
+  // Update the assignment
   const { error } = await supabase
     .from("matches")
     .update({ [roleColumn]: scouterId })
@@ -210,7 +232,63 @@ export async function updateMatchAssignment(
     return false;
   }
 
+  // Send unassignment notification if scout was removed
+  if (previousScouterId && !scouterId && currentMatch) {
+    sendUnassignmentNotification(
+      previousScouterId,
+      currentMatch.match_number,
+      currentMatch.events?.name || "Event",
+      roleToDisplay[role] || role
+    ).catch((err) =>
+      console.error("Failed to send unassignment notification:", err)
+    );
+  }
+
   return true;
+}
+
+// Send unassignment notification via edge function
+async function sendUnassignmentNotification(
+  userId: string,
+  matchNumber: number,
+  eventName: string,
+  role: string
+): Promise<void> {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.warn("Supabase credentials not available for notification");
+    return;
+  }
+
+  try {
+    const response = await fetch(
+      `${supabaseUrl}/functions/v1/send-unassignment-notification`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${supabaseAnonKey}`,
+        },
+        body: JSON.stringify({
+          userId,
+          matchNumber,
+          eventName,
+          role,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error("Unassignment notification failed:", error);
+    } else {
+      console.log("Unassignment notification sent successfully");
+    }
+  } catch (error) {
+    console.error("Error sending unassignment notification:", error);
+  }
 }
 
 // Get matches assigned to a specific user

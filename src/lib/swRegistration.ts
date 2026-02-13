@@ -90,3 +90,25 @@ export async function waitForRegistration(
   console.warn("Service worker registration timeout");
   return null;
 }
+
+/**
+ * Set up listener for navigation messages from service worker.
+ * Call this with a navigation function from your router.
+ */
+export function setupNavigationListener(
+  navigate: (path: string) => void
+): () => void {
+  const handleMessage = (event: MessageEvent) => {
+    if (event.data && event.data.type === "NAVIGATE") {
+      console.log("Navigating from SW notification:", event.data.url);
+      navigate(event.data.url);
+    }
+  };
+
+  navigator.serviceWorker?.addEventListener("message", handleMessage);
+
+  // Return cleanup function
+  return () => {
+    navigator.serviceWorker?.removeEventListener("message", handleMessage);
+  };
+}

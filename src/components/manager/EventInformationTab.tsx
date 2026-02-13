@@ -10,9 +10,11 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { CalendarIcon, Save } from "lucide-react";
+import { CalendarIcon, Save, PlusCircle } from "lucide-react";
 import { format } from "date-fns";
 import { updateEvent } from "@/lib/matches";
+import { supabase } from "@/lib/supabase";
+import { useToast } from "@/hooks/use-toast";
 import type { Event, Profile, MatchAssignment } from "@/types";
 
 interface EventInformationTabProps {
@@ -32,9 +34,11 @@ export function EventInformationTab({
 }: EventInformationTabProps) {
   const currentEvent = events.find((e) => e.id === selectedEvent);
   const isAllEvents = selectedEvent === "all";
+  const { toast } = useToast();
 
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isAddingMatches, setIsAddingMatches] = useState(false);
   const [editedEvent, setEditedEvent] = useState<Partial<Event>>({
     name: currentEvent?.name || "",
     event_code: currentEvent?.event_code || "",
@@ -74,6 +78,56 @@ export function EventInformationTab({
       scouting_map_url: currentEvent?.scouting_map_url || "",
     });
     setIsEditing(false);
+  };
+
+  const handleAddMatches = async () => {
+    if (!currentEvent || isAllEvents) return;
+
+    setIsAddingMatches(true);
+
+    try {
+      // Get the highest match number for this event
+      const { data: existingMatches, error: fetchError } = await supabase
+        .from("matches")
+        .select("match_number")
+        .eq("event_id", currentEvent.id)
+        .order("match_number", { ascending: false })
+        .limit(1);
+
+      if (fetchError) throw fetchError;
+
+      const highestMatchNumber = existingMatches?.[0]?.match_number || 0;
+      const eventCode = currentEvent.event_code || currentEvent.name.replace(/\s+/g, "").toLowerCase();
+
+      // Create 10 new matches
+      const newMatches = Array.from({ length: 10 }, (_, i) => ({
+        name: `${eventCode}-Q${highestMatchNumber + i + 1}`,
+        match_number: highestMatchNumber + i + 1,
+        event_id: currentEvent.id,
+      }));
+
+      const { error: insertError } = await supabase
+        .from("matches")
+        .insert(newMatches);
+
+      if (insertError) throw insertError;
+
+      toast({
+        title: "Matches Added",
+        description: `Added matches ${highestMatchNumber + 1} through ${highestMatchNumber + 10}`,
+      });
+
+      onEventUpdate?.();
+    } catch (error: any) {
+      console.error("Failed to add matches:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to add matches",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAddingMatches(false);
+    }
   };
 
   return (
@@ -192,7 +246,21 @@ export function EventInformationTab({
                 <Label className="text-sm font-medium text-muted-foreground">
                   Total Matches
                 </Label>
-                <p className="text-lg font-semibold">{matches.length}</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <p className="text-lg font-semibold">{matches.length}</p>
+                  {!isAllEvents && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleAddMatches}
+                      disabled={isAddingMatches}
+                      className="h-7"
+                    >
+                      <PlusCircle className="h-3 w-3 mr-1" />
+                      {isAddingMatches ? "Adding..." : "+10"}
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
