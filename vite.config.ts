@@ -17,9 +17,9 @@ export default defineConfig(({ mode }) => ({
       registerType: "prompt",
       injectRegister: false,
       manifest: {
-        name: "2026 Scout - FRC Scouting",
-        short_name: "2026 Scout",
-        description: "FIRST Robotics Competition scouting application",
+        name: "Iron Panthers Scout - FRC Scouting",
+        short_name: "Iron Panthers",
+        description: "Iron Panthers FRC 5026 scouting application",
         theme_color: "#0a0a0a",
         background_color: "#0a0a0a",
         display: "standalone",
@@ -28,17 +28,17 @@ export default defineConfig(({ mode }) => ({
         scope: mode === "production" ? "/2026-scout/" : "/",
         icons: [
           {
-            src: "/icons/icon-192x192.png",
+            src: "/iron_panthers_logo.png",
             sizes: "192x192",
             type: "image/png",
           },
           {
-            src: "/icons/icon-512x512.png",
+            src: "/iron_panthers_logo.png",
             sizes: "512x512",
             type: "image/png",
           },
           {
-            src: "/icons/icon-512x512.png",
+            src: "/iron_panthers_logo.png",
             sizes: "512x512",
             type: "image/png",
             purpose: "maskable",
