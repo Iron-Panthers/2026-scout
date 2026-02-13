@@ -62,6 +62,7 @@ export default function Scouting() {
     phaseProgress,
     startMatch: startMatchTimer,
     resetMatch,
+    skipToPhase,
   } = useMatchTimer(currentPhase);
 
   // Wrap startMatch to also record the match start time in scouting state
@@ -215,6 +216,17 @@ export default function Scouting() {
         },
       ],
     },
+    {
+      id: "trench",
+      title: "Trench",
+      x: 0.05,
+      y: 0.65,
+      w: 0.08,
+      h: 0.11,
+      color: "#8b5cf6",
+      type: "direct",
+      action: "recordTrench",
+    },
   ];
 
   // Action handlers defined inline
@@ -235,6 +247,7 @@ export default function Scouting() {
         break;
       case "recordTrench":
         increment(`counters.{phase}.trenchIntakes`);
+        console.log("trench intake recorded");
         break;
       default:
         console.warn(`Action handler not found: ${actionName}`);
@@ -368,6 +381,20 @@ export default function Scouting() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            {/* Review & Submit */}
+            <DropdownMenuItem
+              onClick={async () => {
+                // Compress and encode state for smaller URLs
+                const { compressState } = await import("@/lib/stateCompression");
+                const compressed = compressState(state);
+                navigate(`/review/${compressed}`);
+              }}
+            >
+              Review &amp; Submit
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+
+            {/* Orientation Options */}
             <DropdownMenuItem onClick={() => setOrientation(0)}>
               0° (Default)
             </DropdownMenuItem>
@@ -381,30 +408,34 @@ export default function Scouting() {
               270° (Left)
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={resetMatch}
-              className="text-orange-600 dark:text-orange-400"
-            >
-              <RotateCcw className="mr-2 h-4 w-4" />
+
+            {/* Reset Timer */}
+            <DropdownMenuItem onClick={resetMatch}>
               Reset Match Timer
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => {
-                // Encode state as base64url
-                const json = JSON.stringify(state);
-                const base64url = btoa(
-                  encodeURIComponent(json).replace(/%([0-9A-F]{2})/g, (_, p1) =>
-                    String.fromCharCode(parseInt(p1, 16))
-                  )
-                )
-                  .replace(/\+/g, "-")
-                  .replace(/\//g, "_")
-                  .replace(/=+$/, "");
-                navigate(`/review/${base64url}`);
-              }}
-            >
-              Review &amp; Submit
+
+            {/* Skip to Phase */}
+            <DropdownMenuItem onClick={() => skipToPhase("auto")}>
+              Skip to Auto
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => skipToPhase("transition-shift")}>
+              Skip to Transition
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => skipToPhase("phase1")}>
+              Skip to Phase 1
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => skipToPhase("phase2")}>
+              Skip to Phase 2
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => skipToPhase("phase3")}>
+              Skip to Phase 3
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => skipToPhase("phase4")}>
+              Skip to Phase 4
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => skipToPhase("endgame")}>
+              Skip to Endgame
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

@@ -17,6 +17,7 @@ import {
   markAsUploaded,
   generateOfflineKey,
 } from "@/lib/offlineStorage";
+import { compressState, decompressState, decodeLegacyBase64Url } from "@/lib/stateCompression";
 import { supabase } from "@/lib/supabase";
 import { Checkbox } from "@/components/ui/checkbox";
 
@@ -174,22 +175,22 @@ export default function ScoutingReview() {
   // Check if opened with manager parameter
   const isManagerMode = searchParams.get("forScoutingManager") === "true";
 
-  // Decode state from base64url param
+  // Decode state from compressed URL param
   let initialState: any = null;
   if (encoded) {
     try {
-      const base64 = encoded.replace(/-/g, "+").replace(/_/g, "/");
-      const json = decodeURIComponent(
-        Array.prototype.map
-          .call(
-            atob(base64),
-            (c: string) => `%${("00" + c.charCodeAt(0).toString(16)).slice(-2)}`
-          )
-          .join("")
-      );
-      initialState = JSON.parse(json);
+      // Try new compression format first
+      initialState = decompressState(encoded);
     } catch (e) {
-      initialState = null;
+      // Fall back to legacy base64url format for old URLs
+      console.log("New format failed, trying legacy format...");
+      try {
+        initialState = decodeLegacyBase64Url(encoded);
+        console.log("Successfully decoded legacy format");
+      } catch (legacyError) {
+        console.error("Failed to decode state from URL");
+        initialState = null;
+      }
     }
   }
 
@@ -288,25 +289,17 @@ export default function ScoutingReview() {
     return () => clearTimeout(timeoutId);
   }, [state, user?.id, toast]); // Save whenever state changes
 
-  // Update the base64url in the route when state changes (debounced)
+  // Update the compressed URL when state changes (debounced)
   useEffect(() => {
     if (!state || !encoded) return;
 
     // Debounce URL updates to avoid performance issues during editing
     const timeoutId = setTimeout(() => {
       try {
-        const json = JSON.stringify(state);
-        const base64 = btoa(
-          encodeURIComponent(json).replace(/%([0-9A-F]{2})/g, (_, p1) =>
-            String.fromCharCode(parseInt(p1, 16))
-          )
-        )
-          .replace(/\+/g, "-")
-          .replace(/\//g, "_")
-          .replace(/=+$/, "");
+        const compressed = compressState(state);
         // Only update if different
-        if (base64 !== encoded) {
-          const newUrl = `/review/${base64}`;
+        if (compressed !== encoded) {
+          const newUrl = `/review/${compressed}`;
           window.history.replaceState(null, "", newUrl);
         }
       } catch {

@@ -9,6 +9,7 @@ import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
 import PitScouting from "./pages/PitScouting";
 import Scouting from "./pages/Scouting";
+import QualScouting from "./pages/QualScouting";
 import Login from "./pages/Login";
 import Dev from "./pages/Dev";
 import ScoutConfig from "./pages/ScoutConfig";
@@ -19,6 +20,7 @@ import PushTest from "./pages/PushTest";
 import { Toaster } from "./components/ui/toaster";
 import UpdateBanner from "./components/UpdateBanner";
 import MatchAssignmentListener from "./components/MatchAssignmentListener";
+import NotificationNavigationListener from "./components/NotificationNavigationListener";
 
 function App() {
   return (
@@ -86,6 +88,14 @@ function App() {
               }
             />
             <Route
+              path="/qual-scouting"
+              element={
+                <ProtectedRoute>
+                  <QualScouting />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/dev"
               element={
                 <ProtectedRoute>
@@ -130,6 +140,7 @@ function App() {
           <Toaster />
           <UpdateBanner />
           <MatchAssignmentListener />
+          <NotificationNavigationListener />
         </BrowserRouter>
       </SettingsProvider>
     </AuthProvider>

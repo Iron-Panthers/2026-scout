@@ -64,6 +64,8 @@ export interface MatchTimerState {
   startMatch: () => void;
   /** Reset the timer and go back to pre-match state */
   resetMatch: () => void;
+  /** Skip to the start of a specific phase */
+  skipToPhase: (phase: Phase) => void;
 }
 
 /**
@@ -140,6 +142,28 @@ export function useMatchTimer(currentPhase: Phase): MatchTimerState {
     }
   }, []);
 
+  const skipToPhase = useCallback((phase: Phase) => {
+    const targetTime = PHASE_START_TIMES[phase];
+
+    // Cancel any existing animation frame
+    if (animationFrameRef.current !== null) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+
+    // Set the new time and start reference
+    setElapsedTime(targetTime);
+    startTimeRef.current = Date.now() - (targetTime * 1000);
+
+    // Ensure timer is running
+    if (!hasStarted) {
+      setHasStarted(true);
+    }
+    if (!isRunning) {
+      setIsRunning(true);
+    }
+  }, [hasStarted, isRunning]);
+
   return {
     elapsedTime,
     isRunning,
@@ -149,5 +173,6 @@ export function useMatchTimer(currentPhase: Phase): MatchTimerState {
     phaseProgress,
     startMatch,
     resetMatch,
+    skipToPhase,
   };
 }

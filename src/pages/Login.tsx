@@ -45,7 +45,11 @@ export default function Login() {
 
     try {
       if (mode === "signup") {
-        console.log("Attempting signup with:", data.email);
+        console.log("=== SIGNUP ATTEMPT ===");
+        console.log("Email:", data.email);
+        console.log("Name:", data.name);
+        console.log("Supabase URL:", import.meta.env.VITE_SUPABASE_URL);
+
         const { data: signUpData, error: signUpError } =
           await supabase.auth.signUp({
             email: data.email,
@@ -54,15 +58,24 @@ export default function Login() {
               data: {
                 name: data.name,
               },
+              emailRedirectTo: window.location.origin + '/dashboard',
             },
           });
 
-        console.log("Signup response:", {
-          data: signUpData,
-          error: signUpError,
-        });
+        console.log("=== SIGNUP RESPONSE ===");
+        console.log("Data:", signUpData);
+        console.log("Error:", signUpError);
+        console.log("User ID:", signUpData?.user?.id);
+        console.log("Session:", signUpData?.session);
 
-        if (signUpError) throw signUpError;
+        if (signUpError) {
+          console.error("Signup error details:", {
+            message: signUpError.message,
+            status: signUpError.status,
+            name: signUpError.name,
+          });
+          throw signUpError;
+        }
 
         setSuccess(
           "Account created successfully! Please check your email to verify your account."
@@ -71,30 +84,44 @@ export default function Login() {
         setLoading(false);
         setTimeout(() => setMode("login"), 3000);
       } else {
-        console.log("Attempting login with:", data.email);
+        console.log("=== LOGIN ATTEMPT ===");
+        console.log("Email:", data.email);
+        console.log("Supabase URL:", import.meta.env.VITE_SUPABASE_URL);
+        console.log("Current URL:", window.location.href);
+
         const { data: signInData, error: signInError } =
           await supabase.auth.signInWithPassword({
             email: data.email,
             password: data.password,
+            options: {
+              // Ensure redirect stays on current origin
+              emailRedirectTo: window.location.origin + '/dashboard',
+            },
           });
 
-        console.log("Login response:", {
-          data: signInData,
-          error: signInError,
-        });
+        console.log("=== LOGIN RESPONSE ===");
+        console.log("Data:", signInData);
+        console.log("Error:", signInError);
+        console.log("Session exists:", !!signInData?.session);
+        console.log("User ID:", signInData?.user?.id);
 
         if (signInError) {
-          console.error("Sign in error:", signInError);
+          console.error("Login error details:", {
+            message: signInError.message,
+            status: signInError.status,
+            name: signInError.name,
+          });
           throw signInError;
         }
 
-        console.log("Login successful, session:", signInData.session);
-
-        // Navigation will happen, but don't clear loading yet
+        console.log("Login successful! Navigating to dashboard...");
         navigate("/dashboard");
       }
     } catch (err: any) {
-      console.error("Auth error:", err);
+      console.error("=== AUTH ERROR ===");
+      console.error("Full error:", err);
+      console.error("Error message:", err.message);
+      console.error("Error status:", err.status);
       setError(err.message || "An error occurred during authentication");
       setLoading(false);
     }
@@ -112,15 +139,22 @@ export default function Login() {
     setError(null);
 
     try {
+      // Build redirect URL - use current origin for better localhost support
+      const baseUrl = import.meta.env.BASE_URL || '/';
+      const redirectTo = `${window.location.origin}${baseUrl}dashboard`.replace(/\/+/g, '/').replace(':/', '://');
+
+      console.log('OAuth redirect URL:', redirectTo);
+
       const { error: signInError } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}${import.meta.env.BASE_URL}dashboard`,
+          redirectTo,
         },
       });
 
       if (signInError) throw signInError;
     } catch (err: any) {
+      console.error('Google sign in error:', err);
       setError(err.message || "An error occurred with Google sign in");
       setGoogleLoading(false);
     }

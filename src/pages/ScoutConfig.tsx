@@ -285,17 +285,18 @@ export default function ScoutConfig() {
 
   return (
     <div
-      className="space-y-3 py-4 grid place-items-center"
+      className="min-h-screen flex flex-col"
       style={{ padding: "20px" }}
     >
       {/* Back Button */}
-      <div className="w-full max-w-sm mb-2">
-        <Button variant="ghost" onClick={() => navigate("/dashboard")}>
+      <div className="w-full max-w-sm mx-auto mb-4">
+        <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard")}>
           <ArrowLeft className="mr-2 h-4 w-4" />
-          Back
+          Back to Dashboard
         </Button>
       </div>
 
+      <div className="flex-1 flex flex-col items-center space-y-3 pb-16">
       <Button
         onClick={() => {
           // Require at minimum: role, event_id, and match_number
@@ -316,7 +317,11 @@ export default function ScoutConfig() {
               match_type: matchType
             });
 
-            const url = `/scouting?${params.toString()}`;
+            // Route to qual scouting page for qual roles
+            const isQualRole = role === "qualRed" || role === "qualBlue";
+            const url = isQualRole
+              ? `/qual-scouting?${params.toString()}`
+              : `/scouting?${params.toString()}`;
             console.log("Navigation URL:", url);
             navigate(url);
           }
@@ -554,21 +559,24 @@ export default function ScoutConfig() {
           <TabsContent value="game">
             <p>:skull:</p>
           </TabsContent>
-          <TabsList className="sticky h-8 left-0 w-full text-center bottom-0 mt-6 bg-background/95 backdrop-blur-sm pb-2">
+
+          {/* Tab Buttons - Fixed at bottom */}
+          <TabsList className="fixed h-10 left-0 right-0 w-full text-center bottom-0 bg-background border-t border-border z-50">
             <TabsTrigger
               value="config"
-              className="w-2/5 pw-10 py-2 data-[state=active]:border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 mx-1"
+              className="w-2/5 py-2 data-[state=active]:border-t-2 data-[state=active]:border-primary bg-background hover:bg-accent hover:text-accent-foreground mx-1"
             >
               Settings
             </TabsTrigger>
             <TabsTrigger
               value="game"
-              className="w-2/5 pw-10 py-2 data-[state=active]:border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 mx-1"
+              className="w-2/5 py-2 data-[state=active]:border-t-2 data-[state=active]:border-primary bg-background hover:bg-accent hover:text-accent-foreground mx-1"
             >
               Games
             </TabsTrigger>
           </TabsList>
         </Tabs>
+      </div>
       </div>
 
       {/* Confirmation Dialog */}
