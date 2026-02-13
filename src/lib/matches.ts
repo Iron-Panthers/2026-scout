@@ -255,21 +255,28 @@ async function sendUnassignmentNotification(
   role: string
 ): Promise<void> {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-  if (!supabaseUrl || !supabaseAnonKey) {
-    console.warn("Supabase credentials not available for notification");
+  if (!supabaseUrl) {
+    console.warn("Supabase URL not available for notification");
     return;
   }
 
   try {
+    // Get the current user's session token
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (!session?.access_token) {
+      console.warn("No active session for sending notification");
+      return;
+    }
+
     const response = await fetch(
       `${supabaseUrl}/functions/v1/send-unassignment-notification`,
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${supabaseAnonKey}`,
+          Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
           userId,
@@ -281,7 +288,7 @@ async function sendUnassignmentNotification(
     );
 
     if (!response.ok) {
-      const error = await response.text();
+      const error = await response.json();
       console.error("Unassignment notification failed:", error);
     } else {
       console.log("Unassignment notification sent successfully");
@@ -330,7 +337,24 @@ export async function removeUserFromMatch(
   userId: string,
   role: string
 ): Promise<boolean> {
-  const roleColumn = `${role.toLowerCase()}_scouter_id`;
+  // Map camelCase role names to snake_case database columns
+  const roleToColumn: Record<string, string> = {
+    red1: "red1_scouter_id",
+    red2: "red2_scouter_id",
+    red3: "red3_scouter_id",
+    qualRed: "qual_red_scouter_id",
+    blue1: "blue1_scouter_id",
+    blue2: "blue2_scouter_id",
+    blue3: "blue3_scouter_id",
+    qualBlue: "qual_blue_scouter_id",
+  };
+
+  const roleColumn = roleToColumn[role];
+
+  if (!roleColumn) {
+    console.error(`Invalid role: ${role}`);
+    return false;
+  }
 
   const { error } = await supabase
     .from("matches")

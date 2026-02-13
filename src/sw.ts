@@ -118,13 +118,13 @@ self.addEventListener("notificationclick", (event) => {
   const scope = self.registration.scope;
   const basePath = new URL(scope).pathname;
 
-  // Build full URL with base path
-  let targetPath = url;
+  // Build full URL with base path for opening new windows
+  let fullPath = url;
   if (!url.startsWith(basePath) && !url.startsWith('http')) {
-    targetPath = basePath.replace(/\/$/, '') + url;
+    fullPath = basePath.replace(/\/$/, '') + url;
   }
 
-  const fullUrl = new URL(targetPath, self.location.origin).href;
+  const fullUrl = new URL(fullPath, self.location.origin).href;
 
   event.waitUntil(
     self.clients
@@ -134,15 +134,16 @@ self.addEventListener("notificationclick", (event) => {
         for (const client of clients) {
           if ("focus" in client) {
             return client.focus().then(() => {
-              // Send navigation message to the client with base path
+              // Send navigation message WITHOUT base path
+              // React Router will add the basename automatically
               client.postMessage({
                 type: "NAVIGATE",
-                url: targetPath,
+                url: url,  // Use original URL without base path
               });
             });
           }
         }
-        // Otherwise open a new window
+        // Otherwise open a new window with full URL
         return self.clients.openWindow(fullUrl);
       })
   );
