@@ -216,17 +216,6 @@ export default function Scouting() {
         },
       ],
     },
-    {
-      id: "trench",
-      title: "Trench",
-      x: 0.05,
-      y: 0.65,
-      w: 0.08,
-      h: 0.11,
-      color: "#8b5cf6",
-      type: "direct",
-      action: "recordTrench",
-    },
   ];
 
   // Action handlers defined inline
@@ -244,10 +233,6 @@ export default function Scouting() {
       case "recordClimb":
         increment(`counters.{phase}.climb${payload}`);
         console.log(`climb recorded: ${payload}`);
-        break;
-      case "recordTrench":
-        increment(`counters.{phase}.trenchIntakes`);
-        console.log("trench intake recorded");
         break;
       default:
         console.warn(`Action handler not found: ${actionName}`);
