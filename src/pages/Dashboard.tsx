@@ -161,15 +161,15 @@ export default function Dashboard() {
     loadMatches();
   }, [loadMatches]);
 
-  // Subscribe to real-time updates for match assignments
+  // Subscribe to real-time updates for match assignments and submissions
   useEffect(() => {
     if (!user?.id) return;
 
-    console.log("Setting up realtime subscription for matches...");
+    console.log("Setting up realtime subscriptions for matches and submissions...");
 
-    // Subscribe to changes in matches table
+    // Subscribe to changes in matches table and scouting_submissions table
     const channel = supabase
-      .channel("match-assignments")
+      .channel("scout-dashboard-updates")
       .on(
         "postgres_changes",
         {
@@ -183,10 +183,23 @@ export default function Dashboard() {
           loadMatches();
         }
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "*", // Listen to all events (INSERT, UPDATE, DELETE)
+          schema: "public",
+          table: "scouting_submissions",
+        },
+        (payload) => {
+          console.log("Scouting submission changed:", payload);
+          // Reload matches to update submission status
+          loadMatches();
+        }
+      )
       .subscribe();
 
     return () => {
-      console.log("Cleaning up realtime subscription...");
+      console.log("Cleaning up realtime subscriptions...");
       supabase.removeChannel(channel);
     };
   }, [user?.id, loadMatches]);

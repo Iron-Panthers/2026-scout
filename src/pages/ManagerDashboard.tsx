@@ -222,6 +222,47 @@ export default function ManagerDashboard() {
     loadData();
   }, [loadData]);
 
+  // Subscribe to real-time updates for match assignments and submissions
+  useEffect(() => {
+    console.log("Setting up realtime subscriptions for matches and submissions...");
+
+    // Subscribe to changes in matches table and scouting_submissions table
+    const channel = supabase
+      .channel("manager-dashboard-updates")
+      .on(
+        "postgres_changes",
+        {
+          event: "*", // Listen to all events (INSERT, UPDATE, DELETE)
+          schema: "public",
+          table: "matches",
+        },
+        (payload) => {
+          console.log("Match assignment changed (manager view):", payload);
+          // Reload matches when any match is updated
+          loadData();
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*", // Listen to all events (INSERT, UPDATE, DELETE)
+          schema: "public",
+          table: "scouting_submissions",
+        },
+        (payload) => {
+          console.log("Scouting submission changed (manager view):", payload);
+          // Reload matches to update submission status
+          loadData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      console.log("Cleaning up realtime subscriptions...");
+      supabase.removeChannel(channel);
+    };
+  }, [loadData]);
+
   // Load rosters for selected event
   const loadRosters = useCallback(async () => {
     if (selectedEvent === "all") {
