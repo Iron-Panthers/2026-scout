@@ -150,8 +150,21 @@ export default function Scouting() {
 
   // Phase navigation removed - timer auto-advances phases
 
-  // Define action buttons directly in TypeScript
-  const actionButtons: ActionButton[] = [
+  // Check if we're scouting a blue alliance team (rotate buttons 180° for blue side)
+  const isBlueAlliance = role.toLowerCase().startsWith("blue");
+
+  // Helper to rotate button positions 180° (flip on both x and y axes)
+  const rotateButton180 = (btn: ActionButton): ActionButton => {
+    if (!isBlueAlliance) return btn;
+    return {
+      ...btn,
+      x: 1 - btn.x - btn.w,
+      y: 1 - btn.y - btn.h,
+    };
+  };
+
+  // Define action buttons directly in TypeScript (positions for red alliance)
+  const baseActionButtons: ActionButton[] = [
     {
       id: "depot-intake",
       title: "Depot",
@@ -307,6 +320,9 @@ export default function Scouting() {
       ],
     },
   ];
+
+  // Apply 180° rotation for blue alliance scouting
+  const actionButtons = baseActionButtons.map(rotateButton180);
 
   // Derive button press counts from actual state.events
   // This ensures counts sync with undo/redo operations
