@@ -72,8 +72,9 @@ export interface MatchTimerState {
 
 /**
  * Calculate current phase based on elapsed time
+ * EXPORTED - Use this everywhere for consistent phase calculation
  */
-function getCurrentPhaseFromTime(elapsedTime: number): Phase {
+export function getCurrentPhaseFromTime(elapsedTime: number): Phase {
   if (elapsedTime < 20) return "auto";
   if (elapsedTime < 30) return "transition-shift";
   if (elapsedTime < 55) return "phase1";

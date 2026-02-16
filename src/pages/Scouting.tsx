@@ -130,15 +130,6 @@ export default function Scouting() {
     "phase4",
     "endgame",
   ];
-  const phaseAbbr: Record<Phase, string> = {
-    auto: "A",
-    "transition-shift": "TS",
-    phase1: "P1",
-    phase2: "P2",
-    phase3: "P3",
-    phase4: "P4",
-    endgame: "EG",
-  };
 
   const currentPhaseIndex = phases.indexOf(currentPhase);
 
@@ -199,15 +190,12 @@ export default function Scouting() {
     payload?: string
     // button?: ActionButton
   ) => {
-    console.log(state);
     switch (actionName) {
       case "recordDepotIntake":
         logEvent("depotIntakes");
-        console.log("intake depot");
         break;
       case "recordClimb":
         logEvent(`climb${payload}`);
-        console.log(`climb recorded: ${payload}`);
         break;
       default:
         console.warn(`Action handler not found: ${actionName}`);
@@ -297,16 +285,6 @@ export default function Scouting() {
             </span>
           </div>
         </div>
-
-        {/* Phase Display (auto-advances based on timer) */}
-        <Button
-          variant="default"
-          size="sm"
-          disabled
-          className="h-9 w-9 p-0 text-[10px] font-bold"
-        >
-          {phaseAbbr[currentPhase]}
-        </Button>
       </div>
       {/* Fixed Orientation Menu */}
       <div className="fixed top-1 right-1 z-50">

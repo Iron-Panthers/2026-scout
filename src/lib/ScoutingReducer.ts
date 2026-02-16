@@ -203,6 +203,7 @@ export class ScoutingReducer<T extends Record<string, any> = ScoutingData> {
     if (action.type === "UNDO") {
       const newState = this.handleUndo();
       console.log("[ScoutingReducer] UNDO complete, history size:", this.history.length);
+      console.log("[ScoutingReducer] Current state:", newState);
       return newState;
     }
 
@@ -236,6 +237,9 @@ export class ScoutingReducer<T extends Record<string, any> = ScoutingData> {
         console.warn("[ScoutingReducer] Unknown action type:", action);
         return this.currentState;
     }
+
+    // Log the current state after action
+    console.log("[ScoutingReducer] Current state:", newState);
 
     return newState;
   }
