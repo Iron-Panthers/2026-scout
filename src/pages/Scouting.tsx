@@ -39,7 +39,12 @@ export default function Scouting() {
     title: string;
     action: string;
     options: ModalOption[];
+    buttonId: string;
   } | null>(null);
+
+  // Button press tracking for visual feedback
+  const [buttonPressCounts, setButtonPressCounts] = useState<Record<string, number>>({});
+  const [pressedButtonId, setPressedButtonId] = useState<string | null>(null);
 
   // Use the reducer hook instead of useState
   const { state, set, logEvent, undo, canUndo } = useScoutingReducer(
@@ -155,9 +160,10 @@ export default function Scouting() {
       y: 0.235,
       w: 0.08,
       h: 0.11,
-      color: "#ef4444",
+      color: "#ff5555",
       type: "direct",
       action: "recordDepotIntake",
+      repeatable: false,
     },
     {
       id: "climb-modal",
@@ -166,24 +172,25 @@ export default function Scouting() {
       y: 0.45,
       w: 0.08,
       h: 0.155,
-      color: "#ca8a04",
+      color: "#facc15",
       type: "modal",
       action: "recordClimb",
+      repeatable: false,
       options: [
         {
           label: "Climb L3",
           payload: "L3",
-          color: "#ca8a04",
+          color: "#facc15",
         },
         {
           label: "Climb L2",
           payload: "L2",
-          color: "#ca8a04",
+          color: "#facc15",
         },
         {
           label: "Climb L1",
           payload: "L1",
-          color: "#ca8a04",
+          color: "#facc15",
         },
       ],
     },
@@ -195,7 +202,7 @@ export default function Scouting() {
       y: 0.24,
       w: 0.065,
       h: 0.18,
-      color: "#f59e0b",
+      color: "#fb923c",
       type: "direct",
       action: "recordBumpLeftHome",
     },
@@ -206,7 +213,7 @@ export default function Scouting() {
       y: 0.58,
       w: 0.065,
       h: 0.18,
-      color: "#f59e0b",
+      color: "#fb923c",
       type: "direct",
       action: "recordBumpRightHome",
     },
@@ -217,7 +224,7 @@ export default function Scouting() {
       y: 0.24,
       w: 0.065,
       h: 0.18,
-      color: "#f59e0b",
+      color: "#fb923c",
       type: "direct",
       action: "recordBumpLeftAway",
     },
@@ -228,7 +235,7 @@ export default function Scouting() {
       y: 0.58,
       w: 0.065,
       h: 0.18,
-      color: "#f59e0b",
+      color: "#fb923c",
       type: "direct",
       action: "recordBumpRightAway",
     },
@@ -240,7 +247,7 @@ export default function Scouting() {
       y: 0.06,
       w: 0.065,
       h: 0.15,
-      color: "#06b6d4",
+      color: "#22d3ee",
       type: "direct",
       action: "recordTrenchLeftHome",
     },
@@ -251,7 +258,7 @@ export default function Scouting() {
       y: 0.79,
       w: 0.065,
       h: 0.15,
-      color: "#06b6d4",
+      color: "#22d3ee",
       type: "direct",
       action: "recordTrenchRightHome",
     },
@@ -262,7 +269,7 @@ export default function Scouting() {
       y: 0.06,
       w: 0.065,
       h: 0.15,
-      color: "#06b6d4",
+      color: "#22d3ee",
       type: "direct",
       action: "recordTrenchLeftAway",
     },
@@ -273,7 +280,7 @@ export default function Scouting() {
       y: 0.79,
       w: 0.065,
       h: 0.15,
-      color: "#06b6d4",
+      color: "#22d3ee",
       type: "direct",
       action: "recordTrenchRightAway",
     },
@@ -285,19 +292,19 @@ export default function Scouting() {
       y: 0.8,
       w: 0.08,
       h: 0.12,
-      color: "#f97316",
+      color: "#ff7849",
       type: "modal",
       action: "recordOutpost",
       options: [
         {
           label: "Intake from Outpost",
           payload: "intake",
-          color: "#f97316",
+          color: "#ff7849",
         },
         {
           label: "Feed Outpost",
           payload: "feed",
-          color: "#f97316",
+          color: "#ff7849",
         },
       ],
     },
@@ -354,13 +361,34 @@ export default function Scouting() {
   };
 
   const handleButtonClick = (button: ActionButton) => {
+    // Check if non-repeatable button has already been pressed
+    if (button.repeatable === false && buttonPressCounts[button.id] > 0) {
+      return; // Don't allow clicking non-repeatable buttons again
+    }
+
     if (button.type === "direct" && button.action) {
+      // Increment press count
+      setButtonPressCounts(prev => ({
+        ...prev,
+        [button.id]: (prev[button.id] || 0) + 1
+      }));
+
+      // Show press animation
+      setPressedButtonId(button.id);
+      setTimeout(() => setPressedButtonId(null), 200);
+
       handleAction(button.action, button.payload);
     } else if (button.type === "modal" && button.options && button.action) {
+      // Check if non-repeatable modal has already been used
+      if (button.repeatable === false && buttonPressCounts[button.id] > 0) {
+        return;
+      }
+
       setModalConfig({
         title: button.title,
         action: button.action,
         options: button.options,
+        buttonId: button.id,
       });
       setModalOpen(true);
     }
@@ -368,6 +396,12 @@ export default function Scouting() {
 
   const handleModalOptionSelect = (option: ModalOption) => {
     if (modalConfig?.action) {
+      // Increment press count for modal button
+      setButtonPressCounts(prev => ({
+        ...prev,
+        [modalConfig.buttonId]: (prev[modalConfig.buttonId] || 0) + 1
+      }));
+
       handleAction(modalConfig.action, option.payload);
     }
   };
@@ -558,6 +592,8 @@ export default function Scouting() {
         onButtonClick={handleButtonClick}
         onShotClick={handleShotClick}
         shotMultiplier={getShotMultiplier()}
+        buttonPressCounts={buttonPressCounts}
+        pressedButtonId={pressedButtonId}
       />
 
       {/* Modal */}
