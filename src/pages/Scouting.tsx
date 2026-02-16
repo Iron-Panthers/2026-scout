@@ -39,11 +39,20 @@ export default function Scouting() {
     title: string;
     action: string;
     options: ModalOption[];
+    buttonId: string;
   } | null>(null);
 
+  // Button press tracking for visual feedback (only for animation)
+  const [pressedButtonId, setPressedButtonId] = useState<string | null>(null);
+
   // Use the reducer hook instead of useState
-  const { state, set, logEvent, undo, canUndo } =
-    useScoutingReducer(match_id || "", role || "", event_code, match_number, team_number);
+  const { state, set, logEvent, undo, canUndo } = useScoutingReducer(
+    match_id || "",
+    role || "",
+    event_code,
+    match_number,
+    team_number
+  );
 
   // Continuous match timer
   const {
@@ -141,8 +150,21 @@ export default function Scouting() {
 
   // Phase navigation removed - timer auto-advances phases
 
-  // Define action buttons directly in TypeScript
-  const actionButtons: ActionButton[] = [
+  // Check if we're scouting a blue alliance team (rotate buttons 180° for blue side)
+  const isBlueAlliance = role.toLowerCase().startsWith("blue");
+
+  // Helper to rotate button positions 180° (flip on both x and y axes)
+  const rotateButton180 = (btn: ActionButton): ActionButton => {
+    if (!isBlueAlliance) return btn;
+    return {
+      ...btn,
+      x: 1 - btn.x - btn.w,
+      y: 1 - btn.y - btn.h,
+    };
+  };
+
+  // Define action buttons directly in TypeScript (positions for red alliance)
+  const baseActionButtons: ActionButton[] = [
     {
       id: "depot-intake",
       title: "Depot",
@@ -150,9 +172,10 @@ export default function Scouting() {
       y: 0.235,
       w: 0.08,
       h: 0.11,
-      color: "#ef4444",
+      color: "#ff5555",
       type: "direct",
       action: "recordDepotIntake",
+      repeatable: false,
     },
     {
       id: "climb-modal",
@@ -161,28 +184,179 @@ export default function Scouting() {
       y: 0.45,
       w: 0.08,
       h: 0.155,
-      color: "#ef4444",
+      color: "#facc15",
       type: "modal",
       action: "recordClimb",
       options: [
         {
           label: "Climb L3",
           payload: "L3",
-          color: "#ef4444",
+          color: "#facc15",
         },
         {
           label: "Climb L2",
           payload: "L2",
-          color: "#ef4444",
+          color: "#facc15",
         },
         {
           label: "Climb L1",
           payload: "L1",
-          color: "#ef4444",
+          color: "#facc15",
+        },
+      ],
+    },
+    // Bump buttons (4 across field) - Brown/tan color
+    {
+      id: "bump-left-home",
+      title: "Bump",
+      x: 0.27,
+      y: 0.24,
+      w: 0.065,
+      h: 0.18,
+      color: "#fb923c",
+      type: "direct",
+      action: "recordBumpLeftHome",
+    },
+    {
+      id: "bump-right-home",
+      title: "Bump",
+      x: 0.27,
+      y: 0.58,
+      w: 0.065,
+      h: 0.18,
+      color: "#fb923c",
+      type: "direct",
+      action: "recordBumpRightHome",
+    },
+    {
+      id: "bump-left-away",
+      title: "Bump",
+      x: 0.67,
+      y: 0.24,
+      w: 0.065,
+      h: 0.18,
+      color: "#fb923c",
+      type: "direct",
+      action: "recordBumpLeftAway",
+    },
+    {
+      id: "bump-right-away",
+      title: "Bump",
+      x: 0.67,
+      y: 0.58,
+      w: 0.065,
+      h: 0.18,
+      color: "#fb923c",
+      type: "direct",
+      action: "recordBumpRightAway",
+    },
+    // Trench buttons (4 across field) - Cyan/blue color
+    {
+      id: "trench-left-home",
+      title: "Trench",
+      x: 0.27,
+      y: 0.06,
+      w: 0.065,
+      h: 0.15,
+      color: "#22d3ee",
+      type: "direct",
+      action: "recordTrenchLeftHome",
+    },
+    {
+      id: "trench-right-home",
+      title: "Trench",
+      x: 0.27,
+      y: 0.79,
+      w: 0.065,
+      h: 0.15,
+      color: "#22d3ee",
+      type: "direct",
+      action: "recordTrenchRightHome",
+    },
+    {
+      id: "trench-left-away",
+      title: "Trench",
+      x: 0.67,
+      y: 0.06,
+      w: 0.065,
+      h: 0.15,
+      color: "#22d3ee",
+      type: "direct",
+      action: "recordTrenchLeftAway",
+    },
+    {
+      id: "trench-right-away",
+      title: "Trench",
+      x: 0.67,
+      y: 0.79,
+      w: 0.065,
+      h: 0.15,
+      color: "#22d3ee",
+      type: "direct",
+      action: "recordTrenchRightAway",
+    },
+    // Outpost modal (left side of field) - Orange/amber color
+    {
+      id: "outpost-modal",
+      title: "Outpost",
+      x: 0.05,
+      y: 0.8,
+      w: 0.08,
+      h: 0.12,
+      color: "#ff7849",
+      type: "modal",
+      action: "recordOutpost",
+      options: [
+        {
+          label: "Intake from Outpost",
+          payload: "intake",
+          color: "#ff7849",
+        },
+        {
+          label: "Feed Outpost",
+          payload: "feed",
+          color: "#ff7849",
         },
       ],
     },
   ];
+
+  // Apply 180° rotation for blue alliance scouting
+  const actionButtons = baseActionButtons.map(rotateButton180);
+
+  // Derive button press counts from actual state.events
+  // This ensures counts sync with undo/redo operations
+  const getButtonPressCounts = (): Record<string, number> => {
+    const counts: Record<string, number> = {};
+
+    // Map button IDs to their event type patterns
+    const buttonEventMap: Record<string, string | RegExp> = {
+      "depot-intake": "depotIntakes",
+      "climb-modal": /^climb(L1|L2|L3)$/,
+      "bump-left-home": "bumpLeftHome",
+      "bump-right-home": "bumpRightHome",
+      "bump-left-away": "bumpLeftAway",
+      "bump-right-away": "bumpRightAway",
+      "trench-left-home": "trenchLeftHome",
+      "trench-right-home": "trenchRightHome",
+      "trench-left-away": "trenchLeftAway",
+      "trench-right-away": "trenchRightAway",
+      "outpost-modal": /^outpost(Intake|Feed)$/,
+    };
+
+    // Count events for each button
+    Object.entries(buttonEventMap).forEach(([buttonId, pattern]) => {
+      if (typeof pattern === "string") {
+        counts[buttonId] = state.events.filter(e => e.type === pattern).length;
+      } else {
+        counts[buttonId] = state.events.filter(e => pattern.test(e.type)).length;
+      }
+    });
+
+    return counts;
+  };
+
+  const buttonPressCounts = getButtonPressCounts();
 
   // Action handlers defined inline
   const handleAction = (
@@ -197,19 +371,66 @@ export default function Scouting() {
       case "recordClimb":
         logEvent(`climb${payload}`);
         break;
+      // Bump events
+      case "recordBumpLeftHome":
+        logEvent("bumpLeftHome");
+        break;
+      case "recordBumpRightHome":
+        logEvent("bumpRightHome");
+        break;
+      case "recordBumpLeftAway":
+        logEvent("bumpLeftAway");
+        break;
+      case "recordBumpRightAway":
+        logEvent("bumpRightAway");
+        break;
+      // Trench events
+      case "recordTrenchLeftHome":
+        logEvent("trenchLeftHome");
+        break;
+      case "recordTrenchRightHome":
+        logEvent("trenchRightHome");
+        break;
+      case "recordTrenchLeftAway":
+        logEvent("trenchLeftAway");
+        break;
+      case "recordTrenchRightAway":
+        logEvent("trenchRightAway");
+        break;
+      // Outpost events
+      case "recordOutpost":
+        logEvent(
+          `outpost${payload?.charAt(0).toUpperCase()}${payload?.slice(1)}`
+        );
+        break;
       default:
         console.warn(`Action handler not found: ${actionName}`);
     }
   };
 
   const handleButtonClick = (button: ActionButton) => {
+    // Check if non-repeatable button has already been pressed
+    if (button.repeatable === false && buttonPressCounts[button.id] > 0) {
+      return; // Don't allow clicking non-repeatable buttons again
+    }
+
     if (button.type === "direct" && button.action) {
+      // Show press animation
+      setPressedButtonId(button.id);
+      setTimeout(() => setPressedButtonId(null), 200);
+
       handleAction(button.action, button.payload);
     } else if (button.type === "modal" && button.options && button.action) {
+      // Check if non-repeatable modal has already been used
+      if (button.repeatable === false && buttonPressCounts[button.id] > 0) {
+        return;
+      }
+
       setModalConfig({
         title: button.title,
         action: button.action,
         options: button.options,
+        buttonId: button.id,
       });
       setModalOpen(true);
     }
@@ -299,7 +520,9 @@ export default function Scouting() {
             <DropdownMenuItem
               onClick={async () => {
                 // Compress and encode state for smaller URLs
-                const { compressState } = await import("@/lib/stateCompression");
+                const { compressState } = await import(
+                  "@/lib/stateCompression"
+                );
                 const compressed = compressState(state);
                 navigate(`/review/${compressed}`);
               }}
@@ -405,6 +628,8 @@ export default function Scouting() {
         onButtonClick={handleButtonClick}
         onShotClick={handleShotClick}
         shotMultiplier={getShotMultiplier()}
+        buttonPressCounts={buttonPressCounts}
+        pressedButtonId={pressedButtonId}
       />
 
       {/* Modal */}

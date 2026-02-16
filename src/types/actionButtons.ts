@@ -16,6 +16,7 @@ export interface ActionButton {
   action?: string; // For direct type or modal type
   payload?: string; // Optional payload for direct actions
   options?: ModalOption[]; // For modal type
+  repeatable?: boolean; // If false, button can only be pressed once (default: true)
 }
 
 export interface TransformedButton {

@@ -17,6 +17,8 @@ interface ScoutingCanvasProps {
   onButtonClick: (button: ActionButton) => void;
   onShotClick: (x: number, y: number, timestamp: number) => void;
   shotMultiplier: number;
+  buttonPressCounts: Record<string, number>;
+  pressedButtonId: string | null;
 }
 
 // Phase colors for shot visualization (full spectrum)
@@ -29,6 +31,19 @@ const PHASE_COLORS = {
   phase4: "#3b82f6",      // Blue
   endgame: "#8b5cf6",     // Purple
 } as const;
+
+// Helper to darken a color for press feedback
+function darkenColor(hex: string, amount: number): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+
+  const newR = Math.max(0, Math.floor(r * (1 - amount)));
+  const newG = Math.max(0, Math.floor(g * (1 - amount)));
+  const newB = Math.max(0, Math.floor(b * (1 - amount)));
+
+  return `#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`;
+}
 
 export interface ScoutingCanvasHandle {
   getCanvasElement: () => HTMLCanvasElement | null;
@@ -44,6 +59,8 @@ const ScoutingCanvas = forwardRef<ScoutingCanvasHandle, ScoutingCanvasProps>(
       onButtonClick,
       onShotClick,
       shotMultiplier,
+      buttonPressCounts,
+      pressedButtonId,
     },
     ref
   ) => {
@@ -66,13 +83,13 @@ const ScoutingCanvas = forwardRef<ScoutingCanvasHandle, ScoutingCanvasProps>(
 
     useEffect(() => {
       drawCanvas();
-    }, [orientation, shots, showActionButtons, actionButtons]);
+    }, [orientation, shots, showActionButtons, actionButtons, buttonPressCounts, pressedButtonId]);
 
     useEffect(() => {
       const handleResize = () => drawCanvas();
       window.addEventListener("resize", handleResize);
       return () => window.removeEventListener("resize", handleResize);
-    }, [orientation, shots, showActionButtons, actionButtons]);
+    }, [orientation, shots, showActionButtons, actionButtons, buttonPressCounts, pressedButtonId]);
 
     const drawCanvas = () => {
       const canvas = canvasRef.current;
@@ -165,7 +182,24 @@ const ScoutingCanvas = forwardRef<ScoutingCanvasHandle, ScoutingCanvasProps>(
             canvasHeight
           );
 
-          ctx.fillStyle = button.color;
+          const isPressed = pressedButtonId === button.id;
+          const pressCount = buttonPressCounts[button.id] || 0;
+          const isNonRepeatableUsed = button.repeatable === false && pressCount > 0;
+
+          // Determine button color
+          let buttonColor: string;
+          if (isNonRepeatableUsed) {
+            // Grey out non-repeatable buttons that have been used
+            buttonColor = "#808080";
+          } else if (isPressed) {
+            // Darken color if currently pressed (visual feedback)
+            buttonColor = darkenColor(button.color, 0.3);
+          } else {
+            // Normal color
+            buttonColor = button.color;
+          }
+
+          ctx.fillStyle = buttonColor;
           ctx.fillRect(
             transformed.x,
             transformed.y,
@@ -182,6 +216,20 @@ const ScoutingCanvas = forwardRef<ScoutingCanvasHandle, ScoutingCanvasProps>(
             transformed.height
           );
 
+          // Large background count number (only for repeatable buttons with count > 0)
+          if (button.repeatable !== false && button.type === "direct" && pressCount > 0) {
+            ctx.fillStyle = "rgba(0, 0, 0, 0.4)";
+            ctx.font = `bold ${Math.min(transformed.width, transformed.height) * 0.8}px sans-serif`;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(
+              pressCount.toString(),
+              transformed.x + transformed.width / 2,
+              transformed.y + transformed.height / 2
+            );
+          }
+
+          // Button label (on top of count)
           ctx.fillStyle = "#ffffff";
           ctx.font = "bold 14px sans-serif";
           ctx.textAlign = "center";
