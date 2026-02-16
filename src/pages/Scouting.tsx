@@ -42,8 +42,7 @@ export default function Scouting() {
     buttonId: string;
   } | null>(null);
 
-  // Button press tracking for visual feedback
-  const [buttonPressCounts, setButtonPressCounts] = useState<Record<string, number>>({});
+  // Button press tracking for visual feedback (only for animation)
   const [pressedButtonId, setPressedButtonId] = useState<string | null>(null);
 
   // Use the reducer hook instead of useState
@@ -175,7 +174,6 @@ export default function Scouting() {
       color: "#facc15",
       type: "modal",
       action: "recordClimb",
-      repeatable: false,
       options: [
         {
           label: "Climb L3",
@@ -310,6 +308,40 @@ export default function Scouting() {
     },
   ];
 
+  // Derive button press counts from actual state.events
+  // This ensures counts sync with undo/redo operations
+  const getButtonPressCounts = (): Record<string, number> => {
+    const counts: Record<string, number> = {};
+
+    // Map button IDs to their event type patterns
+    const buttonEventMap: Record<string, string | RegExp> = {
+      "depot-intake": "depotIntakes",
+      "climb-modal": /^climb(L1|L2|L3)$/,
+      "bump-left-home": "bumpLeftHome",
+      "bump-right-home": "bumpRightHome",
+      "bump-left-away": "bumpLeftAway",
+      "bump-right-away": "bumpRightAway",
+      "trench-left-home": "trenchLeftHome",
+      "trench-right-home": "trenchRightHome",
+      "trench-left-away": "trenchLeftAway",
+      "trench-right-away": "trenchRightAway",
+      "outpost-modal": /^outpost(Intake|Feed)$/,
+    };
+
+    // Count events for each button
+    Object.entries(buttonEventMap).forEach(([buttonId, pattern]) => {
+      if (typeof pattern === "string") {
+        counts[buttonId] = state.events.filter(e => e.type === pattern).length;
+      } else {
+        counts[buttonId] = state.events.filter(e => pattern.test(e.type)).length;
+      }
+    });
+
+    return counts;
+  };
+
+  const buttonPressCounts = getButtonPressCounts();
+
   // Action handlers defined inline
   const handleAction = (
     actionName: string,
@@ -367,12 +399,6 @@ export default function Scouting() {
     }
 
     if (button.type === "direct" && button.action) {
-      // Increment press count
-      setButtonPressCounts(prev => ({
-        ...prev,
-        [button.id]: (prev[button.id] || 0) + 1
-      }));
-
       // Show press animation
       setPressedButtonId(button.id);
       setTimeout(() => setPressedButtonId(null), 200);
@@ -396,12 +422,6 @@ export default function Scouting() {
 
   const handleModalOptionSelect = (option: ModalOption) => {
     if (modalConfig?.action) {
-      // Increment press count for modal button
-      setButtonPressCounts(prev => ({
-        ...prev,
-        [modalConfig.buttonId]: (prev[modalConfig.buttonId] || 0) + 1
-      }));
-
       handleAction(modalConfig.action, option.payload);
     }
   };
