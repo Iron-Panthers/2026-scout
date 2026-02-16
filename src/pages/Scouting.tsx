@@ -42,8 +42,13 @@ export default function Scouting() {
   } | null>(null);
 
   // Use the reducer hook instead of useState
-  const { state, set, logEvent, undo, canUndo } =
-    useScoutingReducer(match_id || "", role || "", event_code, match_number, team_number);
+  const { state, set, logEvent, undo, canUndo } = useScoutingReducer(
+    match_id || "",
+    role || "",
+    event_code,
+    match_number,
+    team_number
+  );
 
   // Continuous match timer
   const {
@@ -161,24 +166,138 @@ export default function Scouting() {
       y: 0.45,
       w: 0.08,
       h: 0.155,
-      color: "#ef4444",
+      color: "#ca8a04",
       type: "modal",
       action: "recordClimb",
       options: [
         {
           label: "Climb L3",
           payload: "L3",
-          color: "#ef4444",
+          color: "#ca8a04",
         },
         {
           label: "Climb L2",
           payload: "L2",
-          color: "#ef4444",
+          color: "#ca8a04",
         },
         {
           label: "Climb L1",
           payload: "L1",
-          color: "#ef4444",
+          color: "#ca8a04",
+        },
+      ],
+    },
+    // Bump buttons (4 across field) - Brown/tan color
+    {
+      id: "bump-left-home",
+      title: "Bump",
+      x: 0.27,
+      y: 0.24,
+      w: 0.065,
+      h: 0.18,
+      color: "#f59e0b",
+      type: "direct",
+      action: "recordBumpLeftHome",
+    },
+    {
+      id: "bump-right-home",
+      title: "Bump",
+      x: 0.27,
+      y: 0.58,
+      w: 0.065,
+      h: 0.18,
+      color: "#f59e0b",
+      type: "direct",
+      action: "recordBumpRightHome",
+    },
+    {
+      id: "bump-left-away",
+      title: "Bump",
+      x: 0.67,
+      y: 0.24,
+      w: 0.065,
+      h: 0.18,
+      color: "#f59e0b",
+      type: "direct",
+      action: "recordBumpLeftAway",
+    },
+    {
+      id: "bump-right-away",
+      title: "Bump",
+      x: 0.67,
+      y: 0.58,
+      w: 0.065,
+      h: 0.18,
+      color: "#f59e0b",
+      type: "direct",
+      action: "recordBumpRightAway",
+    },
+    // Trench buttons (4 across field) - Cyan/blue color
+    {
+      id: "trench-left-home",
+      title: "Trench",
+      x: 0.27,
+      y: 0.06,
+      w: 0.065,
+      h: 0.15,
+      color: "#06b6d4",
+      type: "direct",
+      action: "recordTrenchLeftHome",
+    },
+    {
+      id: "trench-right-home",
+      title: "Trench",
+      x: 0.27,
+      y: 0.79,
+      w: 0.065,
+      h: 0.15,
+      color: "#06b6d4",
+      type: "direct",
+      action: "recordTrenchRightHome",
+    },
+    {
+      id: "trench-left-away",
+      title: "Trench",
+      x: 0.67,
+      y: 0.06,
+      w: 0.065,
+      h: 0.15,
+      color: "#06b6d4",
+      type: "direct",
+      action: "recordTrenchLeftAway",
+    },
+    {
+      id: "trench-right-away",
+      title: "Trench",
+      x: 0.67,
+      y: 0.79,
+      w: 0.065,
+      h: 0.15,
+      color: "#06b6d4",
+      type: "direct",
+      action: "recordTrenchRightAway",
+    },
+    // Outpost modal (left side of field) - Orange/amber color
+    {
+      id: "outpost-modal",
+      title: "Outpost",
+      x: 0.05,
+      y: 0.8,
+      w: 0.08,
+      h: 0.12,
+      color: "#f97316",
+      type: "modal",
+      action: "recordOutpost",
+      options: [
+        {
+          label: "Intake from Outpost",
+          payload: "intake",
+          color: "#f97316",
+        },
+        {
+          label: "Feed Outpost",
+          payload: "feed",
+          color: "#f97316",
         },
       ],
     },
@@ -196,6 +315,38 @@ export default function Scouting() {
         break;
       case "recordClimb":
         logEvent(`climb${payload}`);
+        break;
+      // Bump events
+      case "recordBumpLeftHome":
+        logEvent("bumpLeftHome");
+        break;
+      case "recordBumpRightHome":
+        logEvent("bumpRightHome");
+        break;
+      case "recordBumpLeftAway":
+        logEvent("bumpLeftAway");
+        break;
+      case "recordBumpRightAway":
+        logEvent("bumpRightAway");
+        break;
+      // Trench events
+      case "recordTrenchLeftHome":
+        logEvent("trenchLeftHome");
+        break;
+      case "recordTrenchRightHome":
+        logEvent("trenchRightHome");
+        break;
+      case "recordTrenchLeftAway":
+        logEvent("trenchLeftAway");
+        break;
+      case "recordTrenchRightAway":
+        logEvent("trenchRightAway");
+        break;
+      // Outpost events
+      case "recordOutpost":
+        logEvent(
+          `outpost${payload?.charAt(0).toUpperCase()}${payload?.slice(1)}`
+        );
         break;
       default:
         console.warn(`Action handler not found: ${actionName}`);
@@ -299,7 +450,9 @@ export default function Scouting() {
             <DropdownMenuItem
               onClick={async () => {
                 // Compress and encode state for smaller URLs
-                const { compressState } = await import("@/lib/stateCompression");
+                const { compressState } = await import(
+                  "@/lib/stateCompression"
+                );
                 const compressed = compressState(state);
                 navigate(`/review/${compressed}`);
               }}
