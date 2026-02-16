@@ -8,7 +8,8 @@
       "Bash(ls -la \"c:\\\\Users\\\\bruce\\\\Coding\\\\2026-scout\\\\src\\\\lib\"\" 2>/dev/null || echo \"Cannot list directory \")",
       "Read(//c/Users/bruce/Coding/2026-scout/**)",
       "WebFetch(domain:vite-pwa-org.netlify.app)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(npm run build:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

@@ -54,6 +54,8 @@ export interface MatchTimerState {
   isRunning: boolean;
   /** Whether the match has started */
   hasStarted: boolean;
+  /** Current phase based on elapsed time */
+  currentPhase: Phase;
   /** Time remaining in the current phase */
   phaseTimeRemaining: number;
   /** Duration of the current phase */
@@ -69,15 +71,31 @@ export interface MatchTimerState {
 }
 
 /**
+ * Calculate current phase based on elapsed time
+ */
+function getCurrentPhaseFromTime(elapsedTime: number): Phase {
+  if (elapsedTime < 20) return "auto";
+  if (elapsedTime < 30) return "transition-shift";
+  if (elapsedTime < 55) return "phase1";
+  if (elapsedTime < 80) return "phase2";
+  if (elapsedTime < 105) return "phase3";
+  if (elapsedTime < 130) return "phase4";
+  return "endgame";
+}
+
+/**
  * Hook for managing the continuous match timer
  * Unlike usePhaseTimer, this timer runs continuously through the entire match
  */
-export function useMatchTimer(currentPhase: Phase): MatchTimerState {
+export function useMatchTimer(): MatchTimerState {
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
   const startTimeRef = useRef<number | null>(null);
   const animationFrameRef = useRef<number | null>(null);
+
+  // Calculate current phase based on elapsed time
+  const currentPhase = getCurrentPhaseFromTime(elapsedTime);
 
   // Calculate phase-specific time values
   const phaseStartTime = PHASE_START_TIMES[currentPhase];
@@ -168,6 +186,7 @@ export function useMatchTimer(currentPhase: Phase): MatchTimerState {
     elapsedTime,
     isRunning,
     hasStarted,
+    currentPhase,
     phaseTimeRemaining,
     phaseDuration,
     phaseProgress,
