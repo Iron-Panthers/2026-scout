@@ -32,15 +32,6 @@ export default function Scouting() {
   const team_number = parseInt(searchParams.get("team_number") || "0");
   const match_type = parseInt(searchParams.get("type") || "qual");
 
-  console.log("Scouting page loaded:", {
-    match_id,
-    role,
-    event_code,
-    match_number,
-    team_number,
-    match_type
-  });
-
   const [selected, setSelected] = useState("");
   const [orientation, setOrientation] = useState<0 | 90 | 180 | 270>(0);
   const [modalOpen, setModalOpen] = useState(false);
@@ -51,19 +42,20 @@ export default function Scouting() {
   } | null>(null);
 
   // Use the reducer hook instead of useState
-  const { state, set, increment, undo, canUndo, setPhase, currentPhase } =
+  const { state, set, logEvent, undo, canUndo } =
     useScoutingReducer(match_id || "", role || "", event_code, match_number, team_number);
 
   // Continuous match timer
   const {
     hasStarted,
+    currentPhase,
     phaseTimeRemaining,
     phaseDuration,
     phaseProgress,
     startMatch: startMatchTimer,
     resetMatch,
     skipToPhase,
-  } = useMatchTimer(currentPhase);
+  } = useMatchTimer();
 
   // Wrap startMatch to also record the match start time in scouting state
   const startMatch = () => {
@@ -128,14 +120,6 @@ export default function Scouting() {
     endgame: "Endgame",
   };
 
-  // Log the initialized state
-  console.log("Scouting state initialized:", {
-    matchId: state.matchId,
-    event_code: state.event_code,
-    match_number: state.match_number,
-    role: state.role,
-  });
-
   // All phases in order and abbreviations
   const phases: Phase[] = [
     "auto",
@@ -146,15 +130,6 @@ export default function Scouting() {
     "phase4",
     "endgame",
   ];
-  const phaseAbbr: Record<Phase, string> = {
-    auto: "A",
-    "transition-shift": "TS",
-    phase1: "P1",
-    phase2: "P2",
-    phase3: "P3",
-    phase4: "P4",
-    endgame: "EG",
-  };
 
   const currentPhaseIndex = phases.indexOf(currentPhase);
 
@@ -164,16 +139,7 @@ export default function Scouting() {
       ? PHASE_DISPLAY_NAMES[phases[currentPhaseIndex + 1]]
       : null;
 
-  const goToNextPhase = () => {
-    if (currentPhaseIndex < phases.length - 1) {
-      setPhase(phases[currentPhaseIndex + 1]);
-    }
-  };
-  const goToPrevPhase = () => {
-    if (currentPhaseIndex > 0) {
-      setPhase(phases[currentPhaseIndex - 1]);
-    }
-  };
+  // Phase navigation removed - timer auto-advances phases
 
   // Define action buttons directly in TypeScript
   const actionButtons: ActionButton[] = [
@@ -224,15 +190,12 @@ export default function Scouting() {
     payload?: string
     // button?: ActionButton
   ) => {
-    console.log(state);
     switch (actionName) {
       case "recordDepotIntake":
-        increment(`counters.{phase}.depotIntakes`);
-        console.log("intake depot");
+        logEvent("depotIntakes");
         break;
       case "recordClimb":
-        increment(`counters.{phase}.climb${payload}`);
-        console.log(`climb recorded: ${payload}`);
+        logEvent(`climb${payload}`);
         break;
       default:
         console.warn(`Action handler not found: ${actionName}`);
@@ -270,7 +233,7 @@ export default function Scouting() {
       timestamp: relativeTimestamp,
     }));
 
-    set("shots.{phase}", [...state.shots[currentPhase], ...newShots]);
+    set("shots", [...state.shots, ...newShots]);
   };
 
   const getShotMultiplier = (): number => {
@@ -322,40 +285,6 @@ export default function Scouting() {
             </span>
           </div>
         </div>
-
-        {/* Phase Shifter */}
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={goToNextPhase}
-          disabled={currentPhaseIndex === phases.length - 1}
-          className="h-9 w-9 p-0 text-base"
-          style={{
-            opacity: currentPhaseIndex === phases.length - 1 ? 0.5 : 1,
-          }}
-        >
-          &#8593;
-        </Button>
-        <Button
-          variant="default"
-          size="sm"
-          disabled={currentPhaseIndex === phases.length - 1}
-          className="h-9 w-9 p-0 text-[10px] font-bold"
-        >
-          {phaseAbbr[currentPhase]}
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={goToPrevPhase}
-          disabled={currentPhaseIndex === 0}
-          className="h-9 w-9 p-0 text-base"
-          style={{
-            opacity: currentPhaseIndex === 0 ? 0.5 : 1,
-          }}
-        >
-          &#8595;
-        </Button>
       </div>
       {/* Fixed Orientation Menu */}
       <div className="fixed top-1 right-1 z-50">
@@ -470,7 +399,7 @@ export default function Scouting() {
       {/* Canvas Area */}
       <ScoutingCanvas
         orientation={orientation}
-        shots={state.shots[currentPhase]}
+        shots={state.shots}
         actionButtons={actionButtons}
         showActionButtons={selected === "action"}
         onButtonClick={handleButtonClick}

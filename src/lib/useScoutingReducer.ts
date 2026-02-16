@@ -1,6 +1,6 @@
 import { useCallback, useReducer } from "react";
 import { ScoutingReducer } from "./ScoutingReducer";
-import type { Action, ScoutingData, Phase } from "./ScoutingReducer";
+import type { Action, ScoutingData } from "./ScoutingReducer";
 
 /**
  * Action creator functions for common operations
@@ -44,6 +44,14 @@ export const actionCreators = {
   undo: (): Action => ({
     type: "UNDO",
   }),
+
+  /**
+   * Create a LOG_EVENT action
+   */
+  logEvent: (eventType: string, timestamp: number): Action => ({
+    type: "LOG_EVENT",
+    payload: { eventType, timestamp },
+  }),
 };
 
 /**
@@ -56,13 +64,12 @@ export interface UseScoutingReducerReturn<T> {
   toggle: (path: string) => void;
   increment: (path: string, amount?: number) => void;
   decrement: (path: string, amount?: number) => void;
+  logEvent: (eventType: string) => void;
   undo: () => void;
   canUndo: boolean;
   historySize: number;
   clearHistory: () => void;
   reset: () => void;
-  setPhase: (phase: Phase) => void;
-  currentPhase: Phase;
 }
 
 /**
@@ -114,33 +121,31 @@ export function useScoutingReducer(
   // Convenience methods
   const set = useCallback(
     (path: string, value: any) => {
-      const finalPath = path.replace(
-        "{phase}",
-        reducerInstance.state.currentPhase
-      );
-      dispatch(actionCreators.set(finalPath, value));
+      dispatch(actionCreators.set(path, value));
     },
-    [dispatch, reducerInstance]
+    [dispatch]
   );
 
   const increment = useCallback(
     (path: string, amount?: number) => {
-      const finalPath = path.replace(
-        "{phase}",
-        reducerInstance.state.currentPhase
-      );
-      dispatch(actionCreators.increment(finalPath, amount));
+      dispatch(actionCreators.increment(path, amount));
     },
-    [dispatch, reducerInstance]
+    [dispatch]
   );
 
   const decrement = useCallback(
     (path: string, amount?: number) => {
-      const finalPath = path.replace(
-        "{phase}",
-        reducerInstance.state.currentPhase
-      );
-      dispatch(actionCreators.decrement(finalPath, amount));
+      dispatch(actionCreators.decrement(path, amount));
+    },
+    [dispatch]
+  );
+
+  const logEvent = useCallback(
+    (eventType: string) => {
+      const timestamp = reducerInstance.state.matchStartTime
+        ? (Date.now() - reducerInstance.state.matchStartTime) / 1000
+        : 0;
+      dispatch(actionCreators.logEvent(eventType, timestamp));
     },
     [dispatch, reducerInstance]
   );
@@ -160,24 +165,9 @@ export function useScoutingReducer(
 
   const toggle = useCallback(
     (path: string) => {
-      const finalPath = path.replace(
-        "{phase}",
-        reducerInstance.state.currentPhase
-      );
-      dispatch(actionCreators.toggle(finalPath));
+      dispatch(actionCreators.toggle(path));
     },
-    [dispatch, reducerInstance]
-  );
-
-  const setPhase = useCallback(
-    (phase: Phase) => {
-      // Directly update the reducerInstance's state if possible
-      if ("currentPhase" in reducerInstance.state) {
-        reducerInstance.state.currentPhase = phase;
-        forceUpdate();
-      }
-    },
-    [reducerInstance, forceUpdate]
+    [dispatch]
   );
 
   return {
@@ -187,12 +177,11 @@ export function useScoutingReducer(
     toggle,
     increment,
     decrement,
+    logEvent,
     undo,
     canUndo: reducerInstance.canUndo(),
     historySize: reducerInstance.getHistorySize(),
     clearHistory,
     reset,
-    setPhase,
-    currentPhase: reducerInstance.state.currentPhase,
   };
 }

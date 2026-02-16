@@ -16,7 +16,7 @@ export interface Profile {
   updated_at: string;
 }
 
-// Event Type
+// Event Type (database event)
 export interface Event {
   id: string;
   name: string;
@@ -28,6 +28,19 @@ export interface Event {
   scouting_map_url: string | null; // URL to the scouting map image
   created_at: string;
   updated_at: string;
+}
+
+// Scouting Event (action logged during match)
+export interface ScoutingEvent {
+  type: string;
+  timestamp: number;
+}
+
+// Shot Event (shot location with timestamp)
+export interface ShotEvent {
+  x: number;
+  y: number;
+  timestamp: number;
 }
 
 // Match Type (from Supabase)

@@ -1,6 +1,7 @@
 import { useRef, useEffect, forwardRef, useImperativeHandle } from "react";
 import type { ActionButton, TransformedButton } from "@/types/actionButtons";
 import fieldImage from "@/assets/FE-2026-_REBUILT_Playing_Field_With_Fuel.png";
+import { getCurrentPhaseFromTime } from "@/lib/useMatchTimer";
 
 interface Shot {
   x: number;
@@ -17,6 +18,17 @@ interface ScoutingCanvasProps {
   onShotClick: (x: number, y: number, timestamp: number) => void;
   shotMultiplier: number;
 }
+
+// Phase colors for shot visualization (full spectrum)
+const PHASE_COLORS = {
+  auto: "#dc2626",        // Bright Red
+  "transition-shift": "#f59e0b", // Amber/Orange
+  phase1: "#eab308",      // Yellow
+  phase2: "#10b981",      // Emerald Green
+  phase3: "#06b6d4",      // Cyan
+  phase4: "#3b82f6",      // Blue
+  endgame: "#8b5cf6",     // Purple
+} as const;
 
 export interface ScoutingCanvasHandle {
   getCanvasElement: () => HTMLCanvasElement | null;
@@ -134,7 +146,9 @@ const ScoutingCanvas = forwardRef<ScoutingCanvasHandle, ScoutingCanvasProps>(
           shotY = canvasHeight - shot.x * scaledWidth;
         }
 
-        ctx.fillStyle = "#3b82f6";
+        // Color shot based on phase (using centralized phase calculation)
+        const phase = getCurrentPhaseFromTime(shot.timestamp);
+        ctx.fillStyle = PHASE_COLORS[phase];
         ctx.beginPath();
         ctx.arc(shotX, shotY, 8, 0, Math.PI * 2);
         ctx.fill();

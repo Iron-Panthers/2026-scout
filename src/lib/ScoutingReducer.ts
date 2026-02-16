@@ -1,17 +1,3 @@
-/**
- * List of all counter names for initialization
- */
-const COUNTER_NAMES = [
-  "trenchLeftHome",
-  "trenchRigthHome",
-  "bumpLeftHome",
-  "bumpRightHome",
-  "trenchLeftAway",
-  "trenchRightAway",
-  "climbl1",
-  "climbl2",
-  "climbl3",
-];
 
 /**
  * ScoutingReducer - A state management system with built-in actions and undo functionality
@@ -40,10 +26,9 @@ export interface ScoutingData {
   team_number: number;
   match_type: string;
   role: string;
-  currentPhase: Phase;
   matchStartTime: number | null;
-  shots: Record<Phase, Array<{ x: number; y: number; timestamp: number }>>;
-  counters: Record<Phase, Record<string, number>>;
+  events: Array<{ type: string; timestamp: number }>;
+  shots: Array<{ x: number; y: number; timestamp: number }>;
   comments: string;
   robot_problems: string | null;
   errors: string | null;
@@ -53,7 +38,7 @@ export interface ScoutingData {
 /**
  * Action types supported by the reducer
  */
-export type ActionType = "SET" | "TOGGLE" | "INCREMENT" | "DECREMENT" | "UNDO";
+export type ActionType = "SET" | "TOGGLE" | "INCREMENT" | "DECREMENT" | "UNDO" | "LOG_EVENT";
 
 /**
  * Action payload definitions
@@ -93,6 +78,14 @@ export interface UndoAction {
   type: "UNDO";
 }
 
+export interface LogEventAction {
+  type: "LOG_EVENT";
+  payload: {
+    eventType: string;
+    timestamp: number;
+  };
+}
+
 /**
  * Union type for all actions
  */
@@ -101,7 +94,8 @@ export type Action =
   | ToggleAction
   | IncrementAction
   | DecrementAction
-  | UndoAction;
+  | UndoAction
+  | LogEventAction;
 
 /**
  * ScoutingReducer class for managing scouting state with history
@@ -130,6 +124,8 @@ export class ScoutingReducer<T extends Record<string, any> = ScoutingData> {
    * @param role - The role for this match
    * @param event_code - The event code for this match (e.g., "2025cave")
    * @param match_number - The match number
+   * @param team_number - The team number
+   * @param match_type - The match type (qual, playoff, etc)
    * @returns ScoutingData
    */
   static createInitialState(
@@ -140,27 +136,6 @@ export class ScoutingReducer<T extends Record<string, any> = ScoutingData> {
     team_number: number = 0,
     match_type: string = "qual"
   ): ScoutingData {
-    const phases: Phase[] = [
-      "auto",
-      "transition-shift",
-      "phase1",
-      "phase2",
-      "phase3",
-      "phase4",
-      "endgame",
-    ];
-    const shots: Record<
-      Phase,
-      Array<{ x: number; y: number; timestamp: number }>
-    > = {} as any;
-    const counters: Record<Phase, Record<string, number>> = {} as any;
-    for (const phase of phases) {
-      shots[phase] = [];
-      counters[phase] = {};
-      for (const name of COUNTER_NAMES) {
-        counters[phase][name] = 0;
-      }
-    }
     return {
       matchId,
       event_code,
@@ -168,10 +143,9 @@ export class ScoutingReducer<T extends Record<string, any> = ScoutingData> {
       team_number,
       match_type,
       role,
-      currentPhase: "auto",
       matchStartTime: null,
-      shots,
-      counters,
+      events: [],
+      shots: [],
       comments: "",
       errors: null,
       robot_problems: null,
@@ -222,31 +196,52 @@ export class ScoutingReducer<T extends Record<string, any> = ScoutingData> {
    * @returns The new state
    */
   reduce(action: Action): T {
+    // Log the action being dispatched
+    console.log("[ScoutingReducer]", action.type, action);
+
     // Handle UNDO separately (doesn't add to history)
     if (action.type === "UNDO") {
-      return this.handleUndo();
+      const newState = this.handleUndo();
+      console.log("[ScoutingReducer] UNDO complete, history size:", this.history.length);
+      console.log("[ScoutingReducer] Current state:", newState);
+      return newState;
     }
 
     // Save current state to history before applying action
     this.addToHistory(this.currentState);
 
+    let newState: T;
     switch (action.type) {
       case "SET":
-        return this.handleSet(action.payload.path, action.payload.value);
+        newState = this.handleSet(action.payload.path, action.payload.value);
+        break;
 
       case "TOGGLE":
-        return this.handleToggle(action.payload.path);
+        newState = this.handleToggle(action.payload.path);
+        break;
 
       case "INCREMENT":
-        return this.handleIncrement(action.payload.path, action.payload.amount);
+        newState = this.handleIncrement(action.payload.path, action.payload.amount);
+        break;
 
       case "DECREMENT":
-        return this.handleDecrement(action.payload.path, action.payload.amount);
+        newState = this.handleDecrement(action.payload.path, action.payload.amount);
+        break;
+
+      case "LOG_EVENT":
+        newState = this.handleLogEvent(action.payload.eventType, action.payload.timestamp);
+        console.log("[ScoutingReducer] Event logged:", action.payload.eventType, "at", action.payload.timestamp.toFixed(2) + "s");
+        break;
 
       default:
-        console.warn("Unknown action type:", action);
+        console.warn("[ScoutingReducer] Unknown action type:", action);
         return this.currentState;
     }
+
+    // Log the current state after action
+    console.log("[ScoutingReducer] Current state:", newState);
+
+    return newState;
   }
 
   /**
@@ -325,6 +320,19 @@ export class ScoutingReducer<T extends Record<string, any> = ScoutingData> {
 
     const newState = this.deepClone(this.currentState);
     this.setValueAtPath(newState, path, newValue);
+    this.currentState = newState;
+    return newState;
+  }
+
+  /**
+   * Handle LOG_EVENT action - append an event to the events array
+   */
+  private handleLogEvent(eventType: string, timestamp: number): T {
+    const newState = this.deepClone(this.currentState);
+    if (!(newState as any).events) {
+      (newState as any).events = [];
+    }
+    (newState as any).events.push({ type: eventType, timestamp });
     this.currentState = newState;
     return newState;
   }

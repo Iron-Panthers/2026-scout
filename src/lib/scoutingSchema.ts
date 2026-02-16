@@ -11,7 +11,7 @@ import { supabase } from "./supabase";
 /**
  * Current schema version - increment when scouting data structure changes
  */
-export const CURRENT_SCHEMA_VERSION = 1;
+export const CURRENT_SCHEMA_VERSION = 2;
 
 /**
  * Schema version metadata
@@ -98,6 +98,56 @@ export function migrateScoutingData(
 }
 
 /**
+ * Migrate V1 (phase-based) to V2 (event-based)
+ */
+function migrateV1ToV2(data: Record<string, any>): Record<string, any> {
+  type Phase = "auto" | "transition-shift" | "phase1" | "phase2" | "phase3" | "phase4" | "endgame";
+
+  const phases: Phase[] = [
+    "auto", "transition-shift", "phase1", "phase2",
+    "phase3", "phase4", "endgame"
+  ];
+
+  const phaseStartTimes: Record<Phase, number> = {
+    "auto": 0, "transition-shift": 20, "phase1": 30,
+    "phase2": 55, "phase3": 80, "phase4": 105, "endgame": 130
+  };
+
+  // Convert phase-based counters to events
+  const events: Array<{type: string, timestamp: number}> = [];
+  phases.forEach(phase => {
+    const counters = data.counters?.[phase] || {};
+    const phaseStart = phaseStartTimes[phase];
+
+    Object.entries(counters).forEach(([counterName, count]) => {
+      // For each counter value, create that many events
+      for (let i = 0; i < (count as number); i++) {
+        events.push({
+          type: counterName,
+          timestamp: phaseStart + (i * 0.5) // Spread events by 0.5s within phase
+        });
+      }
+    });
+  });
+
+  // Flatten shots from phase-based to single array
+  const shots: Array<{x: number, y: number, timestamp: number}> = [];
+  phases.forEach(phase => {
+    const phaseShots = data.shots?.[phase] || [];
+    shots.push(...phaseShots);
+  });
+
+  return {
+    ...data,
+    events: events.sort((a, b) => a.timestamp - b.timestamp),
+    shots: shots.sort((a, b) => a.timestamp - b.timestamp),
+    // Remove old fields
+    counters: undefined,
+    currentPhase: undefined
+  };
+}
+
+/**
  * Apply a specific migration step
  */
 function applyMigration(
@@ -113,11 +163,8 @@ function applyMigration(
       // No migration needed for initial version
       return data;
 
-    // Future migrations go here:
-    // case 2:
-    //   return migrateV1ToV2(data);
-    // case 3:
-    //   return migrateV2ToV3(data);
+    case 2:
+      return migrateV1ToV2(data);
 
     default:
       console.warn(`No migration defined for v${fromVersion} to v${toVersion}`);

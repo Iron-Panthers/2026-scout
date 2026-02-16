@@ -236,15 +236,6 @@ export default function ScoutingReview() {
     }
   }, [isManagerMode, state]);
 
-  // Log the decoded state
-  console.log("ScoutingReview state loaded:", {
-    matchId: state?.matchId,
-    event_code: state?.event_code,
-    match_number: state?.match_number,
-    match_type: state?.match_type,
-    role: state?.role,
-  });
-
   // Auto-save to offline storage (debounced)
   const lastSaveRef = useRef<number>(0);
   useEffect(() => {
