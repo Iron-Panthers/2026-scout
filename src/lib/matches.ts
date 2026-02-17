@@ -172,7 +172,8 @@ export async function createEventWithMatches(
 export async function updateMatchAssignment(
   matchId: string,
   role: string,
-  scouterId: string | null
+  scouterId: string | null,
+  previousScouterId?: string | null
 ): Promise<boolean> {
   // Map camelCase role names to snake_case database columns
   const roleToColumn: Record<string, string> = {
@@ -212,32 +213,30 @@ export async function updateMatchAssignment(
     scouterId,
   });
 
-  // Get current assignment before updating (for unassignment notifications)
-  const { data: currentMatch } = await supabase
-    .from("matches")
-    .select("*, events(name)")
-    .eq("id", matchId)
-    .single();
-
-  const previousScouterId = currentMatch?.[roleColumn];
-
-  // Update the assignment
-  const { error } = await supabase
+  // Single query: UPDATE with RETURNING to get match data for notifications
+  const { data, error } = await supabase
     .from("matches")
     .update({ [roleColumn]: scouterId })
-    .eq("id", matchId);
+    .eq("id", matchId)
+    .select("match_number, events(name)")
+    .single();
 
   if (error) {
     console.error("Error updating match assignment:", error);
     return false;
   }
 
-  // Send unassignment notification if scout was removed
-  if (previousScouterId && !scouterId && currentMatch) {
+  // Send unassignment notification if scout was removed (fire and forget)
+  if (previousScouterId && !scouterId && data) {
+    // Type assertion for the joined events data
+    const matchData = data as unknown as {
+      match_number: number;
+      events: { name: string } | null;
+    };
     sendUnassignmentNotification(
       previousScouterId,
-      currentMatch.match_number,
-      currentMatch.events?.name || "Event",
+      matchData.match_number,
+      matchData.events?.name || "Event",
       roleToDisplay[role] || role
     ).catch((err) =>
       console.error("Failed to send unassignment notification:", err)
