@@ -9,7 +9,8 @@
       "Read(//c/Users/bruce/Coding/2026-scout/**)",
       "WebFetch(domain:vite-pwa-org.netlify.app)",
       "Bash(dir:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "WebFetch(domain:supabase.com)"
     ]
   },
   "enableAllProjectMcpServers": true,
