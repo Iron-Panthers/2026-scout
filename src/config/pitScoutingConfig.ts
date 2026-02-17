@@ -10,6 +10,20 @@ export interface PitScoutingQuestion {
 export const pitScoutingQuestions: PitScoutingQuestion[] = [
   // Robot Specifications
   {
+    id: "weight",
+    type: "text",
+    label: "How heavy is your robot (with bumpers)?",
+    placeholder: "Enter weight in pounds",
+    required: true,
+  },
+  {
+    id: "dimensions",
+    type: "text",
+    label: "What are your drivebase dimensions?",
+    placeholder: "e.g., 28 x 32 inches (L x W)",
+    required: true,
+  },
+  {
     id: "drivetrain",
     type: "radio",
     label: "What type of drivetrain does the robot have?",
@@ -17,21 +31,49 @@ export const pitScoutingQuestions: PitScoutingQuestion[] = [
     options: ["Swerve", "Mecanum", "Tank", "West Coast", "Other"],
   },
   {
-    id: "weight",
+    id: "hopper-space",
     type: "text",
-    label: "Robot weight (lbs)",
-    placeholder: "Enter weight in pounds",
+    label: "What is their hopper space?",
+    placeholder: "Describe hopper capacity/space",
     required: false,
   },
   {
-    id: "dimensions",
+    id: "shooting-intake-speed",
     type: "text",
-    label: "Robot dimensions (L x W x H in inches)",
-    placeholder: "e.g., 28 x 32 x 24",
+    label: "What is their stated shooting/intake speed?",
+    placeholder: "e.g., 2 seconds per cycle",
     required: false,
   },
 
   // Capabilities
+  {
+    id: "climb-levels",
+    type: "checkbox",
+    label: "If you can climb, what levels can you climb on?",
+    options: [
+      "Level 1",
+      "Level 2",
+      "Level 3",
+      "Level 4",
+      "Cannot climb",
+    ],
+  },
+  {
+    id: "outpost-interaction",
+    type: "radio",
+    label: "Do they interact with outpost?",
+    required: true,
+    options: ["Yes", "No"],
+  },
+  {
+    id: "terrain-capability",
+    type: "checkbox",
+    label: "Can you go over the bump and/or trench?",
+    options: [
+      "Can go over bump",
+      "Can go over trench",
+    ],
+  },
   {
     id: "autonomous",
     type: "checkbox",
@@ -55,13 +97,6 @@ export const pitScoutingQuestions: PitScoutingQuestion[] = [
       "Ground pickup",
       "Human player station",
     ],
-  },
-  {
-    id: "climb-capability",
-    type: "radio",
-    label: "Can the robot climb/hang?",
-    required: true,
-    options: ["Yes", "No", "In Development"],
   },
 
   // Strategy & Design
@@ -87,6 +122,13 @@ export const pitScoutingQuestions: PitScoutingQuestion[] = [
   },
 
   // Team Information
+  {
+    id: "driver-competitions",
+    type: "text",
+    label: "How many competitions have your drivers driven at?",
+    placeholder: "Enter number of competitions",
+    required: false,
+  },
   {
     id: "programming-language",
     type: "radio",
