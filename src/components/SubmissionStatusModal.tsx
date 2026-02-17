@@ -62,38 +62,40 @@ export function SubmissionStatusModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-md max-h-[90vh] flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>Submission Status</DialogTitle>
           <DialogDescription>
             Checking dependencies before submitting scouting data
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3 py-4">
+        <div className="space-y-2 py-2 overflow-y-auto flex-1">
           {dependencies.map((dep, idx) => (
             <div
               key={idx}
-              className="flex items-center justify-between p-3 rounded-lg bg-accent/50"
+              className="flex items-center justify-between p-2 rounded-lg bg-accent/50"
             >
-              <div className="flex items-center gap-3">
-                {getStatusIcon(dep.status)}
-                <div>
-                  <p className="font-medium text-sm">{dep.label}</p>
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <div className="flex-shrink-0">
+                  {getStatusIcon(dep.status)}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-sm truncate">{dep.label}</p>
                   {dep.value && (
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-muted-foreground truncate">
                       {dep.value}
                     </p>
                   )}
                   {dep.status === "error" && dep.errorMessage && (
-                    <p className="text-xs text-destructive mt-1">
+                    <p className="text-xs text-destructive mt-0.5 line-clamp-2">
                       {dep.errorMessage}
                     </p>
                   )}
                 </div>
               </div>
               <span
-                className={`text-xs font-medium uppercase ${getStatusColor(
+                className={`text-xs font-medium uppercase flex-shrink-0 ml-2 ${getStatusColor(
                   dep.status
                 )}`}
               >
@@ -103,7 +105,7 @@ export function SubmissionStatusModal({
           ))}
         </div>
 
-        <DialogFooter className="gap-2">
+        <DialogFooter className="gap-2 flex-shrink-0">
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
