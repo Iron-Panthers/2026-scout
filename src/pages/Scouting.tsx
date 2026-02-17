@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { MoreVertical, Undo, RotateCcw } from "lucide-react";
+import { MoreVertical, Undo, RotateCcw, Send } from "lucide-react";
 // import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -515,21 +515,6 @@ export default function Scouting() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            {/* Review & Submit */}
-            <DropdownMenuItem
-              onClick={async () => {
-                // Compress and encode state for smaller URLs
-                const { compressState } = await import(
-                  "@/lib/stateCompression"
-                );
-                const compressed = compressState(state);
-                navigate(`/review/${compressed}`);
-              }}
-            >
-              Review &amp; Submit
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-
             {/* Orientation Options */}
             <DropdownMenuItem onClick={() => setOrientation(0)}>
               0° (Default)
@@ -576,6 +561,28 @@ export default function Scouting() {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      {/* Review & Submit Button (Endgame Only) */}
+      {currentPhase === "endgame" && (
+        <div className="fixed top-10 right-1 md:top-14 md:right-2 lg:top-17 lg:right-3 z-50">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 w-8 md:h-10 md:w-10 lg:h-12 lg:w-12 xl:h-14 xl:w-14 p-0 border-red-500 bg-red-500/10 hover:bg-red-500/20 text-red-500 hover:text-red-600"
+            onClick={async () => {
+              // Compress and encode state for smaller URLs
+              const { compressState } = await import(
+                "@/lib/stateCompression"
+              );
+              const compressed = compressState(state);
+              navigate(`/review/${compressed}`);
+            }}
+            title="Review & Submit"
+          >
+            <Send className="h-3.5 w-3.5 md:h-5 md:w-5 lg:h-6 lg:w-6 xl:h-7 xl:w-7" />
+          </Button>
+        </div>
+      )}
 
       {/* Sidebar */}
       <aside className="w-16 md:w-24 lg:w-28 xl:w-32 border-r border-border bg-card p-1 md:p-2 lg:p-3 flex flex-col gap-1 md:gap-2 lg:gap-3">
