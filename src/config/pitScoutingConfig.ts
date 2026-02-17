@@ -40,8 +40,8 @@ export const pitScoutingQuestions: PitScoutingQuestion[] = [
   {
     id: "shooting-intake-speed",
     type: "text",
-    label: "What is their stated shooting/intake speed?",
-    placeholder: "e.g., 2 seconds per cycle",
+    label: "What is their stated shooting/intake speed (shots per second)?",
+    placeholder: "e.g., 2.5",
     required: false,
   },
 
@@ -74,52 +74,6 @@ export const pitScoutingQuestions: PitScoutingQuestion[] = [
       "Can go over trench",
     ],
   },
-  {
-    id: "autonomous",
-    type: "checkbox",
-    label: "Autonomous capabilities",
-    options: [
-      "Can score in autonomous",
-      "Can pick up game pieces",
-      "Has complex pathing",
-      "Uses vision",
-      "Leaves starting zone",
-    ],
-  },
-  {
-    id: "scoring-locations",
-    type: "checkbox",
-    label: "Where can the robot score?",
-    options: [
-      "High goal",
-      "Mid goal",
-      "Low goal",
-      "Ground pickup",
-      "Human player station",
-    ],
-  },
-
-  // Strategy & Design
-  {
-    id: "primary-strategy",
-    type: "select",
-    label: "Primary game strategy",
-    required: true,
-    options: [
-      "Offense focused",
-      "Defense focused",
-      "Balanced",
-      "Support/Cycle",
-      "Specialist",
-    ],
-  },
-  {
-    id: "unique-mechanisms",
-    type: "textarea",
-    label: "Describe any unique mechanisms or features",
-    placeholder: "What makes this robot special or different?",
-    required: false,
-  },
 
   // Team Information
   {
@@ -129,56 +83,8 @@ export const pitScoutingQuestions: PitScoutingQuestion[] = [
     placeholder: "Enter number of competitions",
     required: false,
   },
-  {
-    id: "programming-language",
-    type: "radio",
-    label: "What programming language does the team use?",
-    options: ["Java", "C++", "Python", "LabVIEW", "Other"],
-  },
-  {
-    id: "experience-level",
-    type: "radio",
-    label: "Team experience level",
-    options: ["Rookie", "2-3 years", "4-6 years", "7-10 years", "10+ years"],
-  },
-
-  // Performance & Reliability
-  {
-    id: "consistency-rating",
-    type: "radio",
-    label: "How consistent/reliable does the robot appear?",
-    required: true,
-    options: [
-      "Very reliable",
-      "Mostly reliable",
-      "Average",
-      "Some issues",
-      "Many issues",
-    ],
-  },
-  {
-    id: "build-quality",
-    type: "radio",
-    label: "Overall build quality",
-    required: true,
-    options: ["Excellent", "Good", "Average", "Below Average", "Poor"],
-  },
 
   // Additional Notes
-  {
-    id: "strengths",
-    type: "textarea",
-    label: "What are this robot's main strengths?",
-    placeholder: "Speed, accuracy, versatility, etc.",
-    required: false,
-  },
-  {
-    id: "weaknesses",
-    type: "textarea",
-    label: "What are this robot's main weaknesses?",
-    placeholder: "Any limitations or concerns observed",
-    required: false,
-  },
   {
     id: "additional-notes",
     type: "textarea",
