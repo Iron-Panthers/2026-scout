@@ -22,15 +22,11 @@ import { pitScoutingQuestions } from "@/config/pitScoutingConfig";
 import type { PitScoutingQuestion } from "@/config/pitScoutingConfig";
 import type { Event } from "@/types";
 import { PhotoUpload } from "@/components/PhotoUpload";
-import { uploadPitPhoto, fileToDataUrl } from "@/lib/photoUpload";
+import { uploadPitPhoto } from "@/lib/photoUpload";
 import {
   submitPitScouting,
   hasExistingPitScouting,
 } from "@/lib/pitScouting";
-import {
-  saveOfflinePit,
-  markPitAsUploaded,
-} from "@/lib/offlinePitScouting";
 
 export default function PitScouting() {
   const navigate = useNavigate();
@@ -101,24 +97,6 @@ export default function PitScouting() {
         }
       }
 
-      // Save offline backup (failsafe)
-      let offlineKey: string | null = null;
-      try {
-        offlineKey = saveOfflinePit(
-          Number(teamNumber),
-          scouterName,
-          activeEvent.event_code || "",
-          formData,
-          {
-            eventId: activeEvent.id,
-            photoDataUrl: photo ? await fileToDataUrl(photo) : undefined,
-          }
-        );
-      } catch (storageError) {
-        console.warn("Failed to save offline backup:", storageError);
-        // Continue with submission even if offline save fails
-      }
-
       // Upload photo (optional - only if provided)
       let photoUrls: string[] = [];
       if (photo && user?.id) {
@@ -147,11 +125,6 @@ export default function PitScouting() {
         formData,
         photoUrls
       );
-
-      // Mark offline as uploaded
-      if (offlineKey) {
-        markPitAsUploaded(offlineKey);
-      }
 
       // Success feedback
       toast({

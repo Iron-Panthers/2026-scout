@@ -23,16 +23,3 @@ export interface PitScoutingFormData {
   "driver-competitions"?: string;
   "additional-notes"?: string;
 }
-
-export interface OfflinePitScoutingData {
-  teamNumber: number;
-  scouterName: string;
-  eventCode: string;
-  eventId?: string;
-  formData: PitScoutingFormData;
-  photoDataUrl?: string;
-  timestamp: number;
-  uploaded: boolean;
-  uploadedAt?: number;
-  schemaVersion: number;
-}
