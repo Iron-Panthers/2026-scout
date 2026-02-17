@@ -56,12 +56,14 @@ export default function ScoutConfig() {
     {}
   );
   const [manualMode, setManualMode] = useState(!param_match_id);
+  const [isTeamNumberAutofilled, setIsTeamNumberAutofilled] = useState(false);
 
   // Role locking state
   const [lockedRole, setLockedRole] = useState<string | null>(null);
   const [lockedMatchType, setLockedMatchType] = useState<string | null>(null);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [pendingChange, setPendingChange] = useState<{type: 'role' | 'matchType', value: string} | null>(null);
+  const [showTeamNumberUnlockDialog, setShowTeamNumberUnlockDialog] = useState(false);
 
   // Load active event on mount
   useEffect(() => {
@@ -175,6 +177,7 @@ export default function ScoutConfig() {
 
           if (teamNumber) {
             setTeamNumber(teamNumber);
+            setIsTeamNumberAutofilled(true);
 
             // Fetch team photo if not a qual role
             if (match_role !== "qualRed" && match_role !== "qualBlue") {
@@ -198,6 +201,7 @@ export default function ScoutConfig() {
     if (role === "qualRed" || role === "qualBlue") {
       setTeamNumber(0);
       setTeamPhoto(null);
+      setIsTeamNumberAutofilled(false);
       return;
     }
 
@@ -210,6 +214,7 @@ export default function ScoutConfig() {
 
       if (teamNumber) {
         setTeamNumber(teamNumber);
+        setIsTeamNumberAutofilled(true);
 
         // Fetch team photo
         const photoUrl = await getTeamPhoto(teamNumber, CURRENT_YEAR);
@@ -397,17 +402,29 @@ export default function ScoutConfig() {
                 <span className="text-sm font-medium text-muted-foreground">
                   Team Number
                 </span>
-                <Input
-                  className="font-semibold w-30 text-right"
-                  type="number"
-                  placeholder={role === "qualRed" || role === "qualBlue" ? "N/A for qual scouting" : "#####"}
-                  onInput={(e) => {
-                    setTeamNumber(parseInt(e.currentTarget.value));
-                  }}
-                  value={role === "qualRed" || role === "qualBlue" ? "" : teamNumber}
-                  disabled={role === "qualRed" || role === "qualBlue"}
-                  readOnly={teamNumber > 0 && role !== "qualRed" && role !== "qualBlue"}
-                />
+                <div className="flex items-center gap-2">
+                  {isTeamNumberAutofilled && (
+                    <button
+                      type="button"
+                      onClick={() => setShowTeamNumberUnlockDialog(true)}
+                      className="hover:bg-accent/50 rounded p-1 transition-colors"
+                      aria-label="Unlock team number for editing"
+                    >
+                      <Lock className="h-3 w-3 text-muted-foreground" />
+                    </button>
+                  )}
+                  <Input
+                    className="font-semibold w-30 text-right"
+                    type="number"
+                    placeholder={role === "qualRed" || role === "qualBlue" ? "N/A for qual scouting" : "#####"}
+                    onInput={(e) => {
+                      setTeamNumber(parseInt(e.currentTarget.value));
+                    }}
+                    value={role === "qualRed" || role === "qualBlue" ? "" : teamNumber}
+                    disabled={role === "qualRed" || role === "qualBlue"}
+                    readOnly={isTeamNumberAutofilled}
+                  />
+                </div>
               </div>
               <div className="flex justify-between items-center p-1 pl-3 bg-accent/50 rounded-lg">
                 <span className="text-sm font-medium text-muted-foreground">
@@ -601,6 +618,30 @@ export default function ScoutConfig() {
             </Button>
             <Button onClick={confirmChange}>
               Yes, Change
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Team Number Unlock Dialog */}
+      <Dialog open={showTeamNumberUnlockDialog} onOpenChange={setShowTeamNumberUnlockDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Unlock Team Number?</DialogTitle>
+            <DialogDescription>
+              This team number ({teamNumber}) was automatically fetched from The Blue Alliance.
+              Are you sure you want to unlock it for manual editing? This may cause data inconsistencies.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowTeamNumberUnlockDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={() => {
+              setIsTeamNumberAutofilled(false);
+              setShowTeamNumberUnlockDialog(false);
+            }}>
+              Yes, Unlock
             </Button>
           </DialogFooter>
         </DialogContent>
