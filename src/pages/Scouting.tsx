@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { MoreVertical, Undo, RotateCcw } from "lucide-react";
+import { MoreVertical, Undo, RotateCcw, Send } from "lucide-react";
 // import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -467,14 +467,14 @@ export default function Scouting() {
   return (
     <div className="h-screen w-screen bg-background flex overflow-hidden relative">
       {/* Phase Timer & Shifter - Bottom Right */}
-      <div className="fixed bottom-1 right-1 z-50 flex flex-col items-center gap-0.5">
+      <div className="fixed bottom-1 right-1 md:bottom-2 md:right-2 lg:bottom-3 lg:right-3 z-50 flex flex-col items-center gap-0.5 md:gap-1">
         {/* Timer Display */}
-        <div className="flex flex-col items-center mb-0.5">
-          <span className="text-[9px] text-white font-bold leading-none mb-0.5">
+        <div className="flex flex-col items-center mb-0.5 md:mb-1">
+          <span className="text-[9px] md:text-xs lg:text-sm text-white font-bold leading-none mb-0.5 md:mb-1">
             {PHASE_DISPLAY_NAMES[currentPhase]}
           </span>
           <div
-            className="relative w-11 h-11 flex items-center justify-center rounded-full border-2 bg-black"
+            className="relative w-11 h-11 md:w-16 md:h-16 lg:w-20 lg:h-20 xl:w-24 xl:h-24 flex items-center justify-center rounded-full border-2 md:border-3 lg:border-4 bg-black"
             style={{
               borderColor:
                 phaseTimeRemaining <= 5 && phaseTimeRemaining > 0 && hasStarted
@@ -494,11 +494,10 @@ export default function Scouting() {
             }}
           >
             <span
-              className="absolute text-xs font-bold text-white"
+              className="absolute text-xs md:text-base lg:text-lg xl:text-xl font-bold text-white"
               style={{
                 fontFamily:
                   'ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, "DejaVu Sans Mono", monospace',
-                fontSize: "0.75rem",
                 fontVariantNumeric: "tabular-nums",
               }}
             >
@@ -508,29 +507,14 @@ export default function Scouting() {
         </div>
       </div>
       {/* Fixed Orientation Menu */}
-      <div className="fixed top-1 right-1 z-50">
+      <div className="fixed top-1 right-1 md:top-2 md:right-2 lg:top-3 lg:right-3 z-50">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="h-8 w-8 p-0">
-              <MoreVertical className="h-3.5 w-3.5" />
+            <Button variant="outline" size="sm" className="h-8 w-8 md:h-10 md:w-10 lg:h-12 lg:w-12 xl:h-14 xl:w-14 p-0">
+              <MoreVertical className="h-3.5 w-3.5 md:h-5 md:w-5 lg:h-6 lg:w-6 xl:h-7 xl:w-7" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            {/* Review & Submit */}
-            <DropdownMenuItem
-              onClick={async () => {
-                // Compress and encode state for smaller URLs
-                const { compressState } = await import(
-                  "@/lib/stateCompression"
-                );
-                const compressed = compressState(state);
-                navigate(`/review/${compressed}`);
-              }}
-            >
-              Review &amp; Submit
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-
             {/* Orientation Options */}
             <DropdownMenuItem onClick={() => setOrientation(0)}>
               0° (Default)
@@ -578,44 +562,66 @@ export default function Scouting() {
         </DropdownMenu>
       </div>
 
+      {/* Review & Submit Button (Endgame Only) */}
+      {currentPhase === "endgame" && (
+        <div className="fixed top-10 right-1 md:top-14 md:right-2 lg:top-17 lg:right-3 z-50">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 w-8 md:h-10 md:w-10 lg:h-12 lg:w-12 xl:h-14 xl:w-14 p-0 border-red-500 bg-red-500/10 hover:bg-red-500/20 text-red-500 hover:text-red-600"
+            onClick={async () => {
+              // Compress and encode state for smaller URLs
+              const { compressState } = await import(
+                "@/lib/stateCompression"
+              );
+              const compressed = compressState(state);
+              navigate(`/review/${compressed}`);
+            }}
+            title="Review & Submit"
+          >
+            <Send className="h-3.5 w-3.5 md:h-5 md:w-5 lg:h-6 lg:w-6 xl:h-7 xl:w-7" />
+          </Button>
+        </div>
+      )}
+
       {/* Sidebar */}
-      <aside className="w-16 border-r border-border bg-card p-1 flex flex-col gap-1">
+      <aside className="w-16 md:w-24 lg:w-28 xl:w-32 border-r border-border bg-card p-1 md:p-2 lg:p-3 flex flex-col gap-1 md:gap-2 lg:gap-3">
         <Button
           variant={selected === "1x" ? "default" : "outline"}
-          className="w-full flex-1 text-sm font-bold px-0"
+          className="w-full flex-1 text-sm md:text-lg lg:text-xl xl:text-2xl font-bold px-0"
           onClick={() => setSelected("1x")}
         >
           1x
         </Button>
         <Button
           variant={selected === "5x" ? "default" : "outline"}
-          className="w-full flex-1 text-sm font-bold px-0"
+          className="w-full flex-1 text-sm md:text-lg lg:text-xl xl:text-2xl font-bold px-0"
           onClick={() => setSelected("5x")}
         >
           5x
         </Button>
         <Button
           variant={selected === "10x" ? "default" : "outline"}
-          className="w-full flex-1 text-xs font-bold px-0"
+          className="w-full flex-1 text-xs md:text-lg lg:text-xl xl:text-2xl font-bold px-0"
           onClick={() => setSelected("10x")}
         >
           10x
         </Button>
         <Button
           variant={selected === "action" ? "default" : "outline"}
-          className="w-full flex-1 text-[10px] font-bold px-0 leading-tight"
+          className="w-full flex-1 text-[10px] md:text-base lg:text-lg xl:text-xl font-bold px-0 leading-tight"
           onClick={() => setSelected("action")}
         >
           ACT
         </Button>
         <Button
           variant="outline"
-          className="w-full h-9 p-0"
+          className="w-full h-9 md:h-12 lg:h-14 xl:h-16 p-0"
           onClick={undo}
           disabled={!canUndo}
           title="Undo"
         >
-          <Undo className="h-4 w-4" />
+          <Undo className="h-4 w-4 md:h-6 md:w-6 lg:h-7 lg:w-7 xl:h-8 xl:w-8" />
         </Button>
       </aside>
 

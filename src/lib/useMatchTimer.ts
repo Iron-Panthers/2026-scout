@@ -2,37 +2,39 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import type { Phase } from "./ScoutingReducer";
 
 /**
- * Phase durations and start times in the 160-second match
+ * Phase durations and start times in the 163-second match
+ * Includes 3-second delay between auto and teleop (as per FRC match rules)
  *
  * Auto:             0-20s   (20s duration)
- * Transition Shift: 20-30s  (10s duration)
- * Phase 1:          30-55s  (25s duration)
- * Phase 2:          55-80s  (25s duration)
- * Phase 3:          80-105s (25s duration)
- * Phase 4:          105-130s (25s duration)
- * Endgame:          130-160s (30s duration)
+ * [3-second delay:  20-23s]
+ * Transition Shift: 23-33s  (10s duration)
+ * Phase 1:          33-58s  (25s duration)
+ * Phase 2:          58-83s  (25s duration)
+ * Phase 3:          83-108s (25s duration)
+ * Phase 4:          108-133s (25s duration)
+ * Endgame:          133-163s (30s duration)
  *
- * Total: 160 seconds
+ * Total: 163 seconds
  */
 
 export const PHASE_START_TIMES: Record<Phase, number> = {
   "auto": 0,
-  "transition-shift": 20,
-  "phase1": 30,
-  "phase2": 55,
-  "phase3": 80,
-  "phase4": 105,
-  "endgame": 130,
+  "transition-shift": 23,
+  "phase1": 33,
+  "phase2": 58,
+  "phase3": 83,
+  "phase4": 108,
+  "endgame": 133,
 };
 
 export const PHASE_END_TIMES: Record<Phase, number> = {
   "auto": 20,
-  "transition-shift": 30,
-  "phase1": 55,
-  "phase2": 80,
-  "phase3": 105,
-  "phase4": 130,
-  "endgame": 160,
+  "transition-shift": 33,
+  "phase1": 58,
+  "phase2": 83,
+  "phase3": 108,
+  "phase4": 133,
+  "endgame": 163,
 };
 
 export const PHASE_DURATIONS: Record<Phase, number> = {
@@ -45,7 +47,7 @@ export const PHASE_DURATIONS: Record<Phase, number> = {
   "endgame": 30,
 };
 
-export const TOTAL_MATCH_DURATION = 160; // seconds
+export const TOTAL_MATCH_DURATION = 163; // seconds
 
 export interface MatchTimerState {
   /** Total elapsed time in the match (0-160 seconds) */
@@ -73,14 +75,15 @@ export interface MatchTimerState {
 /**
  * Calculate current phase based on elapsed time
  * EXPORTED - Use this everywhere for consistent phase calculation
+ * Note: 3-second delay between auto (ends at 20s) and transition-shift (starts at 23s)
  */
 export function getCurrentPhaseFromTime(elapsedTime: number): Phase {
   if (elapsedTime < 20) return "auto";
-  if (elapsedTime < 30) return "transition-shift";
-  if (elapsedTime < 55) return "phase1";
-  if (elapsedTime < 80) return "phase2";
-  if (elapsedTime < 105) return "phase3";
-  if (elapsedTime < 130) return "phase4";
+  if (elapsedTime < 33) return "transition-shift";
+  if (elapsedTime < 58) return "phase1";
+  if (elapsedTime < 83) return "phase2";
+  if (elapsedTime < 108) return "phase3";
+  if (elapsedTime < 133) return "phase4";
   return "endgame";
 }
 

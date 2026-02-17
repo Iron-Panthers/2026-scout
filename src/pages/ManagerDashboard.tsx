@@ -40,6 +40,7 @@ import { EventInformationTab } from "@/components/manager/EventInformationTab";
 import { CreateEventTab } from "@/components/manager/CreateEventTab";
 import { ScoutAssignmentDialog } from "@/components/manager/ScoutAssignmentDialog";
 import { RosterManagementTab } from "@/components/manager/RosterManagementTab";
+import { useToast } from "@/hooks/use-toast";
 import type {
   Profile,
   Role,
@@ -53,6 +54,7 @@ import type {
 
 export default function ManagerDashboard() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const userName =
     user?.user_metadata?.name || user?.email?.split("@")[0] || "Manager";
   const userInitials = userName
@@ -222,6 +224,47 @@ export default function ManagerDashboard() {
     loadData();
   }, [loadData]);
 
+  // Subscribe to real-time updates for match assignments and submissions
+  useEffect(() => {
+    console.log("Setting up realtime subscriptions for matches and submissions...");
+
+    // Subscribe to changes in matches table and scouting_submissions table
+    const channel = supabase
+      .channel("manager-dashboard-updates")
+      .on(
+        "postgres_changes",
+        {
+          event: "*", // Listen to all events (INSERT, UPDATE, DELETE)
+          schema: "public",
+          table: "matches",
+        },
+        (payload) => {
+          console.log("Match assignment changed (manager view):", payload);
+          // Reload matches when any match is updated
+          loadData();
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*", // Listen to all events (INSERT, UPDATE, DELETE)
+          schema: "public",
+          table: "scouting_submissions",
+        },
+        (payload) => {
+          console.log("Scouting submission changed (manager view):", payload);
+          // Reload matches to update submission status
+          loadData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      console.log("Cleaning up realtime subscriptions...");
+      supabase.removeChannel(channel);
+    };
+  }, [loadData]);
+
   // Load rosters for selected event
   const loadRosters = useCallback(async () => {
     if (selectedEvent === "all") {
@@ -299,10 +342,26 @@ export default function ManagerDashboard() {
   const paginatedMatches = matches.slice(startIndex, endIndex);
 
   const handleAssignScout = useCallback(
-    async (profile: Profile) => {
+    (profile: Profile) => {
       if (!selectedCell) return;
 
-      // Update local state immediately for responsive UI
+      // Find current match for rollback
+      const currentMatch = matches.find(
+        (m) => m.matchNumber === selectedCell.matchNumber
+      );
+      if (!currentMatch?.matchId) {
+        toast({
+          title: "Error",
+          description: "Match not found",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Capture previous state for rollback
+      const previousAssignment = currentMatch.assignments[selectedCell.role];
+
+      // 1. Update UI immediately (optimistic)
       setMatches((prevMatches) =>
         prevMatches.map((match) =>
           match.matchNumber === selectedCell.matchNumber
@@ -327,32 +386,63 @@ export default function ManagerDashboard() {
         )
       );
 
-      // Persist to database
-      try {
-        const currentMatch = matches.find(
-          (m) => m.matchNumber === selectedCell.matchNumber
-        );
-        if (!currentMatch?.matchId) {
-          console.error(
-            "Match ID not found for match number:",
-            selectedCell.matchNumber
-          );
-          return;
-        }
-        await updateMatchAssignment(
-          currentMatch.matchId,
-          selectedCell.role,
-          profile.id
-        );
-      } catch (error) {
-        console.error("Failed to update match assignment:", error);
-        // TODO: Show error toast/notification to user
-      }
-
+      // 2. Close dialog immediately (instant feedback)
       setDialogOpen(false);
       setSelectedCell(null);
+
+      // 3. Fire database operation in background
+      updateMatchAssignment(
+        currentMatch.matchId,
+        selectedCell.role,
+        profile.id,
+        previousAssignment?.id
+      )
+        .then((success) => {
+          if (!success) {
+            // Rollback UI on failure
+            setMatches((prevMatches) =>
+              prevMatches.map((match) =>
+                match.matchNumber === selectedCell.matchNumber
+                  ? {
+                      ...match,
+                      assignments: {
+                        ...match.assignments,
+                        [selectedCell.role]: previousAssignment,
+                      },
+                    }
+                  : match
+              )
+            );
+            toast({
+              title: "Assignment Failed",
+              description: "Could not assign scout to match",
+              variant: "destructive",
+            });
+          }
+        })
+        .catch(() => {
+          // Rollback UI on error
+          setMatches((prevMatches) =>
+            prevMatches.map((match) =>
+              match.matchNumber === selectedCell.matchNumber
+                ? {
+                    ...match,
+                    assignments: {
+                      ...match.assignments,
+                      [selectedCell.role]: previousAssignment,
+                    },
+                  }
+                : match
+            )
+          );
+          toast({
+            title: "Assignment Failed",
+            description: "Network error occurred",
+            variant: "destructive",
+          });
+        });
     },
-    [selectedCell]
+    [selectedCell, matches, toast]
   );
 
   const openAssignmentDialog = useCallback(
@@ -364,8 +454,22 @@ export default function ManagerDashboard() {
   );
 
   const handleClearAssignment = useCallback(
-    async (matchNumber: number, role: Role) => {
-      // Update local state immediately
+    (matchNumber: number, role: Role) => {
+      // Find current match for rollback
+      const currentMatch = matches.find((m) => m.matchNumber === matchNumber);
+      if (!currentMatch?.matchId) {
+        toast({
+          title: "Error",
+          description: "Match not found",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Capture previous state for rollback
+      const previousAssignment = currentMatch.assignments[role];
+
+      // 1. Update UI immediately (optimistic)
       setMatches((prevMatches) =>
         prevMatches.map((match) =>
           match.matchNumber === matchNumber
@@ -380,19 +484,59 @@ export default function ManagerDashboard() {
         )
       );
 
-      // Persist to database
-      try {
-        const currentMatch = matches.find((m) => m.matchNumber === matchNumber);
-        if (!currentMatch?.matchId) {
-          console.error("Match ID not found for match number:", matchNumber);
-          return;
-        }
-        await updateMatchAssignment(currentMatch.matchId, role, null);
-      } catch (error) {
-        console.error("Failed to clear match assignment:", error);
-      }
+      // 2. Fire database operation in background
+      updateMatchAssignment(
+        currentMatch.matchId,
+        role,
+        null,
+        previousAssignment?.id
+      )
+        .then((success) => {
+          if (!success) {
+            // Rollback UI on failure
+            setMatches((prevMatches) =>
+              prevMatches.map((match) =>
+                match.matchNumber === matchNumber
+                  ? {
+                      ...match,
+                      assignments: {
+                        ...match.assignments,
+                        [role]: previousAssignment,
+                      },
+                    }
+                  : match
+              )
+            );
+            toast({
+              title: "Clear Failed",
+              description: "Could not remove scout assignment",
+              variant: "destructive",
+            });
+          }
+        })
+        .catch(() => {
+          // Rollback UI on error
+          setMatches((prevMatches) =>
+            prevMatches.map((match) =>
+              match.matchNumber === matchNumber
+                ? {
+                    ...match,
+                    assignments: {
+                      ...match.assignments,
+                      [role]: previousAssignment,
+                    },
+                  }
+                : match
+            )
+          );
+          toast({
+            title: "Clear Failed",
+            description: "Network error occurred",
+            variant: "destructive",
+          });
+        });
     },
-    [matches]
+    [matches, toast]
   );
 
   // Match selection handlers

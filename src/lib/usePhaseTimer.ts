@@ -3,16 +3,18 @@ import type { Phase } from "./ScoutingReducer";
 
 /**
  * Phase durations in seconds, based on the FRC 2026 REBUILT game manual.
+ * Note: Includes 3-second delay between auto and teleop periods.
  *
- * Auto:             20s  (match clock 0:20 → 0:00)
- * Transition Shift: 10s  (teleop clock 2:20 → 2:10)
- * Shift 1 (phase1): 25s  (teleop clock 2:10 → 1:45)
- * Shift 2 (phase2): 25s  (teleop clock 1:45 → 1:20)
- * Shift 3 (phase3): 25s  (teleop clock 1:20 → 0:55)
- * Shift 4 (phase4): 25s  (teleop clock 0:55 → 0:30)
- * Endgame:          30s  (teleop clock 0:30 → 0:00)
+ * Auto:             20s  (match time 0-20s)
+ * [3-second delay]       (match time 20-23s)
+ * Transition Shift: 10s  (match time 23-33s, teleop clock 2:20 → 2:10)
+ * Shift 1 (phase1): 25s  (match time 33-58s, teleop clock 2:10 → 1:45)
+ * Shift 2 (phase2): 25s  (match time 58-83s, teleop clock 1:45 → 1:20)
+ * Shift 3 (phase3): 25s  (match time 83-108s, teleop clock 1:20 → 0:55)
+ * Shift 4 (phase4): 25s  (match time 108-133s, teleop clock 0:55 → 0:30)
+ * Endgame:          30s  (match time 133-163s, teleop clock 0:30 → 0:00)
  *
- * Total: 160s = 2 minutes 40 seconds
+ * Total: 163s = 2 minutes 43 seconds
  */
 export const PHASE_DURATIONS: Record<Phase, number> = {
   auto: 20,
