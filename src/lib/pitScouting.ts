@@ -164,3 +164,27 @@ export async function deletePitScouting(submissionId: string): Promise<void> {
     throw new Error(`Failed to delete pit scouting: ${error.message}`);
   }
 }
+
+/**
+ * Get team photo URL from pit scouting submissions
+ * @param teamNum - Team number
+ * @param eventId - Event ID
+ * @returns First photo URL if available, null otherwise
+ */
+export async function getTeamPhotoFromPitScouting(
+  teamNum: number,
+  eventId: string
+): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("pit_scouting_submissions")
+    .select("photo_urls")
+    .eq("team_num", teamNum)
+    .eq("event_id", eventId)
+    .maybeSingle();
+
+  if (error || !data || !data.photo_urls || data.photo_urls.length === 0) {
+    return null;
+  }
+
+  return data.photo_urls[0];
+}

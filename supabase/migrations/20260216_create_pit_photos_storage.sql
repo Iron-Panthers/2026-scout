@@ -1,6 +1,6 @@
 -- Create storage bucket for pit scouting photos
 INSERT INTO storage.buckets (id, name, public)
-VALUES ('pit-scouting-photos', 'pit-scouting-photos', false)
+VALUES ('pit-scouting-photos', 'pit-scouting-photos', true)
 ON CONFLICT (id) DO NOTHING;
 
 -- Enable RLS for the bucket
