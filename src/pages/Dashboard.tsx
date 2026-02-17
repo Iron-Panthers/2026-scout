@@ -14,13 +14,14 @@ import { ClipboardList, Wrench, X } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { getUserMatches, removeUserFromMatch, getEvents } from "@/lib/matches";
-import { getMatchTeam, getTeamPhoto, CURRENT_YEAR } from "@/lib/blueAlliance";
+import { getMatchTeam } from "@/lib/blueAlliance";
 import { filterMatchesWithoutSubmissions } from "@/lib/scoutingSchema";
 import { supabase } from "@/lib/supabase";
 import DashboardHeader from "@/components/DashboardHeader";
 import UserProfileMenu from "@/components/UserProfileMenu";
 import OfflineMatches from "@/components/OfflineMatches";
 import AnimatedContent from "@/components/AnimatedContent";
+import { TeamImage } from "@/components/TeamImage";
 import type { Match, Role, Event } from "@/types";
 
 export function prettifyRole(role) {
@@ -61,8 +62,6 @@ export default function Dashboard() {
   const [teamNumbers, setTeamNumbers] = useState<Record<string, number | null>>(
     {}
   );
-  const [teamPhoto, setTeamPhoto] = useState<string | null>(null);
-  const [loadingPhoto, setLoadingPhoto] = useState(false);
 
   const navigate = useNavigate();
 
@@ -221,20 +220,6 @@ export default function Dashboard() {
   const handleMatchClick = async (userMatch: UserMatch) => {
     setSelectedMatch(userMatch);
     setDialogOpen(true);
-    setTeamPhoto(null);
-    setLoadingPhoto(true);
-
-    // Fetch team photo if not a qual role
-    if (userMatch.role !== "qualRed" && userMatch.role !== "qualBlue") {
-      const teamNumber = teamNumbers[`${userMatch.match.id}-${userMatch.role}`];
-      if (teamNumber) {
-        const photoUrl = await getTeamPhoto(teamNumber, CURRENT_YEAR);
-        console.log(`Photo URL for team ${teamNumber}:`, photoUrl);
-        setTeamPhoto(photoUrl);
-      }
-    }
-
-    setLoadingPhoto(false);
   };
 
   const handleDecline = async () => {
@@ -439,36 +424,17 @@ export default function Dashboard() {
             {/* Two-column layout on landscape/small screens, stacked on portrait and desktop */}
             <div className="flex flex-col landscape:flex-row landscape:md:flex-col gap-3 landscape:gap-3 landscape:md:gap-4 py-3 landscape:py-2 landscape:md:py-4">
               {/* Robot Image */}
-              <div className="w-full landscape:w-44 landscape:md:w-full landscape:flex-shrink-0 landscape:md:flex-shrink h-32 sm:h-40 md:h-48 landscape:h-full landscape:min-h-[180px] landscape:md:min-h-0 landscape:md:h-48 bg-muted rounded-lg flex items-center justify-center border-2 border-border overflow-hidden">
-                {loadingPhoto ? (
-                  <div className="text-center">
-                    <p className="text-xs md:text-sm text-muted-foreground font-semibold">
-                      Loading...
-                    </p>
-                  </div>
-                ) : teamPhoto ? (
-                  <img
-                    src={teamPhoto}
-                    alt="Robot"
+              <div className="w-full landscape:w-44 landscape:md:w-full landscape:flex-shrink-0 landscape:md:flex-shrink h-32 sm:h-40 md:h-48 landscape:h-full landscape:min-h-[180px] landscape:md:min-h-0 landscape:md:h-48 bg-muted rounded-lg border-2 border-border overflow-hidden">
+                {selectedMatch && selectedMatch.role !== "qualRed" && selectedMatch.role !== "qualBlue" ? (
+                  <TeamImage
+                    teamNumber={teamNumbers[`${selectedMatch.match.id}-${selectedMatch.role}`] || 0}
+                    eventId={selectedMatch.match.event_id || undefined}
                     className="w-full h-full object-contain"
-                    onError={(e) => {
-                      console.error("Failed to load image:", teamPhoto);
-                      e.currentTarget.style.display = "none";
-                      e.currentTarget.parentElement!.innerHTML = `
-                        <div class="text-center">
-                          <p class="text-muted-foreground font-semibold text-xs md:text-sm">Robot Image</p>
-                          <p class="text-xs md:text-sm text-muted-foreground">Failed to load</p>
-                        </div>
-                      `;
-                    }}
                   />
                 ) : (
-                  <div className="text-center">
+                  <div className="w-full h-full flex items-center justify-center">
                     <p className="text-xs md:text-sm text-muted-foreground font-semibold">
                       Robot Image
-                    </p>
-                    <p className="text-xs md:text-sm text-muted-foreground">
-                      Not available
                     </p>
                   </div>
                 )}

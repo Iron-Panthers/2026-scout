@@ -3,9 +3,9 @@ import {
   CURRENT_YEAR,
   getEventMatches,
   getMatchTeam,
-  getTeamPhoto,
 } from "@/lib/blueAlliance";
 import { getEvents, getMatch, getMatches, getUserMatches } from "@/lib/matches";
+import { TeamImage } from "@/components/TeamImage";
 import React, { useState, useEffect } from "react";
 import {
   Navigate,
@@ -50,8 +50,6 @@ export default function ScoutConfig() {
   const [eventCode, setEventCode] = useState("");
   const [eventName, setEventName] = useState("");
   const [availableEvents, setAvailableEvents] = useState<any[]>([]);
-  const [loadingPhoto, setLoadingPhoto] = useState(false);
-  const [teamPhoto, setTeamPhoto] = useState<string | null>(null);
   const [teamNumbers, setTeamNumbers] = useState<Record<string, number | null>>(
     {}
   );
@@ -178,14 +176,6 @@ export default function ScoutConfig() {
           if (teamNumber) {
             setTeamNumber(teamNumber);
             setIsTeamNumberAutofilled(true);
-
-            // Fetch team photo if not a qual role
-            if (match_role !== "qualRed" && match_role !== "qualBlue") {
-              const photoUrl = await getTeamPhoto(teamNumber, CURRENT_YEAR);
-              if (photoUrl) {
-                setTeamPhoto(photoUrl);
-              }
-            }
           }
         } catch (error) {
           console.log("Could not fetch team info (offline?):", error);
@@ -200,7 +190,6 @@ export default function ScoutConfig() {
     // Skip for qual roles - they don't have specific team numbers
     if (role === "qualRed" || role === "qualBlue") {
       setTeamNumber(0);
-      setTeamPhoto(null);
       setIsTeamNumberAutofilled(false);
       return;
     }
@@ -209,25 +198,16 @@ export default function ScoutConfig() {
     if (!matchNumber || !role || !eventCode) return;
 
     try {
-      setLoadingPhoto(true);
       const teamNumber = await getMatchTeam(eventCode, matchNumber, role);
 
       if (teamNumber) {
         setTeamNumber(teamNumber);
         setIsTeamNumberAutofilled(true);
-
-        // Fetch team photo
-        const photoUrl = await getTeamPhoto(teamNumber, CURRENT_YEAR);
-        if (photoUrl) {
-          setTeamPhoto(photoUrl);
-        }
       } else {
         console.log("Could not find team number (offline or match not in TBA)");
       }
     } catch (error) {
       console.log("Could not fetch team info (offline?):", error);
-    } finally {
-      setLoadingPhoto(false);
     }
   };
 
@@ -349,35 +329,21 @@ export default function ScoutConfig() {
         <Tabs defaultValue="config" className="">
           <TabsContent value="config" className="">
             {/* Robot Image */}
-            <div className="w-full h-40 bg-muted rounded-lg flex items-center justify-center border-2 border-border overflow-hidden mb-2">
-              {loadingPhoto ? (
-                <div className="text-center">
-                  <p className="text-muted-foreground font-semibold">
-                    Loading...
-                  </p>
-                </div>
-              ) : teamPhoto ? (
-                <img
-                  src={teamPhoto}
-                  alt="Robot"
+            <div className="w-full h-40 bg-muted rounded-lg border-2 border-border overflow-hidden mb-2">
+              {role !== "qualRed" && role !== "qualBlue" && teamNumber > 0 ? (
+                <TeamImage
+                  teamNumber={teamNumber}
+                  eventId={eventId || undefined}
                   className="w-full h-full object-contain"
-                  onError={(e) => {
-                    console.error("Failed to load image:", teamPhoto);
-                    e.currentTarget.style.display = "none";
-                    e.currentTarget.parentElement!.innerHTML = `
-                        <div class="text-center">
-                          <p class="text-muted-foreground font-semibold">Robot Image</p>
-                          <p class="text-sm text-muted-foreground">Failed to load</p>
-                        </div>
-                      `;
-                  }}
                 />
               ) : (
-                <div className="text-center">
-                  <p className="text-muted-foreground font-semibold">
-                    Robot Image
-                  </p>
-                  <p className="text-sm text-muted-foreground">Not available</p>
+                <div className="w-full h-full flex items-center justify-center">
+                  <div className="text-center">
+                    <p className="text-muted-foreground font-semibold">
+                      Robot Image
+                    </p>
+                    <p className="text-sm text-muted-foreground">Not available</p>
+                  </div>
                 </div>
               )}
             </div>
