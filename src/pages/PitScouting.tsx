@@ -13,20 +13,32 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 import { getActiveEvent } from "@/lib/matches";
 import { pitScoutingQuestions } from "@/config/pitScoutingConfig";
 import type { PitScoutingQuestion } from "@/config/pitScoutingConfig";
 import type { Event } from "@/types";
+import { PhotoUpload } from "@/components/PhotoUpload";
+import { uploadPitPhoto } from "@/lib/photoUpload";
+import {
+  submitPitScouting,
+  hasExistingPitScouting,
+} from "@/lib/pitScouting";
 
 export default function PitScouting() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { toast } = useToast();
   const [scouterName, setScouterName] = useState("");
   const [teamNumber, setTeamNumber] = useState("");
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [activeEvent, setActiveEvent] = useState<Event | null>(null);
   const [loadingEvent, setLoadingEvent] = useState(true);
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     const loadActiveEvent = async () => {
@@ -37,10 +49,101 @@ export default function PitScouting() {
     loadActiveEvent();
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Form submitted:", { scouterName, teamNumber, ...formData });
-    // TODO: Handle form submission
+
+    // Validation
+    if (!activeEvent) {
+      toast({
+        title: "Error",
+        description: "No active event found",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!scouterName.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter your name",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!teamNumber || Number(teamNumber) <= 0) {
+      toast({
+        title: "Error",
+        description: "Please enter a valid team number",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // Check for duplicate submission
+      if (user?.id) {
+        const exists = await hasExistingPitScouting(
+          Number(teamNumber),
+          activeEvent.id,
+          user.id
+        );
+        if (exists) {
+          throw new Error(
+            `You have already submitted pit scouting for team ${teamNumber} at this event`
+          );
+        }
+      }
+
+      // Upload photo (optional - only if provided)
+      let photoUrls: string[] = [];
+      if (photo && user?.id) {
+        try {
+          const { publicUrl } = await uploadPitPhoto(
+            photo,
+            user.id,
+            activeEvent.event_code || "",
+            Number(teamNumber)
+          );
+          photoUrls = [publicUrl];
+        } catch (photoError) {
+          console.error("Photo upload failed:", photoError);
+          throw new Error(
+            `Photo upload failed: ${photoError instanceof Error ? photoError.message : "Unknown error"}`
+          );
+        }
+      }
+
+      // Submit to database
+      await submitPitScouting(
+        Number(teamNumber),
+        activeEvent.id,
+        user?.id || "",
+        scouterName,
+        formData,
+        photoUrls
+      );
+
+      // Success feedback
+      toast({
+        title: "Success",
+        description: "Pit scouting submitted successfully",
+      });
+
+      navigate(-1);
+    } catch (error) {
+      console.error("Submission error:", error);
+      toast({
+        title: "Submission failed",
+        description:
+          error instanceof Error ? error.message : "Please try again",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleInputChange = (id: string, value: any) => {
@@ -76,6 +179,7 @@ export default function PitScouting() {
               value={formData[question.id] || ""}
               onChange={(e) => handleInputChange(question.id, e.target.value)}
               required={question.required}
+              disabled={isSubmitting}
             />
           </div>
         );
@@ -96,6 +200,7 @@ export default function PitScouting() {
               onChange={(e) => handleInputChange(question.id, e.target.value)}
               required={question.required}
               rows={4}
+              disabled={isSubmitting}
             />
           </div>
         );
@@ -113,12 +218,14 @@ export default function PitScouting() {
               value={formData[question.id] || ""}
               onValueChange={(value) => handleInputChange(question.id, value)}
               required={question.required}
+              disabled={isSubmitting}
             >
               {question.options?.map((option) => (
                 <div key={option} className="flex items-center space-x-2">
                   <RadioGroupItem
                     value={option}
                     id={`${question.id}-${option}`}
+                    disabled={isSubmitting}
                   />
                   <Label
                     htmlFor={`${question.id}-${option}`}
@@ -154,6 +261,7 @@ export default function PitScouting() {
                         checked as boolean
                       )
                     }
+                    disabled={isSubmitting}
                   />
                   <Label
                     htmlFor={`${question.id}-${option}`}
@@ -180,6 +288,7 @@ export default function PitScouting() {
               value={formData[question.id] || ""}
               onValueChange={(value) => handleInputChange(question.id, value)}
               required={question.required}
+              disabled={isSubmitting}
             >
               <SelectTrigger id={question.id}>
                 <SelectValue placeholder="Select an option" />
@@ -267,6 +376,7 @@ export default function PitScouting() {
                   value={scouterName}
                   onChange={(e) => setScouterName(e.target.value)}
                   required
+                  disabled={isSubmitting}
                 />
               </div>
               <div className="space-y-2">
@@ -280,8 +390,23 @@ export default function PitScouting() {
                   value={teamNumber}
                   onChange={(e) => setTeamNumber(e.target.value)}
                   required
+                  disabled={isSubmitting}
                 />
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Robot Photo */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Robot Photo</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <PhotoUpload
+                onPhotoSelected={setPhoto}
+                onPhotoCleared={() => setPhoto(null)}
+                disabled={isSubmitting}
+              />
             </CardContent>
           </Card>
 
@@ -301,11 +426,19 @@ export default function PitScouting() {
               type="button"
               variant="outline"
               onClick={() => navigate(-1)}
+              disabled={isSubmitting}
             >
               Cancel
             </Button>
-            <Button type="submit" size="lg">
-              Submit Pit Scouting Report
+            <Button type="submit" size="lg" disabled={isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Submitting...
+                </>
+              ) : (
+                "Submit Pit Scouting Report"
+              )}
             </Button>
           </div>
         </form>

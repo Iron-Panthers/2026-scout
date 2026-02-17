@@ -134,3 +134,6 @@ export interface UserProfileMenuProps {
   avatarUrl?: string;
   isManager?: boolean;
 }
+
+// Pit Scouting Types
+export * from "./pitScouting";
