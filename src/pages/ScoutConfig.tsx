@@ -406,6 +406,7 @@ export default function ScoutConfig() {
                   }}
                   value={role === "qualRed" || role === "qualBlue" ? "" : teamNumber}
                   disabled={role === "qualRed" || role === "qualBlue"}
+                  readOnly={teamNumber > 0 && role !== "qualRed" && role !== "qualBlue"}
                 />
               </div>
               <div className="flex justify-between items-center p-1 pl-3 bg-accent/50 rounded-lg">
