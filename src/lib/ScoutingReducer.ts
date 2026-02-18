@@ -27,8 +27,10 @@ export interface ScoutingData {
   match_type: string;
   role: string;
   matchStartTime: number | null;
-  events: Array<{ type: string; timestamp: number }>;
-  shots: Array<{ x: number; y: number; timestamp: number }>;
+  shots: number[];
+  events: Array<{ name: string; t: number }>;
+  primaryShotPosition: { x: number; y: number } | null;
+  secondaryShotPosition: { x: number; y: number } | null;
   comments: string;
   robot_problems: string | null;
   errors: string | null;
@@ -144,8 +146,10 @@ export class ScoutingReducer<T extends Record<string, any> = ScoutingData> {
       match_type,
       role,
       matchStartTime: null,
-      events: [],
       shots: [],
+      events: [],
+      primaryShotPosition: null,
+      secondaryShotPosition: null,
       comments: "",
       errors: null,
       robot_problems: null,
@@ -332,7 +336,7 @@ export class ScoutingReducer<T extends Record<string, any> = ScoutingData> {
     if (!(newState as any).events) {
       (newState as any).events = [];
     }
-    (newState as any).events.push({ type: eventType, timestamp });
+    (newState as any).events.push({ name: eventType, t: timestamp });
     this.currentState = newState;
     return newState;
   }

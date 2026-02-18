@@ -80,6 +80,31 @@ export default function PitScouting() {
       return;
     }
 
+    // Validate required questions that need explicit JS checks (checkbox/radio)
+    for (const question of pitScoutingQuestions) {
+      if (!question.required) continue;
+      if (question.type === "checkbox") {
+        const selected = formData[question.id];
+        if (!selected || selected.length === 0) {
+          toast({
+            title: "Required field",
+            description: `Please select at least one option for: "${question.label}"`,
+            variant: "destructive",
+          });
+          return;
+        }
+      } else if (question.type === "radio") {
+        if (!formData[question.id]) {
+          toast({
+            title: "Required field",
+            description: `Please select an option for: "${question.label}"`,
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+    }
+
     setIsSubmitting(true);
 
     try {

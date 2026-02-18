@@ -35,14 +35,14 @@ export const pitScoutingQuestions: PitScoutingQuestion[] = [
     type: "text",
     label: "What is their hopper space?",
     placeholder: "Describe hopper capacity/space",
-    required: false,
+    required: true,
   },
   {
     id: "shooting-intake-speed",
     type: "text",
     label: "What is their stated shooting/intake speed (shots per second)?",
     placeholder: "e.g., 2.5",
-    required: false,
+    required: true,
   },
 
   // Capabilities
@@ -50,6 +50,7 @@ export const pitScoutingQuestions: PitScoutingQuestion[] = [
     id: "climb-levels",
     type: "checkbox",
     label: "If you can climb, what levels can you climb on?",
+    required: true,
     options: [
       "Level 1",
       "Level 2",
@@ -69,6 +70,7 @@ export const pitScoutingQuestions: PitScoutingQuestion[] = [
     id: "terrain-capability",
     type: "checkbox",
     label: "Can you go over the bump and/or trench?",
+    required: true,
     options: [
       "Can go over bump",
       "Can go over trench",
@@ -81,7 +83,7 @@ export const pitScoutingQuestions: PitScoutingQuestion[] = [
     type: "text",
     label: "How many competitions have your drivers driven at?",
     placeholder: "Enter number of competitions",
-    required: false,
+    required: true,
   },
 
   // Additional Notes
@@ -90,6 +92,6 @@ export const pitScoutingQuestions: PitScoutingQuestion[] = [
     type: "textarea",
     label: "Additional notes or observations",
     placeholder: "Any other relevant information...",
-    required: false,
+    required: true,
   },
 ];
