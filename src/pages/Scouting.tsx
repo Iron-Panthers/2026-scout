@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Undo2, ArrowRight, ArrowLeft, Check } from "lucide-react";
 import { useScoutingReducer } from "@/lib/useScoutingReducer";
@@ -45,49 +45,82 @@ export default function Scouting() {
 
   const [frame, setFrame] = useState<1 | 2>(1);
 
-  // Dot drag state
+  // ── Dot drag state ──────────────────────────────────────────────────────
   const draggingDot = useRef<"primary" | "secondary" | null>(null);
   const pendingDotPos = useRef<{ x: number; y: number } | null>(null);
   const hasMoved = useRef(false);
   const imgContainerRef = useRef<HTMLDivElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
   const [dotPreview, setDotPreview] = useState<{
     which: "primary" | "secondary";
     x: number;
     y: number;
   } | null>(null);
 
-  // Derived counts
-  const shotCount = state.shots.length;
-  const bumpCount = state.events.filter((e) => e.name === "bump").length;
-  const trenchCount = state.events.filter((e) => e.name === "trench").length;
+  // Tracks the actual rendered image rect within the container (px, relative to container top-left).
+  // Needed because object-contain leaves letterbox/pillarbox space that should not count.
+  const [imgBounds, setImgBounds] = useState<{
+    x: number; y: number; w: number; h: number;
+  } | null>(null);
 
-  const addShots = (count: number) => {
-    const ts = state.matchStartTime
-      ? (Date.now() - state.matchStartTime) / 1000
-      : 0;
-    set("shots", [...state.shots, ...Array(count).fill(ts)]);
-  };
+  const updateImgBounds = useCallback(() => {
+    const container = imgContainerRef.current;
+    const img = imgRef.current;
+    if (!container || !img || !img.naturalWidth) return;
 
-  const handleFinish = async () => {
-    const { compressState } = await import("@/lib/stateCompression");
-    navigate(`/review/${compressState(state)}`);
-  };
+    const cW = container.clientWidth;
+    const cH = container.clientHeight;
+    const iAspect = img.naturalWidth / img.naturalHeight;
+    const cAspect = cW / cH;
 
+    let iW: number, iH: number, iX: number, iY: number;
+    if (cAspect > iAspect) {
+      // Wider container → pillarboxed (empty on left/right)
+      iH = cH; iW = cH * iAspect;
+      iX = (cW - iW) / 2; iY = 0;
+    } else {
+      // Taller container → letterboxed (empty on top/bottom)
+      iW = cW; iH = cW / iAspect;
+      iX = 0; iY = (cH - iH) / 2;
+    }
+    setImgBounds({ x: iX, y: iY, w: iW, h: iH });
+  }, []);
+
+  // Set up ResizeObserver when Frame 2 mounts
+  useEffect(() => {
+    if (frame !== 2) return;
+    const container = imgContainerRef.current;
+    if (!container) return;
+    updateImgBounds();
+    const ro = new ResizeObserver(updateImgBounds);
+    ro.observe(container);
+    return () => ro.disconnect();
+  }, [frame, updateImgBounds]);
+
+  // Convert viewport pointer coords → normalized image coords (0–1 from image top-left).
+  // Returns null if bounds not ready.
   const getNormalized = useCallback(
-    (clientX: number, clientY: number): { x: number; y: number } => {
-      const rect = imgContainerRef.current?.getBoundingClientRect();
-      if (!rect) return { x: 0.5, y: 0.5 };
-      const x = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
-      const y = Math.min(1, Math.max(0, (clientY - rect.top) / rect.height));
-      return { x, y };
+    (clientX: number, clientY: number): { x: number; y: number } | null => {
+      const container = imgContainerRef.current;
+      if (!container || !imgBounds) return null;
+      const rect = container.getBoundingClientRect();
+      const relX = clientX - rect.left;
+      const relY = clientY - rect.top;
+      return {
+        x: Math.min(1, Math.max(0, (relX - imgBounds.x) / imgBounds.w)),
+        y: Math.min(1, Math.max(0, (relY - imgBounds.y) / imgBounds.h)),
+      };
     },
-    []
+    [imgBounds]
   );
 
-  const handleDotPointerDown = (
-    e: React.PointerEvent,
-    which: "primary" | "secondary"
-  ) => {
+  // Convert normalized image coords → px offset from container top-left (for absolute positioning).
+  const toContainerPx = (pos: { x: number; y: number }) =>
+    imgBounds
+      ? { left: imgBounds.x + pos.x * imgBounds.w, top: imgBounds.y + pos.y * imgBounds.h }
+      : null;
+
+  const handleDotPointerDown = (e: React.PointerEvent, which: "primary" | "secondary") => {
     e.stopPropagation();
     draggingDot.current = which;
     hasMoved.current = false;
@@ -98,17 +131,15 @@ export default function Scouting() {
     if (draggingDot.current === null) return;
     hasMoved.current = true;
     const pos = getNormalized(e.clientX, e.clientY);
+    if (!pos) return;
     pendingDotPos.current = pos;
-    setDotPreview({ which: draggingDot.current, x: pos.x, y: pos.y });
+    setDotPreview({ which: draggingDot.current, ...pos });
   };
 
   const handleContainerPointerUp = (e: React.PointerEvent) => {
     if (draggingDot.current !== null) {
       if (hasMoved.current && pendingDotPos.current) {
-        const key =
-          draggingDot.current === "primary"
-            ? "primaryShotPosition"
-            : "secondaryShotPosition";
+        const key = draggingDot.current === "primary" ? "primaryShotPosition" : "secondaryShotPosition";
         set(key, pendingDotPos.current);
       }
       draggingDot.current = null;
@@ -116,6 +147,7 @@ export default function Scouting() {
       setDotPreview(null);
     } else {
       const pos = getNormalized(e.clientX, e.clientY);
+      if (!pos) return;
       if (state.primaryShotPosition === null) {
         set("primaryShotPosition", pos);
       } else if (state.secondaryShotPosition === null) {
@@ -124,31 +156,106 @@ export default function Scouting() {
     }
   };
 
+  // ── Derived ─────────────────────────────────────────────────────────────
+  const shotCount = state.shots.length;
+  const bumpCount = state.events.filter((e) => e.name === "bump").length;
+  const trenchCount = state.events.filter((e) => e.name === "trench").length;
   const headerLabel = `Team ${team_number || "?"} — Match ${match_number || "?"}`;
 
-  const primaryPos =
-    dotPreview?.which === "primary" ? dotPreview : state.primaryShotPosition;
-  const secondaryPos =
-    dotPreview?.which === "secondary" ? dotPreview : state.secondaryShotPosition;
+  const addShots = (count: number) => {
+    const ts = state.matchStartTime ? (Date.now() - state.matchStartTime) / 1000 : 0;
+    set("shots", [...state.shots, ...Array(count).fill(ts)]);
+  };
 
+  const handleFinish = async () => {
+    const { compressState } = await import("@/lib/stateCompression");
+    navigate(`/review/${compressState(state)}`);
+  };
+
+  // Use preview coords during drag, otherwise committed state
+  const primaryPos = dotPreview?.which === "primary" ? dotPreview : state.primaryShotPosition;
+  const secondaryPos = dotPreview?.which === "secondary" ? dotPreview : state.secondaryShotPosition;
+
+  // ── Reusable action button snippets ────────────────────────────────────
+  const undoBtn = (extraClass = "") => (
+    <button
+      className={`flex flex-col items-center justify-center gap-1 transition-colors
+        ${canUndo
+          ? "bg-rose-100 dark:bg-rose-950/50 hover:bg-rose-200 dark:hover:bg-rose-900/60 active:bg-rose-300 dark:active:bg-rose-900/70 text-rose-700 dark:text-rose-300"
+          : "bg-muted/40 text-muted-foreground/40 pointer-events-none"
+        } ${extraClass}`}
+      onPointerDown={(e) => { e.preventDefault(); if (canUndo) undo(); }}
+    >
+      <Undo2 className="w-6 h-6" />
+      <span className="text-xs font-medium">Undo</span>
+    </button>
+  );
+
+  const nextBtn = (extraClass = "") => (
+    <button
+      className={`flex flex-col items-center justify-center gap-1
+        bg-violet-100 dark:bg-violet-950/50
+        hover:bg-violet-200 dark:hover:bg-violet-900/60
+        active:bg-violet-300 dark:active:bg-violet-900/70
+        text-violet-700 dark:text-violet-300 transition-colors ${extraClass}`}
+      onPointerDown={(e) => { e.preventDefault(); setFrame(2); }}
+    >
+      <ArrowRight className="w-6 h-6" />
+      <span className="text-xs font-medium">Next</span>
+    </button>
+  );
+
+  const backBtn = (extraClass = "") => (
+    <button
+      className={`flex flex-col items-center justify-center gap-1
+        bg-amber-100 dark:bg-amber-950/50
+        hover:bg-amber-200 dark:hover:bg-amber-900/60
+        active:bg-amber-300 dark:active:bg-amber-900/70
+        text-amber-700 dark:text-amber-300 transition-colors ${extraClass}`}
+      onPointerDown={(e) => { e.preventDefault(); setFrame(1); }}
+    >
+      <ArrowLeft className="w-6 h-6" />
+      <span className="text-xs font-medium">Back</span>
+    </button>
+  );
+
+  const finishBtn = (extraClass = "") => (
+    <button
+      className={`flex flex-col items-center justify-center gap-1
+        bg-violet-100 dark:bg-violet-950/50
+        hover:bg-violet-200 dark:hover:bg-violet-900/60
+        active:bg-violet-300 dark:active:bg-violet-900/70
+        text-violet-700 dark:text-violet-300 transition-colors ${extraClass}`}
+      onPointerDown={(e) => { e.preventDefault(); handleFinish(); }}
+    >
+      <Check className="w-6 h-6" />
+      <span className="text-xs font-medium">Finish</span>
+    </button>
+  );
+
+  // ── Header (shared) ─────────────────────────────────────────────────────
+  const Header = () => (
+    <div className="h-12 border-b border-border flex items-center px-4 shrink-0 bg-card gap-2">
+      <span className="font-semibold text-sm">{headerLabel}</span>
+      <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{role}</span>
+      <div className="ml-auto flex items-center gap-1.5">
+        <span className="text-xs text-muted-foreground">Phase</span>
+        <span className="text-xs font-semibold bg-primary/10 text-primary px-2 py-0.5 rounded-full tabular-nums">
+          {PHASE_LABELS[currentPhase] ?? currentPhase}
+        </span>
+      </div>
+    </div>
+  );
+
+  // ── Frame 1 ─────────────────────────────────────────────────────────────
   const Frame1 = () => (
     <div className="h-screen w-screen flex flex-col select-none touch-none overflow-hidden bg-background">
-      {/* Header */}
-      <div className="h-12 border-b border-border flex items-center px-4 shrink-0 bg-card gap-2">
-        <span className="font-semibold text-sm">{headerLabel}</span>
-        <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{role}</span>
-        <div className="ml-auto flex items-center gap-1.5">
-          <span className="text-xs text-muted-foreground">Phase</span>
-          <span className="text-xs font-semibold bg-primary/10 text-primary px-2 py-0.5 rounded-full tabular-nums">
-            {PHASE_LABELS[currentPhase] ?? currentPhase}
-          </span>
-        </div>
-      </div>
+      <Header />
 
-      {/* Button grid */}
-      <div className="flex flex-1 overflow-hidden">
+      {/* Main button grid */}
+      <div className="flex flex-1 overflow-hidden min-h-0">
 
-        {/* Col 1: Shot buttons with score badge */}
+        {/* Col 1: Shot buttons + score badge */}
         <div className="relative flex flex-col flex-[5] border-r border-border">
           {/* +20 */}
           <button
@@ -186,8 +293,8 @@ export default function Scouting() {
           </button>
         </div>
 
-        {/* Col 2: Bump + Trench */}
-        <div className="flex flex-col flex-[5] border-r border-border">
+        {/* Col 2: Bump + Trench — no right border in portrait (it's the last col) */}
+        <div className="flex flex-col flex-[5] portrait:border-r-0 landscape:border-r landscape:border-border">
           {/* Bump */}
           <button
             className="relative flex-1 flex flex-col items-center justify-center overflow-hidden
@@ -197,7 +304,6 @@ export default function Scouting() {
               border-b border-border transition-colors"
             onPointerDown={(e) => { e.preventDefault(); logEvent("bump"); }}
           >
-            {/* Ghost count */}
             <span
               className="absolute font-black select-none leading-none text-sky-400/25 dark:text-sky-400/20 tabular-nums"
               style={{ fontSize: "clamp(5rem, 20vw, 10rem)" }}
@@ -216,7 +322,6 @@ export default function Scouting() {
               transition-colors"
             onPointerDown={(e) => { e.preventDefault(); logEvent("trench"); }}
           >
-            {/* Ghost count */}
             <span
               className="absolute font-black select-none leading-none text-emerald-400/25 dark:text-emerald-400/20 tabular-nums"
               style={{ fontSize: "clamp(5rem, 20vw, 10rem)" }}
@@ -227,49 +332,28 @@ export default function Scouting() {
           </button>
         </div>
 
-        {/* Col 3: Undo + Next */}
-        <div className="flex flex-col flex-[2]">
-          {/* Undo */}
-          <button
-            className={`flex-1 flex flex-col items-center justify-center gap-1 border-b border-border transition-colors
-              ${canUndo
-                ? "bg-rose-100 dark:bg-rose-950/50 hover:bg-rose-200 dark:hover:bg-rose-900/60 active:bg-rose-300 dark:active:bg-rose-900/70 text-rose-700 dark:text-rose-300"
-                : "bg-muted/40 text-muted-foreground/40 pointer-events-none"
-              }`}
-            onPointerDown={(e) => { e.preventDefault(); if (canUndo) undo(); }}
-          >
-            <Undo2 className="w-6 h-6" />
-            <span className="text-xs font-medium">Undo</span>
-          </button>
-
-          {/* Next */}
-          <button
-            className="flex-1 flex flex-col items-center justify-center gap-1
-              bg-violet-100 dark:bg-violet-950/50
-              hover:bg-violet-200 dark:hover:bg-violet-900/60
-              active:bg-violet-300 dark:active:bg-violet-900/70
-              text-violet-700 dark:text-violet-300
-              transition-colors"
-            onPointerDown={(e) => { e.preventDefault(); setFrame(2); }}
-          >
-            <ArrowRight className="w-6 h-6" />
-            <span className="text-xs font-medium">Next</span>
-          </button>
+        {/* Col 3: Undo + Next — landscape only */}
+        <div className="portrait:hidden landscape:flex flex-col flex-[2]">
+          {undoBtn("flex-1 border-b border-border")}
+          {nextBtn("flex-1")}
         </div>
+      </div>
+
+      {/* Bottom bar: Undo | Next — portrait only */}
+      <div className="portrait:flex landscape:hidden h-20 shrink-0 border-t border-border">
+        {undoBtn("flex-1 border-r border-border")}
+        {nextBtn("flex-1")}
       </div>
     </div>
   );
 
+  // ── Frame 2 ─────────────────────────────────────────────────────────────
   const Frame2 = () => (
     <div className="h-screen w-screen flex flex-col select-none touch-none overflow-hidden bg-background">
-      {/* Header */}
-      <div className="h-12 border-b border-border flex items-center px-4 shrink-0 bg-card gap-2">
-        <span className="font-semibold text-sm">{headerLabel}</span>
-        <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{role}</span>
-      </div>
+      <Header />
 
-      <div className="flex flex-1 overflow-hidden">
-        {/* Field image area */}
+      <div className="flex flex-1 overflow-hidden min-h-0">
+        {/* Field image */}
         <div
           ref={imgContainerRef}
           className="relative flex-1 overflow-hidden cursor-crosshair"
@@ -277,29 +361,37 @@ export default function Scouting() {
           onPointerUp={handleContainerPointerUp}
         >
           <img
+            ref={imgRef}
             src={fieldImage}
             alt="Field"
             className="w-full h-full object-contain pointer-events-none"
             draggable={false}
+            onLoad={updateImgBounds}
           />
 
-          {/* Primary dot */}
-          {primaryPos && (
-            <div
-              className="absolute w-8 h-8 rounded-full bg-amber-400 border-2 border-amber-700 shadow-lg cursor-grab active:cursor-grabbing -translate-x-1/2 -translate-y-1/2"
-              style={{ left: `${primaryPos.x * 100}%`, top: `${primaryPos.y * 100}%` }}
-              onPointerDown={(e) => handleDotPointerDown(e, "primary")}
-            />
-          )}
+          {/* Primary dot — positioned relative to actual image rect */}
+          {primaryPos && toContainerPx(primaryPos) && (() => {
+            const px = toContainerPx(primaryPos)!;
+            return (
+              <div
+                className="absolute w-8 h-8 rounded-full bg-amber-400 border-2 border-amber-700 shadow-lg cursor-grab active:cursor-grabbing -translate-x-1/2 -translate-y-1/2"
+                style={{ left: px.left, top: px.top }}
+                onPointerDown={(e) => handleDotPointerDown(e, "primary")}
+              />
+            );
+          })()}
 
           {/* Secondary dot */}
-          {secondaryPos && (
-            <div
-              className="absolute w-8 h-8 rounded-full bg-violet-400 border-2 border-violet-700 shadow-lg cursor-grab active:cursor-grabbing -translate-x-1/2 -translate-y-1/2"
-              style={{ left: `${secondaryPos.x * 100}%`, top: `${secondaryPos.y * 100}%` }}
-              onPointerDown={(e) => handleDotPointerDown(e, "secondary")}
-            />
-          )}
+          {secondaryPos && toContainerPx(secondaryPos) && (() => {
+            const px = toContainerPx(secondaryPos)!;
+            return (
+              <div
+                className="absolute w-8 h-8 rounded-full bg-violet-400 border-2 border-violet-700 shadow-lg cursor-grab active:cursor-grabbing -translate-x-1/2 -translate-y-1/2"
+                style={{ left: px.left, top: px.top }}
+                onPointerDown={(e) => handleDotPointerDown(e, "secondary")}
+              />
+            );
+          })()}
 
           {/* Legend */}
           <div className="absolute bottom-2 left-2 text-xs bg-card/80 border border-border rounded-md px-2 py-1 pointer-events-none flex items-center gap-2">
@@ -310,49 +402,19 @@ export default function Scouting() {
           </div>
         </div>
 
-        {/* Sidebar */}
-        <div className="w-24 flex flex-col border-l border-border shrink-0">
-          {/* Back */}
-          <button
-            className="flex-1 flex flex-col items-center justify-center gap-1 border-b border-border
-              bg-amber-100 dark:bg-amber-950/50
-              hover:bg-amber-200 dark:hover:bg-amber-900/60
-              active:bg-amber-300 dark:active:bg-amber-900/70
-              text-amber-700 dark:text-amber-300
-              transition-colors"
-            onPointerDown={(e) => { e.preventDefault(); setFrame(1); }}
-          >
-            <ArrowLeft className="w-6 h-6" />
-            <span className="text-xs font-medium">Back</span>
-          </button>
-
-          {/* Undo */}
-          <button
-            className={`flex-1 flex flex-col items-center justify-center gap-1 border-b border-border transition-colors
-              ${canUndo
-                ? "bg-rose-100 dark:bg-rose-950/50 hover:bg-rose-200 dark:hover:bg-rose-900/60 active:bg-rose-300 dark:active:bg-rose-900/70 text-rose-700 dark:text-rose-300"
-                : "bg-muted/40 text-muted-foreground/40 pointer-events-none"
-              }`}
-            onPointerDown={(e) => { e.preventDefault(); if (canUndo) undo(); }}
-          >
-            <Undo2 className="w-6 h-6" />
-            <span className="text-xs font-medium">Undo</span>
-          </button>
-
-          {/* Finish */}
-          <button
-            className="flex-1 flex flex-col items-center justify-center gap-1
-              bg-violet-100 dark:bg-violet-950/50
-              hover:bg-violet-200 dark:hover:bg-violet-900/60
-              active:bg-violet-300 dark:active:bg-violet-900/70
-              text-violet-700 dark:text-violet-300
-              transition-colors"
-            onPointerDown={(e) => { e.preventDefault(); handleFinish(); }}
-          >
-            <Check className="w-6 h-6" />
-            <span className="text-xs font-medium">Finish</span>
-          </button>
+        {/* Sidebar: Back | Undo | Finish — landscape only */}
+        <div className="portrait:hidden landscape:flex w-24 flex-col border-l border-border shrink-0">
+          {backBtn("flex-1 border-b border-border")}
+          {undoBtn("flex-1 border-b border-border")}
+          {finishBtn("flex-1")}
         </div>
+      </div>
+
+      {/* Bottom bar: Back | Undo | Finish — portrait only */}
+      <div className="portrait:flex landscape:hidden h-20 shrink-0 border-t border-border">
+        {backBtn("flex-1 border-r border-border")}
+        {undoBtn("flex-1 border-r border-border")}
+        {finishBtn("flex-1")}
       </div>
     </div>
   );
