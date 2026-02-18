@@ -11,7 +11,7 @@ import { supabase } from "./supabase";
 /**
  * Current schema version - increment when scouting data structure changes
  */
-export const CURRENT_SCHEMA_VERSION = 2;
+export const CURRENT_SCHEMA_VERSION = 3;
 
 /**
  * Schema version metadata
@@ -148,6 +148,32 @@ function migrateV1ToV2(data: Record<string, any>): Record<string, any> {
 }
 
 /**
+ * Migrate V2 (event-based with x/y shots) to V3 (flat timestamp shots, renamed events)
+ */
+function migrateV2ToV3(data: Record<string, any>): Record<string, any> {
+  // shots: {x,y,timestamp}[] → number[]
+  const oldShots = Array.isArray(data.shots) ? data.shots : [];
+  const newShots: number[] = oldShots.map((s: any) =>
+    typeof s === "number" ? s : (s?.timestamp ?? 0)
+  );
+
+  // events: {type,timestamp} → {name,t}
+  const oldEvents = Array.isArray(data.events) ? data.events : [];
+  const newEvents = oldEvents.map((e: any) => ({
+    name: e?.name ?? e?.type ?? "unknown",
+    t: e?.t ?? e?.timestamp ?? 0,
+  }));
+
+  return {
+    ...data,
+    shots: newShots,
+    events: newEvents,
+    primaryShotPosition: data.primaryShotPosition ?? null,
+    secondaryShotPosition: data.secondaryShotPosition ?? null,
+  };
+}
+
+/**
  * Apply a specific migration step
  */
 function applyMigration(
@@ -165,6 +191,9 @@ function applyMigration(
 
     case 2:
       return migrateV1ToV2(data);
+
+    case 3:
+      return migrateV2ToV3(data);
 
     default:
       console.warn(`No migration defined for v${fromVersion} to v${toVersion}`);

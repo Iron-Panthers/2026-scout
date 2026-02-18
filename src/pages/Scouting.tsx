@@ -1,127 +1,36 @@
-import { useState, useEffect, useRef } from "react";
-import { Button } from "@/components/ui/button";
-import { MoreVertical, Undo, RotateCcw, Send } from "lucide-react";
-// import { cn } from "@/lib/utils";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
-import type { ActionButton, ModalOption } from "@/types/actionButtons";
-import ActionModal from "@/components/scouting/ActionModal";
-import ScoutingCanvas from "@/components/scouting/ScoutingCanvas";
-import StartMatchOverlay from "@/components/scouting/StartMatchOverlay";
-import PhaseTransitionOverlay from "@/components/scouting/PhaseTransitionOverlay";
+import { useState, useRef, useCallback, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { Undo2, ArrowRight, ArrowLeft, Check } from "lucide-react";
 import { useScoutingReducer } from "@/lib/useScoutingReducer";
 import { useMatchTimer } from "@/lib/useMatchTimer";
-import type { Phase } from "@/lib/ScoutingReducer";
-// import type { ScoutingData } from "@/lib/ScoutingReducer";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import StartMatchOverlay from "@/components/scouting/StartMatchOverlay";
+import fieldImage from "@/assets/FE-2026-_REBUILT_Playing_Field_With_Fuel.png";
 
 export default function Scouting() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  // Read all parameters from query string
   const match_id = searchParams.get("match_id") || "";
   const role = searchParams.get("role") || "";
   const event_code = searchParams.get("event_code") || "";
   const match_number = parseInt(searchParams.get("match_number") || "0");
   const team_number = parseInt(searchParams.get("team_number") || "0");
-  const match_type = parseInt(searchParams.get("type") || "qual");
+  const match_type = searchParams.get("type") || "qual";
 
-  const [selected, setSelected] = useState("");
-  const [orientation, setOrientation] = useState<0 | 90 | 180 | 270>(0);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [modalConfig, setModalConfig] = useState<{
-    title: string;
-    action: string;
-    options: ModalOption[];
-    buttonId: string;
-  } | null>(null);
-
-  // Button press tracking for visual feedback (only for animation)
-  const [pressedButtonId, setPressedButtonId] = useState<string | null>(null);
-
-  // Use the reducer hook instead of useState
   const { state, set, logEvent, undo, canUndo } = useScoutingReducer(
     match_id || "",
     role || "",
     event_code,
     match_number,
-    team_number
+    team_number,
+    match_type
   );
 
-  // Continuous match timer
-  const {
-    hasStarted,
-    currentPhase,
-    phaseTimeRemaining,
-    phaseDuration,
-    phaseProgress,
-    startMatch: startMatchTimer,
-    resetMatch,
-    skipToPhase,
-  } = useMatchTimer();
+  const { hasStarted, startMatch: startMatchTimer, currentPhase } = useMatchTimer();
 
-  // Wrap startMatch to also record the match start time in scouting state
-  const startMatch = () => {
-    const now = Date.now();
-    set("matchStartTime", now);
-    startMatchTimer();
-  };
-
-  // Track phase transitions for overlay
-  const [showPhaseTransition, setShowPhaseTransition] = useState(false);
-  const prevPhaseTimeRef = useRef(phaseTimeRemaining);
-  const prevPhaseRef = useRef(currentPhase);
-
-  // Detect when phase time hits 0 to show transition overlay
-  useEffect(() => {
-    if (
-      hasStarted &&
-      prevPhaseTimeRef.current > 0 &&
-      phaseTimeRemaining === 0
-    ) {
-      setShowPhaseTransition(true);
-      // Auto-dismiss after 3 seconds
-      const timeout = setTimeout(() => {
-        setShowPhaseTransition(false);
-      }, 3000);
-      return () => clearTimeout(timeout);
-    }
-    prevPhaseTimeRef.current = phaseTimeRemaining;
-  }, [phaseTimeRemaining, hasStarted]);
-
-  // Dismiss overlay when user manually changes phase
-  useEffect(() => {
-    if (prevPhaseRef.current !== currentPhase) {
-      setShowPhaseTransition(false);
-      prevPhaseRef.current = currentPhase;
-    }
-  }, [currentPhase]);
-
-  // Dismiss overlay when match is reset
-  useEffect(() => {
-    if (!hasStarted) {
-      setShowPhaseTransition(false);
-    }
-  }, [hasStarted]);
-
-  // Format seconds as M:SS (whole seconds only)
-  const formatTime = (seconds: number) => {
-    const wholeSeconds = Math.floor(seconds);
-    const m = Math.floor(wholeSeconds / 60);
-    const s = wholeSeconds % 60;
-    return `${m}:${s.toString().padStart(2, "0")}`;
-  };
-
-  // Phase names for display
-  const PHASE_DISPLAY_NAMES: Record<Phase, string> = {
+  const PHASE_LABELS: Record<string, string> = {
     auto: "Auto",
-    "transition-shift": "T Shift",
+    "transition-shift": "T-Shift",
     phase1: "Shift 1",
     phase2: "Shift 2",
     phase3: "Shift 3",
@@ -129,537 +38,396 @@ export default function Scouting() {
     endgame: "Endgame",
   };
 
-  // All phases in order and abbreviations
-  const phases: Phase[] = [
-    "auto",
-    "transition-shift",
-    "phase1",
-    "phase2",
-    "phase3",
-    "phase4",
-    "endgame",
-  ];
+  const startMatch = () => {
+    set("matchStartTime", Date.now());
+    startMatchTimer();
+  };
 
-  const currentPhaseIndex = phases.indexOf(currentPhase);
+  const [frame, setFrame] = useState<1 | 2>(1);
 
-  // Get next phase name for overlay
-  const nextPhaseName =
-    currentPhaseIndex < phases.length - 1
-      ? PHASE_DISPLAY_NAMES[phases[currentPhaseIndex + 1]]
+  // ── Dot drag state ──────────────────────────────────────────────────────
+  const draggingDot = useRef<"primary" | "secondary" | null>(null);
+  const pendingDotPos = useRef<{ x: number; y: number } | null>(null);
+  const hasMoved = useRef(false);
+  const imgContainerRef = useRef<HTMLDivElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
+  const [dotPreview, setDotPreview] = useState<{
+    which: "primary" | "secondary";
+    x: number;
+    y: number;
+  } | null>(null);
+
+  // Tracks the actual rendered image rect within the container (px, relative to container top-left).
+  // Needed because object-contain leaves letterbox/pillarbox space that should not count.
+  const [imgBounds, setImgBounds] = useState<{
+    x: number; y: number; w: number; h: number;
+  } | null>(null);
+
+  const updateImgBounds = useCallback(() => {
+    const container = imgContainerRef.current;
+    const img = imgRef.current;
+    if (!container || !img || !img.naturalWidth) return;
+
+    const cW = container.clientWidth;
+    const cH = container.clientHeight;
+    const iAspect = img.naturalWidth / img.naturalHeight;
+    const cAspect = cW / cH;
+
+    let iW: number, iH: number, iX: number, iY: number;
+    if (cAspect > iAspect) {
+      // Wider container → pillarboxed (empty on left/right)
+      iH = cH; iW = cH * iAspect;
+      iX = (cW - iW) / 2; iY = 0;
+    } else {
+      // Taller container → letterboxed (empty on top/bottom)
+      iW = cW; iH = cW / iAspect;
+      iX = 0; iY = (cH - iH) / 2;
+    }
+    setImgBounds({ x: iX, y: iY, w: iW, h: iH });
+  }, []);
+
+  // Set up ResizeObserver when Frame 2 mounts
+  useEffect(() => {
+    if (frame !== 2) return;
+    const container = imgContainerRef.current;
+    if (!container) return;
+    updateImgBounds();
+    const ro = new ResizeObserver(updateImgBounds);
+    ro.observe(container);
+    return () => ro.disconnect();
+  }, [frame, updateImgBounds]);
+
+  // Convert viewport pointer coords → normalized image coords (0–1 from image top-left).
+  // Returns null if bounds not ready.
+  const getNormalized = useCallback(
+    (clientX: number, clientY: number): { x: number; y: number } | null => {
+      const container = imgContainerRef.current;
+      if (!container || !imgBounds) return null;
+      const rect = container.getBoundingClientRect();
+      const relX = clientX - rect.left;
+      const relY = clientY - rect.top;
+      return {
+        x: Math.min(1, Math.max(0, (relX - imgBounds.x) / imgBounds.w)),
+        y: Math.min(1, Math.max(0, (relY - imgBounds.y) / imgBounds.h)),
+      };
+    },
+    [imgBounds]
+  );
+
+  // Convert normalized image coords → px offset from container top-left (for absolute positioning).
+  const toContainerPx = (pos: { x: number; y: number }) =>
+    imgBounds
+      ? { left: imgBounds.x + pos.x * imgBounds.w, top: imgBounds.y + pos.y * imgBounds.h }
       : null;
 
-  // Phase navigation removed - timer auto-advances phases
-
-  // Check if we're scouting a blue alliance team (rotate buttons 180° for blue side)
-  const isBlueAlliance = role.toLowerCase().startsWith("blue");
-
-  // Helper to rotate button positions 180° (flip on both x and y axes)
-  const rotateButton180 = (btn: ActionButton): ActionButton => {
-    if (!isBlueAlliance) return btn;
-    return {
-      ...btn,
-      x: 1 - btn.x - btn.w,
-      y: 1 - btn.y - btn.h,
-    };
+  const handleDotPointerDown = (e: React.PointerEvent, which: "primary" | "secondary") => {
+    e.stopPropagation();
+    draggingDot.current = which;
+    hasMoved.current = false;
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
   };
 
-  // Define action buttons directly in TypeScript (positions for red alliance)
-  const baseActionButtons: ActionButton[] = [
-    {
-      id: "depot-intake",
-      title: "Depot",
-      x: 0.05,
-      y: 0.235,
-      w: 0.08,
-      h: 0.11,
-      color: "#ff5555",
-      type: "direct",
-      action: "recordDepotIntake",
-      repeatable: false,
-    },
-    {
-      id: "climb-modal",
-      title: "Climb",
-      x: 0.05,
-      y: 0.45,
-      w: 0.08,
-      h: 0.155,
-      color: "#facc15",
-      type: "modal",
-      action: "recordClimb",
-      options: [
-        {
-          label: "Climb L3",
-          payload: "L3",
-          color: "#facc15",
-        },
-        {
-          label: "Climb L2",
-          payload: "L2",
-          color: "#facc15",
-        },
-        {
-          label: "Climb L1",
-          payload: "L1",
-          color: "#facc15",
-        },
-      ],
-    },
-    // Bump buttons (4 across field) - Brown/tan color
-    {
-      id: "bump-left-home",
-      title: "Bump",
-      x: 0.27,
-      y: 0.24,
-      w: 0.065,
-      h: 0.18,
-      color: "#fb923c",
-      type: "direct",
-      action: "recordBumpLeftHome",
-    },
-    {
-      id: "bump-right-home",
-      title: "Bump",
-      x: 0.27,
-      y: 0.58,
-      w: 0.065,
-      h: 0.18,
-      color: "#fb923c",
-      type: "direct",
-      action: "recordBumpRightHome",
-    },
-    {
-      id: "bump-left-away",
-      title: "Bump",
-      x: 0.67,
-      y: 0.24,
-      w: 0.065,
-      h: 0.18,
-      color: "#fb923c",
-      type: "direct",
-      action: "recordBumpLeftAway",
-    },
-    {
-      id: "bump-right-away",
-      title: "Bump",
-      x: 0.67,
-      y: 0.58,
-      w: 0.065,
-      h: 0.18,
-      color: "#fb923c",
-      type: "direct",
-      action: "recordBumpRightAway",
-    },
-    // Trench buttons (4 across field) - Cyan/blue color
-    {
-      id: "trench-left-home",
-      title: "Trench",
-      x: 0.27,
-      y: 0.06,
-      w: 0.065,
-      h: 0.15,
-      color: "#22d3ee",
-      type: "direct",
-      action: "recordTrenchLeftHome",
-    },
-    {
-      id: "trench-right-home",
-      title: "Trench",
-      x: 0.27,
-      y: 0.79,
-      w: 0.065,
-      h: 0.15,
-      color: "#22d3ee",
-      type: "direct",
-      action: "recordTrenchRightHome",
-    },
-    {
-      id: "trench-left-away",
-      title: "Trench",
-      x: 0.67,
-      y: 0.06,
-      w: 0.065,
-      h: 0.15,
-      color: "#22d3ee",
-      type: "direct",
-      action: "recordTrenchLeftAway",
-    },
-    {
-      id: "trench-right-away",
-      title: "Trench",
-      x: 0.67,
-      y: 0.79,
-      w: 0.065,
-      h: 0.15,
-      color: "#22d3ee",
-      type: "direct",
-      action: "recordTrenchRightAway",
-    },
-    // Outpost modal (left side of field) - Orange/amber color
-    {
-      id: "outpost-modal",
-      title: "Outpost",
-      x: 0.05,
-      y: 0.8,
-      w: 0.08,
-      h: 0.12,
-      color: "#ff7849",
-      type: "modal",
-      action: "recordOutpost",
-      options: [
-        {
-          label: "Intake from Outpost",
-          payload: "intake",
-          color: "#ff7849",
-        },
-        {
-          label: "Feed Outpost",
-          payload: "feed",
-          color: "#ff7849",
-        },
-      ],
-    },
-  ];
+  const handleContainerPointerMove = (e: React.PointerEvent) => {
+    if (draggingDot.current === null) return;
+    hasMoved.current = true;
+    const pos = getNormalized(e.clientX, e.clientY);
+    if (!pos) return;
+    pendingDotPos.current = pos;
+    setDotPreview({ which: draggingDot.current, ...pos });
+  };
 
-  // Apply 180° rotation for blue alliance scouting
-  const actionButtons = baseActionButtons.map(rotateButton180);
-
-  // Derive button press counts from actual state.events
-  // This ensures counts sync with undo/redo operations
-  const getButtonPressCounts = (): Record<string, number> => {
-    const counts: Record<string, number> = {};
-
-    // Map button IDs to their event type patterns
-    const buttonEventMap: Record<string, string | RegExp> = {
-      "depot-intake": "depotIntakes",
-      "climb-modal": /^climb(L1|L2|L3)$/,
-      "bump-left-home": "bumpLeftHome",
-      "bump-right-home": "bumpRightHome",
-      "bump-left-away": "bumpLeftAway",
-      "bump-right-away": "bumpRightAway",
-      "trench-left-home": "trenchLeftHome",
-      "trench-right-home": "trenchRightHome",
-      "trench-left-away": "trenchLeftAway",
-      "trench-right-away": "trenchRightAway",
-      "outpost-modal": /^outpost(Intake|Feed)$/,
-    };
-
-    // Count events for each button
-    Object.entries(buttonEventMap).forEach(([buttonId, pattern]) => {
-      if (typeof pattern === "string") {
-        counts[buttonId] = state.events.filter(e => e.type === pattern).length;
-      } else {
-        counts[buttonId] = state.events.filter(e => pattern.test(e.type)).length;
+  const handleContainerPointerUp = (e: React.PointerEvent) => {
+    if (draggingDot.current !== null) {
+      if (hasMoved.current && pendingDotPos.current) {
+        const key = draggingDot.current === "primary" ? "primaryShotPosition" : "secondaryShotPosition";
+        set(key, pendingDotPos.current);
       }
-    });
-
-    return counts;
-  };
-
-  const buttonPressCounts = getButtonPressCounts();
-
-  // Action handlers defined inline
-  const handleAction = (
-    actionName: string,
-    payload?: string
-    // button?: ActionButton
-  ) => {
-    switch (actionName) {
-      case "recordDepotIntake":
-        logEvent("depotIntakes");
-        break;
-      case "recordClimb":
-        logEvent(`climb${payload}`);
-        break;
-      // Bump events
-      case "recordBumpLeftHome":
-        logEvent("bumpLeftHome");
-        break;
-      case "recordBumpRightHome":
-        logEvent("bumpRightHome");
-        break;
-      case "recordBumpLeftAway":
-        logEvent("bumpLeftAway");
-        break;
-      case "recordBumpRightAway":
-        logEvent("bumpRightAway");
-        break;
-      // Trench events
-      case "recordTrenchLeftHome":
-        logEvent("trenchLeftHome");
-        break;
-      case "recordTrenchRightHome":
-        logEvent("trenchRightHome");
-        break;
-      case "recordTrenchLeftAway":
-        logEvent("trenchLeftAway");
-        break;
-      case "recordTrenchRightAway":
-        logEvent("trenchRightAway");
-        break;
-      // Outpost events
-      case "recordOutpost":
-        logEvent(
-          `outpost${payload?.charAt(0).toUpperCase()}${payload?.slice(1)}`
-        );
-        break;
-      default:
-        console.warn(`Action handler not found: ${actionName}`);
-    }
-  };
-
-  const handleButtonClick = (button: ActionButton) => {
-    // Check if non-repeatable button has already been pressed
-    if (button.repeatable === false && buttonPressCounts[button.id] > 0) {
-      return; // Don't allow clicking non-repeatable buttons again
-    }
-
-    if (button.type === "direct" && button.action) {
-      // Show press animation
-      setPressedButtonId(button.id);
-      setTimeout(() => setPressedButtonId(null), 200);
-
-      handleAction(button.action, button.payload);
-    } else if (button.type === "modal" && button.options && button.action) {
-      // Check if non-repeatable modal has already been used
-      if (button.repeatable === false && buttonPressCounts[button.id] > 0) {
-        return;
+      draggingDot.current = null;
+      pendingDotPos.current = null;
+      setDotPreview(null);
+    } else {
+      const pos = getNormalized(e.clientX, e.clientY);
+      if (!pos) return;
+      if (state.primaryShotPosition === null) {
+        set("primaryShotPosition", pos);
+      } else if (state.secondaryShotPosition === null) {
+        set("secondaryShotPosition", pos);
       }
-
-      setModalConfig({
-        title: button.title,
-        action: button.action,
-        options: button.options,
-        buttonId: button.id,
-      });
-      setModalOpen(true);
     }
   };
 
-  const handleModalOptionSelect = (option: ModalOption) => {
-    if (modalConfig?.action) {
-      handleAction(modalConfig.action, option.payload);
-    }
+  // ── Derived ─────────────────────────────────────────────────────────────
+  const shotCount = state.shots.length;
+  const bumpCount = state.events.filter((e) => e.name === "bump").length;
+  const trenchCount = state.events.filter((e) => e.name === "trench").length;
+  const headerLabel = `Team ${team_number || "?"} — Match ${match_number || "?"}`;
+
+  const addShots = (count: number) => {
+    const ts = state.matchStartTime ? (Date.now() - state.matchStartTime) / 1000 : 0;
+    set("shots", [...state.shots, ...Array(count).fill(ts)]);
   };
 
-  const handleShotClick = (x: number, y: number, timestamp: number) => {
-    const shotCount = selected === "1x" ? 1 : selected === "5x" ? 5 : 10;
-    // Convert absolute timestamp to seconds into the match
-    const relativeTimestamp = state.matchStartTime
-      ? (timestamp - state.matchStartTime) / 1000
-      : timestamp;
-    const newShots = Array.from({ length: shotCount }, () => ({
-      x,
-      y,
-      timestamp: relativeTimestamp,
-    }));
-
-    set("shots", [...state.shots, ...newShots]);
+  const handleFinish = async () => {
+    const { compressState } = await import("@/lib/stateCompression");
+    navigate(`/review/${compressState(state)}`);
   };
 
-  const getShotMultiplier = (): number => {
-    if (selected === "1x") return 1;
-    if (selected === "5x") return 5;
-    if (selected === "10x") return 10;
-    return 0;
-  };
+  // Use preview coords during drag, otherwise committed state
+  const primaryPos = dotPreview?.which === "primary" ? dotPreview : state.primaryShotPosition;
+  const secondaryPos = dotPreview?.which === "secondary" ? dotPreview : state.secondaryShotPosition;
 
-  return (
-    <div className="h-screen w-screen bg-background flex overflow-hidden relative">
-      {/* Phase Timer & Shifter - Bottom Right */}
-      <div className="fixed bottom-1 right-1 md:bottom-2 md:right-2 lg:bottom-3 lg:right-3 z-50 flex flex-col items-center gap-0.5 md:gap-1">
-        {/* Timer Display */}
-        <div className="flex flex-col items-center mb-0.5 md:mb-1">
-          <span className="text-[9px] md:text-xs lg:text-sm text-white font-bold leading-none mb-0.5 md:mb-1">
-            {PHASE_DISPLAY_NAMES[currentPhase]}
-          </span>
-          <div
-            className="relative w-11 h-11 md:w-16 md:h-16 lg:w-20 lg:h-20 xl:w-24 xl:h-24 flex items-center justify-center rounded-full border-2 md:border-3 lg:border-4 bg-black"
-            style={{
-              borderColor:
-                phaseTimeRemaining <= 5 && phaseTimeRemaining > 0 && hasStarted
-                  ? "#ef4444"
-                  : phaseProgress < 0.5
-                  ? "#22c55e"
-                  : phaseProgress < 0.8
-                  ? "#eab308"
-                  : "#ef4444",
-              background: `conic-gradient(${
-                phaseProgress < 0.5
-                  ? "#22c55e"
-                  : phaseProgress < 0.8
-                  ? "#eab308"
-                  : "#ef4444"
-              } ${phaseProgress * 360}deg, black ${phaseProgress * 360}deg)`,
-            }}
+  // ── Reusable action button snippets ────────────────────────────────────
+  const undoBtn = (extraClass = "") => (
+    <button
+      className={`flex flex-col items-center justify-center gap-1 transition-colors
+        ${canUndo
+          ? "bg-rose-100 dark:bg-rose-950/50 hover:bg-rose-200 dark:hover:bg-rose-900/60 active:bg-rose-300 dark:active:bg-rose-900/70 text-rose-700 dark:text-rose-300"
+          : "bg-muted/40 text-muted-foreground/40 pointer-events-none"
+        } ${extraClass}`}
+      onPointerDown={(e) => { e.preventDefault(); if (canUndo) undo(); }}
+    >
+      <Undo2 className="w-6 h-6" />
+      <span className="text-xs font-medium">Undo</span>
+    </button>
+  );
+
+  const nextBtn = (extraClass = "") => (
+    <button
+      className={`flex flex-col items-center justify-center gap-1
+        bg-violet-100 dark:bg-violet-950/50
+        hover:bg-violet-200 dark:hover:bg-violet-900/60
+        active:bg-violet-300 dark:active:bg-violet-900/70
+        text-violet-700 dark:text-violet-300 transition-colors ${extraClass}`}
+      onPointerDown={(e) => { e.preventDefault(); setFrame(2); }}
+    >
+      <ArrowRight className="w-6 h-6" />
+      <span className="text-xs font-medium">Next</span>
+    </button>
+  );
+
+  const backBtn = (extraClass = "") => (
+    <button
+      className={`flex flex-col items-center justify-center gap-1
+        bg-amber-100 dark:bg-amber-950/50
+        hover:bg-amber-200 dark:hover:bg-amber-900/60
+        active:bg-amber-300 dark:active:bg-amber-900/70
+        text-amber-700 dark:text-amber-300 transition-colors ${extraClass}`}
+      onPointerDown={(e) => { e.preventDefault(); setFrame(1); }}
+    >
+      <ArrowLeft className="w-6 h-6" />
+      <span className="text-xs font-medium">Back</span>
+    </button>
+  );
+
+  const finishBtn = (extraClass = "") => (
+    <button
+      className={`flex flex-col items-center justify-center gap-1
+        bg-violet-100 dark:bg-violet-950/50
+        hover:bg-violet-200 dark:hover:bg-violet-900/60
+        active:bg-violet-300 dark:active:bg-violet-900/70
+        text-violet-700 dark:text-violet-300 transition-colors ${extraClass}`}
+      onPointerDown={(e) => { e.preventDefault(); handleFinish(); }}
+    >
+      <Check className="w-6 h-6" />
+      <span className="text-xs font-medium">Finish</span>
+    </button>
+  );
+
+  // ── Header (shared) ─────────────────────────────────────────────────────
+  const Header = () => (
+    <div className="h-12 border-b border-border flex items-center px-4 shrink-0 bg-card gap-2">
+      <span className="font-semibold text-sm">{headerLabel}</span>
+      <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{role}</span>
+      <div className="ml-auto flex items-center gap-1.5">
+        <span className="text-xs text-muted-foreground">Phase</span>
+        <span className="text-xs font-semibold bg-primary/10 text-primary px-2 py-0.5 rounded-full tabular-nums">
+          {PHASE_LABELS[currentPhase] ?? currentPhase}
+        </span>
+      </div>
+    </div>
+  );
+
+  // ── Frame 1 ─────────────────────────────────────────────────────────────
+  const Frame1 = () => (
+    <div className="h-screen w-screen flex flex-col select-none touch-none overflow-hidden bg-background">
+      <Header />
+
+      {/* Main button grid */}
+      <div className="flex flex-1 overflow-hidden min-h-0">
+
+        {/* Col 1: Shot buttons + score badge */}
+        <div className="relative flex flex-col flex-[5] border-r border-border">
+          {/* +20 */}
+          <button
+            className="flex-1 flex flex-col items-center justify-center
+              bg-amber-100 dark:bg-amber-950/50
+              hover:bg-amber-200 dark:hover:bg-amber-900/60
+              active:bg-amber-300 dark:active:bg-amber-900/70
+              border-b border-border transition-colors"
+            onPointerDown={(e) => { e.preventDefault(); addShots(20); }}
+          >
+            <div className="w-20 h-20 rounded-full border-2 border-amber-400/70 dark:border-amber-500/50 flex items-center justify-center bg-amber-50/60 dark:bg-amber-900/30">
+              <span className="text-2xl font-bold text-amber-700 dark:text-amber-300 tabular-nums">+20</span>
+            </div>
+          </button>
+
+          {/* Score badge straddling the border */}
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10 pointer-events-none">
+            <div className="bg-card border-2 border-border rounded-full w-14 h-14 flex items-center justify-center shadow-md">
+              <span className="text-2xl font-black tabular-nums text-foreground leading-none">{shotCount}</span>
+            </div>
+          </div>
+
+          {/* +5 */}
+          <button
+            className="flex-1 flex flex-col items-center justify-center
+              bg-amber-50 dark:bg-amber-950/30
+              hover:bg-amber-100 dark:hover:bg-amber-900/40
+              active:bg-amber-200 dark:active:bg-amber-900/50
+              transition-colors"
+            onPointerDown={(e) => { e.preventDefault(); addShots(5); }}
+          >
+            <div className="w-20 h-20 rounded-full border-2 border-amber-300/60 dark:border-amber-600/40 flex items-center justify-center bg-white/40 dark:bg-amber-950/20">
+              <span className="text-2xl font-bold text-amber-600 dark:text-amber-400 tabular-nums">+5</span>
+            </div>
+          </button>
+        </div>
+
+        {/* Col 2: Bump + Trench — no right border in portrait (it's the last col) */}
+        <div className="flex flex-col flex-[5] portrait:border-r-0 landscape:border-r landscape:border-border">
+          {/* Bump */}
+          <button
+            className="relative flex-1 flex flex-col items-center justify-center overflow-hidden
+              bg-sky-100 dark:bg-sky-950/50
+              hover:bg-sky-200 dark:hover:bg-sky-900/60
+              active:bg-sky-300 dark:active:bg-sky-900/70
+              border-b border-border transition-colors"
+            onPointerDown={(e) => { e.preventDefault(); logEvent("bump"); }}
           >
             <span
-              className="absolute text-xs md:text-base lg:text-lg xl:text-xl font-bold text-white"
-              style={{
-                fontFamily:
-                  'ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, "DejaVu Sans Mono", monospace',
-                fontVariantNumeric: "tabular-nums",
-              }}
+              className="absolute font-black select-none leading-none text-sky-400/25 dark:text-sky-400/20 tabular-nums"
+              style={{ fontSize: "clamp(5rem, 20vw, 10rem)" }}
             >
-              {formatTime(phaseTimeRemaining)}
+              {bumpCount}
             </span>
+            <span className="relative text-3xl font-semibold text-sky-800 dark:text-sky-200">Bump</span>
+          </button>
+
+          {/* Trench */}
+          <button
+            className="relative flex-1 flex flex-col items-center justify-center overflow-hidden
+              bg-emerald-100 dark:bg-emerald-950/50
+              hover:bg-emerald-200 dark:hover:bg-emerald-900/60
+              active:bg-emerald-300 dark:active:bg-emerald-900/70
+              transition-colors"
+            onPointerDown={(e) => { e.preventDefault(); logEvent("trench"); }}
+          >
+            <span
+              className="absolute font-black select-none leading-none text-emerald-400/25 dark:text-emerald-400/20 tabular-nums"
+              style={{ fontSize: "clamp(5rem, 20vw, 10rem)" }}
+            >
+              {trenchCount}
+            </span>
+            <span className="relative text-3xl font-semibold text-emerald-800 dark:text-emerald-200">Trench</span>
+          </button>
+        </div>
+
+        {/* Col 3: Undo + Next — landscape only */}
+        <div className="portrait:hidden landscape:flex flex-col flex-[2]">
+          {undoBtn("flex-1 border-b border-border")}
+          {nextBtn("flex-1")}
+        </div>
+      </div>
+
+      {/* Bottom bar: Undo | Next — portrait only */}
+      <div className="portrait:flex landscape:hidden h-20 shrink-0 border-t border-border">
+        {undoBtn("flex-1 border-r border-border")}
+        {nextBtn("flex-1")}
+      </div>
+    </div>
+  );
+
+  // ── Frame 2 ─────────────────────────────────────────────────────────────
+  const Frame2 = () => (
+    <div className="h-screen w-screen flex flex-col select-none touch-none overflow-hidden bg-background">
+      <Header />
+
+      <div className="flex flex-1 overflow-hidden min-h-0">
+        {/* Field image */}
+        <div
+          ref={imgContainerRef}
+          className="relative flex-1 overflow-hidden cursor-crosshair"
+          onPointerMove={handleContainerPointerMove}
+          onPointerUp={handleContainerPointerUp}
+        >
+          <img
+            ref={imgRef}
+            src={fieldImage}
+            alt="Field"
+            className="w-full h-full object-contain pointer-events-none"
+            draggable={false}
+            onLoad={updateImgBounds}
+          />
+
+          {/* Primary dot — positioned relative to actual image rect */}
+          {primaryPos && toContainerPx(primaryPos) && (() => {
+            const px = toContainerPx(primaryPos)!;
+            return (
+              <div
+                className="absolute w-8 h-8 rounded-full bg-amber-400 border-2 border-amber-700 shadow-lg cursor-grab active:cursor-grabbing -translate-x-1/2 -translate-y-1/2"
+                style={{ left: px.left, top: px.top }}
+                onPointerDown={(e) => handleDotPointerDown(e, "primary")}
+              />
+            );
+          })()}
+
+          {/* Secondary dot */}
+          {secondaryPos && toContainerPx(secondaryPos) && (() => {
+            const px = toContainerPx(secondaryPos)!;
+            return (
+              <div
+                className="absolute w-8 h-8 rounded-full bg-violet-400 border-2 border-violet-700 shadow-lg cursor-grab active:cursor-grabbing -translate-x-1/2 -translate-y-1/2"
+                style={{ left: px.left, top: px.top }}
+                onPointerDown={(e) => handleDotPointerDown(e, "secondary")}
+              />
+            );
+          })()}
+
+          {/* Legend */}
+          <div className="absolute bottom-2 left-2 text-xs bg-card/80 border border-border rounded-md px-2 py-1 pointer-events-none flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block" />
+            <span className="text-muted-foreground">Primary</span>
+            <span className="w-2.5 h-2.5 rounded-full bg-violet-400 inline-block" />
+            <span className="text-muted-foreground">Secondary</span>
           </div>
         </div>
-      </div>
-      {/* Fixed Orientation Menu */}
-      <div className="fixed top-1 right-1 md:top-2 md:right-2 lg:top-3 lg:right-3 z-50">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="h-8 w-8 md:h-10 md:w-10 lg:h-12 lg:w-12 xl:h-14 xl:w-14 p-0">
-              <MoreVertical className="h-3.5 w-3.5 md:h-5 md:w-5 lg:h-6 lg:w-6 xl:h-7 xl:w-7" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            {/* Orientation Options */}
-            <DropdownMenuItem onClick={() => setOrientation(0)}>
-              0° (Default)
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setOrientation(90)}>
-              90° (Right)
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setOrientation(180)}>
-              180° (Flipped)
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setOrientation(270)}>
-              270° (Left)
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
 
-            {/* Reset Timer */}
-            <DropdownMenuItem onClick={resetMatch}>
-              Reset Match Timer
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-
-            {/* Skip to Phase */}
-            <DropdownMenuItem onClick={() => skipToPhase("auto")}>
-              Skip to Auto
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => skipToPhase("transition-shift")}>
-              Skip to Transition
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => skipToPhase("phase1")}>
-              Skip to Phase 1
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => skipToPhase("phase2")}>
-              Skip to Phase 2
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => skipToPhase("phase3")}>
-              Skip to Phase 3
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => skipToPhase("phase4")}>
-              Skip to Phase 4
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => skipToPhase("endgame")}>
-              Skip to Endgame
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
-      {/* Review & Submit Button (Endgame Only) */}
-      {currentPhase === "endgame" && (
-        <div className="fixed top-10 right-1 md:top-14 md:right-2 lg:top-17 lg:right-3 z-50">
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 w-8 md:h-10 md:w-10 lg:h-12 lg:w-12 xl:h-14 xl:w-14 p-0 border-red-500 bg-red-500/10 hover:bg-red-500/20 text-red-500 hover:text-red-600"
-            onClick={async () => {
-              // Compress and encode state for smaller URLs
-              const { compressState } = await import(
-                "@/lib/stateCompression"
-              );
-              const compressed = compressState(state);
-              navigate(`/review/${compressed}`);
-            }}
-            title="Review & Submit"
-          >
-            <Send className="h-3.5 w-3.5 md:h-5 md:w-5 lg:h-6 lg:w-6 xl:h-7 xl:w-7" />
-          </Button>
+        {/* Sidebar: Back | Undo | Finish — landscape only */}
+        <div className="portrait:hidden landscape:flex w-24 flex-col border-l border-border shrink-0">
+          {backBtn("flex-1 border-b border-border")}
+          {undoBtn("flex-1 border-b border-border")}
+          {finishBtn("flex-1")}
         </div>
-      )}
+      </div>
 
-      {/* Sidebar */}
-      <aside className="w-16 md:w-24 lg:w-28 xl:w-32 border-r border-border bg-card p-1 md:p-2 lg:p-3 flex flex-col gap-1 md:gap-2 lg:gap-3">
-        <Button
-          variant={selected === "1x" ? "default" : "outline"}
-          className="w-full flex-1 text-sm md:text-lg lg:text-xl xl:text-2xl font-bold px-0"
-          onClick={() => setSelected("1x")}
-        >
-          1x
-        </Button>
-        <Button
-          variant={selected === "5x" ? "default" : "outline"}
-          className="w-full flex-1 text-sm md:text-lg lg:text-xl xl:text-2xl font-bold px-0"
-          onClick={() => setSelected("5x")}
-        >
-          5x
-        </Button>
-        <Button
-          variant={selected === "10x" ? "default" : "outline"}
-          className="w-full flex-1 text-xs md:text-lg lg:text-xl xl:text-2xl font-bold px-0"
-          onClick={() => setSelected("10x")}
-        >
-          10x
-        </Button>
-        <Button
-          variant={selected === "action" ? "default" : "outline"}
-          className="w-full flex-1 text-[10px] md:text-base lg:text-lg xl:text-xl font-bold px-0 leading-tight"
-          onClick={() => setSelected("action")}
-        >
-          ACT
-        </Button>
-        <Button
-          variant="outline"
-          className="w-full h-9 md:h-12 lg:h-14 xl:h-16 p-0"
-          onClick={undo}
-          disabled={!canUndo}
-          title="Undo"
-        >
-          <Undo className="h-4 w-4 md:h-6 md:w-6 lg:h-7 lg:w-7 xl:h-8 xl:w-8" />
-        </Button>
-      </aside>
+      {/* Bottom bar: Back | Undo | Finish — portrait only */}
+      <div className="portrait:flex landscape:hidden h-20 shrink-0 border-t border-border">
+        {backBtn("flex-1 border-r border-border")}
+        {undoBtn("flex-1 border-r border-border")}
+        {finishBtn("flex-1")}
+      </div>
+    </div>
+  );
 
-      {/* Canvas Area */}
-      <ScoutingCanvas
-        orientation={orientation}
-        shots={state.shots}
-        actionButtons={actionButtons}
-        showActionButtons={selected === "action"}
-        onButtonClick={handleButtonClick}
-        onShotClick={handleShotClick}
-        shotMultiplier={getShotMultiplier()}
-        buttonPressCounts={buttonPressCounts}
-        pressedButtonId={pressedButtonId}
-      />
-
-      {/* Modal */}
-      <ActionModal
-        isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
-        title={modalConfig?.title || ""}
-        options={modalConfig?.options || []}
-        onOptionSelect={handleModalOptionSelect}
-      />
-
-      {/* Start Match Overlay */}
+  return (
+    <>
+      {frame === 1 ? <Frame1 /> : <Frame2 />}
       <StartMatchOverlay
         show={!hasStarted}
         onStartMatch={startMatch}
         matchNumber={match_number}
         role={role}
       />
-
-      {/* Phase Transition Overlay */}
-      <PhaseTransitionOverlay
-        show={showPhaseTransition}
-        nextPhaseName={nextPhaseName}
-      />
-    </div>
+    </>
   );
 }
