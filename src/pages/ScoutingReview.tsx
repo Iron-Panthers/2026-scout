@@ -8,7 +8,7 @@ import {
 import { ChevronDown, ChevronRight, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
-import { submitScoutingData, resolveMatchId } from "@/lib/scoutingSchema";
+import { submitScoutingData, submitQualScoutingData, resolveMatchId } from "@/lib/scoutingSchema";
 import { useToast } from "@/hooks/use-toast";
 import { SubmissionStatusModal } from "@/components/SubmissionStatusModal";
 import SafeQRCode from "@/components/SafeQRCode";
@@ -590,7 +590,11 @@ export default function ScoutingReview() {
     setIsSubmitting(true);
 
     try {
-      await submitScoutingData(matchId, state.role, state, user?.id, state.team_number, state.match_type);
+      if (state.match_type === "qual") {
+        await submitQualScoutingData(matchId, state.role, state, user?.id);
+      } else {
+        await submitScoutingData(matchId, state.role, state, user?.id, state.team_number ?? 0, state.match_type);
+      }
 
       // Mark as uploaded in offline storage
       if (offlineKey) {
@@ -661,68 +665,72 @@ export default function ScoutingReview() {
               <p className="text-xs text-destructive mt-1">Comments are required before submission</p>
             )}
           </div>
-          <div className="mb-6">
-            <label className="block uppercase text-xs font-medium tracking-wider text-muted-foreground m-5 mb-2 flex items-center">
-              Robot Problems?&nbsp;&nbsp;&nbsp;
-              <Checkbox className="w-7 h-7 border-b-gray-500" checked={state.robot_problems !== null} onCheckedChange={(checked) => 
-                handleFieldChange(
-                  "robot_problems",
-                  checked ? writtenTempState.problems || "" : null
-                )
-              }/>
-            </label>
-            {state.robot_problems !== null && 
-              <textarea
-                className="w-full bg-background border border-border rounded-lg px-4 py-3 text-foreground text-base font-normal focus:outline-none focus:ring-2 focus:ring-primary/80 transition disabled:opacity-60"
-                rows={2}
-                value={state.robot_problems}
-                onChange={(e) => { handleFieldChange("robot_problems", e.target.value); writtenTempState.problems = e.target.value; setWrittenTempState(writtenTempState); }}
-                style={{ fontFamily: "inherit", resize: "vertical" }}
-              />
-            }
-          </div>
-          <div className="mb-6">
-            <label className="block uppercase text-xs font-medium tracking-wider text-muted-foreground m-5 mb-2 flex items-center">
-              Scouting Errors?&nbsp;&nbsp;&nbsp;
-              <Checkbox className="w-7 h-7 border-b-gray-500" checked={state.errors !== null} onCheckedChange={(checked) => 
-                handleFieldChange(
-                  "errors",
-                  checked ? writtenTempState.errors || "" : null
-                )
-              }/>
-            </label>
-            {state.errors !== null &&
-              <textarea
-                className="w-full bg-background border border-border rounded-lg px-4 py-3 text-foreground text-base font-normal focus:outline-none focus:ring-2 focus:ring-primary/80 transition disabled:opacity-60"
-                rows={2}
-                value={state.errors}
-                onChange={(e) => { handleFieldChange("errors", e.target.value); writtenTempState.errors = e.target.value; setWrittenTempState(writtenTempState); }}
-                style={{ fontFamily: "inherit", resize: "vertical" }}
-              />
-            }       
-          </div>
-          <div>
-            <label className="block uppercase text-xs font-medium tracking-wider text-muted-foreground m-5 mb-2 flex items-center">
-              Defense?&nbsp;&nbsp;&nbsp;
-              <Checkbox className="w-7 h-7 border-b-gray-500" checked={state.defenseDescription !== null} onCheckedChange={(checked) => 
-                handleFieldChange(
-                  "defenseDescription",
-                  checked ? writtenTempState.defense || "" : null
-                )
-              }/>
-            </label>
-            {state.defenseDescription !== null &&
-              <textarea
-                className="w-full bg-background border border-border rounded-lg px-4 py-3 text-foreground text-base font-normal focus:outline-none focus:ring-2 focus:ring-primary/80 transition disabled:opacity-60"
-                rows={2}
-                value={state.defenseDescription}
-                onChange={(e) =>
-                  { handleFieldChange("defenseDescription", e.target.value); writtenTempState.defense = e.target.value; setWrittenTempState(writtenTempState); }
+          {state.role !== "qualRed" && state.role !== "qualBlue" && (
+            <>
+              <div className="mb-6">
+                <label className="block uppercase text-xs font-medium tracking-wider text-muted-foreground m-5 mb-2 flex items-center">
+                  Robot Problems?&nbsp;&nbsp;&nbsp;
+                  <Checkbox className="w-7 h-7 border-b-gray-500" checked={state.robot_problems !== null} onCheckedChange={(checked) =>
+                    handleFieldChange(
+                      "robot_problems",
+                      checked ? writtenTempState.problems || "" : null
+                    )
+                  }/>
+                </label>
+                {state.robot_problems !== null &&
+                  <textarea
+                    className="w-full bg-background border border-border rounded-lg px-4 py-3 text-foreground text-base font-normal focus:outline-none focus:ring-2 focus:ring-primary/80 transition disabled:opacity-60"
+                    rows={2}
+                    value={state.robot_problems}
+                    onChange={(e) => { handleFieldChange("robot_problems", e.target.value); writtenTempState.problems = e.target.value; setWrittenTempState(writtenTempState); }}
+                    style={{ fontFamily: "inherit", resize: "vertical" }}
+                  />
                 }
-                style={{ fontFamily: "inherit", resize: "vertical" }}
-              />
-      }
-          </div>
+              </div>
+              <div className="mb-6">
+                <label className="block uppercase text-xs font-medium tracking-wider text-muted-foreground m-5 mb-2 flex items-center">
+                  Scouting Errors?&nbsp;&nbsp;&nbsp;
+                  <Checkbox className="w-7 h-7 border-b-gray-500" checked={state.errors !== null} onCheckedChange={(checked) =>
+                    handleFieldChange(
+                      "errors",
+                      checked ? writtenTempState.errors || "" : null
+                    )
+                  }/>
+                </label>
+                {state.errors !== null &&
+                  <textarea
+                    className="w-full bg-background border border-border rounded-lg px-4 py-3 text-foreground text-base font-normal focus:outline-none focus:ring-2 focus:ring-primary/80 transition disabled:opacity-60"
+                    rows={2}
+                    value={state.errors}
+                    onChange={(e) => { handleFieldChange("errors", e.target.value); writtenTempState.errors = e.target.value; setWrittenTempState(writtenTempState); }}
+                    style={{ fontFamily: "inherit", resize: "vertical" }}
+                  />
+                }
+              </div>
+              <div>
+                <label className="block uppercase text-xs font-medium tracking-wider text-muted-foreground m-5 mb-2 flex items-center">
+                  Defense?&nbsp;&nbsp;&nbsp;
+                  <Checkbox className="w-7 h-7 border-b-gray-500" checked={state.defenseDescription !== null} onCheckedChange={(checked) =>
+                    handleFieldChange(
+                      "defenseDescription",
+                      checked ? writtenTempState.defense || "" : null
+                    )
+                  }/>
+                </label>
+                {state.defenseDescription !== null &&
+                  <textarea
+                    className="w-full bg-background border border-border rounded-lg px-4 py-3 text-foreground text-base font-normal focus:outline-none focus:ring-2 focus:ring-primary/80 transition disabled:opacity-60"
+                    rows={2}
+                    value={state.defenseDescription}
+                    onChange={(e) =>
+                      { handleFieldChange("defenseDescription", e.target.value); writtenTempState.defense = e.target.value; setWrittenTempState(writtenTempState); }
+                    }
+                    style={{ fontFamily: "inherit", resize: "vertical" }}
+                  />
+                }
+              </div>
+            </>
+          )}
         </section>
 
         {/* Actions */}

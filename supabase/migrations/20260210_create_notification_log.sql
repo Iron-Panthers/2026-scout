@@ -12,4 +12,4 @@ CREATE TABLE IF NOT EXISTS notification_log (
 ALTER TABLE notification_log ENABLE ROW LEVEL SECURITY;
 
 -- Index for cleanup queries
-CREATE INDEX idx_notification_log_sent_at ON notification_log(sent_at);
+CREATE INDEX IF NOT EXISTS idx_notification_log_sent_at ON notification_log(sent_at);

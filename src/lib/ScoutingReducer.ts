@@ -37,6 +37,17 @@ export interface ScoutingData {
   defenseDescription: string | null;
 }
 
+export interface QualScoutingData {
+  matchId: string;
+  event_code: string;
+  match_number: number;
+  match_type: "qual";
+  role: string; // "qualRed" or "qualBlue"
+  rankings: number[]; // team numbers ordered best→worst
+  teamOptions: Record<string, { outposeFed: boolean; passed: boolean }>;
+  comments: string;
+}
+
 /**
  * Action types supported by the reducer
  */
@@ -121,15 +132,31 @@ export class ScoutingReducer<T extends Record<string, any> = ScoutingData> {
   }
 
   /**
-   * Create an initial ScoutingData state object
-   * @param matchId - The match ID for this match
-   * @param role - The role for this match
-   * @param event_code - The event code for this match (e.g., "2025cave")
-   * @param match_number - The match number
-   * @param team_number - The team number
-   * @param match_type - The match type (qual, playoff, etc)
-   * @returns ScoutingData
+   * Create an initial QualScoutingData state object
    */
+  static createQualInitialState(
+    matchId: string,
+    role: string,
+    event_code: string,
+    match_number: number,
+    teamNumbers: number[]
+  ): QualScoutingData {
+    const teamOptions: Record<string, { outposeFed: boolean; passed: boolean }> = {};
+    teamNumbers.forEach((n) => {
+      teamOptions[String(n)] = { outposeFed: false, passed: false };
+    });
+    return {
+      matchId,
+      role,
+      event_code,
+      match_number,
+      match_type: "qual",
+      rankings: teamNumbers,
+      teamOptions,
+      comments: "",
+    };
+  }
+
   static createInitialState(
     matchId: string,
     role: string = "",

@@ -287,6 +287,45 @@ export async function submitScoutingData(
   return data as ScoutingSubmission;
 }
 
+export const QUAL_SCHEMA_VERSION = 1;
+
+export interface QualScoutingSubmission {
+  id: string;
+  match_id: string;
+  role: string;
+  scouting_data: Record<string, any>;
+  schema_version: number;
+  scouter_id?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function submitQualScoutingData(
+  matchId: string,
+  role: string,
+  scoutingData: Record<string, any>,
+  scouterId?: string
+): Promise<QualScoutingSubmission> {
+  const { data, error } = await supabase
+    .from("qual_scouting_submissions")
+    .insert({
+      match_id: matchId,
+      role,
+      scouting_data: scoutingData,
+      schema_version: QUAL_SCHEMA_VERSION,
+      scouter_id: scouterId,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error("Error submitting qual scouting data:", error);
+    throw error;
+  }
+
+  return data as QualScoutingSubmission;
+}
+
 /**
  * Get scouting submissions for a match, with automatic migration
  */
@@ -440,31 +479,39 @@ export async function filterMatchesWithoutSubmissions<
 >(matches: T[]): Promise<T[]> {
   if (matches.length === 0) return matches;
 
-  // Build query for all match_id + role combinations
-  const matchRolePairs = matches.map((m) => ({
-    match_id: m.match.id,
-    role: m.role,
-  }));
+  const matchIds = matches.map((m) => m.match.id);
+  const qualRoles = new Set(["qualRed", "qualBlue"]);
 
-  // Get all existing submissions for these match_id + role combinations
-  const { data: submissions, error } = await supabase
-    .from("scouting_submissions")
-    .select("match_id, role")
-    .in(
-      "match_id",
-      matches.map((m) => m.match.id)
-    );
+  const quantMatches = matches.filter((m) => !qualRoles.has(m.role));
+  const qualMatches = matches.filter((m) => qualRoles.has(m.role));
 
-  if (error) {
-    console.error("Error fetching submissions:", error);
-    return matches; // Return all matches if there's an error
+  const submittedSet = new Set<string>();
+
+  // Check quant submissions
+  if (quantMatches.length > 0) {
+    const { data, error } = await supabase
+      .from("scouting_submissions")
+      .select("match_id, role")
+      .in("match_id", matchIds);
+    if (error) {
+      console.error("Error fetching scouting submissions:", error);
+    } else {
+      (data || []).forEach((s) => submittedSet.add(`${s.match_id}:${s.role}`));
+    }
   }
 
-  // Create a Set of "matchId:role" strings for quick lookup
-  const submittedSet = new Set(
-    (submissions || []).map((s) => `${s.match_id}:${s.role}`)
-  );
+  // Check qual submissions
+  if (qualMatches.length > 0) {
+    const { data, error } = await supabase
+      .from("qual_scouting_submissions")
+      .select("match_id, role")
+      .in("match_id", matchIds);
+    if (error) {
+      console.error("Error fetching qual scouting submissions:", error);
+    } else {
+      (data || []).forEach((s) => submittedSet.add(`${s.match_id}:${s.role}`));
+    }
+  }
 
-  // Filter out matches that have been submitted
   return matches.filter((m) => !submittedSet.has(`${m.match.id}:${m.role}`));
 }

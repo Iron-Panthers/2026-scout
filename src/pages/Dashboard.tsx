@@ -16,6 +16,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { getUserMatches, removeUserFromMatch, getEvents } from "@/lib/matches";
 import { getMatchTeam } from "@/lib/blueAlliance";
 import { filterMatchesWithoutSubmissions } from "@/lib/scoutingSchema";
+import { getUserPitAssignments, type UserPitAssignment } from "@/lib/pitScoutingAssignments";
 import { supabase } from "@/lib/supabase";
 import DashboardHeader from "@/components/DashboardHeader";
 import UserProfileMenu from "@/components/UserProfileMenu";
@@ -54,7 +55,7 @@ interface UserMatch {
 }
 
 export default function Dashboard() {
-  const { user } = useAuth();
+  const { user, profile, getAvatarUrl } = useAuth();
   const [matches, setMatches] = useState<UserMatch[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedMatch, setSelectedMatch] = useState<UserMatch | null>(null);
@@ -62,18 +63,19 @@ export default function Dashboard() {
   const [teamNumbers, setTeamNumbers] = useState<Record<string, number | null>>(
     {}
   );
+  const [pitAssignments, setPitAssignments] = useState<UserPitAssignment[]>([]);
 
   const navigate = useNavigate();
 
   const userName =
-    user?.user_metadata?.name || user?.email?.split("@")[0] || "Scout";
+    profile?.name || user?.user_metadata?.name || user?.email?.split("@")[0] || "Scout";
   const userInitials = userName
     .split(" ")
     .map((n: string) => n[0])
     .join("")
     .toUpperCase()
     .slice(0, 2);
-  const avatarUrl = user?.user_metadata?.avatar_url || "";
+  const avatarUrl = getAvatarUrl();
 
   // Load user's assigned matches
   const loadMatches = useCallback(async () => {
@@ -160,6 +162,17 @@ export default function Dashboard() {
     loadMatches();
   }, [loadMatches]);
 
+  // Load pit scouting assignments for current user
+  const loadPitAssignments = useCallback(async () => {
+    if (!user?.id) return;
+    const data = await getUserPitAssignments(user.id);
+    setPitAssignments(data);
+  }, [user?.id]);
+
+  useEffect(() => {
+    loadPitAssignments();
+  }, [loadPitAssignments]);
+
   // Subscribe to real-time updates for match assignments and submissions
   useEffect(() => {
     if (!user?.id) return;
@@ -185,14 +198,47 @@ export default function Dashboard() {
       .on(
         "postgres_changes",
         {
-          event: "*", // Listen to all events (INSERT, UPDATE, DELETE)
+          event: "*",
           schema: "public",
           table: "scouting_submissions",
         },
         (payload) => {
           console.log("Scouting submission changed:", payload);
-          // Reload matches to update submission status
           loadMatches();
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "qual_scouting_submissions",
+        },
+        (payload) => {
+          console.log("Qual scouting submission changed:", payload);
+          loadMatches();
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "pit_scouting_assignments",
+        },
+        () => {
+          loadPitAssignments();
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "pit_scouting_submissions",
+        },
+        () => {
+          loadPitAssignments();
         }
       )
       .subscribe();
@@ -201,7 +247,7 @@ export default function Dashboard() {
       console.log("Cleaning up realtime subscriptions...");
       supabase.removeChannel(channel);
     };
-  }, [user?.id, loadMatches]);
+  }, [user?.id, loadMatches, loadPitAssignments]);
 
   const getRoleColor = (role: string) => {
     if (role.startsWith("red") || role === "qualRed") {
@@ -304,6 +350,76 @@ export default function Dashboard() {
             </Link>
           </Button>
         </div>
+
+        {/* Pit Scouting Assignments Section */}
+        {pitAssignments.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold mb-4">
+              Your Pit Scouting Assignments
+            </h2>
+            <div className="overflow-x-auto pb-4">
+              <div className="flex gap-4 min-w-min items-stretch">
+                {pitAssignments.map((assignment, index) => (
+                  <AnimatedContent
+                    key={assignment.id}
+                    direction="horizontal"
+                    distance={50}
+                    duration={0.5}
+                    delay={index * 0.1}
+                    threshold={0.2}
+                    className="flex-shrink-0 flex"
+                  >
+                    <Card
+                      className="w-64 flex flex-col bg-green-900/40 border-green-700/50 border-2 hover:scale-[1.02] transition-transform cursor-pointer"
+                      onClick={() =>
+                        navigate(
+                          `/pit-scouting?team=${assignment.team_number}`
+                        )
+                      }
+                    >
+                      <CardHeader className="pb-2">
+                        <div className="flex items-center justify-between mb-1 gap-2">
+                          <Badge
+                            variant="outline"
+                            className="bg-green-600/20 text-green-400 border-green-600/30 text-xs"
+                          >
+                            Pit Scout
+                          </Badge>
+                        </div>
+                        <CardTitle className="text-3xl font-bold font-mono">
+                          {assignment.team_number}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2">
+                          <div className="text-sm text-muted-foreground">
+                            <div className="font-semibold text-foreground mb-1">
+                              {userName}
+                            </div>
+                            <div className="text-xs">{assignment.event_name}</div>
+                          </div>
+                          <Button
+                            className="w-full mt-4 bg-green-700 hover:bg-green-600"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(
+                                `/pit-scouting?team=${assignment.team_number}`
+                              );
+                            }}
+                          >
+                            <Wrench className="h-4 w-4 mr-1" />
+                            Scout Pit
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </AnimatedContent>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Scheduled Matches Section */}
         <div className="mb-8">

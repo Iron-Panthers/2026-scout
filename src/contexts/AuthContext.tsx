@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import type { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { getProfile, createProfile } from "@/lib/profiles";
@@ -11,6 +11,7 @@ interface AuthContextType {
   loading: boolean;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  getAvatarUrl: () => string;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -101,9 +102,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setProfile(null);
   };
 
+  // Priority: custom upload in DB > Google/OAuth avatar > empty (falls back to initials)
+  const getAvatarUrl = useCallback((): string => {
+    return profile?.avatar_url || user?.user_metadata?.avatar_url || "";
+  }, [profile, user]);
+
   return (
     <AuthContext.Provider
-      value={{ user, session, profile, loading, signOut, refreshProfile }}
+      value={{ user, session, profile, loading, signOut, refreshProfile, getAvatarUrl }}
     >
       {children}
     </AuthContext.Provider>
