@@ -287,6 +287,45 @@ export async function submitScoutingData(
   return data as ScoutingSubmission;
 }
 
+export const QUAL_SCHEMA_VERSION = 1;
+
+export interface QualScoutingSubmission {
+  id: string;
+  match_id: string;
+  role: string;
+  scouting_data: Record<string, any>;
+  schema_version: number;
+  scouter_id?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function submitQualScoutingData(
+  matchId: string,
+  role: string,
+  scoutingData: Record<string, any>,
+  scouterId?: string
+): Promise<QualScoutingSubmission> {
+  const { data, error } = await supabase
+    .from("qual_scouting_submissions")
+    .insert({
+      match_id: matchId,
+      role,
+      scouting_data: scoutingData,
+      schema_version: QUAL_SCHEMA_VERSION,
+      scouter_id: scouterId,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error("Error submitting qual scouting data:", error);
+    throw error;
+  }
+
+  return data as QualScoutingSubmission;
+}
+
 /**
  * Get scouting submissions for a match, with automatic migration
  */

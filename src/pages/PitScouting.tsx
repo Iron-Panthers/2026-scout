@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ArrowLeft, Loader2 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { getActiveEvent } from "@/lib/matches";
@@ -30,10 +30,12 @@ import {
 
 export default function PitScouting() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const { user, profile } = useAuth();
   const { toast } = useToast();
   const [scouterName, setScouterName] = useState("");
   const [teamNumber, setTeamNumber] = useState("");
+  const [teamNumberLocked, setTeamNumberLocked] = useState(false);
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [activeEvent, setActiveEvent] = useState<Event | null>(null);
   const [loadingEvent, setLoadingEvent] = useState(true);
@@ -48,6 +50,19 @@ export default function PitScouting() {
     };
     loadActiveEvent();
   }, []);
+
+  // Auto-fill from URL params when navigated from a pit assignment card
+  useEffect(() => {
+    const teamParam = searchParams.get("team");
+    if (teamParam) {
+      setTeamNumber(teamParam);
+      setTeamNumberLocked(true);
+    }
+    const name = profile?.name || user?.user_metadata?.name;
+    if (name) {
+      setScouterName(name);
+    }
+  }, [searchParams, user, profile]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -407,6 +422,9 @@ export default function PitScouting() {
               <div className="space-y-2">
                 <Label htmlFor="team-number">
                   Team Number <span className="text-destructive">*</span>
+                  {teamNumberLocked && (
+                    <span className="ml-2 text-xs text-muted-foreground">(pre-filled from assignment)</span>
+                  )}
                 </Label>
                 <Input
                   id="team-number"
@@ -415,7 +433,8 @@ export default function PitScouting() {
                   value={teamNumber}
                   onChange={(e) => setTeamNumber(e.target.value)}
                   required
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || teamNumberLocked}
+                  readOnly={teamNumberLocked}
                 />
               </div>
             </CardContent>

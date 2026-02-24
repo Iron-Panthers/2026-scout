@@ -188,3 +188,19 @@ export async function getTeamInfo(teamNumber: number) {
 export async function getEventMatches(eventCode: string) {
   return await tbaFetch<TBAMatch[]>(`/event/${eventCode}/matches`);
 }
+
+export interface TBATeamSimple {
+  team_number: number;
+  nickname: string;
+  city: string | null;
+  state_prov: string | null;
+}
+
+/**
+ * Gets all teams at an event (simple format)
+ * @param eventCode - The event code (e.g., "2024cmp", "2024caln")
+ * @returns Array of teams or empty array if not found
+ */
+export async function getEventTeams(eventCode: string): Promise<TBATeamSimple[]> {
+  return (await tbaFetch<TBATeamSimple[]>(`/event/${eventCode}/teams/simple`)) ?? [];
+}

@@ -23,6 +23,7 @@ import {
   Calendar,
   PlusCircle,
   ListChecks,
+  Wrench,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -40,6 +41,7 @@ import { EventInformationTab } from "@/components/manager/EventInformationTab";
 import { CreateEventTab } from "@/components/manager/CreateEventTab";
 import { ScoutAssignmentDialog } from "@/components/manager/ScoutAssignmentDialog";
 import { RosterManagementTab } from "@/components/manager/RosterManagementTab";
+import { PitScoutingAssignmentsTab } from "@/components/manager/PitScoutingAssignmentsTab";
 import { useToast } from "@/hooks/use-toast";
 import type {
   Profile,
@@ -53,17 +55,17 @@ import type {
 } from "@/types";
 
 export default function ManagerDashboard() {
-  const { user } = useAuth();
+  const { user, profile: myProfile, getAvatarUrl } = useAuth();
   const { toast } = useToast();
   const userName =
-    user?.user_metadata?.name || user?.email?.split("@")[0] || "Manager";
+    myProfile?.name || user?.user_metadata?.name || user?.email?.split("@")[0] || "Manager";
   const userInitials = userName
     .split(" ")
     .map((n: string) => n[0])
     .join("")
     .toUpperCase()
     .slice(0, 2);
-  const avatarUrl = user?.user_metadata?.avatar_url || "";
+  const avatarUrl = getAvatarUrl();
 
   const roles: Role[] = [
     "red1",
@@ -142,7 +144,7 @@ export default function ManagerDashboard() {
                 .join("")
                 .toUpperCase()
                 .slice(0, 2),
-              avatar: "",
+              avatar: profile.avatar_url || "",
             };
           }
         }
@@ -202,7 +204,7 @@ export default function ManagerDashboard() {
                   .join("")
                   .toUpperCase()
                   .slice(0, 2),
-                avatar: "",
+                avatar: profile.avatar_url || "",
               };
             }
           });
@@ -378,7 +380,7 @@ export default function ManagerDashboard() {
                       .join("")
                       .toUpperCase()
                       .slice(0, 2),
-                    avatar: "",
+                    avatar: profile.avatar_url || "",
                   },
                 },
               }
@@ -642,7 +644,7 @@ export default function ManagerDashboard() {
                   .join("")
                   .toUpperCase()
                   .slice(0, 2),
-                avatar: "",
+                avatar: profile.avatar_url || "",
               };
             }
           });
@@ -728,6 +730,12 @@ export default function ManagerDashboard() {
                         Create Event
                       </div>
                     )}
+                    {activeTab === "pit" && (
+                      <div className="flex items-center gap-2">
+                        <Wrench className="h-4 w-4" />
+                        Pit Scouting
+                      </div>
+                    )}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
@@ -755,12 +763,18 @@ export default function ManagerDashboard() {
                       Create Event
                     </div>
                   </SelectItem>
+                  <SelectItem value="pit">
+                    <div className="flex items-center gap-2">
+                      <Wrench className="h-4 w-4" />
+                      Pit Scouting
+                    </div>
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             {/* Desktop: Tab Buttons */}
-            <TabsList className="hidden md:grid w-full max-w-3xl grid-cols-4 gap-1">
+            <TabsList className="hidden md:grid w-full max-w-4xl grid-cols-5 gap-1">
               <TabsTrigger
                 value="assignments"
                 className="flex items-center justify-center gap-2"
@@ -779,6 +793,10 @@ export default function ManagerDashboard() {
               <TabsTrigger value="create" className="flex items-center justify-center gap-2">
                 <PlusCircle className="h-4 w-4" />
                 Create Event
+              </TabsTrigger>
+              <TabsTrigger value="pit" className="flex items-center justify-center gap-2">
+                <Wrench className="h-4 w-4" />
+                Pit Scouting
               </TabsTrigger>
             </TabsList>
 
@@ -1007,6 +1025,15 @@ export default function ManagerDashboard() {
               setNumQualMatches={setNumQualMatches}
               isCreatingEvent={isCreatingEvent}
               onCreateEvent={handleCreateEvent}
+            />
+          </TabsContent>
+
+          {/* Pit Scouting Tab */}
+          <TabsContent value="pit" className="mt-0">
+            <PitScoutingAssignmentsTab
+              selectedEvent={selectedEvent}
+              events={events}
+              availableScouts={availableScouts}
             />
           </TabsContent>
         </Tabs>

@@ -2,18 +2,21 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Mail, Calendar, CheckCircle2, Clock } from "lucide-react";
+import { ArrowLeft, Mail, Calendar, CheckCircle2, Clock, Camera } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getUserMatches } from "@/lib/matches";
+import { uploadAvatar } from "@/lib/profiles";
 import type { Match } from "@/types";
 
 export default function Profile() {
   const navigate = useNavigate();
-  const { user: authUser, profile } = useAuth();
+  const { user: authUser, profile, getAvatarUrl, refreshProfile } = useAuth();
   const [userMatches, setUserMatches] = useState<Match[]>([]);
   const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const loadMatches = async () => {
@@ -37,7 +40,18 @@ export default function Profile() {
     .join("")
     .toUpperCase()
     .slice(0, 2);
-  const avatarUrl = authUser?.user_metadata?.avatar_url || "";
+  const avatarUrl = getAvatarUrl();
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !authUser?.id) return;
+    setUploading(true);
+    await uploadAvatar(authUser.id, file);
+    await refreshProfile();
+    setUploading(false);
+    // Reset input so the same file can be re-selected
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
   const email = authUser?.email || "";
   const userRole = profile?.role || "scout";
   const isManager = profile?.is_manager || false;
@@ -69,12 +83,29 @@ export default function Profile() {
         <Card className="mb-6">
           <CardContent className="pt-6">
             <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
-              <Avatar className="h-32 w-32">
-                <AvatarImage src={avatarUrl} alt={userName} />
-                <AvatarFallback className="text-4xl bg-primary text-primary-foreground">
-                  {userInitials}
-                </AvatarFallback>
-              </Avatar>
+              <div className="relative shrink-0">
+                <Avatar className="h-32 w-32">
+                  <AvatarImage src={avatarUrl} alt={userName} />
+                  <AvatarFallback className="text-4xl bg-primary text-primary-foreground">
+                    {userInitials}
+                  </AvatarFallback>
+                </Avatar>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleAvatarUpload}
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  className="absolute bottom-1 right-1 bg-primary text-primary-foreground rounded-full p-1.5 shadow-md hover:bg-primary/90 transition-colors disabled:opacity-50"
+                  aria-label="Change profile photo"
+                >
+                  <Camera className="h-4 w-4" />
+                </button>
+              </div>
               <div className="flex-1 text-center md:text-left">
                 <h1 className="text-3xl font-bold mb-2">{userName}</h1>
                 <div className="flex gap-2 justify-center md:justify-start mb-4">

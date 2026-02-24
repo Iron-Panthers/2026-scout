@@ -1,12 +1,22 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Cloud,
   CloudOff,
   Upload,
   Trash2,
+  Pencil,
   CheckCircle2,
   AlertCircle,
   Loader2,
@@ -26,9 +36,11 @@ import {
 } from "@/lib/offlineStorage";
 import {
   submitScoutingData,
+  submitQualScoutingData,
   resolveMatchId,
 } from "@/lib/scoutingSchema";
 import { supabase } from "@/lib/supabase";
+import { compressState } from "@/lib/stateCompression";
 import { prettifyRole } from "@/pages/Dashboard";
 
 interface OfflineMatchWithStatus extends OfflineMatchData {
@@ -177,13 +189,22 @@ export default function OfflineMatches() {
         throw new Error("Could not resolve match ID");
       }
 
-      // Submit to database
-      await submitScoutingData(
-        matchId,
-        match.role,
-        match.scoutingData,
-        match.scouterId || user?.id
-      );
+      // Submit to database (qual vs quant)
+      if (match.scoutingData?.match_type === "qual") {
+        await submitQualScoutingData(
+          matchId,
+          match.role,
+          match.scoutingData,
+          match.scouterId || user?.id
+        );
+      } else {
+        await submitScoutingData(
+          matchId,
+          match.role,
+          match.scoutingData,
+          match.scouterId || user?.id
+        );
+      }
 
       // Mark as uploaded in local storage
       markAsUploaded(match.key);
@@ -319,17 +340,17 @@ export default function OfflineMatches() {
               disabled={uploadingAll || !isOnline}
               size="sm"
               variant="default"
-              title={!isOnline ? "Cannot upload while offline" : undefined}
+              title={!isOnline ? "Cannot upload while offline" : "Upload all pending matches"}
             >
               {uploadingAll ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Uploading...
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span className="hidden sm:inline ml-2">Uploading...</span>
                 </>
               ) : (
                 <>
-                  <Upload className="mr-2 h-4 w-4" />
-                  Upload All
+                  <Upload className="h-4 w-4" />
+                  <span className="hidden sm:inline ml-2">Upload All</span>
                 </>
               )}
             </Button>
@@ -409,63 +430,111 @@ function MatchRow({
   onDelete: (key: string) => void;
   isOnline?: boolean;
 }) {
+  const navigate = useNavigate();
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const formattedDate = new Date(match.timestamp).toLocaleString();
 
-  return (
-    <div className="flex items-center justify-between p-3 border border-border rounded-lg bg-card hover:bg-accent/50 transition-colors">
-      <div className="flex-1">
-        <div className="flex items-center gap-2">
-          <span className="font-semibold">
-            Match {match.matchNumber}
-          </span>
-          <Badge variant="outline">{prettifyRole(match.role)}</Badge>
-          {match.uploaded ? (
-            match.verifying ? (
-              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-            ) : match.dbStatus === "uploaded" ? (
-              <CheckCircle2 className="h-4 w-4 text-green-600" />
-            ) : match.dbStatus === "missing" ? (
-              <AlertCircle className="h-4 w-4 text-yellow-600" title="Not found in database" />
-            ) : null
-          ) : (
-            <Badge variant="destructive" className="text-xs">Not Uploaded</Badge>
-          )}
-        </div>
-        <div className="text-xs text-muted-foreground mt-1">
-          {match.eventCode} • {formattedDate}
-        </div>
-      </div>
+  const handleEdit = () => {
+    try {
+      const compressed = compressState(match.scoutingData);
+      navigate(`/review/${compressed}`);
+    } catch (e) {
+      console.error("Failed to compress state for review", e);
+    }
+  };
 
-      <div className="flex items-center gap-2">
-        {!match.uploaded && (
-          <Button
-            onClick={() => onUpload(match)}
-            disabled={match.uploading || !isOnline}
-            size="sm"
-            variant="default"
-            title={!isOnline ? "Cannot upload while offline" : undefined}
-          >
-            {match.uploading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+  return (
+    <>
+      <div className="flex items-center justify-between p-3 border border-border rounded-lg bg-card hover:bg-accent/50 transition-colors">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-semibold">
+              Match {match.matchNumber}
+            </span>
+            <Badge variant="outline">{prettifyRole(match.role)}</Badge>
+            {match.uploaded ? (
+              match.verifying ? (
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              ) : match.dbStatus === "uploaded" ? (
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
+              ) : match.dbStatus === "missing" ? (
+                <AlertCircle className="h-4 w-4 text-yellow-600" title="Not found in database" />
+              ) : null
             ) : (
-              <>
-                <Upload className="mr-1 h-3 w-3" />
-                Upload
-              </>
+              <Badge variant="destructive" className="text-xs">Not Uploaded</Badge>
             )}
-          </Button>
-        )}
-        {match.uploaded && (
+          </div>
+          <div className="text-xs text-muted-foreground mt-1">
+            {match.eventCode} • {formattedDate}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1 shrink-0 ml-2">
+          {!match.uploaded && (
+            <Button
+              onClick={() => onUpload(match)}
+              disabled={match.uploading || !isOnline}
+              size="sm"
+              variant="default"
+              title={!isOnline ? "Cannot upload while offline" : "Upload"}
+            >
+              {match.uploading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <>
+                  <Upload className="h-3 w-3" />
+                  <span className="hidden sm:inline ml-1">Upload</span>
+                </>
+              )}
+            </Button>
+          )}
+
           <Button
-            onClick={() => onDelete(match.key)}
+            onClick={handleEdit}
+            size="sm"
+            variant="outline"
+            title="Edit in review"
+          >
+            <Pencil className="h-3 w-3" />
+            <span className="hidden sm:inline ml-1">Edit</span>
+          </Button>
+
+          <Button
+            onClick={() => setShowDeleteConfirm(true)}
             size="sm"
             variant="ghost"
             className="text-muted-foreground hover:text-destructive"
+            title="Delete"
           >
             <Trash2 className="h-4 w-4" />
           </Button>
-        )}
+        </div>
       </div>
-    </div>
+
+      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete match?</DialogTitle>
+            <DialogDescription>
+              This will permanently remove Match {match.matchNumber} ({prettifyRole(match.role)}) from offline storage. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                onDelete(match.key);
+                setShowDeleteConfirm(false);
+              }}
+            >
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

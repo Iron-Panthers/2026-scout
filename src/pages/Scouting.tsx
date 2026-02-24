@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import { compressState } from "@/lib/stateCompression";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Undo2, ArrowRight, ArrowLeft, Check } from "lucide-react";
 import { useScoutingReducer } from "@/lib/useScoutingReducer";
@@ -15,7 +16,7 @@ export default function Scouting() {
   const event_code = searchParams.get("event_code") || "";
   const match_number = parseInt(searchParams.get("match_number") || "0");
   const team_number = parseInt(searchParams.get("team_number") || "0");
-  const match_type = searchParams.get("type") || "qual";
+  const match_type = "quant";
 
   const { state, set, logEvent, undo, canUndo } = useScoutingReducer(
     match_id || "",
@@ -167,8 +168,7 @@ export default function Scouting() {
     set("shots", [...state.shots, ...Array(count).fill(ts)]);
   };
 
-  const handleFinish = async () => {
-    const { compressState } = await import("@/lib/stateCompression");
+  const handleFinish = () => {
     navigate(`/review/${compressState(state)}`);
   };
 

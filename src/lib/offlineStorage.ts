@@ -164,7 +164,7 @@ export function saveOfflineMatch(
     eventCode,
     matchNumber,
     role,
-    timestamp, // Last updated timestamp
+    timestamp: existingMatch?.timestamp ?? timestamp, // Preserve original timestamp
     uploaded: existingMatch?.uploaded || false, // Preserve uploaded status
     uploadedAt: existingMatch?.uploadedAt, // Preserve upload timestamp if exists
     schemaVersion: CURRENT_SCHEMA_VERSION,

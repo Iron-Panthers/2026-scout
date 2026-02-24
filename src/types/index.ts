@@ -12,6 +12,7 @@ export interface Profile {
   name: string | null;
   role: "scout" | "manager" | "admin";
   is_manager: boolean;
+  avatar_url: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -137,3 +138,12 @@ export interface UserProfileMenuProps {
 
 // Pit Scouting Types
 export * from "./pitScouting";
+
+export interface PitScoutingAssignment {
+  id: string;
+  event_id: string;
+  team_number: number;
+  scouter_id: string | null;
+  created_at: string;
+  updated_at: string;
+}

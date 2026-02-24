@@ -1,255 +1,296 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Check } from "lucide-react";
-import { supabase } from "@/lib/supabase";
-import { useToast } from "@/hooks/use-toast";
-import { getMatchTeam, CURRENT_YEAR } from "@/lib/blueAlliance";
+import { Check, GripVertical } from "lucide-react";
+import { getMatchTeam } from "@/lib/blueAlliance";
+import { ScoutingReducer, type QualScoutingData } from "@/lib/ScoutingReducer";
+import { TeamImage } from "@/components/TeamImage";
+import { Loader2 } from "lucide-react";
 
-interface RobotRating {
-  teamNumber: number;
-  speed: number; // 1-5
-  fieldAwareness: number; // 1-5
+// Row height used for drag hit-test
+const ROW_HEIGHT = 96; // px, must match rendered height
+
+interface DragState {
+  dragging: boolean;
+  dragIndex: number;
+  startY: number;
+  currentY: number;
 }
 
 export default function QualScouting() {
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const { toast } = useToast();
+  const [searchParams] = useSearchParams();
 
   const matchId = searchParams.get("match_id") || "";
-  const role = searchParams.get("role") || ""; // qualRed or qualBlue
+  const role = searchParams.get("role") || "qualRed";
   const eventCode = searchParams.get("event_code") || "";
   const matchNumber = parseInt(searchParams.get("match_number") || "0");
 
-  const [ratings, setRatings] = useState<RobotRating[]>([
-    { teamNumber: 0, speed: 0, fieldAwareness: 0 },
-    { teamNumber: 0, speed: 0, fieldAwareness: 0 },
-    { teamNumber: 0, speed: 0, fieldAwareness: 0 },
-  ]);
-  const [comments, setComments] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [teamNumbersLoaded, setTeamNumbersLoaded] = useState(false);
-
   const alliance = role === "qualRed" ? "red" : "blue";
-  const positions = ["1", "2", "3"];
 
-  // Load team numbers from TBA
+  // Reducer state
+  const reducerRef = useRef<ScoutingReducer<QualScoutingData> | null>(null);
+  const [state, setState] = useState<QualScoutingData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // ── Load team numbers from TBA ──────────────────────────────────────────
   useEffect(() => {
-    const loadTeamNumbers = async () => {
-      if (!eventCode || !matchNumber || teamNumbersLoaded) return;
-
+    let mounted = true;
+    const load = async () => {
       try {
-        const newRatings = [...ratings];
-        for (let i = 0; i < 3; i++) {
-          const roleName = `${alliance}${i + 1}`;
-          const teamNumber = await getMatchTeam(eventCode, matchNumber, roleName);
-          if (teamNumber) {
-            newRatings[i] = { ...newRatings[i], teamNumber };
-          }
+        const teamNumbers: number[] = [];
+        for (let i = 1; i <= 3; i++) {
+          const roleName = `${alliance}${i}`;
+          const teamNum = await getMatchTeam(eventCode, matchNumber, roleName);
+          teamNumbers.push(teamNum ?? 0);
         }
-        setRatings(newRatings);
-        setTeamNumbersLoaded(true);
-      } catch (error) {
-        console.error("Failed to load team numbers:", error);
+        if (!mounted) return;
+        const initialState = ScoutingReducer.createQualInitialState(
+          matchId,
+          role,
+          eventCode,
+          matchNumber,
+          teamNumbers
+        );
+        const reducer = new ScoutingReducer<QualScoutingData>(initialState);
+        reducerRef.current = reducer;
+        setState(initialState);
+      } catch (err) {
+        console.error("Failed to load team numbers:", err);
+        if (!mounted) return;
+        // Fall back to zeros so the page still renders
+        const fallback = ScoutingReducer.createQualInitialState(
+          matchId,
+          role,
+          eventCode,
+          matchNumber,
+          [0, 0, 0]
+        );
+        reducerRef.current = new ScoutingReducer<QualScoutingData>(fallback);
+        setState(fallback);
+      } finally {
+        if (mounted) setLoading(false);
       }
     };
+    load();
+    return () => { mounted = false; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-    loadTeamNumbers();
-  }, [eventCode, matchNumber, alliance]);
+  // Helper: dispatch a SET action and sync React state
+  const dispatchSet = useCallback((path: string, value: unknown) => {
+    if (!reducerRef.current) return;
+    const next = reducerRef.current.reduce({ type: "SET", payload: { path, value } });
+    setState(next);
+  }, []);
 
-  const updateRating = (index: number, field: "speed" | "fieldAwareness", value: number) => {
-    const newRatings = [...ratings];
-    newRatings[index] = { ...newRatings[index], [field]: value };
-    setRatings(newRatings);
-  };
+  // ── Drag-and-drop state ─────────────────────────────────────────────────
+  const [drag, setDrag] = useState<DragState>({
+    dragging: false,
+    dragIndex: -1,
+    startY: 0,
+    currentY: 0,
+  });
 
-  const canSubmit = () => {
-    // All ratings must be set (1-5) and comments required
-    return (
-      ratings.every((r) => r.speed > 0 && r.fieldAwareness > 0) &&
-      comments.trim() !== ""
-    );
-  };
+  const listRef = useRef<HTMLDivElement>(null);
 
-  const handleSubmit = async () => {
-    if (!canSubmit()) {
-      toast({
-        title: "Incomplete Data",
-        description: "Please rate all robots and add comments",
-        variant: "destructive",
+  const onDragPointerDown = useCallback(
+    (e: React.PointerEvent, index: number) => {
+      e.preventDefault();
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      setDrag({
+        dragging: true,
+        dragIndex: index,
+        startY: e.clientY,
+        currentY: e.clientY,
       });
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      // Prepare qual scouting data
-      const qualData = {
-        version: 1,
-        alliance,
-        ratings,
-        comments,
-        submittedAt: new Date().toISOString(),
-      };
-
-      // Submit to database
-      const { error: submitError } = await supabase
-        .from("scouting_submissions")
-        .insert({
-          match_id: matchId || null,
-          match_number: matchNumber,
-          event_code: eventCode,
-          role: role,
-          scouter_id: user?.id,
-          data: qualData,
-          schema_version: 1,
-        });
-
-      if (submitError) {
-        throw submitError;
-      }
-
-      toast({
-        title: "Success!",
-        description: "Qual scouting submitted successfully",
-      });
-
-      navigate("/dashboard");
-    } catch (error: any) {
-      console.error("Submission error:", error);
-      toast({
-        title: "Submission Failed",
-        description: error.message || "Please try again",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const RatingSelector = ({
-    label,
-    value,
-    onChange,
-  }: {
-    label: string;
-    value: number;
-    onChange: (val: number) => void;
-  }) => (
-    <div className="space-y-2">
-      <div className="text-sm font-medium text-muted-foreground">{label}</div>
-      <div className="flex gap-2">
-        {[1, 2, 3, 4, 5].map((num) => (
-          <button
-            key={num}
-            type="button"
-            onClick={() => onChange(num)}
-            className={`w-12 h-12 rounded-lg border-2 font-semibold transition-all ${
-              value === num
-                ? "bg-primary text-primary-foreground border-primary scale-110"
-                : "bg-background border-border hover:border-primary/50"
-            }`}
-          >
-            {num}
-          </button>
-        ))}
-      </div>
-      <div className="flex justify-between text-xs text-muted-foreground">
-        <span>Slow/Poor</span>
-        <span>Fast/Excellent</span>
-      </div>
-    </div>
+    },
+    []
   );
 
+  const onDragPointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      if (!drag.dragging) return;
+      setDrag((d) => ({ ...d, currentY: e.clientY }));
+    },
+    [drag.dragging]
+  );
+
+  const onDragPointerUp = useCallback(() => {
+    if (!drag.dragging || !state) return;
+
+    const delta = drag.currentY - drag.startY;
+    const steps = Math.round(delta / ROW_HEIGHT);
+    const newIndex = Math.max(
+      0,
+      Math.min(state.rankings.length - 1, drag.dragIndex + steps)
+    );
+
+    if (newIndex !== drag.dragIndex) {
+      const newRankings = [...state.rankings];
+      const [moved] = newRankings.splice(drag.dragIndex, 1);
+      newRankings.splice(newIndex, 0, moved);
+      dispatchSet("rankings", newRankings);
+    }
+
+    setDrag({ dragging: false, dragIndex: -1, startY: 0, currentY: 0 });
+  }, [drag, state, dispatchSet]);
+
+  // ── Finish ──────────────────────────────────────────────────────────────
+  const handleFinish = async () => {
+    if (!state) return;
+    const { compressState } = await import("@/lib/stateCompression");
+    navigate(`/review/${compressState(state)}`);
+  };
+
+  // ── Row gradient colours ─────────────────────────────────────────────────
+  const rowBg = ["bg-emerald-500/20", "bg-amber-400/20", "bg-rose-500/20"];
+  const rowBorder = ["border-emerald-500/40", "border-amber-400/40", "border-rose-500/40"];
+
+  // ── Loading state ────────────────────────────────────────────────────────
+  if (loading || !state) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center bg-background">
+        <Loader2 className="w-10 h-10 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  const headerLabel = `Match ${matchNumber} — teams: ${state.rankings.join(", ")}`;
+
   return (
-    <div className="min-h-screen p-4 pb-24">
-      {/* Header */}
-      <div className="max-w-2xl mx-auto mb-6">
-        <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard")}>
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Dashboard
-        </Button>
-        <div className="mt-4">
-          <h1 className="text-2xl font-bold">Qual Scouting</h1>
-          <p className="text-muted-foreground">
-            Match {matchNumber} • {alliance === "red" ? "Red" : "Blue"} Alliance
-          </p>
-        </div>
+    <div
+      className="h-screen w-screen flex flex-col select-none touch-none overflow-hidden bg-background"
+      onPointerMove={onDragPointerMove}
+      onPointerUp={onDragPointerUp}
+    >
+      {/* ── Header ──────────────────────────────────────────────────────── */}
+      <div className="h-12 border-b border-border flex items-center px-4 shrink-0 bg-card gap-2">
+        <span className="font-semibold text-sm truncate">{headerLabel}</span>
+        <span className="ml-auto text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full shrink-0">
+          {role}
+        </span>
       </div>
 
-      {/* Ratings */}
-      <div className="max-w-2xl mx-auto space-y-6">
-        {ratings.map((rating, index) => (
-          <div
-            key={index}
-            className={`p-6 rounded-lg border-2 ${
-              alliance === "red" ? "border-red-500/30 bg-red-500/5" : "border-blue-500/30 bg-blue-500/5"
-            }`}
+      {/* ── Main area ───────────────────────────────────────────────────── */}
+      <div className="flex flex-1 overflow-hidden min-h-0">
+        {/* Left label column */}
+        <div className="w-8 flex flex-col items-center justify-between py-3 shrink-0 border-r border-border">
+          <span
+            className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 tracking-widest"
+            style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
           >
-            <div className="flex items-center gap-3 mb-4">
-              <div
-                className={`text-lg font-bold ${
-                  alliance === "red" ? "text-red-500" : "text-blue-500"
-                }`}
-              >
-                {alliance === "red" ? "Red" : "Blue"} {positions[index]}
-              </div>
-              {rating.teamNumber > 0 && (
-                <div className="text-sm font-medium text-muted-foreground">
-                  Team {rating.teamNumber}
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-4">
-              <RatingSelector
-                label="Speed"
-                value={rating.speed}
-                onChange={(val) => updateRating(index, "speed", val)}
-              />
-              <RatingSelector
-                label="Field Awareness"
-                value={rating.fieldAwareness}
-                onChange={(val) => updateRating(index, "fieldAwareness", val)}
-              />
-            </div>
-          </div>
-        ))}
-
-        {/* Comments */}
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Comments (Required)</label>
-          <Textarea
-            value={comments}
-            onChange={(e) => setComments(e.target.value)}
-            placeholder="Overall observations about the alliance performance..."
-            className={`min-h-24 ${
-              !comments.trim() ? "border-red-500" : ""
-            }`}
-          />
+            BEST
+          </span>
+          <div className="flex-1 w-px bg-border mx-auto my-1" />
+          <span
+            className="text-[10px] font-bold text-rose-600 dark:text-rose-400 tracking-widest"
+            style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
+          >
+            WORST
+          </span>
         </div>
 
-        {/* Submit Button */}
-        <Button
-          onClick={handleSubmit}
-          disabled={!canSubmit() || loading}
-          size="lg"
-          className="w-full h-16 text-lg"
+        {/* Team ranking list */}
+        <div
+          ref={listRef}
+          className="flex-1 flex flex-col py-2 px-3 gap-2 overflow-hidden"
         >
-          {loading ? (
-            "Submitting..."
-          ) : (
-            <>
-              <Check className="mr-2 h-5 w-5" />
-              Submit Qual Scouting
-            </>
-          )}
-        </Button>
+          {state.rankings.map((teamNum, index) => {
+            const isDraggingThis = drag.dragging && drag.dragIndex === index;
+            const translateY = isDraggingThis ? drag.currentY - drag.startY : 0;
+            const opts = state.teamOptions[String(teamNum)] ?? {
+              outposeFed: false,
+              passed: false,
+            };
+
+            return (
+              <div
+                key={teamNum}
+                style={{
+                  transform: `translateY(${translateY}px)`,
+                  zIndex: isDraggingThis ? 10 : 1,
+                  transition: isDraggingThis ? "none" : "transform 0.15s ease",
+                  height: ROW_HEIGHT,
+                }}
+                className={`relative flex items-center gap-3 px-3 rounded-xl border-2
+                  ${rowBg[index]} ${rowBorder[index]}
+                  ${isDraggingThis ? "shadow-2xl scale-[1.02] opacity-95" : ""}
+                `}
+              >
+                {/* Drag handle */}
+                <div
+                  className="cursor-grab active:cursor-grabbing touch-none shrink-0 text-muted-foreground"
+                  onPointerDown={(e) => onDragPointerDown(e, index)}
+                >
+                  <GripVertical className="w-5 h-5" />
+                </div>
+
+                {/* Rank badge */}
+                <span className="text-xs font-bold text-muted-foreground w-4 shrink-0">
+                  {index + 1}
+                </span>
+
+                {/* Team photo */}
+                <div className="w-14 h-14 rounded-lg overflow-hidden border border-border shrink-0">
+                  <TeamImage
+                    teamNumber={teamNum}
+                    className="w-full h-full object-cover"
+                    fallbackClassName="w-full h-full flex items-center justify-center bg-muted"
+                  />
+                </div>
+
+                {/* Team number */}
+                <span className="text-2xl font-black tabular-nums flex-1 min-w-0 truncate">
+                  {teamNum || "?"}
+                </span>
+
+                {/* Toggle buttons */}
+                <div className="flex flex-col gap-1.5 shrink-0">
+                  <button
+                    className={`px-3 py-1 rounded-md text-xs font-semibold border transition-colors
+                      ${opts.outposeFed
+                        ? "bg-violet-500 text-white border-violet-500"
+                        : "bg-transparent text-muted-foreground border-border"
+                      }`}
+                    onPointerDown={(e) => {
+                      e.stopPropagation();
+                      dispatchSet(`teamOptions.${teamNum}.outposeFed`, !opts.outposeFed);
+                    }}
+                  >
+                    Outpose Fed
+                  </button>
+                  <button
+                    className={`px-3 py-1 rounded-md text-xs font-semibold border transition-colors
+                      ${opts.passed
+                        ? "bg-sky-500 text-white border-sky-500"
+                        : "bg-transparent text-muted-foreground border-border"
+                      }`}
+                    onPointerDown={(e) => {
+                      e.stopPropagation();
+                      dispatchSet(`teamOptions.${teamNum}.passed`, !opts.passed);
+                    }}
+                  >
+                    Passed
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Right finish panel */}
+        <div className="w-24 flex flex-col shrink-0 border-l border-border">
+          <button
+            className="flex-1 flex flex-col items-center justify-center gap-2
+              bg-violet-100 dark:bg-violet-950/50
+              hover:bg-violet-200 dark:hover:bg-violet-900/60
+              active:bg-violet-300 dark:active:bg-violet-900/70
+              text-violet-700 dark:text-violet-300 transition-colors"
+            onPointerDown={(e) => { e.preventDefault(); handleFinish(); }}
+          >
+            <Check className="w-7 h-7" />
+            <span className="text-sm font-semibold">Finish</span>
+          </button>
+        </div>
       </div>
     </div>
   );

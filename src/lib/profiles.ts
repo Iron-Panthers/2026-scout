@@ -58,6 +58,29 @@ export async function updateProfile(
   return true;
 }
 
+export async function uploadAvatar(
+  userId: string,
+  file: File
+): Promise<string | null> {
+  const ext = file.name.split(".").pop() || "jpg";
+  const path = `${userId}/avatar.${ext}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from("avatars")
+    .upload(path, file, { upsert: true });
+
+  if (uploadError) {
+    console.error("Error uploading avatar:", uploadError);
+    return null;
+  }
+
+  const { data } = supabase.storage.from("avatars").getPublicUrl(path);
+  const publicUrl = data.publicUrl;
+
+  await updateProfile(userId, { avatar_url: publicUrl });
+  return publicUrl;
+}
+
 export async function createProfile(
   userId: string,
   name: string
