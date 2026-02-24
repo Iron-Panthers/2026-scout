@@ -9,13 +9,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, X } from "lucide-react";
+import { Loader2, X, CheckCircle2 } from "lucide-react";
 import { getEventTeams, type TBATeamSimple } from "@/lib/blueAlliance";
 import {
   getPitAssignmentsForEvent,
   upsertPitAssignment,
   removePitAssignment,
 } from "@/lib/pitScoutingAssignments";
+import { getPitScoutingByEvent } from "@/lib/pitScouting";
 import { ScoutAssignmentDialog } from "@/components/manager/ScoutAssignmentDialog";
 import { useToast } from "@/hooks/use-toast";
 import type { Event, Profile, PitScoutingAssignment } from "@/types";
@@ -34,6 +35,7 @@ export function PitScoutingAssignmentsTab({
   const { toast } = useToast();
   const [teams, setTeams] = useState<TBATeamSimple[]>([]);
   const [assignments, setAssignments] = useState<PitScoutingAssignment[]>([]);
+  const [submittedTeams, setSubmittedTeams] = useState<Map<number, string>>(new Map());
   const [loadingTeams, setLoadingTeams] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [assigningTeam, setAssigningTeam] = useState<number | null>(null);
@@ -46,11 +48,12 @@ export function PitScoutingAssignmentsTab({
 
     setLoadingTeams(true);
     try {
-      const [teamsData, assignmentsData] = await Promise.all([
+      const [teamsData, assignmentsData, submissionsData] = await Promise.all([
         currentEvent.event_code
           ? getEventTeams(currentEvent.event_code)
           : Promise.resolve([]),
         getPitAssignmentsForEvent(currentEvent.id),
+        getPitScoutingByEvent(currentEvent.id),
       ]);
 
       // Sort teams by team number
@@ -59,6 +62,7 @@ export function PitScoutingAssignmentsTab({
       );
       setTeams(sorted);
       setAssignments(assignmentsData);
+      setSubmittedTeams(new Map(submissionsData.map((s) => [s.team_num, s.scouter_name])));
     } finally {
       setLoadingTeams(false);
     }
@@ -177,6 +181,11 @@ export function PitScoutingAssignmentsTab({
           <h2 className="text-2xl font-bold">Pit Scouting Assignments</h2>
           <p className="text-sm text-muted-foreground mt-1">
             Assign scouts to teams for pit scouting at {currentEvent.name}
+            {teams.length > 0 && (
+              <span className="ml-2 text-green-400 font-medium">
+                — {submittedTeams.size}/{teams.length} submitted
+              </span>
+            )}
           </p>
         </div>
         {loadingTeams && (
@@ -202,7 +211,7 @@ export function PitScoutingAssignmentsTab({
                 <TableHead className="w-28 font-semibold">Team #</TableHead>
                 <TableHead className="font-semibold">Team Name</TableHead>
                 <TableHead className="font-semibold">Location</TableHead>
-                <TableHead className="font-semibold">Assigned Scout</TableHead>
+                <TableHead className="font-semibold">Status</TableHead>
                 <TableHead className="w-32 text-right font-semibold">
                   Actions
                 </TableHead>
@@ -211,10 +220,20 @@ export function PitScoutingAssignmentsTab({
             <TableBody>
               {teams.map((team) => {
                 const scout = getAssignedScout(team.team_number);
+                const submittedBy = submittedTeams.get(team.team_number);
+                const isSubmitted = submittedBy !== undefined;
                 return (
-                  <TableRow key={team.team_number}>
+                  <TableRow
+                    key={team.team_number}
+                    className={isSubmitted ? "bg-green-950/30" : undefined}
+                  >
                     <TableCell className="font-mono font-bold">
-                      {team.team_number}
+                      <div className="flex items-center gap-2">
+                        {isSubmitted && (
+                          <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+                        )}
+                        {team.team_number}
+                      </div>
                     </TableCell>
                     <TableCell>{team.nickname}</TableCell>
                     <TableCell className="text-muted-foreground text-sm">
@@ -223,10 +242,14 @@ export function PitScoutingAssignmentsTab({
                         .join(", ") || "—"}
                     </TableCell>
                     <TableCell>
-                      {scout ? (
+                      {isSubmitted ? (
+                        <Badge className="bg-green-700/30 text-green-400 border-green-600/40 border">
+                          ✓ {submittedBy}
+                        </Badge>
+                      ) : scout ? (
                         <Badge
                           variant="outline"
-                          className="bg-green-900/20 text-green-400 border-green-600/30"
+                          className="bg-muted/30 text-foreground border-border"
                         >
                           {scout.name || "Unknown"}
                         </Badge>
@@ -238,14 +261,16 @@ export function PitScoutingAssignmentsTab({
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => openAssignDialog(team.team_number)}
-                        >
-                          Assign
-                        </Button>
-                        {scout && (
+                        {!isSubmitted && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openAssignDialog(team.team_number)}
+                          >
+                            Assign
+                          </Button>
+                        )}
+                        {scout && !isSubmitted && (
                           <Button
                             variant="ghost"
                             size="sm"

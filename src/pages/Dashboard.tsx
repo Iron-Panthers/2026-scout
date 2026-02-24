@@ -198,13 +198,24 @@ export default function Dashboard() {
       .on(
         "postgres_changes",
         {
-          event: "*", // Listen to all events (INSERT, UPDATE, DELETE)
+          event: "*",
           schema: "public",
           table: "scouting_submissions",
         },
         (payload) => {
           console.log("Scouting submission changed:", payload);
-          // Reload matches to update submission status
+          loadMatches();
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "qual_scouting_submissions",
+        },
+        (payload) => {
+          console.log("Qual scouting submission changed:", payload);
           loadMatches();
         }
       )
@@ -214,6 +225,17 @@ export default function Dashboard() {
           event: "*",
           schema: "public",
           table: "pit_scouting_assignments",
+        },
+        () => {
+          loadPitAssignments();
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "pit_scouting_submissions",
         },
         () => {
           loadPitAssignments();
