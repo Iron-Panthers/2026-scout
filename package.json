@@ -11,7 +11,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "deploy": "npm run build:quick && gh-pages -d dist",
-    "db:push": "supabase db push",
+    "db:push": "supabase db push --include-all",
     "db:link": "supabase link --project-ref qwzsrlbhwigozonzthvx"
   },
   "dependencies": {

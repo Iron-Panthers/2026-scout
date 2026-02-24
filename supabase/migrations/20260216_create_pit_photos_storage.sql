@@ -4,6 +4,7 @@ VALUES ('pit-scouting-photos', 'pit-scouting-photos', true)
 ON CONFLICT (id) DO NOTHING;
 
 -- Enable RLS for the bucket
+DROP POLICY IF EXISTS "Authenticated users can upload pit photos" ON storage.objects;
 CREATE POLICY "Authenticated users can upload pit photos"
   ON storage.objects FOR INSERT
   WITH CHECK (
@@ -12,6 +13,7 @@ CREATE POLICY "Authenticated users can upload pit photos"
   );
 
 -- All authenticated users can view pit photos
+DROP POLICY IF EXISTS "Authenticated users can view pit photos" ON storage.objects;
 CREATE POLICY "Authenticated users can view pit photos"
   ON storage.objects FOR SELECT
   USING (
@@ -20,6 +22,7 @@ CREATE POLICY "Authenticated users can view pit photos"
   );
 
 -- All authenticated users can update pit photos
+DROP POLICY IF EXISTS "Authenticated users can update pit photos" ON storage.objects;
 CREATE POLICY "Authenticated users can update pit photos"
   ON storage.objects FOR UPDATE
   USING (
@@ -28,6 +31,7 @@ CREATE POLICY "Authenticated users can update pit photos"
   );
 
 -- All authenticated users can delete pit photos
+DROP POLICY IF EXISTS "Authenticated users can delete pit photos" ON storage.objects;
 CREATE POLICY "Authenticated users can delete pit photos"
   ON storage.objects FOR DELETE
   USING (

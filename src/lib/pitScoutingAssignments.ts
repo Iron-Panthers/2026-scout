@@ -66,24 +66,38 @@ export interface UserPitAssignment extends PitScoutingAssignment {
 export async function getUserPitAssignments(
   userId: string
 ): Promise<UserPitAssignment[]> {
-  const { data, error } = await supabase
-    .from("pit_scouting_assignments")
-    .select("*, events(id, name, event_code)")
-    .eq("scouter_id", userId);
+  const [{ data: assignments, error }, { data: submissions }] =
+    await Promise.all([
+      supabase
+        .from("pit_scouting_assignments")
+        .select("*, events(id, name, event_code)")
+        .eq("scouter_id", userId),
+      supabase
+        .from("pit_scouting_submissions")
+        .select("team_num, event_id")
+        .eq("scouter_id", userId),
+    ]);
 
   if (error) {
     console.error("Error fetching user pit assignments:", error);
     return [];
   }
 
-  return (data ?? []).map((row: any) => ({
-    id: row.id,
-    event_id: row.event_id,
-    team_number: row.team_number,
-    scouter_id: row.scouter_id,
-    created_at: row.created_at,
-    updated_at: row.updated_at,
-    event_code: row.events?.event_code ?? null,
-    event_name: row.events?.name ?? "Unknown Event",
-  }));
+  // Build a set of "event_id:team_number" keys that are already submitted
+  const submitted = new Set(
+    (submissions ?? []).map((s) => `${s.event_id}:${s.team_num}`)
+  );
+
+  return (assignments ?? [])
+    .filter((row: any) => !submitted.has(`${row.event_id}:${row.team_number}`))
+    .map((row: any) => ({
+      id: row.id,
+      event_id: row.event_id,
+      team_number: row.team_number,
+      scouter_id: row.scouter_id,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+      event_code: row.events?.event_code ?? null,
+      event_name: row.events?.name ?? "Unknown Event",
+    }));
 }
