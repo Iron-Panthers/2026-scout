@@ -407,51 +407,51 @@ export default function ScoutConfig() {
                         {lockedRole && role === lockedRole && " (Assigned)"}
                       </p>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent className="w-fit h-fit rounded-lg shadow-md border border-border bg-popover">
+                    <DropdownMenuContent className="w-40 h-fit rounded-lg shadow-md border border-primary bg-popover overflow-y-scroll max-h-35">
                       <DropdownMenuItem
-                        className="p-2 px-7 bg-primary border-b rounded-lg"
+                        className="p-2 px-7 border-b rounded-lg"
                         onClick={() => handleRoleChange("red1")}
                       >
                         Red 1
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        className="p-2 px-7 bg-primary border-b rounded-lg"
+                        className="p-2 px-7 border-b rounded-lg"
                         onClick={() => handleRoleChange("red2")}
                       >
                         Red 2
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        className="p-2 px-7 bg-primary border-b rounded-lg"
+                        className="p-2 px-7 border-b rounded-lg"
                         onClick={() => handleRoleChange("red3")}
                       >
                         Red 3
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        className="p-2 px-7 bg-primary border-b rounded-lg"
+                        className="p-2 px-7 border-b rounded-lg"
                         onClick={() => handleRoleChange("qualRed")}
                       >
                         Qual Red
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        className="p-2 px-7 bg-chart-5 border-b rounded-lg"
+                        className="p-2 px-7 border-b rounded-lg"
                         onClick={() => handleRoleChange("blue1")}
                       >
                         Blue 1
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        className="p-2 px-7 bg-chart-5 border-b rounded-lg"
+                        className="p-2 px-7 border-b rounded-lg"
                         onClick={() => handleRoleChange("blue2")}
                       >
                         Blue 2
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        className="p-2 px-7 bg-chart-5 border-b rounded-lg"
+                        className="p-2 px-7 border-b rounded-lg"
                         onClick={() => handleRoleChange("blue3")}
                       >
                         Blue 3
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        className="p-2 px-7 bg-chart-5 border-b rounded-lg"
+                        className="p-2 px-7 border-b rounded-lg"
                         onClick={() => handleRoleChange("qualBlue")}
                       >
                         Qual Blue
@@ -475,7 +475,7 @@ export default function ScoutConfig() {
                         {lockedMatchType && matchType === lockedMatchType && " (Assigned)"}
                       </p>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent className="w-fit h-fit rounded-lg shadow-md border border-border bg-popover">
+                    <DropdownMenuContent className="w-fit h-fit rounded-lg shadow-md border border-primary bg-popover">
                       <DropdownMenuItem
                         className="p-2 px-7 bg-accent-foreground/10 border-b rounded-lg"
                         onClick={() => handleMatchTypeChange("Qualification")}
