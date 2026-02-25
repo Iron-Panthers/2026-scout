@@ -189,8 +189,8 @@ export default function OfflineMatches() {
         throw new Error("Could not resolve match ID");
       }
 
-      // Submit to database (qual vs quant)
-      if (match.scoutingData?.match_type === "qual") {
+      // Submit to database (qual ranking vs quant scouting)
+      if (match.role === "qualRed" || match.role === "qualBlue") {
         await submitQualScoutingData(
           matchId,
           match.role,

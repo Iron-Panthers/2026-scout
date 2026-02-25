@@ -169,7 +169,7 @@ export default function Scouting() {
   };
 
   const handleFinish = () => {
-    navigate(`/review/${compressState(state)}`);
+    navigate(`/review/${compressState(state)}?type=quant`);
   };
 
   // Use preview coords during drag, otherwise committed state

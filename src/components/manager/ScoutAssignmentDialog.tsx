@@ -16,7 +16,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import type { Profile } from "@/types";
 
 // Instant dialog content without animations
@@ -28,10 +28,7 @@ function InstantDialogContent({
   return (
     <DialogPortal>
       <DialogPrimitive.Overlay
-        className={cn(
-          "fixed inset-0 z-50 bg-black/50",
-          className
-        )}
+        className="fixed inset-0 z-50 bg-black/50"
       />
       <DialogPrimitive.Content
         className={cn(
@@ -78,6 +75,7 @@ const ScoutItem = memo(({ profile, onSelect }: { profile: Profile; onSelect: () 
       className="flex items-center gap-3 px-4 py-3 cursor-pointer"
     >
       <Avatar className="h-10 w-10">
+        <AvatarImage src={profile.avatar_url || ""} />
         <AvatarFallback className="text-sm bg-primary/20 text-primary">
           {initials}
         </AvatarFallback>

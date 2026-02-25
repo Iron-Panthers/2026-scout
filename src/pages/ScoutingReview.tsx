@@ -175,6 +175,11 @@ export default function ScoutingReview() {
   // Check if opened with manager parameter
   const isManagerMode = searchParams.get("forScoutingManager") === "true";
 
+  // Determine scouting type from URL param; fall back to role for legacy URLs
+  const scoutingType =
+    searchParams.get("type") ??
+    (state?.role === "qualRed" || state?.role === "qualBlue" ? "qual" : "quant");
+
   // Decode state from compressed URL param
   let initialState: any = null;
   if (encoded) {
@@ -290,7 +295,10 @@ export default function ScoutingReview() {
         const compressed = compressState(state);
         // Only update if different
         if (compressed !== encoded) {
-          const newUrl = `/review/${compressed}`;
+          const typeParam = searchParams.get("type");
+          const newUrl = typeParam
+            ? `/review/${compressed}?type=${typeParam}`
+            : `/review/${compressed}`;
           window.history.replaceState(null, "", newUrl);
         }
       } catch {
@@ -590,7 +598,7 @@ export default function ScoutingReview() {
     setIsSubmitting(true);
 
     try {
-      if (state.match_type === "qual") {
+      if (scoutingType === "qual") {
         await submitQualScoutingData(matchId, state.role, state, user?.id);
       } else {
         await submitScoutingData(matchId, state.role, state, user?.id, state.team_number ?? 0, state.match_type);
