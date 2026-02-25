@@ -16,7 +16,7 @@ export default function Scouting() {
   const event_code = searchParams.get("event_code") || "";
   const match_number = parseInt(searchParams.get("match_number") || "0");
   const team_number = parseInt(searchParams.get("team_number") || "0");
-  const match_type = "quant";
+  const match_type = "qual";
 
   const { state, set, logEvent, undo, canUndo } = useScoutingReducer(
     match_id || "",
@@ -169,7 +169,7 @@ export default function Scouting() {
   };
 
   const handleFinish = () => {
-    navigate(`/review/${compressState(state)}`);
+    navigate(`/review/${compressState(state)}?type=quant`);
   };
 
   // Use preview coords during drag, otherwise committed state

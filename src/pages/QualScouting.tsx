@@ -138,7 +138,7 @@ export default function QualScouting() {
   const handleFinish = async () => {
     if (!state) return;
     const { compressState } = await import("@/lib/stateCompression");
-    navigate(`/review/${compressState(state)}`);
+    navigate(`/review/${compressState(state)}?type=qual`);
   };
 
   // ── Row gradient colours ─────────────────────────────────────────────────
