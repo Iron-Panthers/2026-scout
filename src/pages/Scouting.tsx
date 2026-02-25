@@ -16,7 +16,7 @@ export default function Scouting() {
   const event_code = searchParams.get("event_code") || "";
   const match_number = parseInt(searchParams.get("match_number") || "0");
   const team_number = parseInt(searchParams.get("team_number") || "0");
-  const match_type = "qual";
+  const match_type = searchParams.get("type") || "qual";
 
   const { state, set, logEvent, undo, canUndo } = useScoutingReducer(
     match_id || "",
