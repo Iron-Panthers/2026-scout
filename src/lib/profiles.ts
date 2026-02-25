@@ -62,12 +62,23 @@ export async function uploadAvatar(
   userId: string,
   file: File
 ): Promise<string | null> {
+  // Delete all existing avatar files for this user so storage stays clean
+  // and the new URL will be different (busting the browser cache)
+  const { data: existingFiles } = await supabase.storage
+    .from("avatars")
+    .list(userId);
+
+  if (existingFiles && existingFiles.length > 0) {
+    const filePaths = existingFiles.map((f) => `${userId}/${f.name}`);
+    await supabase.storage.from("avatars").remove(filePaths);
+  }
+
   const ext = file.name.split(".").pop() || "jpg";
-  const path = `${userId}/avatar.${ext}`;
+  const path = `${userId}/avatar_${Date.now()}.${ext}`;
 
   const { error: uploadError } = await supabase.storage
     .from("avatars")
-    .upload(path, file, { upsert: true });
+    .upload(path, file);
 
   if (uploadError) {
     console.error("Error uploading avatar:", uploadError);
