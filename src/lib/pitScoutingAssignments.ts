@@ -61,14 +61,12 @@ export async function removePitAssignment(
 export interface UserPitAssignment extends PitScoutingAssignment {
   event_code: string | null;
   event_name: string;
-  isRescout?: boolean;
-  existingSubmissionId?: string;
 }
 
 export async function getUserPitAssignments(
   userId: string
 ): Promise<UserPitAssignment[]> {
-  const [{ data: assignments, error }, { data: userSubmissions }] =
+  const [{ data: assignments, error }, { data: submissions }] =
     await Promise.all([
       supabase
         .from("pit_scouting_assignments")
@@ -85,33 +83,14 @@ export async function getUserPitAssignments(
     return [];
   }
 
-  // Filter out assignments this user has already personally submitted
-  const userSubmitted = new Set(
-    (userSubmissions ?? []).map((s) => `${s.event_id}:${s.team_num}`)
+  // Build a set of "event_id:team_number" keys that are already submitted
+  const submitted = new Set(
+    (submissions ?? []).map((s) => `${s.event_id}:${s.team_num}`)
   );
 
-  const pending = (assignments ?? []).filter(
-    (row: any) => !userSubmitted.has(`${row.event_id}:${row.team_number}`)
-  );
-
-  if (!pending.length) return [];
-
-  // Check if anyone has already submitted for these teams (rescout detection)
-  const eventIds = [...new Set(pending.map((a: any) => a.event_id))];
-  const { data: anySubmissions } = await supabase
-    .from("pit_scouting_submissions")
-    .select("team_num, event_id, id")
-    .in("event_id", eventIds);
-
-  const anyoneSubmitted = new Map<string, string>();
-  for (const s of anySubmissions ?? []) {
-    const key = `${s.event_id}:${s.team_num}`;
-    if (!anyoneSubmitted.has(key)) anyoneSubmitted.set(key, s.id);
-  }
-
-  return pending.map((row: any) => {
-    const key = `${row.event_id}:${row.team_number}`;
-    return {
+  return (assignments ?? [])
+    .filter((row: any) => !submitted.has(`${row.event_id}:${row.team_number}`))
+    .map((row: any) => ({
       id: row.id,
       event_id: row.event_id,
       team_number: row.team_number,
@@ -120,8 +99,5 @@ export async function getUserPitAssignments(
       updated_at: row.updated_at,
       event_code: row.events?.event_code ?? null,
       event_name: row.events?.name ?? "Unknown Event",
-      isRescout: anyoneSubmitted.has(key),
-      existingSubmissionId: anyoneSubmitted.get(key),
-    };
-  });
+    }));
 }

@@ -277,7 +277,7 @@ export function PitScoutingAssignmentsTab({
                             Assign
                           </Button>
                         )}
-                        {isSubmitted && !scout && (
+                        {isSubmitted && (
                           <Button
                             variant="outline"
                             size="sm"

@@ -349,30 +349,18 @@ export default function Dashboard() {
                     className="flex-shrink-0 flex"
                   >
                     <Card
-                      className={`w-64 flex flex-col border-2 hover:scale-[1.02] transition-transform cursor-pointer ${
-                        assignment.isRescout
-                          ? "bg-yellow-900/40 border-yellow-700/50"
-                          : "bg-green-900/40 border-green-700/50"
-                      }`}
+                      className="w-64 flex flex-col bg-green-900/40 border-green-700/50 border-2 hover:scale-[1.02] transition-transform cursor-pointer"
                       onClick={() =>
-                        navigate(
-                          assignment.isRescout
-                            ? `/pit-scouting?team=${assignment.team_number}&rescout=true`
-                            : `/pit-scouting?team=${assignment.team_number}`
-                        )
+                        navigate(`/pit-scouting?team=${assignment.team_number}`)
                       }
                     >
                       <CardHeader className="pb-2">
                         <div className="flex items-center justify-between mb-1 gap-2">
                           <Badge
                             variant="outline"
-                            className={`text-xs ${
-                              assignment.isRescout
-                                ? "bg-yellow-600/20 text-yellow-400 border-yellow-600/30"
-                                : "bg-green-600/20 text-green-400 border-green-600/30"
-                            }`}
+                            className="bg-green-600/20 text-green-400 border-green-600/30 text-xs"
                           >
-                            {assignment.isRescout ? "Rescout" : "Pit Scout"}
+                            Pit Scout
                           </Badge>
                         </div>
                         <CardTitle className="text-3xl font-bold font-mono">
@@ -388,23 +376,15 @@ export default function Dashboard() {
                             <div className="text-xs">{assignment.event_name}</div>
                           </div>
                           <Button
-                            className={`w-full mt-4 ${
-                              assignment.isRescout
-                                ? "bg-yellow-700 hover:bg-yellow-600"
-                                : "bg-green-700 hover:bg-green-600"
-                            }`}
+                            className="w-full mt-4 bg-green-700 hover:bg-green-600"
                             size="sm"
                             onClick={(e) => {
                               e.stopPropagation();
-                              navigate(
-                                assignment.isRescout
-                                  ? `/pit-scouting?team=${assignment.team_number}&rescout=true`
-                                  : `/pit-scouting?team=${assignment.team_number}`
-                              );
+                              navigate(`/pit-scouting?team=${assignment.team_number}`);
                             }}
                           >
                             <Wrench className="h-4 w-4 mr-1" />
-                            {assignment.isRescout ? "Update Entry" : "Scout Pit"}
+                            Scout Pit
                           </Button>
                         </div>
                       </CardContent>

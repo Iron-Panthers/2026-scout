@@ -1,7 +1,7 @@
 import type { GameDefinition } from "@/types";
 
-// Points awarded per completed scouting submission
-export const POINTS_PER_MATCH = 25;
+// Points awarded per completed scouting submission (matches server trigger)
+export const POINTS_PER_MATCH = 5;
 
 // Static game catalog — games are iframe embeds, no DB table needed.
 // To add a game: append an entry here and provide a real iframeUrl.
@@ -19,7 +19,7 @@ export const GAMES: GameDefinition[] = [
     id: "tetris",
     name: "Tetris",
     description: "Classic block-stacking puzzle game.",
-    cost: 100,
+    cost: 20,
     // open-source React Tetris on GitHub Pages — no X-Frame-Options restriction
     iframeUrl: "https://onlinetetris.org/GoodOldTetris/",
     thumbnailUrl: "",
@@ -28,7 +28,7 @@ export const GAMES: GameDefinition[] = [
     id: "block-blast",
     name: "Block Blast",
     description: "Fit blocks onto the board to clear lines.",
-    cost: 150,
+    cost: 50,
     // GitHub Pages hosted — no X-Frame-Options restriction
     iframeUrl: "https://games.engineering.com/blockblastgame/index.html",
     thumbnailUrl: "",
@@ -37,7 +37,7 @@ export const GAMES: GameDefinition[] = [
     id: "subway-surfers",
     name: "Subway Surfers",
     description: "Run, dodge, and surf through the subway.",
-    cost: 200,
+    cost: 50,
     // GitHub Pages hosted — no X-Frame-Options restriction
     iframeUrl: "https://77pen.github.io/p8/subway-surfers-newyork/",
     thumbnailUrl: "",

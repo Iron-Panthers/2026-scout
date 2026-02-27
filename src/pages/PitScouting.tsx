@@ -94,6 +94,19 @@ export default function PitScouting() {
     }
   }, [searchParams, user, profile]);
 
+  // Auto-redirect to rescout mode when team is locked and already has data
+  useEffect(() => {
+    if (rescoutMode || !teamNumberLocked || !teamNumber || !activeEvent) return;
+    const teamNum = Number(teamNumber);
+    if (!teamNum || teamNum <= 0) return;
+
+    getPitScoutingForTeamAtEvent(teamNum, activeEvent.id).then((sub) => {
+      if (sub) {
+        navigate(`/pit-scouting?team=${teamNumber}&rescout=true`, { replace: true });
+      }
+    });
+  }, [rescoutMode, teamNumberLocked, teamNumber, activeEvent, navigate]);
+
   // Load existing submission in rescout mode
   useEffect(() => {
     if (!rescoutMode || !teamNumber || !activeEvent) return;
