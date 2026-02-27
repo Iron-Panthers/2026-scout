@@ -226,7 +226,7 @@ export default function Scouting() {
         hover:bg-violet-200 dark:hover:bg-violet-900/60
         active:bg-violet-300 dark:active:bg-violet-900/70
         text-violet-700 dark:text-violet-300 transition-colors ${extraClass}`}
-      onPointerDown={(e) => { e.preventDefault(); handleFinish(); }}
+      onClick={handleFinish}
     >
       <Check className="w-6 h-6" />
       <span className="text-xs font-medium">Finish</span>
