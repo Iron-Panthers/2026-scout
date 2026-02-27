@@ -175,11 +175,6 @@ export default function ScoutingReview() {
   // Check if opened with manager parameter
   const isManagerMode = searchParams.get("forScoutingManager") === "true";
 
-  // Determine scouting type from URL param; fall back to role for legacy URLs
-  const scoutingType =
-    searchParams.get("type") ??
-    (state?.role === "qualRed" || state?.role === "qualBlue" ? "qual" : "quant");
-
   // Decode state from compressed URL param
   let initialState: any = null;
   if (encoded) {
@@ -200,6 +195,13 @@ export default function ScoutingReview() {
   }
 
   const [state, setState] = useState<any>(initialState);
+
+  // Determine scouting type from URL param; fall back to role for legacy URLs
+  // (Must be after useState so `state` is in scope)
+  const scoutingType =
+    searchParams.get("type") ??
+    (state?.role === "qualRed" || state?.role === "qualBlue" ? "qual" : "quant");
+
   const [writtenTempState, setWrittenTempState] = useState<any>({ defense: null, problems: null, errors: null });
   const [rawEdit, setRawEdit] = useState(false);
   const [rawEditOpen, setRawEditOpen] = useState(true);
@@ -299,7 +301,9 @@ export default function ScoutingReview() {
           const newUrl = typeParam
             ? `/review/${compressed}?type=${typeParam}`
             : `/review/${compressed}`;
-          window.history.replaceState(null, "", newUrl);
+          // Use navigate with replace:true so React Router stays in sync
+          // and the basename is correctly included (important for production deployments)
+          navigate(newUrl, { replace: true });
         }
       } catch {
         // ignore
@@ -308,7 +312,7 @@ export default function ScoutingReview() {
 
     // Cleanup timeout on unmount or when deps change
     return () => clearTimeout(timeoutId);
-  }, [state, encoded]);
+  }, [state, encoded, navigate]);
 
   // Handlers for note fields
   const handleFieldChange = (

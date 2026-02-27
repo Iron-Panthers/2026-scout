@@ -396,8 +396,7 @@ export default function ManagerDashboard() {
       updateMatchAssignment(
         currentMatch.matchId,
         selectedCell.role,
-        profile.id,
-        previousAssignment?.id
+        profile.id
       )
         .then((success) => {
           if (!success) {
@@ -490,8 +489,7 @@ export default function ManagerDashboard() {
       updateMatchAssignment(
         currentMatch.matchId,
         role,
-        null,
-        previousAssignment?.id
+        null
       )
         .then((success) => {
           if (!success) {
