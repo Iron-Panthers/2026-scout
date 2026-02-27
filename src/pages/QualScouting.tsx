@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Check, GripVertical } from "lucide-react";
+import { Check, GripVertical, ArrowLeft } from "lucide-react";
 import { getMatchTeam } from "@/lib/blueAlliance";
 import { ScoutingReducer, type QualScoutingData } from "@/lib/ScoutingReducer";
 import { TeamImage } from "@/components/TeamImage";
@@ -171,6 +171,13 @@ export default function QualScouting() {
     >
       {/* ── Header ──────────────────────────────────────────────────────── */}
       <div className="h-12 border-b border-border flex items-center px-4 shrink-0 bg-card gap-2">
+        <button
+          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0"
+          onPointerDown={(e) => { e.preventDefault(); navigate("/dashboard"); }}
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span className="font-medium">Dashboard</span>
+        </button>
         <span className="font-semibold text-sm truncate">{headerLabel}</span>
         <span className="ml-auto text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full shrink-0">
           {role}

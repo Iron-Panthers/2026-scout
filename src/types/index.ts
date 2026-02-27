@@ -147,3 +147,22 @@ export interface PitScoutingAssignment {
   created_at: string;
   updated_at: string;
 }
+
+// Game Shop Types
+export interface GameDefinition {
+  id: string;
+  name: string;
+  description: string;
+  cost: number;
+  iframeUrl: string;
+  thumbnailUrl: string;
+}
+
+export interface GameProfile {
+  id: string;
+  user_id: string;
+  points: number;
+  unlocked_games: string[];
+  created_at: string;
+  updated_at: string;
+}

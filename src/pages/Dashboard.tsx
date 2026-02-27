@@ -351,9 +351,7 @@ export default function Dashboard() {
                     <Card
                       className="w-64 flex flex-col bg-green-900/40 border-green-700/50 border-2 hover:scale-[1.02] transition-transform cursor-pointer"
                       onClick={() =>
-                        navigate(
-                          `/pit-scouting?team=${assignment.team_number}`
-                        )
+                        navigate(`/pit-scouting?team=${assignment.team_number}`)
                       }
                     >
                       <CardHeader className="pb-2">
@@ -382,9 +380,7 @@ export default function Dashboard() {
                             size="sm"
                             onClick={(e) => {
                               e.stopPropagation();
-                              navigate(
-                                `/pit-scouting?team=${assignment.team_number}`
-                              );
+                              navigate(`/pit-scouting?team=${assignment.team_number}`);
                             }}
                           >
                             <Wrench className="h-4 w-4 mr-1" />

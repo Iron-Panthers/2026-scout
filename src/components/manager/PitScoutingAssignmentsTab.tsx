@@ -242,22 +242,29 @@ export function PitScoutingAssignmentsTab({
                         .join(", ") || "—"}
                     </TableCell>
                     <TableCell>
-                      {isSubmitted ? (
-                        <Badge className="bg-green-700/30 text-green-400 border-green-600/40 border">
-                          ✓ {submittedBy}
-                        </Badge>
-                      ) : scout ? (
-                        <Badge
-                          variant="outline"
-                          className="bg-muted/30 text-foreground border-border"
-                        >
-                          {scout.name || "Unknown"}
-                        </Badge>
-                      ) : (
-                        <span className="text-muted-foreground text-sm">
-                          Unassigned
-                        </span>
-                      )}
+                      <div className="flex flex-col gap-1">
+                        {isSubmitted ? (
+                          <Badge className="bg-green-700/30 text-green-400 border-green-600/40 border w-fit">
+                            ✓ {submittedBy}
+                          </Badge>
+                        ) : scout ? (
+                          <Badge
+                            variant="outline"
+                            className="bg-muted/30 text-foreground border-border w-fit"
+                          >
+                            {scout.name || "Unknown"}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">
+                            Unassigned
+                          </span>
+                        )}
+                        {isSubmitted && scout && (
+                          <Badge className="bg-yellow-700/30 text-yellow-400 border-yellow-600/40 border w-fit">
+                            Rescout: {scout.name || "Unknown"}
+                          </Badge>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
@@ -270,7 +277,17 @@ export function PitScoutingAssignmentsTab({
                             Assign
                           </Button>
                         )}
-                        {scout && !isSubmitted && (
+                        {isSubmitted && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="border-yellow-600/50 text-yellow-400 hover:bg-yellow-900/30"
+                            onClick={() => openAssignDialog(team.team_number)}
+                          >
+                            Assign Rescout
+                          </Button>
+                        )}
+                        {scout && (
                           <Button
                             variant="ghost"
                             size="sm"

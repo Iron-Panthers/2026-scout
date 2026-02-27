@@ -22,7 +22,7 @@ export async function submitPitScouting(
   scouterId: string,
   scouterName: string,
   formData: PitScoutingFormData,
-  photoUrls: string[] = []
+  photoUrl: string | null = null
 ): Promise<PitScoutingSubmission> {
   const { data, error } = await supabase
     .from("pit_scouting_submissions")
@@ -32,7 +32,7 @@ export async function submitPitScouting(
       scouter_id: scouterId || null,
       scouter_name: scouterName,
       pit_data: formData,
-      photo_urls: photoUrls,
+      photo_url: photoUrl,
       schema_version: PIT_SCHEMA_VERSION,
     })
     .select()
@@ -132,7 +132,7 @@ export async function updatePitScouting(
   submissionId: string,
   updates: Partial<{
     pit_data: PitScoutingFormData;
-    photo_urls: string[];
+    photo_url: string | null;
     scouter_name: string;
   }>
 ): Promise<PitScoutingSubmission> {
@@ -166,6 +166,30 @@ export async function deletePitScouting(submissionId: string): Promise<void> {
 }
 
 /**
+ * Get any existing pit scouting submission for a team at an event (by anyone)
+ * Used to detect rescout situations and pre-fill rescout form
+ */
+export async function getPitScoutingForTeamAtEvent(
+  teamNum: number,
+  eventId: string
+): Promise<PitScoutingSubmission | null> {
+  const { data, error } = await supabase
+    .from("pit_scouting_submissions")
+    .select("*")
+    .eq("team_num", teamNum)
+    .eq("event_id", eventId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Error fetching existing pit scouting:", error);
+    return null;
+  }
+  return data;
+}
+
+/**
  * Get team photo URL from pit scouting submissions
  * @param teamNum - Team number
  * @param eventId - Event ID
@@ -177,14 +201,14 @@ export async function getTeamPhotoFromPitScouting(
 ): Promise<string | null> {
   const { data, error } = await supabase
     .from("pit_scouting_submissions")
-    .select("photo_urls")
+    .select("photo_url")
     .eq("team_num", teamNum)
     .eq("event_id", eventId)
     .maybeSingle();
 
-  if (error || !data || !data.photo_urls || data.photo_urls.length === 0) {
+  if (error || !data || !data.photo_url) {
     return null;
   }
 
-  return data.photo_urls[0];
+  return data.photo_url;
 }

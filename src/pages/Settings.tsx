@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -25,6 +26,21 @@ export default function Settings() {
   const { settings, updateSetting } = useSettings();
   const { supported, subscribed, loading, permission, error, toggleNotifications } =
     usePushNotifications();
+  const [recording, setRecording] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!recording) return;
+    const handler = (e: KeyboardEvent) => {
+      e.preventDefault();
+      if (e.key === "Escape") { setRecording(null); return; }
+      if (e.key.length === 1) {
+        updateSetting(recording, e.key.toLowerCase());
+        setRecording(null);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [recording, updateSetting]);
 
   const userName = user?.user_metadata?.name || "";
   const email = user?.email || "";
@@ -178,6 +194,26 @@ export default function Settings() {
                           (isNotificationField && (!supported || loading))
                         }
                       />
+                    </div>
+                  );
+                }
+
+                if (field.type === "keybind") {
+                  const isRecording = recording === field.id;
+                  const currentKey = (settings[field.id] ?? field.defaultValue) as string;
+                  return (
+                    <div key={field.id} className="flex items-center justify-between">
+                      <Label>{field.label}</Label>
+                      <button
+                        className={`w-10 h-8 text-sm font-mono font-bold rounded border transition-colors
+                          ${isRecording
+                            ? "border-primary bg-primary/10 text-primary"
+                            : "border-border bg-muted hover:bg-muted/80 text-foreground"
+                          }`}
+                        onClick={() => setRecording(isRecording ? null : field.id)}
+                      >
+                        {isRecording ? "…" : currentKey.toUpperCase()}
+                      </button>
                     </div>
                   );
                 }

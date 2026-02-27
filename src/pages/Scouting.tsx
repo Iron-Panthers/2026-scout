@@ -1,9 +1,10 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { compressState } from "@/lib/stateCompression";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Undo2, ArrowRight, ArrowLeft, Check } from "lucide-react";
+import { Undo2, ArrowRight, ArrowLeft, Check, MoreVertical } from "lucide-react";
 import { useScoutingReducer } from "@/lib/useScoutingReducer";
 import { useMatchTimer } from "@/lib/useMatchTimer";
+import { useSettings } from "@/contexts/SettingsContext";
 import StartMatchOverlay from "@/components/scouting/StartMatchOverlay";
 import fieldImage from "@/assets/FE-2026-_REBUILT_Playing_Field_With_Fuel.png";
 
@@ -27,7 +28,8 @@ export default function Scouting() {
     match_type
   );
 
-  const { hasStarted, startMatch: startMatchTimer, currentPhase } = useMatchTimer();
+  const { hasStarted, startMatch: startMatchTimer, currentPhase, skipToPhase } = useMatchTimer();
+  const { settings } = useSettings();
 
   const PHASE_LABELS: Record<string, string> = {
     auto: "Auto",
@@ -45,6 +47,7 @@ export default function Scouting() {
   };
 
   const [frame, setFrame] = useState<1 | 2>(1);
+  const [optionsOpen, setOptionsOpen] = useState(false);
 
   // ── Dot drag state ──────────────────────────────────────────────────────
   const draggingDot = useRef<"primary" | "secondary" | null>(null);
@@ -168,6 +171,24 @@ export default function Scouting() {
     set("shots", [...state.shots, ...Array(count).fill(ts)]);
   };
 
+  // Keep a stable ref so the keydown handler always has the latest values
+  const keybindActionsRef = useRef({ addShots, logEvent, settings, frame });
+  useEffect(() => { keybindActionsRef.current = { addShots, logEvent, settings, frame }; });
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const { addShots, logEvent, settings, frame } = keybindActionsRef.current;
+      if (frame !== 1) return;
+      const key = e.key.toLowerCase();
+      if (key === (settings["kb-add5"] ?? "z")) { e.preventDefault(); addShots(5); }
+      else if (key === (settings["kb-add10"] ?? "x")) { e.preventDefault(); addShots(10); }
+      else if (key === (settings["kb-bump"] ?? "b")) { e.preventDefault(); logEvent("bump"); }
+      else if (key === (settings["kb-trench"] ?? "t")) { e.preventDefault(); logEvent("trench"); }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
   const handleFinish = () => {
     navigate(`/review/${compressState(state)}?type=quant`);
   };
@@ -233,6 +254,52 @@ export default function Scouting() {
     </button>
   );
 
+  // ── Options overlay ──────────────────────────────────────────────────────
+  const phaseOptions = [
+    { phase: "auto" as const, label: "Auto" },
+    { phase: "transition-shift" as const, label: "T-Shift" },
+    { phase: "phase1" as const, label: "Shift 1" },
+    { phase: "phase2" as const, label: "Shift 2" },
+    { phase: "phase3" as const, label: "Shift 3" },
+    { phase: "phase4" as const, label: "Shift 4" },
+    { phase: "endgame" as const, label: "Endgame" },
+  ];
+
+  const OptionsOverlay = () => (
+    <div className="fixed inset-0 z-50" onPointerDown={() => setOptionsOpen(false)}>
+      <div
+        className="absolute top-12 right-2 bg-card border border-border rounded-xl shadow-xl w-56 overflow-hidden"
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        <button
+          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors text-rose-600 dark:text-rose-400 border-b border-border"
+          onPointerDown={(e) => { e.preventDefault(); navigate("/dashboard"); }}
+        >
+          <ArrowLeft className="w-4 h-4 shrink-0" />
+          <span className="text-sm font-medium">Back to Dashboard</span>
+        </button>
+        <div className="px-3 py-2.5">
+          <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Skip to Phase</span>
+          <div className="mt-2 grid grid-cols-2 gap-1.5">
+            {phaseOptions.map(({ phase, label }) => (
+              <button
+                key={phase}
+                className={`px-3 py-2 rounded-lg text-xs font-semibold transition-colors
+                  ${currentPhase === phase
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted hover:bg-muted/70 text-foreground"
+                  }`}
+                onPointerDown={(e) => { e.preventDefault(); skipToPhase(phase); setOptionsOpen(false); }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   // ── Header (shared) ─────────────────────────────────────────────────────
   const Header = () => (
     <div className="h-12 border-b border-border flex items-center px-4 shrink-0 bg-card gap-2">
@@ -243,6 +310,12 @@ export default function Scouting() {
         <span className="text-xs font-semibold bg-primary/10 text-primary px-2 py-0.5 rounded-full tabular-nums">
           {PHASE_LABELS[currentPhase] ?? currentPhase}
         </span>
+        <button
+          className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-muted active:bg-muted/80 transition-colors text-muted-foreground ml-1"
+          onPointerDown={(e) => { e.preventDefault(); setOptionsOpen((o) => !o); }}
+        >
+          <MoreVertical className="w-4 h-4" />
+        </button>
       </div>
     </div>
   );
@@ -428,6 +501,7 @@ export default function Scouting() {
         matchNumber={match_number}
         role={role}
       />
+      {optionsOpen && OptionsOverlay()}
     </>
   );
 }

@@ -5,7 +5,7 @@ export interface PitScoutingSubmission {
   scouter_id?: string;
   scouter_name: string;
   pit_data: Record<string, any>;
-  photo_urls: string[];
+  photo_url: string | null;
   schema_version: number;
   created_at: string;
   updated_at: string;
