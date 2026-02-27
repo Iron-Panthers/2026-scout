@@ -39,6 +39,7 @@ import {
   updatePitScouting,
   getPitScoutingForTeamAtEvent,
 } from "@/lib/pitScouting";
+import { removePitAssignment } from "@/lib/pitScoutingAssignments";
 
 export default function PitScouting() {
   const navigate = useNavigate();
@@ -222,6 +223,11 @@ export default function PitScouting() {
         photo_url: photoUrl,
         scouter_name: scouterName,
       });
+
+      // Clear the assignment so it no longer shows on dashboard or manager view
+      if (activeEvent) {
+        await removePitAssignment(activeEvent.id, Number(teamNumber));
+      }
 
       toast({ title: "Success", description: "Pit scouting updated successfully" });
       navigate("/dashboard");
