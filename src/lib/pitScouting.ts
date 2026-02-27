@@ -166,6 +166,30 @@ export async function deletePitScouting(submissionId: string): Promise<void> {
 }
 
 /**
+ * Get any existing pit scouting submission for a team at an event (by anyone)
+ * Used to detect rescout situations and pre-fill rescout form
+ */
+export async function getPitScoutingForTeamAtEvent(
+  teamNum: number,
+  eventId: string
+): Promise<PitScoutingSubmission | null> {
+  const { data, error } = await supabase
+    .from("pit_scouting_submissions")
+    .select("*")
+    .eq("team_num", teamNum)
+    .eq("event_id", eventId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Error fetching existing pit scouting:", error);
+    return null;
+  }
+  return data;
+}
+
+/**
  * Get team photo URL from pit scouting submissions
  * @param teamNum - Team number
  * @param eventId - Event ID

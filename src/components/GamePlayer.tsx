@@ -1,12 +1,17 @@
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Play } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import type { GameDefinition } from "@/types";
 
 interface GamePlayerProps {
   game: GameDefinition | null;
   onClose: () => void;
+  /** Pre-built navigation URL for the Start Match button. Omit if match isn't configured yet. */
+  startUrl?: string | null;
 }
 
-export function GamePlayer({ game, onClose }: GamePlayerProps) {
+export function GamePlayer({ game, onClose, startUrl }: GamePlayerProps) {
+  const navigate = useNavigate();
+
   if (!game) return null;
 
   return (
@@ -15,23 +20,37 @@ export function GamePlayer({ game, onClose }: GamePlayerProps) {
       role="dialog"
       aria-label={`Playing ${game.name}`}
     >
-      {/* Back button */}
-      <button
-        onClick={onClose}
-        className="absolute top-3 left-3 z-10 flex items-center gap-1 rounded-full bg-background/80 border border-border px-3 py-1.5 text-sm font-medium shadow backdrop-blur-sm hover:bg-accent transition-colors"
-        aria-label="Close game and go back"
-      >
-        <ChevronLeft className="w-4 h-4" />
-        Back
-      </button>
+      {/* Top bar — always above the iframe, never overlapping game controls */}
+      <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-background shrink-0">
+        <button
+          onClick={onClose}
+          className="flex items-center gap-1 rounded-full border border-border px-3 py-1.5 text-sm font-medium hover:bg-accent transition-colors"
+          aria-label="Close game and go back"
+        >
+          <ChevronLeft className="w-4 h-4" />
+          Back
+        </button>
 
-      {/* Game iframe */}
+        <span className="text-sm font-medium text-muted-foreground">{game.name}</span>
+
+        <button
+          onClick={() => startUrl ? navigate(startUrl) : onClose()}
+          className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors bg-red-600 text-white hover:bg-red-700"
+          aria-label={startUrl ? "Start scouting match" : "Configure match first"}
+          title={startUrl ? undefined : "Set up a match in Settings first"}
+        >
+          <Play className="w-3.5 h-3.5 fill-current" />
+          Start Match
+        </button>
+      </div>
+
+      {/* Game iframe — fills remaining height below the bar */}
       <iframe
         src={game.iframeUrl}
         title={game.name}
-        className="w-full h-full border-none"
+        className="w-full flex-1 border-none"
         allow="fullscreen; autoplay"
-        sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+        sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-pointer-lock"
       />
     </div>
   );

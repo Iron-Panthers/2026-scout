@@ -29,14 +29,16 @@ export function GameCard({ game, isUnlocked, userPoints, onBuy, onPlay }: GameCa
     >
       {/* Thumbnail */}
       <div className="relative w-full aspect-video bg-muted flex items-center justify-center overflow-hidden">
-        <img
-          src={game.thumbnailUrl}
-          alt={game.name}
-          className="w-10 h-10 object-contain"
-          onError={(e) => {
-            (e.currentTarget as HTMLImageElement).style.display = "none";
-          }}
-        />
+        {game.thumbnailUrl && (
+          <img
+            src={game.thumbnailUrl}
+            alt={game.name}
+            className="w-10 h-10 object-contain"
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).style.display = "none";
+            }}
+          />
+        )}
 
         {/* Lock overlay for locked games */}
         {!isUnlocked && (

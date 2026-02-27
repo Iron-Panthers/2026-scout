@@ -20,7 +20,10 @@
       "Bash(cd \"C:/Users/bruce/Coding/2026-scout\" && supabase functions deploy send-match-assignment-notification 2>&1)",
       "Bash(cd \"C:/Users/bruce/Coding/2026-scout\" && npx supabase functions deploy send-match-assignment-notification 2>&1)",
       "Bash(npx vite:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "mcp__supabase__list_migrations",
+      "mcp__supabase__get_advisors",
+      "WebSearch"
     ]
   },
   "enableAllProjectMcpServers": true,

@@ -250,6 +250,21 @@ export default function ScoutConfig() {
   }
 
   const canStart = role && eventCode && matchNumber > 0;
+
+  const startUrl = canStart
+    ? (() => {
+        const params = new URLSearchParams({
+          match_id: match_id || "",
+          role,
+          event_code: eventCode,
+          match_number: matchNumber.toString(),
+          team_number: teamNumber.toString(),
+          match_type: matchType,
+        });
+        const isQualRole = role === "qualRed" || role === "qualBlue";
+        return isQualRole ? `/qual-scouting?${params}` : `/scouting?${params}`;
+      })()
+    : null;
   const getMissingFields = () => {
     const missing = [];
     if (!role) missing.push("role");
@@ -313,6 +328,7 @@ export default function ScoutConfig() {
       </div>
 
       <div className="flex-1 flex flex-col items-center space-y-3 pb-16">
+      <div className="sticky top-0 z-40 w-full bg-background pt-1 pb-2">
       <Button
         onClick={() => {
           // Require at minimum: role, event_id, and match_number
@@ -356,6 +372,7 @@ export default function ScoutConfig() {
           </span>
         )}
       </Button>
+      </div>
       <div className="flex w-full max-w-sm flex-col gap-6">
         <Tabs defaultValue="config" className="">
           <TabsContent value="config" className="">
@@ -694,7 +711,7 @@ export default function ScoutConfig() {
       />
 
       {/* Full-screen game player */}
-      <GamePlayer game={activeGame} onClose={() => setActiveGame(null)} />
+      <GamePlayer game={activeGame} onClose={() => setActiveGame(null)} startUrl={startUrl} />
     </div>
   );
 }

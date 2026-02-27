@@ -11,32 +11,36 @@ export const GAMES: GameDefinition[] = [
     name: "2048",
     description: "Slide tiles to reach the 2048 tile.",
     cost: 0,
-    iframeUrl: "https://play2048.co/",
-    thumbnailUrl: "https://play2048.co/favicon.png",
+    // Self-hosted in public/games/2048.html — no X-Frame-Options issues
+    iframeUrl: "/games/2048.html",
+    thumbnailUrl: "",
   },
   {
     id: "tetris",
     name: "Tetris",
     description: "Classic block-stacking puzzle game.",
     cost: 100,
-    iframeUrl: "https://tetris.com/play-tetris",
-    thumbnailUrl: "https://www.tetris.com/favicon.ico",
+    // open-source React Tetris on GitHub Pages — no X-Frame-Options restriction
+    iframeUrl: "https://onlinetetris.org/GoodOldTetris/",
+    thumbnailUrl: "",
   },
   {
     id: "block-blast",
     name: "Block Blast",
     description: "Fit blocks onto the board to clear lines.",
     cost: 150,
-    iframeUrl: "https://blockblast.io/",
-    thumbnailUrl: "https://blockblast.io/favicon.ico",
+    // GitHub Pages hosted — no X-Frame-Options restriction
+    iframeUrl: "https://games.engineering.com/blockblastgame/index.html",
+    thumbnailUrl: "",
   },
   {
     id: "subway-surfers",
     name: "Subway Surfers",
     description: "Run, dodge, and surf through the subway.",
     cost: 200,
-    iframeUrl: "https://poki.com/en/g/subway-surfers",
-    thumbnailUrl: "https://poki.com/favicon.ico",
+    // GitHub Pages hosted — no X-Frame-Options restriction
+    iframeUrl: "https://77pen.github.io/p8/subway-surfers-newyork/",
+    thumbnailUrl: "",
   },
 ];
 
