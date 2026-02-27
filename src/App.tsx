@@ -19,7 +19,6 @@ import SimpleRealtimeTest from "./pages/SimpleRealtimeTest";
 import PushTest from "./pages/PushTest";
 import { Toaster } from "./components/ui/toaster";
 import UpdateBanner from "./components/UpdateBanner";
-import MatchAssignmentListener from "./components/MatchAssignmentListener";
 import NotificationNavigationListener from "./components/NotificationNavigationListener";
 
 function App() {
@@ -139,7 +138,6 @@ function App() {
           </Routes>
           <Toaster />
           <UpdateBanner />
-          <MatchAssignmentListener />
           <NotificationNavigationListener />
         </BrowserRouter>
       </SettingsProvider>

@@ -172,8 +172,7 @@ export async function createEventWithMatches(
 export async function updateMatchAssignment(
   matchId: string,
   role: string,
-  scouterId: string | null,
-  previousScouterId?: string | null
+  scouterId: string | null
 ): Promise<boolean> {
   // Map camelCase role names to snake_case database columns
   const roleToColumn: Record<string, string> = {
@@ -185,18 +184,6 @@ export async function updateMatchAssignment(
     blue2: "blue2_scouter_id",
     blue3: "blue3_scouter_id",
     qualBlue: "qual_blue_scouter_id",
-  };
-
-  // Map role names to display names
-  const roleToDisplay: Record<string, string> = {
-    red1: "Red 1",
-    red2: "Red 2",
-    red3: "Red 3",
-    qualRed: "Qual Red",
-    blue1: "Blue 1",
-    blue2: "Blue 2",
-    blue3: "Blue 3",
-    qualBlue: "Qual Blue",
   };
 
   const roleColumn = roleToColumn[role];
@@ -213,88 +200,17 @@ export async function updateMatchAssignment(
     scouterId,
   });
 
-  // Single query: UPDATE with RETURNING to get match data for notifications
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from("matches")
     .update({ [roleColumn]: scouterId })
-    .eq("id", matchId)
-    .select("match_number, events(name)")
-    .single();
+    .eq("id", matchId);
 
   if (error) {
     console.error("Error updating match assignment:", error);
     return false;
   }
 
-  // Send unassignment notification if scout was removed (fire and forget)
-  if (previousScouterId && !scouterId && data) {
-    // Type assertion for the joined events data
-    const matchData = data as unknown as {
-      match_number: number;
-      events: { name: string } | null;
-    };
-    sendUnassignmentNotification(
-      previousScouterId,
-      matchData.match_number,
-      matchData.events?.name || "Event",
-      roleToDisplay[role] || role
-    ).catch((err) =>
-      console.error("Failed to send unassignment notification:", err)
-    );
-  }
-
   return true;
-}
-
-// Send unassignment notification via edge function
-async function sendUnassignmentNotification(
-  userId: string,
-  matchNumber: number,
-  eventName: string,
-  role: string
-): Promise<void> {
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-
-  if (!supabaseUrl) {
-    console.warn("Supabase URL not available for notification");
-    return;
-  }
-
-  try {
-    // Get the current user's session token
-    const { data: { session } } = await supabase.auth.getSession();
-
-    if (!session?.access_token) {
-      console.warn("No active session for sending notification");
-      return;
-    }
-
-    const response = await fetch(
-      `${supabaseUrl}/functions/v1/send-unassignment-notification`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
-          userId,
-          matchNumber,
-          eventName,
-          role,
-        }),
-      }
-    );
-
-    if (!response.ok) {
-      const error = await response.json();
-      console.error("Unassignment notification failed:", error);
-    } else {
-      console.log("Unassignment notification sent successfully");
-    }
-  } catch (error) {
-    console.error("Error sending unassignment notification:", error);
-  }
 }
 
 // Get matches assigned to a specific user

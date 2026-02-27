@@ -5,7 +5,8 @@ import {
   CollapsibleTrigger,
   CollapsibleContent,
 } from "@/components/ui/collapsible";
-import { ChevronDown, ChevronRight, Copy, Check } from "lucide-react";
+import { Copy, Check, ChevronDown, ChevronRight } from "lucide-react";
+import { RecursiveJsonEditor } from "@/components/RecursiveJsonEditor";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { submitScoutingData, submitQualScoutingData, resolveMatchId } from "@/lib/scoutingSchema";
@@ -21,149 +22,6 @@ import { compressState, decompressState, decodeLegacyBase64Url } from "@/lib/sta
 import { supabase } from "@/lib/supabase";
 import { Checkbox } from "@/components/ui/checkbox";
 
-// Recursive JSON editor for objects/arrays
-function RecursiveJsonEditor({ value, onChange, path = [] }) {
-  // Helper: is this a phase key? (customize as needed)
-  const isPhaseKey = (k) =>
-    [
-      "auto",
-      "transition-shift",
-      "phase1",
-      "phase2",
-      "phase3",
-      "phase4",
-      "endgame",
-    ].includes(k);
-
-  if (typeof value === "object" && value !== null && !Array.isArray(value)) {
-    const entries = Object.entries(value);
-    const shouldAutoCollapse = entries.length > 20;
-    const [isCollapsed, setIsCollapsed] = useState(shouldAutoCollapse);
-
-    return (
-      <div className="space-y-2 pl-6 border-l-2 border-border relative">
-        {entries.length > 5 && (
-          <button
-            onClick={() => setIsCollapsed(!isCollapsed)}
-            className="absolute -top-6 right-0 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-            type="button"
-          >
-            {isCollapsed ? (
-              <ChevronRight size={14} />
-            ) : (
-              <ChevronDown size={14} />
-            )}
-            <span>{entries.length} properties</span>
-          </button>
-        )}
-        {!isCollapsed &&
-          entries.map(([key, val], idx, arr) => {
-            const isPrimitive =
-              val === null ||
-              ["string", "number", "boolean"].includes(typeof val);
-            const isObjOrArr = typeof val === "object" && val !== null;
-            return (
-              <div
-                key={key}
-                className={isObjOrArr ? "mb-2" : "flex items-center gap-2"}
-              >
-                {isPhaseKey(key) && idx !== 0 && (
-                  <div className="my-4 border-t-2 border-primary/60 opacity-80" />
-                )}
-                {isObjOrArr && (
-                  <div className="block font-mono text-xs text-muted-foreground min-w-[120px] break-all select-none mb-1 mt-2">
-                    {key}
-                  </div>
-                )}
-                {isPrimitive && (
-                  <label className="block font-mono text-xs text-muted-foreground min-w-[120px] break-all select-none">
-                    {key}
-                  </label>
-                )}
-                <RecursiveJsonEditor
-                  value={val}
-                  onChange={(newVal) => {
-                    const updated = { ...value, [key]: newVal };
-                    onChange(updated);
-                  }}
-                  path={[...path, key]}
-                />
-              </div>
-            );
-          })}
-      </div>
-    );
-  } else if (Array.isArray(value)) {
-    const shouldAutoCollapse = value.length > 20;
-    const [isCollapsed, setIsCollapsed] = useState(shouldAutoCollapse);
-
-    return (
-      <div className="space-y-2 pl-6 border-l-2 border-border relative">
-        {value.length > 5 && (
-          <button
-            onClick={() => setIsCollapsed(!isCollapsed)}
-            className="absolute -top-6 right-0 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-            type="button"
-          >
-            {isCollapsed ? (
-              <ChevronRight size={14} />
-            ) : (
-              <ChevronDown size={14} />
-            )}
-            <span>{value.length} items</span>
-          </button>
-        )}
-        {!isCollapsed &&
-          value.map((item, idx) => (
-            <div key={idx} className="flex items-center gap-2">
-              <label className="block font-mono text-xs text-muted-foreground min-w-[40px] select-none">
-                [{idx}]
-              </label>
-              <RecursiveJsonEditor
-                value={item}
-                onChange={(newVal) => {
-                  const updated = value.slice();
-                  updated[idx] = newVal;
-                  onChange(updated);
-                }}
-                path={[...path, idx]}
-              />
-            </div>
-          ))}
-      </div>
-    );
-  } else if (typeof value === "string") {
-    return (
-      <input
-        className="flex-1 bg-background border border-border rounded px-3 py-2 text-foreground font-mono text-sm focus:outline-none focus:ring-2 focus:ring-primary/80"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      />
-    );
-  } else if (typeof value === "number") {
-    return (
-      <input
-        type="number"
-        className="flex-1 bg-background border border-border rounded px-3 py-2 text-foreground font-mono text-sm focus:outline-none focus:ring-2 focus:ring-primary/80"
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-      />
-    );
-  } else if (typeof value === "boolean") {
-    return (
-      <input
-        type="checkbox"
-        checked={value}
-        onChange={(e) => onChange(e.target.checked)}
-        className="w-5 h-5 accent-primary"
-      />
-    );
-  } else if (value === null) {
-    return <span className="italic text-muted-foreground">null</span>;
-  } else {
-    return <span className="italic text-muted-foreground">[unsupported]</span>;
-  }
-}
 
 export default function ScoutingReview() {
   const navigate = useNavigate();
@@ -174,11 +32,6 @@ export default function ScoutingReview() {
 
   // Check if opened with manager parameter
   const isManagerMode = searchParams.get("forScoutingManager") === "true";
-
-  // Determine scouting type from URL param; fall back to role for legacy URLs
-  const scoutingType =
-    searchParams.get("type") ??
-    (state?.role === "qualRed" || state?.role === "qualBlue" ? "qual" : "quant");
 
   // Decode state from compressed URL param
   let initialState: any = null;
@@ -200,6 +53,13 @@ export default function ScoutingReview() {
   }
 
   const [state, setState] = useState<any>(initialState);
+
+  // Determine scouting type from URL param; fall back to role for legacy URLs
+  // (Must be after useState so `state` is in scope)
+  const scoutingType =
+    searchParams.get("type") ??
+    (state?.role === "qualRed" || state?.role === "qualBlue" ? "qual" : "quant");
+
   const [writtenTempState, setWrittenTempState] = useState<any>({ defense: null, problems: null, errors: null });
   const [rawEdit, setRawEdit] = useState(false);
   const [rawEditOpen, setRawEditOpen] = useState(true);
@@ -299,7 +159,9 @@ export default function ScoutingReview() {
           const newUrl = typeParam
             ? `/review/${compressed}?type=${typeParam}`
             : `/review/${compressed}`;
-          window.history.replaceState(null, "", newUrl);
+          // Use navigate with replace:true so React Router stays in sync
+          // and the basename is correctly included (important for production deployments)
+          navigate(newUrl, { replace: true });
         }
       } catch {
         // ignore
@@ -308,7 +170,7 @@ export default function ScoutingReview() {
 
     // Cleanup timeout on unmount or when deps change
     return () => clearTimeout(timeoutId);
-  }, [state, encoded]);
+  }, [state, encoded, navigate]);
 
   // Handlers for note fields
   const handleFieldChange = (

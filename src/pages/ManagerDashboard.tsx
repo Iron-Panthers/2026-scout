@@ -24,6 +24,7 @@ import {
   PlusCircle,
   ListChecks,
   Wrench,
+  ClipboardList,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -42,6 +43,7 @@ import { CreateEventTab } from "@/components/manager/CreateEventTab";
 import { ScoutAssignmentDialog } from "@/components/manager/ScoutAssignmentDialog";
 import { RosterManagementTab } from "@/components/manager/RosterManagementTab";
 import { PitScoutingAssignmentsTab } from "@/components/manager/PitScoutingAssignmentsTab";
+import { ScoutingDataTab } from "@/components/manager/ScoutingDataTab";
 import { useToast } from "@/hooks/use-toast";
 import type {
   Profile,
@@ -396,8 +398,7 @@ export default function ManagerDashboard() {
       updateMatchAssignment(
         currentMatch.matchId,
         selectedCell.role,
-        profile.id,
-        previousAssignment?.id
+        profile.id
       )
         .then((success) => {
           if (!success) {
@@ -490,8 +491,7 @@ export default function ManagerDashboard() {
       updateMatchAssignment(
         currentMatch.matchId,
         role,
-        null,
-        previousAssignment?.id
+        null
       )
         .then((success) => {
           if (!success) {
@@ -736,6 +736,12 @@ export default function ManagerDashboard() {
                         Pit Scouting
                       </div>
                     )}
+                    {activeTab === "data" && (
+                      <div className="flex items-center gap-2">
+                        <ClipboardList className="h-4 w-4" />
+                        Scouting Data
+                      </div>
+                    )}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
@@ -769,12 +775,18 @@ export default function ManagerDashboard() {
                       Pit Scouting
                     </div>
                   </SelectItem>
+                  <SelectItem value="data">
+                    <div className="flex items-center gap-2">
+                      <ClipboardList className="h-4 w-4" />
+                      Scouting Data
+                    </div>
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             {/* Desktop: Tab Buttons */}
-            <TabsList className="hidden md:grid w-full max-w-4xl grid-cols-5 gap-1">
+            <TabsList className="hidden md:grid w-full max-w-5xl grid-cols-6 gap-1">
               <TabsTrigger
                 value="assignments"
                 className="flex items-center justify-center gap-2"
@@ -797,6 +809,10 @@ export default function ManagerDashboard() {
               <TabsTrigger value="pit" className="flex items-center justify-center gap-2">
                 <Wrench className="h-4 w-4" />
                 Pit Scouting
+              </TabsTrigger>
+              <TabsTrigger value="data" className="flex items-center justify-center gap-2">
+                <ClipboardList className="h-4 w-4" />
+                Scouting Data
               </TabsTrigger>
             </TabsList>
 
@@ -1035,6 +1051,11 @@ export default function ManagerDashboard() {
               events={events}
               availableScouts={availableScouts}
             />
+          </TabsContent>
+
+          {/* Scouting Data Tab */}
+          <TabsContent value="data" className="mt-0">
+            <ScoutingDataTab selectedEvent={selectedEvent} events={events} />
           </TabsContent>
         </Tabs>
 
