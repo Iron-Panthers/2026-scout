@@ -8,6 +8,8 @@ import { Loader2 } from "lucide-react";
 
 // Row height used for drag hit-test
 const ROW_HEIGHT = 96; // px, must match rendered height
+const ROW_GAP = 8; // px, matches gap-2
+const ROW_SLOT = ROW_HEIGHT + ROW_GAP;
 
 interface DragState {
   dragging: boolean;
@@ -32,6 +34,9 @@ export default function QualScouting() {
   const [state, setState] = useState<QualScoutingData | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Fixed color index per team — assigned once at load, never changes with position
+  const teamColorIndex = useRef<Record<number, number>>({});
+
   // ── Load team numbers from TBA ──────────────────────────────────────────
   useEffect(() => {
     let mounted = true;
@@ -53,6 +58,7 @@ export default function QualScouting() {
         );
         const reducer = new ScoutingReducer<QualScoutingData>(initialState);
         reducerRef.current = reducer;
+        initialState.rankings.forEach((t, i) => { teamColorIndex.current[t] = i; });
         setState(initialState);
       } catch (err) {
         console.error("Failed to load team numbers:", err);
@@ -66,6 +72,7 @@ export default function QualScouting() {
           [0, 0, 0]
         );
         reducerRef.current = new ScoutingReducer<QualScoutingData>(fallback);
+        fallback.rankings.forEach((t, i) => { teamColorIndex.current[t] = i; });
         setState(fallback);
       } finally {
         if (mounted) setLoading(false);
@@ -118,7 +125,7 @@ export default function QualScouting() {
     if (!drag.dragging || !state) return;
 
     const delta = drag.currentY - drag.startY;
-    const steps = Math.round(delta / ROW_HEIGHT);
+    const steps = Math.round(delta / ROW_SLOT);
     const newIndex = Math.max(
       0,
       Math.min(state.rankings.length - 1, drag.dragIndex + steps)
@@ -194,11 +201,27 @@ export default function QualScouting() {
           ref={listRef}
           className="flex-1 flex flex-col py-2 px-3 gap-2 overflow-hidden"
         >
-          {state.rankings.map((teamNum, index) => {
+          {(() => {
+            const ghostIndex = drag.dragging
+              ? Math.max(0, Math.min(state.rankings.length - 1,
+                  drag.dragIndex + Math.round((drag.currentY - drag.startY) / ROW_SLOT)))
+              : -1;
+
+            return state.rankings.map((teamNum, index) => {
             const isDraggingThis = drag.dragging && drag.dragIndex === index;
-            const translateY = isDraggingThis ? drag.currentY - drag.startY : 0;
+            let translateY = 0;
+            if (isDraggingThis) {
+              translateY = drag.currentY - drag.startY;
+            } else if (drag.dragging) {
+              const di = drag.dragIndex;
+              if (di < ghostIndex && index > di && index <= ghostIndex) {
+                translateY = -ROW_SLOT;
+              } else if (di > ghostIndex && index >= ghostIndex && index < di) {
+                translateY = ROW_SLOT;
+              }
+            }
             const opts = state.teamOptions[String(teamNum)] ?? {
-              outposeFed: false,
+              outpostFed: false,
               passed: false,
             };
 
@@ -212,7 +235,7 @@ export default function QualScouting() {
                   height: ROW_HEIGHT,
                 }}
                 className={`relative flex items-center gap-3 px-3 rounded-xl border-2
-                  ${rowBg[index]} ${rowBorder[index]}
+                  ${rowBg[teamColorIndex.current[teamNum] ?? index]} ${rowBorder[teamColorIndex.current[teamNum] ?? index]}
                   ${isDraggingThis ? "shadow-2xl scale-[1.02] opacity-95" : ""}
                 `}
               >
@@ -247,16 +270,16 @@ export default function QualScouting() {
                 <div className="flex flex-col gap-1.5 shrink-0">
                   <button
                     className={`px-3 py-1 rounded-md text-xs font-semibold border transition-colors
-                      ${opts.outposeFed
+                      ${opts.outpostFed
                         ? "bg-violet-500 text-white border-violet-500"
                         : "bg-transparent text-muted-foreground border-border"
                       }`}
                     onPointerDown={(e) => {
                       e.stopPropagation();
-                      dispatchSet(`teamOptions.${teamNum}.outposeFed`, !opts.outposeFed);
+                      dispatchSet(`teamOptions.${teamNum}.outpostFed`, !opts.outpostFed);
                     }}
                   >
-                    Outpose Fed
+                    Outpost Fed
                   </button>
                   <button
                     className={`px-3 py-1 rounded-md text-xs font-semibold border transition-colors
@@ -274,7 +297,8 @@ export default function QualScouting() {
                 </div>
               </div>
             );
-          })}
+          });
+          })()}
         </div>
 
         {/* Right finish panel */}

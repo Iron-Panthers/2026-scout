@@ -44,7 +44,7 @@ export interface QualScoutingData {
   match_type: "qual";
   role: string; // "qualRed" or "qualBlue"
   rankings: number[]; // team numbers ordered best→worst
-  teamOptions: Record<string, { outposeFed: boolean; passed: boolean }>;
+  teamOptions: Record<string, { outpostFed: boolean; passed: boolean }>;
   comments: string;
 }
 
@@ -141,9 +141,9 @@ export class ScoutingReducer<T extends Record<string, any> = ScoutingData> {
     match_number: number,
     teamNumbers: number[]
   ): QualScoutingData {
-    const teamOptions: Record<string, { outposeFed: boolean; passed: boolean }> = {};
+    const teamOptions: Record<string, { outpostFed: boolean; passed: boolean }> = {};
     teamNumbers.forEach((n) => {
-      teamOptions[String(n)] = { outposeFed: false, passed: false };
+      teamOptions[String(n)] = { outpostFed: false, passed: false };
     });
     return {
       matchId,
