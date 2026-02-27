@@ -530,7 +530,7 @@ export function ScoutingDataTab({ selectedEvent, events: _events }: ScoutingData
           </DialogHeader>
 
           {!editConfirming && (
-            <div className="overflow-y-auto overflow-x-hidden max-h-[60vh] border border-border rounded-md p-5">
+            <div className="overflow-y-auto overflow-x-hidden max-h-[60vh] border border-border rounded-md px-5 pt-8 pb-5">
               <RecursiveJsonEditor
                 value={editData}
                 onChange={(newVal) => setEditData(newVal as Record<string, unknown>)}
