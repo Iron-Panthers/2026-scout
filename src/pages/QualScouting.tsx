@@ -307,7 +307,7 @@ export default function QualScouting() {
               hover:bg-violet-200 dark:hover:bg-violet-900/60
               active:bg-violet-300 dark:active:bg-violet-900/70
               text-violet-700 dark:text-violet-300 transition-colors"
-            onClick={handleFinish}
+            onPointerDown={(e) => { e.preventDefault(); handleFinish(); }}
           >
             <Check className="w-7 h-7" />
             <span className="text-sm font-semibold">Finish</span>

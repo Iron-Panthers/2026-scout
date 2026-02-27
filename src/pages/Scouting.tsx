@@ -226,7 +226,7 @@ export default function Scouting() {
         hover:bg-violet-200 dark:hover:bg-violet-900/60
         active:bg-violet-300 dark:active:bg-violet-900/70
         text-violet-700 dark:text-violet-300 transition-colors ${extraClass}`}
-      onClick={handleFinish}
+      onPointerDown={(e) => { e.preventDefault(); handleFinish(); }}
     >
       <Check className="w-6 h-6" />
       <span className="text-xs font-medium">Finish</span>
@@ -250,7 +250,7 @@ export default function Scouting() {
   // ── Frame 1 ─────────────────────────────────────────────────────────────
   const Frame1 = () => (
     <div className="h-screen w-screen flex flex-col select-none touch-none overflow-hidden bg-background">
-      <Header />
+      {Header()}
 
       {/* Main button grid */}
       <div className="flex flex-1 overflow-hidden min-h-0">
@@ -350,7 +350,7 @@ export default function Scouting() {
   // ── Frame 2 ─────────────────────────────────────────────────────────────
   const Frame2 = () => (
     <div className="h-screen w-screen flex flex-col select-none touch-none overflow-hidden bg-background">
-      <Header />
+      {Header()}
 
       <div className="flex flex-1 overflow-hidden min-h-0">
         {/* Field image */}
@@ -421,7 +421,7 @@ export default function Scouting() {
 
   return (
     <>
-      {frame === 1 ? <Frame1 /> : <Frame2 />}
+      {frame === 1 ? Frame1() : Frame2()}
       <StartMatchOverlay
         show={!hasStarted}
         onStartMatch={startMatch}
