@@ -250,7 +250,7 @@ export default function Scouting() {
   // ── Frame 1 ─────────────────────────────────────────────────────────────
   const Frame1 = () => (
     <div className="h-screen w-screen flex flex-col select-none touch-none overflow-hidden bg-background">
-      <Header />
+      {Header()}
 
       {/* Main button grid */}
       <div className="flex flex-1 overflow-hidden min-h-0">
@@ -350,7 +350,7 @@ export default function Scouting() {
   // ── Frame 2 ─────────────────────────────────────────────────────────────
   const Frame2 = () => (
     <div className="h-screen w-screen flex flex-col select-none touch-none overflow-hidden bg-background">
-      <Header />
+      {Header()}
 
       <div className="flex flex-1 overflow-hidden min-h-0">
         {/* Field image */}
@@ -421,7 +421,7 @@ export default function Scouting() {
 
   return (
     <>
-      {frame === 1 ? <Frame1 /> : <Frame2 />}
+      {frame === 1 ? Frame1() : Frame2()}
       <StartMatchOverlay
         show={!hasStarted}
         onStartMatch={startMatch}

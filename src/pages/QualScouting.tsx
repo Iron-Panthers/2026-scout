@@ -5,6 +5,7 @@ import { getMatchTeam } from "@/lib/blueAlliance";
 import { ScoutingReducer, type QualScoutingData } from "@/lib/ScoutingReducer";
 import { TeamImage } from "@/components/TeamImage";
 import { Loader2 } from "lucide-react";
+import { compressState } from "@/lib/stateCompression";
 
 // Row height used for drag hit-test
 const ROW_HEIGHT = 96; // px, must match rendered height
@@ -142,9 +143,8 @@ export default function QualScouting() {
   }, [drag, state, dispatchSet]);
 
   // ── Finish ──────────────────────────────────────────────────────────────
-  const handleFinish = async () => {
+  const handleFinish = () => {
     if (!state) return;
-    const { compressState } = await import("@/lib/stateCompression");
     navigate(`/review/${compressState(state)}?type=qual`);
   };
 
@@ -234,16 +234,14 @@ export default function QualScouting() {
                   transition: isDraggingThis ? "none" : "transform 0.15s ease",
                   height: ROW_HEIGHT,
                 }}
-                className={`relative flex items-center gap-3 px-3 rounded-xl border-2
+                className={`relative flex items-center gap-3 px-3 rounded-xl border-2 cursor-grab active:cursor-grabbing touch-none
                   ${rowBg[teamColorIndex.current[teamNum] ?? index]} ${rowBorder[teamColorIndex.current[teamNum] ?? index]}
                   ${isDraggingThis ? "shadow-2xl scale-[1.02] opacity-95" : ""}
                 `}
+                onPointerDown={(e) => onDragPointerDown(e, index)}
               >
-                {/* Drag handle */}
-                <div
-                  className="cursor-grab active:cursor-grabbing touch-none shrink-0 text-muted-foreground"
-                  onPointerDown={(e) => onDragPointerDown(e, index)}
-                >
+                {/* Drag handle (visual only) */}
+                <div className="shrink-0 text-muted-foreground pointer-events-none">
                   <GripVertical className="w-5 h-5" />
                 </div>
 
