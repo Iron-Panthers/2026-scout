@@ -41,7 +41,7 @@ import {
 } from "@/lib/scoutingSchema";
 import { supabase } from "@/lib/supabase";
 import { compressState } from "@/lib/stateCompression";
-import { prettifyRole } from "@/pages/Dashboard";
+import { prettifyRole } from "@/lib/roleUtils";
 
 interface OfflineMatchWithStatus extends OfflineMatchData {
   key: string;

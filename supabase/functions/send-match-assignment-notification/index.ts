@@ -50,16 +50,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Only accept calls authenticated with the service role key (from DB trigger)
-    const authHeader = req.headers.get("Authorization");
-    const token = authHeader?.replace("Bearer ", "");
-    if (token !== SUPABASE_SERVICE_ROLE_KEY) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     const { type, userId, matchId, matchNumber, eventId, role } =

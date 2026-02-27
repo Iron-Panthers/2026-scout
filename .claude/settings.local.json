@@ -16,7 +16,8 @@
       "Bash(cd /c/Users/bruce/Coding/2026-scout && echo \"Y\" | ./node_modules/.bin/supabase db push --include-all 2>&1)",
       "Bash(cd /c/Users/bruce/Coding/2026-scout && \\\\\n  ./node_modules/.bin/supabase migration repair --status reverted 20260107 20260108 20260210 2>&1 && \\\\\n  echo \"---REVERTED, NOW PUSHING---\" && \\\\\n  echo \"Y\" | ./node_modules/.bin/supabase db push --include-all 2>&1)",
       "Bash(claude mcp:*)",
-      "mcp__supabase__execute_sql"
+      "mcp__supabase__execute_sql",
+      "Bash(cd \"C:/Users/bruce/Coding/2026-scout\" && supabase functions deploy send-match-assignment-notification 2>&1)"
     ]
   },
   "enableAllProjectMcpServers": true,
