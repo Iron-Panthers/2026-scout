@@ -25,6 +25,7 @@ import {
   ListChecks,
   Wrench,
   ClipboardList,
+  Coins,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -45,6 +46,7 @@ import { RosterManagementTab } from "@/components/manager/RosterManagementTab";
 import { PitScoutingAssignmentsTab } from "@/components/manager/PitScoutingAssignmentsTab";
 import { ScoutingDataTab } from "@/components/manager/ScoutingDataTab";
 import { useToast } from "@/hooks/use-toast";
+import { awardPoints } from "@/lib/gameProfiles";
 import type {
   Profile,
   Role,
@@ -117,6 +119,11 @@ export default function ManagerDashboard() {
 
   // Active tab state for mobile dropdown
   const [activeTab, setActiveTab] = useState<string>("assignments");
+
+  // Award points state
+  const [awardTargetId, setAwardTargetId] = useState<string>("");
+  const [awardAmount, setAwardAmount] = useState<string>("");
+  const [awardLoading, setAwardLoading] = useState(false);
 
   // Helper function to convert database match to assignment format
   const convertMatchToAssignment = useCallback(
@@ -742,6 +749,12 @@ export default function ManagerDashboard() {
                         Scouting Data
                       </div>
                     )}
+                    {activeTab === "points" && (
+                      <div className="flex items-center gap-2">
+                        <Coins className="h-4 w-4" />
+                        Points
+                      </div>
+                    )}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
@@ -781,12 +794,18 @@ export default function ManagerDashboard() {
                       Scouting Data
                     </div>
                   </SelectItem>
+                  <SelectItem value="points">
+                    <div className="flex items-center gap-2">
+                      <Coins className="h-4 w-4" />
+                      Points
+                    </div>
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             {/* Desktop: Tab Buttons */}
-            <TabsList className="hidden md:grid w-full max-w-5xl grid-cols-6 gap-1">
+            <TabsList className="hidden md:grid w-full max-w-5xl grid-cols-7 gap-1">
               <TabsTrigger
                 value="assignments"
                 className="flex items-center justify-center gap-2"
@@ -813,6 +832,10 @@ export default function ManagerDashboard() {
               <TabsTrigger value="data" className="flex items-center justify-center gap-2">
                 <ClipboardList className="h-4 w-4" />
                 Scouting Data
+              </TabsTrigger>
+              <TabsTrigger value="points" className="flex items-center justify-center gap-2">
+                <Coins className="h-4 w-4" />
+                Points
               </TabsTrigger>
             </TabsList>
 
@@ -1056,6 +1079,80 @@ export default function ManagerDashboard() {
           {/* Scouting Data Tab */}
           <TabsContent value="data" className="mt-0">
             <ScoutingDataTab selectedEvent={selectedEvent} events={events} />
+          </TabsContent>
+
+          {/* Points Economy Tab */}
+          <TabsContent value="points" className="mt-0">
+            <div className="max-w-md space-y-4">
+              <div>
+                <h2 className="text-lg font-semibold">Award Points</h2>
+                <p className="text-sm text-muted-foreground">
+                  Award points to scouts for good performance or participation.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                {/* Scout selector */}
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Scout</label>
+                  <Select value={awardTargetId} onValueChange={setAwardTargetId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a scout" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableScouts.map((scout) => (
+                        <SelectItem key={scout.id} value={scout.id}>
+                          {scout.name || scout.id}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Amount input */}
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium">Points to Award</label>
+                  <div className="flex items-center gap-2">
+                    <Coins className="w-4 h-4 text-yellow-500 shrink-0" />
+                    <input
+                      type="number"
+                      min="1"
+                      placeholder="e.g. 50"
+                      value={awardAmount}
+                      onChange={(e) => setAwardAmount(e.target.value)}
+                      className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    />
+                  </div>
+                </div>
+
+                <Button
+                  disabled={!awardTargetId || !awardAmount || Number(awardAmount) <= 0 || awardLoading}
+                  onClick={async () => {
+                    if (!awardTargetId || !awardAmount) return;
+                    setAwardLoading(true);
+                    const result = await awardPoints(awardTargetId, Number(awardAmount));
+                    setAwardLoading(false);
+                    if (result.success) {
+                      const scout = availableScouts.find((s) => s.id === awardTargetId);
+                      toast({
+                        title: "Points awarded",
+                        description: `${awardAmount} points awarded to ${scout?.name ?? "scout"}.`,
+                      });
+                      setAwardAmount("");
+                      setAwardTargetId("");
+                    } else {
+                      toast({
+                        title: "Failed to award points",
+                        description: result.error ?? "Unknown error.",
+                        variant: "destructive",
+                      });
+                    }
+                  }}
+                >
+                  {awardLoading ? "Awarding…" : "Award Points"}
+                </Button>
+              </div>
+            </div>
           </TabsContent>
         </Tabs>
 

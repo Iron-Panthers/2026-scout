@@ -18,7 +18,9 @@
       "Bash(claude mcp:*)",
       "mcp__supabase__execute_sql",
       "Bash(cd \"C:/Users/bruce/Coding/2026-scout\" && supabase functions deploy send-match-assignment-notification 2>&1)",
-      "Bash(cd \"C:/Users/bruce/Coding/2026-scout\" && npx supabase functions deploy send-match-assignment-notification 2>&1)"
+      "Bash(cd \"C:/Users/bruce/Coding/2026-scout\" && npx supabase functions deploy send-match-assignment-notification 2>&1)",
+      "Bash(npx vite:*)",
+      "Bash(npx tsc:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

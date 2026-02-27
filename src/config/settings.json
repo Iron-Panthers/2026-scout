@@ -32,5 +32,15 @@
         "editable": true
       }
     ]
+  },
+  "keybinds": {
+    "title": "Keybinds",
+    "description": "Keyboard shortcuts for quantitative scouting (click a key to rebind)",
+    "fields": [
+      { "id": "kb-add5", "label": "+5 Shots", "type": "keybind", "defaultValue": "z" },
+      { "id": "kb-add10", "label": "+10 Shots", "type": "keybind", "defaultValue": "x" },
+      { "id": "kb-bump", "label": "Bump", "type": "keybind", "defaultValue": "b" },
+      { "id": "kb-trench", "label": "Trench", "type": "keybind", "defaultValue": "t" }
+    ]
   }
 }

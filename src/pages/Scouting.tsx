@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Undo2, ArrowRight, ArrowLeft, Check } from "lucide-react";
 import { useScoutingReducer } from "@/lib/useScoutingReducer";
 import { useMatchTimer } from "@/lib/useMatchTimer";
+import { useSettings } from "@/contexts/SettingsContext";
 import StartMatchOverlay from "@/components/scouting/StartMatchOverlay";
 import fieldImage from "@/assets/FE-2026-_REBUILT_Playing_Field_With_Fuel.png";
 
@@ -28,6 +29,7 @@ export default function Scouting() {
   );
 
   const { hasStarted, startMatch: startMatchTimer, currentPhase } = useMatchTimer();
+  const { settings } = useSettings();
 
   const PHASE_LABELS: Record<string, string> = {
     auto: "Auto",
@@ -167,6 +169,24 @@ export default function Scouting() {
     const ts = state.matchStartTime ? (Date.now() - state.matchStartTime) / 1000 : 0;
     set("shots", [...state.shots, ...Array(count).fill(ts)]);
   };
+
+  // Keep a stable ref so the keydown handler always has the latest values
+  const keybindActionsRef = useRef({ addShots, logEvent, settings, frame });
+  useEffect(() => { keybindActionsRef.current = { addShots, logEvent, settings, frame }; });
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const { addShots, logEvent, settings, frame } = keybindActionsRef.current;
+      if (frame !== 1) return;
+      const key = e.key.toLowerCase();
+      if (key === (settings["kb-add5"] ?? "z")) { e.preventDefault(); addShots(5); }
+      else if (key === (settings["kb-add10"] ?? "x")) { e.preventDefault(); addShots(10); }
+      else if (key === (settings["kb-bump"] ?? "b")) { e.preventDefault(); logEvent("bump"); }
+      else if (key === (settings["kb-trench"] ?? "t")) { e.preventDefault(); logEvent("trench"); }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
 
   const handleFinish = () => {
     navigate(`/review/${compressState(state)}?type=quant`);

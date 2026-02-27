@@ -32,8 +32,13 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Lock } from "lucide-react";
-import type { Match } from "@/types";
+import { ArrowLeft, Lock, Coins } from "lucide-react";
+import type { Match, GameDefinition, GameProfile } from "@/types";
+import { GAMES } from "@/config/games";
+import { getGameProfile, purchaseGame } from "@/lib/gameProfiles";
+import { GameCard } from "@/components/GameCard";
+import { GamePurchaseDialog } from "@/components/GamePurchaseDialog";
+import { GamePlayer } from "@/components/GamePlayer";
 
 export default function ScoutConfig() {
   const { match_id: param_match_id } = useParams();
@@ -62,6 +67,12 @@ export default function ScoutConfig() {
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [pendingChange, setPendingChange] = useState<{type: 'role' | 'matchType', value: string} | null>(null);
   const [showTeamNumberUnlockDialog, setShowTeamNumberUnlockDialog] = useState(false);
+
+  // Game shop state
+  const [gameProfile, setGameProfile] = useState<GameProfile | null>(null);
+  const [gameProfileLoading, setGameProfileLoading] = useState(false);
+  const [buyingGame, setBuyingGame] = useState<GameDefinition | null>(null);
+  const [activeGame, setActiveGame] = useState<GameDefinition | null>(null);
 
   // Load active event on mount
   useEffect(() => {
@@ -217,6 +228,26 @@ export default function ScoutConfig() {
       updateTeamNum();
     }
   }, [matchNumber, role, eventCode]);
+
+  // Load game profile once when user is available
+  useEffect(() => {
+    if (!user?.id) return;
+    setGameProfileLoading(true);
+    getGameProfile(user.id).then((profile) => {
+      setGameProfile(profile);
+      setGameProfileLoading(false);
+    });
+  }, [user?.id]);
+
+  async function handlePurchase(game: GameDefinition) {
+    if (!user?.id) return;
+    const result = await purchaseGame(user.id, game.id, game.cost);
+    if (!result.success) throw new Error(result.error ?? "Purchase failed.");
+    // Refresh profile after successful purchase
+    const updated = await getGameProfile(user.id);
+    setGameProfile(updated);
+    setBuyingGame(null);
+  }
 
   const canStart = role && eventCode && matchNumber > 0;
   const getMissingFields = () => {
@@ -541,7 +572,48 @@ export default function ScoutConfig() {
             </div>
           </TabsContent>
           <TabsContent value="game">
-            <p>:skull:</p>
+            {/* Points balance header */}
+            <div className="flex items-center justify-between px-3 py-2 mb-3 bg-accent/50 rounded-lg">
+              <span className="text-sm font-medium text-muted-foreground">Your Points</span>
+              <div className="flex items-center gap-1.5">
+                <Coins className="w-4 h-4 text-yellow-500" />
+                {gameProfileLoading ? (
+                  <span className="text-sm text-muted-foreground">…</span>
+                ) : (
+                  <span className="text-sm font-semibold">{gameProfile?.points ?? 0}</span>
+                )}
+              </div>
+            </div>
+
+            {/* Game grid */}
+            {gameProfileLoading ? (
+              <div className="grid grid-cols-2 gap-3">
+                {GAMES.map((g) => (
+                  <div
+                    key={g.id}
+                    className="rounded-lg border border-border bg-muted animate-pulse aspect-[4/3]"
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                {GAMES.map((game) => {
+                  const isUnlocked =
+                    game.cost === 0 ||
+                    (gameProfile?.unlocked_games ?? []).includes(game.id);
+                  return (
+                    <GameCard
+                      key={game.id}
+                      game={game}
+                      isUnlocked={isUnlocked}
+                      userPoints={gameProfile?.points ?? 0}
+                      onBuy={() => setBuyingGame(game)}
+                      onPlay={() => setActiveGame(game)}
+                    />
+                  );
+                })}
+              </div>
+            )}
           </TabsContent>
 
           {/* Tab Buttons - Fixed at bottom */}
@@ -612,6 +684,17 @@ export default function ScoutConfig() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Game purchase dialog */}
+      <GamePurchaseDialog
+        game={buyingGame}
+        userPoints={gameProfile?.points ?? 0}
+        onConfirm={handlePurchase}
+        onClose={() => setBuyingGame(null)}
+      />
+
+      {/* Full-screen game player */}
+      <GamePlayer game={activeGame} onClose={() => setActiveGame(null)} />
     </div>
   );
 }
