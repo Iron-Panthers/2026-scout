@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -71,6 +72,19 @@ export function PitScoutingAssignmentsTab({
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Realtime: reload when submissions or assignments change
+  useEffect(() => {
+    if (!currentEvent?.id) return;
+
+    const channel = supabase
+      .channel(`pit-manager-${currentEvent.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "pit_scouting_submissions" }, loadData)
+      .on("postgres_changes", { event: "*", schema: "public", table: "pit_scouting_assignments" }, loadData)
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [currentEvent?.id, loadData]);
 
   const openAssignDialog = (teamNumber: number) => {
     setAssigningTeam(teamNumber);

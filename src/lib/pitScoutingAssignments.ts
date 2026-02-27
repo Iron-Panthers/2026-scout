@@ -61,6 +61,7 @@ export async function removePitAssignment(
 export interface UserPitAssignment extends PitScoutingAssignment {
   event_code: string | null;
   event_name: string;
+  isRescout: boolean;
 }
 
 export async function getUserPitAssignments(
@@ -74,7 +75,7 @@ export async function getUserPitAssignments(
         .eq("scouter_id", userId),
       supabase
         .from("pit_scouting_submissions")
-        .select("team_num, event_id")
+        .select("team_num, event_id, updated_at")
         .eq("scouter_id", userId),
     ]);
 
@@ -83,13 +84,19 @@ export async function getUserPitAssignments(
     return [];
   }
 
-  // Build a set of "event_id:team_number" keys that are already submitted
-  const submitted = new Set(
-    (submissions ?? []).map((s) => `${s.event_id}:${s.team_num}`)
+  // Map of "event_id:team_num" -> submission updated_at
+  // Using updated_at so that a rescout submission (which updates the row) also clears the card
+  const submittedAt = new Map(
+    (submissions ?? []).map((s) => [`${s.event_id}:${s.team_num}`, s.updated_at])
   );
 
   return (assignments ?? [])
-    .filter((row: any) => !submitted.has(`${row.event_id}:${row.team_number}`))
+    .filter((row: any) => {
+      const submittedTime = submittedAt.get(`${row.event_id}:${row.team_number}`);
+      if (!submittedTime) return true; // not submitted yet
+      // Show if the assignment was updated AFTER submission (rescout)
+      return row.updated_at > submittedTime;
+    })
     .map((row: any) => ({
       id: row.id,
       event_id: row.event_id,
@@ -99,5 +106,6 @@ export async function getUserPitAssignments(
       updated_at: row.updated_at,
       event_code: row.events?.event_code ?? null,
       event_name: row.events?.name ?? "Unknown Event",
+      isRescout: submittedAt.has(`${row.event_id}:${row.team_number}`),
     }));
 }
