@@ -213,36 +213,54 @@ export async function updateMatchAssignment(
   return true;
 }
 
-// Get matches assigned to a specific user
-export async function getUserMatches(userId: string): Promise<{
+// Get matches assigned to a specific user.
+// Pass activeEventOnly=true to restrict results to the currently active event.
+export async function getUserMatches(
+  userId: string,
+  activeEventOnly = false
+): Promise<{
   matches: Match[];
   profile: Profile | null;
 }> {
-  // Fetch user's profile and all matches in parallel
+  const roleFilter = [
+    "red1_scouter_id",
+    "red2_scouter_id",
+    "red3_scouter_id",
+    "qual_red_scouter_id",
+    "blue1_scouter_id",
+    "blue2_scouter_id",
+    "blue3_scouter_id",
+    "qual_blue_scouter_id",
+  ]
+    .map((col) => `${col}.eq.${userId}`)
+    .join(",");
+
+  const selectClause = activeEventOnly
+    ? "*, events!inner(is_active)"
+    : "*";
+
+  let matchQuery = supabase
+    .from("matches")
+    .select(selectClause)
+    .or(roleFilter)
+    .order("match_number", { ascending: true });
+
+  if (activeEventOnly) {
+    matchQuery = matchQuery.eq("events.is_active", true);
+  }
+
   const [profileResult, matchesResult] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", userId).single(),
-    getMatches(),
+    matchQuery,
   ]);
 
-  const profile = profileResult.data || null;
-  const allMatches = matchesResult;
-
-  // Filter matches where the user is assigned to any role
-  const userMatches = allMatches.filter(
-    (match) =>
-      match.red1_scouter_id === userId ||
-      match.red2_scouter_id === userId ||
-      match.red3_scouter_id === userId ||
-      match.qual_red_scouter_id === userId ||
-      match.blue1_scouter_id === userId ||
-      match.blue2_scouter_id === userId ||
-      match.blue3_scouter_id === userId ||
-      match.qual_blue_scouter_id === userId
-  );
+  if (matchesResult.error) {
+    console.error("Error fetching user matches:", matchesResult.error);
+  }
 
   return {
-    matches: userMatches,
-    profile,
+    matches: matchesResult.data ?? [],
+    profile: profileResult.data ?? null,
   };
 }
 

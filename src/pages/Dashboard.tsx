@@ -61,7 +61,7 @@ export default function Dashboard() {
     if (!user?.id) return;
 
     try {
-      const { matches: userMatches } = await getUserMatches(user.id);
+      const { matches: userMatches } = await getUserMatches(user.id, true);
 
       // Convert matches to display format with role information
       const formattedMatches: UserMatch[] = [];
@@ -89,11 +89,6 @@ export default function Dashboard() {
           }
         });
       });
-
-      // Sort by match number
-      formattedMatches.sort(
-        (a, b) => a.match.match_number - b.match.match_number
-      );
 
       // Filter out matches that already have submissions
       const matchesWithoutSubmissions = await filterMatchesWithoutSubmissions(

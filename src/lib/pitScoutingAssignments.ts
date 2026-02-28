@@ -71,8 +71,9 @@ export async function getUserPitAssignments(
     await Promise.all([
       supabase
         .from("pit_scouting_assignments")
-        .select("*, events(id, name, event_code)")
-        .eq("scouter_id", userId),
+        .select("*, events!inner(id, name, event_code, is_active)")
+        .eq("scouter_id", userId)
+        .eq("events.is_active", true),
       supabase
         .from("pit_scouting_submissions")
         .select("team_num, event_id, updated_at")
