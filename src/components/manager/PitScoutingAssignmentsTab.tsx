@@ -133,12 +133,11 @@ export function PitScoutingAssignmentsTab({
         description: "Could not assign scout",
         variant: "destructive",
       });
-      // Reload to get accurate state
-      loadData();
-    } else {
-      // Reload to get real IDs
+      // Reload to revert to accurate state after failure
       loadData();
     }
+    // On success, the realtime subscription fires loadData() to confirm
+    // with real IDs — no explicit reload needed here
   };
 
   const handleClearAssignment = async (teamNumber: number) => {

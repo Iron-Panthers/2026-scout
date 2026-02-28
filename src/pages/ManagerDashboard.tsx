@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -117,6 +117,9 @@ export default function ManagerDashboard() {
   const [rosters, setRosters] = useState<Roster[]>([]);
   const [selectedMatches, setSelectedMatches] = useState<Set<string>>(new Set());
 
+  // Track whether we've set the initial selected event
+  const initialEventSet = useRef(false);
+
   // Active tab state for mobile dropdown
   const [activeTab, setActiveTab] = useState<string>("assignments");
 
@@ -176,8 +179,10 @@ export default function ManagerDashboard() {
       setEvents(eventsData);
       setAllDbMatches(dbMatches);
 
-      // Set the most recently created event as default
-      if (eventsData.length > 0) {
+      // Only set the selected event on the very first load so realtime updates
+      // don't reset the user's event selection
+      if (!initialEventSet.current && eventsData.length > 0) {
+        initialEventSet.current = true;
         // Events are already sorted by start_date descending from getEvents()
         if (eventsData.filter((a) => a.is_active).length > 0) {
           setSelectedEvent(eventsData.filter((a) => a.is_active)[0].id);
@@ -185,46 +190,6 @@ export default function ManagerDashboard() {
           setSelectedEvent(eventsData[0].id);
         }
       }
-
-      // Convert database matches to component format inline
-      setMatches(
-        dbMatches.map((match) => {
-          const assignments: Partial<Record<Role, Scout>> = {};
-          const roleMapping: Array<{ role: Role; scouterId: string | null }> = [
-            { role: "red1", scouterId: match.red1_scouter_id },
-            { role: "red2", scouterId: match.red2_scouter_id },
-            { role: "red3", scouterId: match.red3_scouter_id },
-            { role: "qualRed", scouterId: match.qual_red_scouter_id },
-            { role: "blue1", scouterId: match.blue1_scouter_id },
-            { role: "blue2", scouterId: match.blue2_scouter_id },
-            { role: "blue3", scouterId: match.blue3_scouter_id },
-            { role: "qualBlue", scouterId: match.qual_blue_scouter_id },
-          ];
-
-          roleMapping.forEach(({ role, scouterId }) => {
-            if (scouterId && profiles.has(scouterId)) {
-              const profile = profiles.get(scouterId)!;
-              assignments[role] = {
-                id: profile.id,
-                name: profile.name || "Unknown",
-                initials: (profile.name || "U")
-                  .split(" ")
-                  .map((n) => n[0])
-                  .join("")
-                  .toUpperCase()
-                  .slice(0, 2),
-                avatar: profile.avatar_url || "",
-              };
-            }
-          });
-
-          return {
-            matchNumber: match.match_number,
-            matchId: match.id,
-            assignments,
-          };
-        })
-      );
     } catch (error) {
       console.error("Failed to load data:", error);
     }
@@ -290,7 +255,8 @@ export default function ManagerDashboard() {
     loadRosters();
   }, [loadRosters]);
 
-  // Filter matches based on selected event
+  // Update matches and submission status when the data or event filter changes.
+  // Does NOT reset pagination — see the separate effect below for that.
   useEffect(() => {
     const filteredDbMatches =
       selectedEvent === "all"
@@ -305,12 +271,14 @@ export default function ManagerDashboard() {
       }))
     );
 
-    // Reset to page 1 when event changes
-    setCurrentPage(1);
-
     // Load submission status for filtered matches
     loadSubmissionStatus(filteredDbMatches);
   }, [selectedEvent, allDbMatches, convertMatchToAssignment]);
+
+  // Reset to page 1 only when the selected event changes, not on every data reload
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedEvent]);
 
   // Load submission status for all match/role combinations
   const loadSubmissionStatus = async (dbMatches: Match[]) => {
