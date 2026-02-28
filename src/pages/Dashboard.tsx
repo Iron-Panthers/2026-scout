@@ -147,6 +147,18 @@ export default function Dashboard() {
     loadPitAssignments();
   }, [loadPitAssignments]);
 
+  // Re-fetch whenever the user navigates back to this tab
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        loadMatches();
+        loadPitAssignments();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [loadMatches, loadPitAssignments]);
+
   // Subscribe to real-time updates for match assignments and submissions
   useEffect(() => {
     if (!user?.id) return;
