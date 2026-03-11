@@ -181,7 +181,7 @@ export default function Scouting() {
       if (frame !== 1) return;
       const key = e.key.toLowerCase();
       if (key === (settings["kb-add5"] ?? "z")) { e.preventDefault(); addShots(5); }
-      else if (key === (settings["kb-add10"] ?? "x")) { e.preventDefault(); addShots(10); }
+      else if (key === (settings["kb-add20"] ?? "x")) { e.preventDefault(); addShots(20); }
       else if (key === (settings["kb-bump"] ?? "b")) { e.preventDefault(); logEvent("bump"); }
       else if (key === (settings["kb-trench"] ?? "t")) { e.preventDefault(); logEvent("trench"); }
     };
