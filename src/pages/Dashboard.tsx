@@ -10,7 +10,7 @@ import {
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { ClipboardList, Wrench, X } from "lucide-react";
+import { ClipboardList, Wrench, X, RefreshCw } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { getUserMatches, removeUserFromMatch, getEvents } from "@/lib/matches";
@@ -43,6 +43,7 @@ export default function Dashboard() {
     {}
   );
   const [pitAssignments, setPitAssignments] = useState<UserPitAssignment[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
 
   const navigate = useNavigate();
 
@@ -417,7 +418,22 @@ export default function Dashboard() {
 
         {/* Scheduled Matches Section */}
         <div className="mb-8">
-          <h2 className="text-2xl font-bold mb-4">Your Assigned Matches</h2>
+          <div className="flex items-center gap-3 mb-4">
+            <h2 className="text-2xl font-bold">Your Assigned Matches</h2>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              disabled={refreshing}
+              onClick={async () => {
+                setRefreshing(true);
+                await Promise.all([loadMatches(), loadPitAssignments()]);
+                setRefreshing(false);
+              }}
+            >
+              <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+            </Button>
+          </div>
           {loading ? (
             <div className="text-muted-foreground">Loading matches...</div>
           ) : matches.length === 0 ? (

@@ -26,6 +26,7 @@ import {
   Wrench,
   ClipboardList,
   Coins,
+  RefreshCw,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -122,6 +123,7 @@ export default function ManagerDashboard() {
 
   // Active tab state for mobile dropdown
   const [activeTab, setActiveTab] = useState<string>("assignments");
+  const [refreshing, setRefreshing] = useState(false);
 
   // Award points state
   const [awardTargetId, setAwardTargetId] = useState<string>("");
@@ -239,6 +241,17 @@ export default function ManagerDashboard() {
       console.log("Cleaning up realtime subscriptions...");
       supabase.removeChannel(channel);
     };
+  }, [loadData]);
+
+  // Re-fetch whenever the user navigates back to this tab
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        loadData();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, [loadData]);
 
   // Load rosters for selected event
@@ -662,10 +675,25 @@ export default function ManagerDashboard() {
       <main className="container mx-auto p-4 md:p-6 max-w-[1600px]">
         {/* Header Section */}
         <div className="flex items-start justify-between mb-8">
-          <DashboardHeader
-            userName={userName}
-            subtitle="Manage scout assignments for the competition"
-          />
+          <div className="flex items-center gap-3">
+            <DashboardHeader
+              userName={userName}
+              subtitle="Manage scout assignments for the competition"
+            />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 mt-1"
+              disabled={refreshing}
+              onClick={async () => {
+                setRefreshing(true);
+                await loadData();
+                setRefreshing(false);
+              }}
+            >
+              <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+            </Button>
+          </div>
           <UserProfileMenu
             userName={userName}
             userInitials={userInitials}
