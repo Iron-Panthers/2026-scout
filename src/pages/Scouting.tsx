@@ -164,9 +164,6 @@ export default function Scouting() {
   const shotCount = state.shots.length;
   const bumpCount = state.events.filter((e) => e.name === "bump").length;
   const trenchCount = state.events.filter((e) => e.name === "trench").length;
-  const climbL1Count = state.events.filter((e) => e.name === "climb-l1").length;
-  const climbL2Count = state.events.filter((e) => e.name === "climb-l2").length;
-  const climbL3Count = state.events.filter((e) => e.name === "climb-l3").length;
   const headerLabel = `Team ${team_number || "?"} — Match ${match_number || "?"}`;
 
   const addShots = (count: number) => {
@@ -405,62 +402,6 @@ export default function Scouting() {
               {trenchCount}
             </span>
             <span className="relative text-3xl font-semibold text-emerald-800 dark:text-emerald-200">Trench</span>
-          </button>
-        </div>
-        {/* Col 3: climb */}
-        <div className="flex flex-col flex-[3] portrait:border-r-0 landscape:border-r landscape:border-border">
-          {/* L1 */}
-          <button
-            className="relative flex-1 flex flex-col items-center justify-center overflow-hidden
-              bg-amber-100 dark:bg-amber-950/50
-              hover:bg-amber-200 dark:hover:bg-amber-900/60
-              active:bg-amber-300 dark:active:bg-amber-900/70
-              border-b border-border transition-colors"
-            onPointerDown={(e) => { e.preventDefault(); logEvent("climb-l1"); }}
-          >
-            <span
-              className="absolute font-black select-none leading-none text-amber-400/25 dark:text-amber-400/20 tabular-nums"
-              style={{ fontSize: "clamp(5rem, 20vw, 10rem)" }}
-            >
-              {climbL1Count}
-            </span>
-            <span className="relative text-3xl font-semibold text-amber-800 dark:text-amber-200">L1</span>
-          </button>
-
-          {/* L2 */}
-          <button
-            className="relative flex-1 flex flex-col items-center justify-center overflow-hidden
-              bg-orange-100-100 dark:bg-orange-950/50
-              hover:bg-orange-200 dark:hover:bg-orange-900/60
-              active:bg-orange-300 dark:active:bg-orange-900/70
-              border-b border-border transition-colors"
-            onPointerDown={(e) => { e.preventDefault(); logEvent("climb-l2"); }}
-          >
-            <span
-              className="absolute font-black select-none leading-none text-orange-400/25 dark:text-orange-400/20 tabular-nums"
-              style={{ fontSize: "clamp(5rem, 20vw, 10rem)" }}
-            >
-              {climbL2Count}
-            </span>
-            <span className="relative text-3xl font-semibold text-orange-800 dark:text-orange-200">L2</span>
-          </button>
-
-          {/* L3 */}
-          <button
-            className="relative flex-1 flex flex-col items-center justify-center overflow-hidden
-              bg-red-100 dark:bg-red-950/50
-              hover:bg-red-200 dark:hover:bg-red-900/60
-              active:bg-red-300 dark:active:bg-red-900/70
-              transition-colors"
-            onPointerDown={(e) => { e.preventDefault(); logEvent("climb-l3"); }}
-          >
-            <span
-              className="absolute font-black select-none leading-none text-red-400/25 dark:text-red-400/20 tabular-nums"
-              style={{ fontSize: "clamp(5rem, 20vw, 10rem)" }}
-            >
-              {climbL3Count}
-            </span>
-            <span className="relative text-3xl font-semibold text-red-800 dark:text-red-200">L3</span>
           </button>
         </div>
 
