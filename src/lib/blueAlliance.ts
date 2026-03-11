@@ -29,6 +29,25 @@ interface TBAMatch {
       score: number;
     };
   };
+  score_breakdown?: {
+    red: TBAScoreBreakdown;
+    blue: TBAScoreBreakdown;
+  };
+}
+
+interface TBAScoreBreakdown {
+  autoTowerRobot1: string;
+  autoTowerRobot2: string;
+  autoTowerRobot3: string;
+  endGameTowerRobot1: string;
+  endGameTowerRobot2: string;
+  endGameTowerRobot3: string;
+  [key: string]: unknown;
+}
+
+export interface MatchTowerStatus {
+  auto: [string, string, string];
+  endgame: [string, string, string];
 }
 
 interface TBAMedia {
@@ -203,4 +222,31 @@ export interface TBATeamSimple {
  */
 export async function getEventTeams(eventCode: string): Promise<TBATeamSimple[]> {
   return (await tbaFetch<TBATeamSimple[]>(`/event/${eventCode}/teams/simple`)) ?? [];
+}
+
+/**
+ * Gets autoTowerRobot1-3 and endgameRobotTower1-3 from TBA match score breakdown
+ * @param eventCode - The event code (e.g., "2026caln")
+ * @param matchNumber - The qual match number
+ * @param alliance - "red" or "blue"
+ * @returns Tower status for all three robots, or null if not available
+ */
+export async function getMatchTowerStatus(
+  eventCode: string,
+  matchNumber: number,
+  alliance: "red" | "blue"
+): Promise<MatchTowerStatus | null> {
+  const matchKey = `${eventCode}_qm${matchNumber}`;
+  const match = await tbaFetch<TBAMatch>(`/match/${matchKey}`);
+
+  if (!match?.score_breakdown) {
+    console.error("No score breakdown available for:", matchKey);
+    return null;
+  }
+
+  const breakdown = match.score_breakdown[alliance];
+  return {
+    auto: [breakdown.autoTowerRobot1, breakdown.autoTowerRobot2, breakdown.autoTowerRobot3],
+    endgame: [breakdown.endGameTowerRobot1, breakdown.endGameTowerRobot2, breakdown.endGameTowerRobot3],
+  };
 }
