@@ -120,10 +120,12 @@ export async function updateRoster(
       });
     }
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("rosters")
       .update(updateData)
-      .eq("id", rosterId);
+      .eq("id", rosterId)
+      .select()
+      .single();
 
     if (error) {
       console.error("Error updating roster:", error);
@@ -134,7 +136,18 @@ export async function updateRoster(
           error: "A roster with this name already exists for this event",
         };
       }
+      // No rows matched (e.g. RLS policy prevented update)
+      if (error.code === "PGRST116") {
+        return {
+          success: false,
+          error: "Could not update roster. You may not have permission.",
+        };
+      }
       return { success: false, error: error.message };
+    }
+
+    if (!data) {
+      return { success: false, error: "Roster not found or update not permitted" };
     }
 
     return { success: true };
