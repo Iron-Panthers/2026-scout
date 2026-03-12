@@ -21,7 +21,6 @@ import {
 import { compressState, decompressState, decodeLegacyBase64Url } from "@/lib/stateCompression";
 import { supabase } from "@/lib/supabase";
 import { Checkbox } from "@/components/ui/checkbox";
-import { getMatchTowerStatus } from "@/lib/blueAlliance";
 
 
 export default function ScoutingReview() {
@@ -432,13 +431,6 @@ export default function ScoutingReview() {
   // Handle final submission
   const handleSubmit = async () => {
     const matchId = resolvedMatchId || state?.matchId;
-
-    const climbData = await getMatchTowerStatus(state?.event_code, state?.match_number, state?.role.includes("red") ? "red" : "blue")
-    const climbed = state?.role.includes("1") ? [ climbData?.auto[0], climbData?.endgame[0] ] : 
-      (state?.role.includes("2") ? [ climbData?.auto[1], climbData?.endgame[1] ] : [ climbData?.auto[2], climbData?.endgame[2] ]);
-
-    state.climbAuto = climbed[0] !== "None";
-    state.climbEndgame = [ climbed[1] === "Level1", climbed[1] === "Level2", climbed[1] === "Level3" ];
 
     console.log("Submitting with matchId:", matchId, "Type:", typeof matchId);
     console.log("Full state:", state);
