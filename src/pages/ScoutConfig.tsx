@@ -455,7 +455,7 @@ export default function ScoutConfig() {
                         {lockedRole && role === lockedRole && " (Assigned)"}
                       </p>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent className="w-40 h-fit rounded-lg shadow-md border border-primary bg-popover overflow-y-scroll max-h-35">
+                    <DropdownMenuContent collisionPadding={{ bottom: 56 }} className="w-40 h-fit rounded-lg shadow-md border border-primary bg-popover overflow-y-scroll max-h-35">
                       <DropdownMenuItem
                         className="p-2 px-7 border-b rounded-lg"
                         onClick={() => handleRoleChange("red1")}
@@ -523,7 +523,7 @@ export default function ScoutConfig() {
                         {lockedMatchType && matchType === lockedMatchType && " (Assigned)"}
                       </p>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent className="w-fit h-fit rounded-lg shadow-md border border-primary bg-popover">
+                    <DropdownMenuContent collisionPadding={{ bottom: 56 }} className="w-fit h-fit rounded-lg shadow-md border border-primary bg-popover">
                       <DropdownMenuItem
                         className="p-2 px-7 bg-accent-foreground/10 border-b rounded-lg"
                         onClick={() => handleMatchTypeChange("Qualification")}
@@ -556,7 +556,7 @@ export default function ScoutConfig() {
                       {eventName || "Select Event"}
                     </p>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent className="w-fit max-h-64 overflow-y-auto rounded-lg shadow-md border border-border bg-popover">
+                  <DropdownMenuContent collisionPadding={{ bottom: 56 }} className="w-fit max-h-64 overflow-y-auto rounded-lg shadow-md border border-border bg-popover">
                     {availableEvents.map((event) => (
                       <DropdownMenuItem
                         key={event.id}

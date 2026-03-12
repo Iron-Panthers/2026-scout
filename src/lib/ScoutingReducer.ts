@@ -31,8 +31,6 @@ export interface ScoutingData {
   events: Array<{ name: string; t: number }>;
   primaryShotPosition: { x: number; y: number } | null;
   secondaryShotPosition: { x: number; y: number } | null;
-  climbAuto: boolean;
-  climbEndgame: [ boolean, boolean, boolean ];
   comments: string;
   robot_problems: string | null;
   errors: string | null;
@@ -179,8 +177,6 @@ export class ScoutingReducer<T extends Record<string, any> = ScoutingData> {
       events: [],
       primaryShotPosition: null,
       secondaryShotPosition: null,
-      climbAuto: false,
-      climbEndgame: [ false, false, false ],
       comments: "",
       errors: null,
       robot_problems: null,
