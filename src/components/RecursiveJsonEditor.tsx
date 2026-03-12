@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { useState, useCallback, useEffect, useRef } from "react";
+import { ChevronDown, ChevronRight, Trash2 } from "lucide-react";
 
 const PHASE_KEYS = new Set([
   "auto",
@@ -17,6 +17,152 @@ interface RecursiveJsonEditorProps {
   value: unknown;
   onChange: (newValue: unknown) => void;
   path?: (string | number)[];
+}
+
+function ArrayEditor({
+  value,
+  onChange,
+  path,
+}: {
+  value: unknown[];
+  onChange: (newValue: unknown) => void;
+  path: (string | number)[];
+}) {
+  const [isCollapsed, setIsCollapsed] = useState(value.length > 20);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const toggleSelect = (idx: number) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx);
+      else next.add(idx);
+      return next;
+    });
+  };
+
+  const deleteSelected = useCallback(() => {
+    if (selected.size === 0) return;
+    const updated = value.filter((_, i) => !selected.has(i));
+    onChange(updated);
+    setSelected(new Set());
+  }, [selected, value, onChange]);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const handler = (e: KeyboardEvent) => {
+      if ((e.key === "Delete" || e.key === "Backspace") && selected.size > 0) {
+        // Only fire if no input is focused inside this container
+        if (document.activeElement && el.contains(document.activeElement)) {
+          const tag = (document.activeElement as HTMLElement).tagName;
+          if (tag === "INPUT" || tag === "TEXTAREA") return;
+        }
+        e.preventDefault();
+        deleteSelected();
+      }
+    };
+    el.addEventListener("keydown", handler);
+    return () => el.removeEventListener("keydown", handler);
+  }, [deleteSelected, selected.size]);
+
+  return (
+    <div
+      ref={containerRef}
+      tabIndex={-1}
+      className="space-y-3 pl-4 border-l-2 border-border relative outline-none"
+    >
+      {value.length > 5 && (
+        <div className="absolute -top-7 right-0 flex items-center gap-2">
+          {selected.size > 0 && (
+            <button
+              type="button"
+              onClick={deleteSelected}
+              className="flex items-center gap-1 text-xs text-destructive hover:text-destructive/80 transition-colors font-medium"
+              title={`Delete ${selected.size} item${selected.size !== 1 ? "s" : ""}`}
+            >
+              <Trash2 size={13} />
+              <span>{selected.size}</span>
+            </button>
+          )}
+          <button
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            type="button"
+          >
+            {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+            <span>{value.length} items</span>
+          </button>
+        </div>
+      )}
+      {!isCollapsed &&
+        value.map((item, idx) => {
+          const isObjOrArr = typeof item === "object" && item !== null;
+          const isSelected = selected.has(idx);
+          return (
+            <div
+              key={idx}
+              className={[
+                isObjOrArr ? "space-y-1" : "flex items-center gap-3",
+                "rounded px-1 cursor-pointer transition-colors",
+                isSelected
+                  ? "ring-2 ring-destructive bg-destructive/10"
+                  : "hover:bg-muted/30",
+              ].join(" ")}
+              onClick={(e) => {
+                // Don't select if clicking on an input/button inside the row
+                const target = e.target as HTMLElement;
+                if (
+                  target.tagName === "INPUT" ||
+                  target.tagName === "BUTTON" ||
+                  target.tagName === "TEXTAREA"
+                )
+                  return;
+                toggleSelect(idx);
+              }}
+            >
+              {isObjOrArr ? (
+                <div className="font-mono text-xs font-medium text-muted-foreground select-none">
+                  [{idx}]
+                </div>
+              ) : (
+                <label className="font-mono text-xs text-muted-foreground min-w-[40px] shrink-0 select-none pointer-events-none">
+                  [{idx}]
+                </label>
+              )}
+              <RecursiveJsonEditor
+                value={item}
+                onChange={(newVal) => {
+                  const updated = value.slice();
+                  updated[idx] = newVal;
+                  onChange(updated);
+                }}
+                path={[...path, idx]}
+              />
+            </div>
+          );
+        })}
+      {!isCollapsed && selected.size > 0 && (
+        <div className="flex items-center gap-2 pt-1 border-t border-border/50">
+          <button
+            type="button"
+            onClick={deleteSelected}
+            className="flex items-center gap-1.5 text-xs bg-destructive text-destructive-foreground rounded px-2 py-1 hover:bg-destructive/80 transition-colors font-medium"
+          >
+            <Trash2 size={12} />
+            Delete {selected.size} item{selected.size !== 1 ? "s" : ""}
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelected(new Set())}
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Clear selection
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function RecursiveJsonEditor({
@@ -79,46 +225,7 @@ export function RecursiveJsonEditor({
       </div>
     );
   } else if (Array.isArray(value)) {
-    return (
-      <div className="space-y-3 pl-4 border-l-2 border-border relative">
-        {value.length > 5 && (
-          <button
-            onClick={() => setIsCollapsed(!isCollapsed)}
-            className="absolute -top-7 right-0 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-            type="button"
-          >
-            {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
-            <span>{value.length} items</span>
-          </button>
-        )}
-        {!isCollapsed &&
-          value.map((item, idx) => {
-            const isObjOrArr = typeof item === "object" && item !== null;
-            return (
-              <div key={idx} className={isObjOrArr ? "space-y-1" : "flex items-center gap-3"}>
-                {isObjOrArr ? (
-                  <div className="font-mono text-xs font-medium text-muted-foreground select-none">
-                    [{idx}]
-                  </div>
-                ) : (
-                  <label className="font-mono text-xs text-muted-foreground min-w-[40px] shrink-0 select-none">
-                    [{idx}]
-                  </label>
-                )}
-                <RecursiveJsonEditor
-                  value={item}
-                  onChange={(newVal) => {
-                    const updated = value.slice();
-                    updated[idx] = newVal;
-                    onChange(updated);
-                  }}
-                  path={[...path, idx]}
-                />
-              </div>
-            );
-          })}
-      </div>
-    );
+    return <ArrayEditor value={value} onChange={onChange} path={path} />;
   } else if (typeof value === "string") {
     return (
       <input

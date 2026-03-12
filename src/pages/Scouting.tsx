@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { compressState } from "@/lib/stateCompression";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Undo2, ArrowRight, ArrowLeft, Check, MoreVertical } from "lucide-react";
+import { Undo2, ArrowRight, ArrowLeft, Check, MoreVertical, RotateCcw } from "lucide-react";
 import { useScoutingReducer } from "@/lib/useScoutingReducer";
 import { useMatchTimer } from "@/lib/useMatchTimer";
 import { useSettings } from "@/contexts/SettingsContext";
@@ -28,7 +28,7 @@ export default function Scouting() {
     match_type
   );
 
-  const { hasStarted, startMatch: startMatchTimer, currentPhase, skipToPhase } = useMatchTimer();
+  const { hasStarted, startMatch: startMatchTimer, resetMatch: resetMatchTimer, currentPhase, skipToPhase } = useMatchTimer();
   const { settings } = useSettings();
 
   const PHASE_LABELS: Record<string, string> = {
@@ -181,7 +181,7 @@ export default function Scouting() {
       if (frame !== 1) return;
       const key = e.key.toLowerCase();
       if (key === (settings["kb-add5"] ?? "z")) { e.preventDefault(); addShots(5); }
-      else if (key === (settings["kb-add10"] ?? "x")) { e.preventDefault(); addShots(10); }
+      else if (key === (settings["kb-add20"] ?? "x")) { e.preventDefault(); addShots(20); }
       else if (key === (settings["kb-bump"] ?? "b")) { e.preventDefault(); logEvent("bump"); }
       else if (key === (settings["kb-trench"] ?? "t")) { e.preventDefault(); logEvent("trench"); }
     };
@@ -265,6 +265,12 @@ export default function Scouting() {
     { phase: "endgame" as const, label: "Endgame" },
   ];
 
+  const handleResetMatch = () => {
+    resetMatchTimer();
+    set("matchStartTime", null);
+    setOptionsOpen(false);
+  };
+
   const OptionsOverlay = () => (
     <div className="fixed inset-0 z-50" onPointerDown={() => setOptionsOpen(false)}>
       <div
@@ -277,6 +283,13 @@ export default function Scouting() {
         >
           <ArrowLeft className="w-4 h-4 shrink-0" />
           <span className="text-sm font-medium">Back to Dashboard</span>
+        </button>
+        <button
+          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-colors text-amber-600 dark:text-amber-400 border-b border-border"
+          onPointerDown={(e) => { e.preventDefault(); handleResetMatch(); }}
+        >
+          <RotateCcw className="w-4 h-4 shrink-0" />
+          <span className="text-sm font-medium">Reset Match Time</span>
         </button>
         <div className="px-3 py-2.5">
           <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Skip to Phase</span>

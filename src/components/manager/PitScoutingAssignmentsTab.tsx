@@ -9,8 +9,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, X, CheckCircle2 } from "lucide-react";
+import { Loader2, X, CheckCircle2, Pencil, Trash2, AlertTriangle } from "lucide-react";
 import { getEventTeams, type TBATeamSimple } from "@/lib/blueAlliance";
 import {
   getPitAssignmentsForEvent,
@@ -19,8 +27,10 @@ import {
 } from "@/lib/pitScoutingAssignments";
 import { getPitScoutingByEvent } from "@/lib/pitScouting";
 import { ScoutAssignmentDialog } from "@/components/manager/ScoutAssignmentDialog";
+import { RecursiveJsonEditor } from "@/components/RecursiveJsonEditor";
 import { useToast } from "@/hooks/use-toast";
 import type { Event, Profile, PitScoutingAssignment } from "@/types";
+import type { PitScoutingSubmission } from "@/types/pitScouting";
 
 interface PitScoutingAssignmentsTabProps {
   selectedEvent: string;
@@ -36,10 +46,21 @@ export function PitScoutingAssignmentsTab({
   const { toast } = useToast();
   const [teams, setTeams] = useState<TBATeamSimple[]>([]);
   const [assignments, setAssignments] = useState<PitScoutingAssignment[]>([]);
+  const [submissions, setSubmissions] = useState<PitScoutingSubmission[]>([]);
   const [submittedTeams, setSubmittedTeams] = useState<Map<number, string>>(new Map());
   const [loadingTeams, setLoadingTeams] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [assigningTeam, setAssigningTeam] = useState<number | null>(null);
+
+  // Edit state
+  const [editTarget, setEditTarget] = useState<PitScoutingSubmission | null>(null);
+  const [editData, setEditData] = useState<Record<string, unknown>>({});
+  const [editConfirming, setEditConfirming] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Delete state
+  const [deleteTarget, setDeleteTarget] = useState<PitScoutingSubmission | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const currentEvent = events.find((e) => e.id === selectedEvent);
   const isAllEvents = selectedEvent === "all";
@@ -63,6 +84,7 @@ export function PitScoutingAssignmentsTab({
       );
       setTeams(sorted);
       setAssignments(assignmentsData);
+      setSubmissions(submissionsData);
       setSubmittedTeams(new Map(submissionsData.map((s) => [s.team_num, s.scouter_name])));
     } finally {
       setLoadingTeams(false);
@@ -157,6 +179,81 @@ export function PitScoutingAssignmentsTab({
         variant: "destructive",
       });
       loadData();
+    }
+  };
+
+  // Edit handlers
+  const handleEditClick = (teamNumber: number) => {
+    const submission = submissions.find((s) => s.team_num === teamNumber);
+    if (!submission) return;
+    setEditTarget(submission);
+    setEditData(submission.pit_data);
+    setEditConfirming(false);
+  };
+
+  const handleEditConfirm = async () => {
+    if (!editTarget) return;
+    setIsSaving(true);
+    try {
+      const { error } = await supabase
+        .from("pit_scouting_submissions")
+        .update({ pit_data: editData })
+        .eq("id", editTarget.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Saved",
+        description: `Pit scouting data updated for team ${editTarget.team_num}.`,
+      });
+      setEditTarget(null);
+      setEditConfirming(false);
+      loadData();
+    } catch (error) {
+      console.error("Error updating pit scouting:", error);
+      toast({
+        title: "Save Failed",
+        description: "Could not update this submission",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Delete handlers
+  const handleDeleteClick = (teamNumber: number) => {
+    const submission = submissions.find((s) => s.team_num === teamNumber);
+    if (!submission) return;
+    setDeleteTarget(submission);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    try {
+      const { error } = await supabase
+        .from("pit_scouting_submissions")
+        .delete()
+        .eq("id", deleteTarget.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Deleted",
+        description: `Pit scouting submission for team ${deleteTarget.team_num} has been permanently deleted.`,
+      });
+      setDeleteTarget(null);
+      loadData();
+    } catch (error) {
+      console.error("Error deleting pit scouting:", error);
+      toast({
+        title: "Delete Failed",
+        description: "Could not delete this submission",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -281,6 +378,28 @@ export function PitScoutingAssignmentsTab({
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
+                        {isSubmitted && (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEditClick(team.team_number)}
+                              className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                              title="Edit pit scouting data"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteClick(team.team_number)}
+                              className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                              title="Delete pit scouting submission"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
                         {!isSubmitted && (
                           <Button
                             variant="outline"
@@ -331,6 +450,148 @@ export function PitScoutingAssignmentsTab({
         availableScouts={availableScouts}
         onAssignScout={handleAssignScout}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              Delete Pit Scouting Submission?
+            </DialogTitle>
+            <DialogDescription asChild>
+              <div className="space-y-3 text-sm text-muted-foreground">
+                <p>
+                  You are about to permanently delete the pit scouting submission for{" "}
+                  <strong className="text-foreground">
+                    Team {deleteTarget?.team_num}
+                  </strong>{" "}
+                  submitted by{" "}
+                  <strong className="text-foreground">
+                    {deleteTarget?.scouter_name ?? "Unknown"}
+                  </strong>
+                  .
+                </p>
+                <p className="text-destructive font-medium">
+                  This action cannot be undone and will remove the data from the database
+                  immediately.
+                </p>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteTarget(null)}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteConfirm} disabled={isDeleting}>
+              {isDeleting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Deleting…
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete Permanently
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog
+        open={!!editTarget}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditTarget(null);
+            setEditConfirming(false);
+          }
+        }}
+      >
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>
+              {editConfirming ? "Confirm Save" : "Edit Pit Scouting Data"}
+            </DialogTitle>
+            <DialogDescription>
+              {editConfirming ? (
+                <>
+                  Confirm changes to pit scouting for{" "}
+                  <strong>Team {editTarget?.team_num}</strong>. This will
+                  overwrite the existing data immediately.
+                </>
+              ) : (
+                <>
+                  Team {editTarget?.team_num}
+                  {editTarget?.scouter_name && (
+                    <> · Submitted by {editTarget.scouter_name}</>
+                  )}
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          {!editConfirming && (
+            <div className="overflow-y-auto overflow-x-hidden max-h-[60vh] border border-border rounded-md px-5 pt-8 pb-5">
+              <RecursiveJsonEditor
+                value={editData}
+                onChange={(newVal) => setEditData(newVal as Record<string, unknown>)}
+              />
+            </div>
+          )}
+
+          {editConfirming && (
+            <div className="rounded-md border border-destructive/40 bg-destructive/10 p-4">
+              <p className="text-sm text-destructive font-medium flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                This will overwrite the existing pit scouting data. This action cannot be undone.
+              </p>
+            </div>
+          )}
+
+          <DialogFooter>
+            {editConfirming ? (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => setEditConfirming(false)}
+                  disabled={isSaving}
+                >
+                  Back to Edit
+                </Button>
+                <Button onClick={handleEditConfirm} disabled={isSaving}>
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Saving…
+                    </>
+                  ) : (
+                    "Confirm Save"
+                  )}
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="outline" onClick={() => setEditTarget(null)}>
+                  Cancel
+                </Button>
+                <Button onClick={() => setEditConfirming(true)}>Save Changes</Button>
+              </>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
