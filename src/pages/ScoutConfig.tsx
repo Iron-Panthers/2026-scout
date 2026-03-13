@@ -60,6 +60,7 @@ export default function ScoutConfig() {
   );
   const [manualMode, setManualMode] = useState(!param_match_id);
   const [isTeamNumberAutofilled, setIsTeamNumberAutofilled] = useState(false);
+  const [qualTeamNumbers, setQualTeamNumbers] = useState<[number, number, number]>([0, 0, 0]);
 
   // Role locking state
   const [lockedRole, setLockedRole] = useState<string | null>(null);
@@ -198,27 +199,37 @@ export default function ScoutConfig() {
   }, [param_match_id, user?.id]);
 
   const updateTeamNum = async () => {
-    // Skip for qual roles - they don't have specific team numbers
-    if (role === "qualRed" || role === "qualBlue") {
-      setTeamNumber(0);
-      setIsTeamNumberAutofilled(false);
-      return;
-    }
-
     if (matchType === "Practice" || matchType === "Playoff") return;
     if (!matchNumber || !role || !eventCode) return;
 
-    try {
-      const teamNumber = await getMatchTeam(eventCode, matchNumber, role);
+    const isQualRole = role === "qualRed" || role === "qualBlue";
 
-      if (teamNumber) {
-        setTeamNumber(teamNumber);
-        setIsTeamNumberAutofilled(true);
-      } else {
-        console.log("Could not find team number (offline or match not in TBA)");
+    if (isQualRole) {
+      // Fetch all 3 team numbers for the alliance
+      const alliance = role === "qualRed" ? "red" : "blue";
+      try {
+        const nums = await Promise.all(
+          [1, 2, 3].map((i) => getMatchTeam(eventCode, matchNumber, `${alliance}${i}`))
+        );
+        const resolved: [number, number, number] = [nums[0] ?? 0, nums[1] ?? 0, nums[2] ?? 0];
+        if (resolved.some((n) => n > 0)) {
+          setQualTeamNumbers(resolved);
+        }
+      } catch (error) {
+        console.log("Could not fetch qual team numbers (offline?):", error);
       }
-    } catch (error) {
-      console.log("Could not fetch team info (offline?):", error);
+    } else {
+      try {
+        const teamNumber = await getMatchTeam(eventCode, matchNumber, role);
+        if (teamNumber) {
+          setTeamNumber(teamNumber);
+          setIsTeamNumberAutofilled(true);
+        } else {
+          console.log("Could not find team number (offline or match not in TBA)");
+        }
+      } catch (error) {
+        console.log("Could not fetch team info (offline?):", error);
+      }
     }
   };
 
@@ -253,6 +264,7 @@ export default function ScoutConfig() {
 
   const startUrl = canStart
     ? (() => {
+        const isQualRole = role === "qualRed" || role === "qualBlue";
         const params = new URLSearchParams({
           match_id: match_id || "",
           role,
@@ -260,8 +272,12 @@ export default function ScoutConfig() {
           match_number: matchNumber.toString(),
           team_number: teamNumber.toString(),
           match_type: matchType,
+          ...(isQualRole && {
+            team1: qualTeamNumbers[0].toString(),
+            team2: qualTeamNumbers[1].toString(),
+            team3: qualTeamNumbers[2].toString(),
+          }),
         });
-        const isQualRole = role === "qualRed" || role === "qualBlue";
         return isQualRole ? `/qual-scouting?${params}` : `/scouting?${params}`;
       })()
     : null;
@@ -340,17 +356,22 @@ export default function ScoutConfig() {
               matchNumber,
             });
 
+            // Route to qual scouting page for qual roles
+            const isQualRole = role === "qualRed" || role === "qualBlue";
             const params = new URLSearchParams({
               match_id: match_id || "", // Can be empty, will be resolved later
               role: role,
               event_code: eventCode,
               match_number: matchNumber.toString(),
               team_number: teamNumber.toString(),
-              match_type: matchType
+              match_type: matchType,
+              ...(isQualRole && {
+                team1: qualTeamNumbers[0].toString(),
+                team2: qualTeamNumbers[1].toString(),
+                team3: qualTeamNumbers[2].toString(),
+              }),
             });
 
-            // Route to qual scouting page for qual roles
-            const isQualRole = role === "qualRed" || role === "qualBlue";
             const url = isQualRole
               ? `/qual-scouting?${params.toString()}`
               : `/scouting?${params.toString()}`;
@@ -412,34 +433,59 @@ export default function ScoutConfig() {
                   value={matchNumber}
                 />
               </div>
-              <div className="flex justify-between items-center pl-3 p-1 bg-accent/50 rounded-lg">
-                <span className="text-sm font-medium text-muted-foreground">
-                  Team Number
-                </span>
-                <div className="flex items-center gap-2">
-                  {isTeamNumberAutofilled && (
-                    <button
-                      type="button"
-                      onClick={() => setShowTeamNumberUnlockDialog(true)}
-                      className="hover:bg-accent/50 rounded p-1 transition-colors"
-                      aria-label="Unlock team number for editing"
-                    >
-                      <Lock className="h-3 w-3 text-muted-foreground" />
-                    </button>
-                  )}
-                  <Input
-                    className="font-semibold w-30 text-right"
-                    type="number"
-                    placeholder={role === "qualRed" || role === "qualBlue" ? "N/A for qual scouting" : "#####"}
-                    onInput={(e) => {
-                      setTeamNumber(parseInt(e.currentTarget.value));
-                    }}
-                    value={role === "qualRed" || role === "qualBlue" ? "" : teamNumber}
-                    disabled={role === "qualRed" || role === "qualBlue"}
-                    readOnly={isTeamNumberAutofilled}
-                  />
+              {role === "qualRed" || role === "qualBlue" ? (
+                <div className="flex flex-col gap-1">
+                  {([0, 1, 2] as const).map((i) => (
+                    <div key={i} className="flex justify-between items-center pl-3 p-1 bg-accent/50 rounded-lg">
+                      <span className="text-sm font-medium text-muted-foreground">
+                        Team {i + 1}
+                      </span>
+                      <Input
+                        className="font-semibold w-30 text-right"
+                        type="number"
+                        placeholder="#####"
+                        value={qualTeamNumbers[i] || ""}
+                        onInput={(e) => {
+                          const val = parseInt(e.currentTarget.value) || 0;
+                          setQualTeamNumbers((prev) => {
+                            const next: [number, number, number] = [...prev];
+                            next[i] = val;
+                            return next;
+                          });
+                        }}
+                      />
+                    </div>
+                  ))}
                 </div>
-              </div>
+              ) : (
+                <div className="flex justify-between items-center pl-3 p-1 bg-accent/50 rounded-lg">
+                  <span className="text-sm font-medium text-muted-foreground">
+                    Team Number
+                  </span>
+                  <div className="flex items-center gap-2">
+                    {isTeamNumberAutofilled && (
+                      <button
+                        type="button"
+                        onClick={() => setShowTeamNumberUnlockDialog(true)}
+                        className="hover:bg-accent/50 rounded p-1 transition-colors"
+                        aria-label="Unlock team number for editing"
+                      >
+                        <Lock className="h-3 w-3 text-muted-foreground" />
+                      </button>
+                    )}
+                    <Input
+                      className="font-semibold w-30 text-right"
+                      type="number"
+                      placeholder="#####"
+                      onInput={(e) => {
+                        setTeamNumber(parseInt(e.currentTarget.value));
+                      }}
+                      value={teamNumber}
+                      readOnly={isTeamNumberAutofilled}
+                    />
+                  </div>
+                </div>
+              )}
               <div className="flex justify-between items-center p-1 pl-3 bg-accent/50 rounded-lg">
                 <span className="text-sm font-medium text-muted-foreground">
                   Your Role

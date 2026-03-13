@@ -27,6 +27,10 @@ export default function QualScouting() {
   const role = searchParams.get("role") || "qualRed";
   const eventCode = searchParams.get("event_code") || "";
   const matchNumber = parseInt(searchParams.get("match_number") || "0");
+  const manualTeam1 = parseInt(searchParams.get("team1") || "0");
+  const manualTeam2 = parseInt(searchParams.get("team2") || "0");
+  const manualTeam3 = parseInt(searchParams.get("team3") || "0");
+  const hasManualTeams = manualTeam1 > 0 || manualTeam2 > 0 || manualTeam3 > 0;
 
   const alliance = role === "qualRed" ? "red" : "blue";
 
@@ -38,16 +42,23 @@ export default function QualScouting() {
   // Fixed color index per team — assigned once at load, never changes with position
   const teamColorIndex = useRef<Record<number, number>>({});
 
-  // ── Load team numbers from TBA ──────────────────────────────────────────
+  // ── Load team numbers from URL params or TBA ────────────────────────────
   useEffect(() => {
     let mounted = true;
     const load = async () => {
       try {
-        const teamNumbers: number[] = [];
-        for (let i = 1; i <= 3; i++) {
-          const roleName = `${alliance}${i}`;
-          const teamNum = await getMatchTeam(eventCode, matchNumber, roleName);
-          teamNumbers.push(teamNum ?? 0);
+        let teamNumbers: number[];
+        if (hasManualTeams) {
+          // Use manually entered team numbers from config page
+          teamNumbers = [manualTeam1, manualTeam2, manualTeam3];
+        } else {
+          // Fetch from TBA, falling back to 0 per slot
+          teamNumbers = [];
+          for (let i = 1; i <= 3; i++) {
+            const roleName = `${alliance}${i}`;
+            const teamNum = await getMatchTeam(eventCode, matchNumber, roleName);
+            teamNumbers.push(teamNum ?? 0);
+          }
         }
         if (!mounted) return;
         const initialState = ScoutingReducer.createQualInitialState(
@@ -64,13 +75,13 @@ export default function QualScouting() {
       } catch (err) {
         console.error("Failed to load team numbers:", err);
         if (!mounted) return;
-        // Fall back to zeros so the page still renders
+        // Fall back to manual teams or zeros
         const fallback = ScoutingReducer.createQualInitialState(
           matchId,
           role,
           eventCode,
           matchNumber,
-          [0, 0, 0]
+          hasManualTeams ? [manualTeam1, manualTeam2, manualTeam3] : [0, 0, 0]
         );
         reducerRef.current = new ScoutingReducer<QualScoutingData>(fallback);
         fallback.rankings.forEach((t, i) => { teamColorIndex.current[t] = i; });
