@@ -201,11 +201,24 @@ export default function ScoutingReview() {
 
   // Check dependencies and resolve matchId if needed
   const checkDependencies = async () => {
-    // Check comments first before opening modal
-    if (!state?.comments || state.comments.trim() === "") {
+    // Check all required/filled fields before opening modal
+    const commentsTooShort = !state?.comments || state.comments.trim().length < 5;
+    const robotProblemsTooShort = state?.robot_problems !== null && state?.robot_problems !== undefined && state.robot_problems.trim().length < 5;
+    const errorsTooShort = state?.errors !== null && state?.errors !== undefined && state.errors.trim().length < 5;
+    const defenseTooShort = state?.defenseDescription !== null && state?.defenseDescription !== undefined && state.defenseDescription.trim().length < 5;
+
+    if (commentsTooShort) {
       toast({
         title: "Comments Required",
-        description: "Please add comments before submitting",
+        description: "Comments must be at least 5 characters",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (robotProblemsTooShort || errorsTooShort || defenseTooShort) {
+      toast({
+        title: "Fields Incomplete",
+        description: "All checked fields require at least 5 characters",
         variant: "destructive",
       });
       return;
@@ -273,7 +286,7 @@ export default function ScoutingReview() {
     const updatedDeps = [...deps];
 
     // Check comments
-    if (state?.comments && state.comments.trim() !== "") {
+    if (state?.comments && state.comments.trim().length >= 5) {
       updatedDeps[0] = {
         ...updatedDeps[0],
         status: "success",
@@ -282,7 +295,7 @@ export default function ScoutingReview() {
       updatedDeps[0] = {
         ...updatedDeps[0],
         status: "error",
-        errorMessage: "Comments are required",
+        errorMessage: "Comments are required (min. 5 characters)",
       };
     }
 
@@ -521,7 +534,7 @@ export default function ScoutingReview() {
             </label>
             <textarea
               className={`w-full bg-background rounded-lg px-4 py-3 text-foreground text-base font-normal focus:outline-none transition disabled:opacity-60 ${
-                !state.comments || state.comments.trim() === ""
+                !state.comments || state.comments.trim().length < 5
                   ? "border-2 border-destructive focus:ring-2 focus:ring-destructive/50"
                   : "border border-border focus:ring-2 focus:ring-primary/80"
               }`}
@@ -531,8 +544,8 @@ export default function ScoutingReview() {
               style={{ fontFamily: "inherit", resize: "vertical" }}
               placeholder="Please describe what happened during this match..."
             />
-            {(!state.comments || state.comments.trim() === "") && (
-              <p className="text-xs text-destructive mt-1">Comments are required before submission</p>
+            {(!state.comments || state.comments.trim().length < 5) && (
+              <p className="text-xs text-destructive mt-1">Comments are required (min. 5 characters)</p>
             )}
           </div>
           {state.role !== "qualRed" && state.role !== "qualBlue" && (
@@ -548,13 +561,22 @@ export default function ScoutingReview() {
                   }/>
                 </label>
                 {state.robot_problems !== null &&
-                  <textarea
-                    className="w-full bg-background border border-border rounded-lg px-4 py-3 text-foreground text-base font-normal focus:outline-none focus:ring-2 focus:ring-primary/80 transition disabled:opacity-60"
-                    rows={2}
-                    value={state.robot_problems}
-                    onChange={(e) => { handleFieldChange("robot_problems", e.target.value); writtenTempState.problems = e.target.value; setWrittenTempState(writtenTempState); }}
-                    style={{ fontFamily: "inherit", resize: "vertical" }}
-                  />
+                  <>
+                    <textarea
+                      className={`w-full bg-background rounded-lg px-4 py-3 text-foreground text-base font-normal focus:outline-none transition disabled:opacity-60 ${
+                        state.robot_problems.trim().length < 5
+                          ? "border-2 border-destructive focus:ring-2 focus:ring-destructive/50"
+                          : "border border-border focus:ring-2 focus:ring-primary/80"
+                      }`}
+                      rows={2}
+                      value={state.robot_problems}
+                      onChange={(e) => { handleFieldChange("robot_problems", e.target.value); writtenTempState.problems = e.target.value; setWrittenTempState(writtenTempState); }}
+                      style={{ fontFamily: "inherit", resize: "vertical" }}
+                    />
+                    {state.robot_problems.trim().length < 5 && (
+                      <p className="text-xs text-destructive mt-1">Description required (min. 5 characters)</p>
+                    )}
+                  </>
                 }
               </div>
               <div className="mb-6">
@@ -568,13 +590,22 @@ export default function ScoutingReview() {
                   }/>
                 </label>
                 {state.errors !== null &&
-                  <textarea
-                    className="w-full bg-background border border-border rounded-lg px-4 py-3 text-foreground text-base font-normal focus:outline-none focus:ring-2 focus:ring-primary/80 transition disabled:opacity-60"
-                    rows={2}
-                    value={state.errors}
-                    onChange={(e) => { handleFieldChange("errors", e.target.value); writtenTempState.errors = e.target.value; setWrittenTempState(writtenTempState); }}
-                    style={{ fontFamily: "inherit", resize: "vertical" }}
-                  />
+                  <>
+                    <textarea
+                      className={`w-full bg-background rounded-lg px-4 py-3 text-foreground text-base font-normal focus:outline-none transition disabled:opacity-60 ${
+                        state.errors.trim().length < 5
+                          ? "border-2 border-destructive focus:ring-2 focus:ring-destructive/50"
+                          : "border border-border focus:ring-2 focus:ring-primary/80"
+                      }`}
+                      rows={2}
+                      value={state.errors}
+                      onChange={(e) => { handleFieldChange("errors", e.target.value); writtenTempState.errors = e.target.value; setWrittenTempState(writtenTempState); }}
+                      style={{ fontFamily: "inherit", resize: "vertical" }}
+                    />
+                    {state.errors.trim().length < 5 && (
+                      <p className="text-xs text-destructive mt-1">Description required (min. 5 characters)</p>
+                    )}
+                  </>
                 }
               </div>
               <div>
@@ -588,15 +619,24 @@ export default function ScoutingReview() {
                   }/>
                 </label>
                 {state.defenseDescription !== null &&
-                  <textarea
-                    className="w-full bg-background border border-border rounded-lg px-4 py-3 text-foreground text-base font-normal focus:outline-none focus:ring-2 focus:ring-primary/80 transition disabled:opacity-60"
-                    rows={2}
-                    value={state.defenseDescription}
-                    onChange={(e) =>
-                      { handleFieldChange("defenseDescription", e.target.value); writtenTempState.defense = e.target.value; setWrittenTempState(writtenTempState); }
-                    }
-                    style={{ fontFamily: "inherit", resize: "vertical" }}
-                  />
+                  <>
+                    <textarea
+                      className={`w-full bg-background rounded-lg px-4 py-3 text-foreground text-base font-normal focus:outline-none transition disabled:opacity-60 ${
+                        state.defenseDescription.trim().length < 5
+                          ? "border-2 border-destructive focus:ring-2 focus:ring-destructive/50"
+                          : "border border-border focus:ring-2 focus:ring-primary/80"
+                      }`}
+                      rows={2}
+                      value={state.defenseDescription}
+                      onChange={(e) =>
+                        { handleFieldChange("defenseDescription", e.target.value); writtenTempState.defense = e.target.value; setWrittenTempState(writtenTempState); }
+                      }
+                      style={{ fontFamily: "inherit", resize: "vertical" }}
+                    />
+                    {state.defenseDescription.trim().length < 5 && (
+                      <p className="text-xs text-destructive mt-1">Description required (min. 5 characters)</p>
+                    )}
+                  </>
                 }
               </div>
             </>

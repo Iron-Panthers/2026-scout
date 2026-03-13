@@ -301,6 +301,12 @@ export default function ScoutConfig() {
     return missing;
   };
 
+  const getRoleColor = (r: string) => {
+    if (r.startsWith("red") || r === "qualRed") return "bg-red-500/20 text-red-400 border-red-500/30";
+    if (r.startsWith("blue") || r === "qualBlue") return "bg-blue-500/20 text-blue-400 border-blue-500/30";
+    return "bg-accent-foreground/10";
+  };
+
   // Handle role change with confirmation if locked
   const handleRoleChange = (newRole: string) => {
     if (lockedRole && newRole !== lockedRole) {
@@ -508,60 +514,21 @@ export default function ScoutConfig() {
                   )}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <p className="px-7 bg-accent-foreground/10 p-2 border-b rounded-lg">
+                      <p className={`px-7 p-2 border-b rounded-lg ${role ? getRoleColor(role) : "bg-accent-foreground/10"}`}>
                         {role ? prettifyRole(role) : "Select Role"}
                         {lockedRole && role === lockedRole && " (Assigned)"}
                       </p>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent collisionPadding={{ bottom: 56 }} className="w-40 h-fit rounded-lg shadow-md border border-primary bg-popover overflow-y-scroll max-h-35">
-                      <DropdownMenuItem
-                        className="p-2 px-7 border-b rounded-lg"
-                        onClick={() => handleRoleChange("red1")}
-                      >
-                        Red 1
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="p-2 px-7 border-b rounded-lg"
-                        onClick={() => handleRoleChange("red2")}
-                      >
-                        Red 2
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="p-2 px-7 border-b rounded-lg"
-                        onClick={() => handleRoleChange("red3")}
-                      >
-                        Red 3
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="p-2 px-7 border-b rounded-lg"
-                        onClick={() => handleRoleChange("qualRed")}
-                      >
-                        Qual Red
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="p-2 px-7 border-b rounded-lg"
-                        onClick={() => handleRoleChange("blue1")}
-                      >
-                        Blue 1
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="p-2 px-7 border-b rounded-lg"
-                        onClick={() => handleRoleChange("blue2")}
-                      >
-                        Blue 2
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="p-2 px-7 border-b rounded-lg"
-                        onClick={() => handleRoleChange("blue3")}
-                      >
-                        Blue 3
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="p-2 px-7 border-b rounded-lg"
-                        onClick={() => handleRoleChange("qualBlue")}
-                      >
-                        Qual Blue
-                      </DropdownMenuItem>
+                    <DropdownMenuContent collisionPadding={{ bottom: 56 }} className="w-40 h-fit rounded-lg shadow-md border border-border bg-popover overflow-y-scroll max-h-35">
+                      {(["red1","red2","red3","qualRed","blue1","blue2","blue3","qualBlue"] as const).map((r) => (
+                        <DropdownMenuItem
+                          key={r}
+                          className={`p-2 px-7 border-b rounded-lg ${getRoleColor(r)}`}
+                          onClick={() => handleRoleChange(r)}
+                        >
+                          {prettifyRole(r)}
+                        </DropdownMenuItem>
+                      ))}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
