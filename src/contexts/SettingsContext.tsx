@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect } from "react";
 import type { ReactNode } from "react";
 import { useAuth } from "./AuthContext";
 import settingsConfig from "@/config/settings.json";
+import { getActiveEvent } from "@/lib/matches";
 
 interface SettingsContextType {
   settings: Record<string, any>;
@@ -28,10 +29,22 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
     // Load from localStorage
     const saved = localStorage.getItem(`settings_${user?.id}`);
-    if (saved) {
-      setSettings({ ...defaultSettings, ...JSON.parse(saved) });
-    } else {
-      setSettings(defaultSettings);
+    const loadedSettings = saved
+      ? { ...defaultSettings, ...JSON.parse(saved) }
+      : defaultSettings;
+    setSettings(loadedSettings);
+
+    // When online, fetch the active event and update the stored event code
+    if (navigator.onLine) {
+      getActiveEvent().then((event) => {
+        if (event?.event_code) {
+          const updated = { ...loadedSettings, "active-event-code": event.event_code };
+          setSettings(updated);
+          if (user?.id) {
+            localStorage.setItem(`settings_${user.id}`, JSON.stringify(updated));
+          }
+        }
+      });
     }
   }, [user?.id]);
 

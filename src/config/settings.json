@@ -33,6 +33,20 @@
       }
     ]
   },
+  "event": {
+    "title": "Event",
+    "description": "Current competition event settings",
+    "fields": [
+      {
+        "id": "active-event-code",
+        "label": "Active Event Code",
+        "description": "Set automatically from the active event",
+        "type": "text",
+        "defaultValue": "",
+        "editable": false
+      }
+    ]
+  },
   "keybinds": {
     "title": "Keybinds",
     "description": "Keyboard shortcuts for quantitative scouting (click a key to rebind)",
