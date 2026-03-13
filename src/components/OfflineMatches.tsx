@@ -38,6 +38,8 @@ import {
   submitScoutingData,
   submitQualScoutingData,
   resolveMatchId,
+  migrateScoutingData,
+  CURRENT_SCHEMA_VERSION,
 } from "@/lib/scoutingSchema";
 import { supabase } from "@/lib/supabase";
 import { compressState } from "@/lib/stateCompression";
@@ -189,20 +191,29 @@ export default function OfflineMatches() {
         throw new Error("Could not resolve match ID");
       }
 
+      // Migrate schema if needed before submitting
+      const storedVersion = match.schemaVersion ?? 1;
+      const scoutingData =
+        storedVersion < CURRENT_SCHEMA_VERSION
+          ? migrateScoutingData(match.scoutingData, storedVersion, CURRENT_SCHEMA_VERSION)
+          : match.scoutingData;
+
       // Submit to database (qual ranking vs quant scouting)
       if (match.role === "qualRed" || match.role === "qualBlue") {
         await submitQualScoutingData(
           matchId,
           match.role,
-          match.scoutingData,
+          scoutingData,
           match.scouterId || user?.id
         );
       } else {
         await submitScoutingData(
           matchId,
           match.role,
-          match.scoutingData,
-          match.scouterId || user?.id
+          scoutingData,
+          match.scouterId || user?.id,
+          scoutingData.team_number ?? 0,
+          scoutingData.match_type ?? "qual"
         );
       }
 
@@ -338,8 +349,9 @@ export default function OfflineMatches() {
             <Button
               onClick={uploadAllMatches}
               disabled={uploadingAll || !isOnline}
-              size="sm"
+              size="icon"
               variant="default"
+              className="h-8 w-8 sm:w-auto sm:px-3 ml-3 shrink-0"
               title={!isOnline ? "Cannot upload while offline" : "Upload all pending matches"}
             >
               {uploadingAll ? (
@@ -474,15 +486,16 @@ function MatchRow({
             <Button
               onClick={() => onUpload(match)}
               disabled={match.uploading || !isOnline}
-              size="sm"
+              size="icon"
               variant="default"
+              className="h-7 w-7 sm:h-8 sm:w-auto sm:px-3"
               title={!isOnline ? "Cannot upload while offline" : "Upload"}
             >
               {match.uploading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
                 <>
-                  <Upload className="h-3 w-3" />
+                  <Upload className="h-3.5 w-3.5" />
                   <span className="hidden sm:inline ml-1">Upload</span>
                 </>
               )}
@@ -491,22 +504,23 @@ function MatchRow({
 
           <Button
             onClick={handleEdit}
-            size="sm"
+            size="icon"
             variant="outline"
+            className="h-7 w-7 sm:h-8 sm:w-auto sm:px-3"
             title="Edit in review"
           >
-            <Pencil className="h-3 w-3" />
+            <Pencil className="h-3.5 w-3.5" />
             <span className="hidden sm:inline ml-1">Edit</span>
           </Button>
 
           <Button
             onClick={() => setShowDeleteConfirm(true)}
-            size="sm"
+            size="icon"
             variant="ghost"
-            className="text-muted-foreground hover:text-destructive"
+            className="h-7 w-7 text-muted-foreground hover:text-destructive"
             title="Delete"
           >
-            <Trash2 className="h-4 w-4" />
+            <Trash2 className="h-3.5 w-3.5" />
           </Button>
         </div>
       </div>

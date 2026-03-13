@@ -46,7 +46,10 @@ export const MatchRow = memo(
             disabled={!match.matchId}
           />
         </TableCell>
-        <TableCell className="font-mono font-semibold border-r border-border">
+        <TableCell
+          className={`font-mono font-semibold border-r border-border ${onToggleSelect && match.matchId ? "cursor-pointer select-none hover:bg-accent/50" : ""}`}
+          onClick={() => onToggleSelect?.(match.matchId || "")}
+        >
           Q-{match.matchNumber}
         </TableCell>
         {roles.map((role) => {

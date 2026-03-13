@@ -304,6 +304,32 @@ export async function removeUserFromMatch(
 }
 
 // Update event details
+export async function setActiveEvent(eventId: string): Promise<boolean> {
+  // Deactivate all events first
+  const { error: deactivateError } = await supabase
+    .from("events")
+    .update({ is_active: false })
+    .neq("id", "00000000-0000-0000-0000-000000000000"); // update all rows
+
+  if (deactivateError) {
+    console.error("Error deactivating events:", deactivateError);
+    return false;
+  }
+
+  // Activate the selected event
+  const { error } = await supabase
+    .from("events")
+    .update({ is_active: true })
+    .eq("id", eventId);
+
+  if (error) {
+    console.error("Error setting active event:", error);
+    return false;
+  }
+
+  return true;
+}
+
 export async function updateEvent(
   eventId: string,
   updates: {

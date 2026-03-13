@@ -7,12 +7,22 @@ interface GamePlayerProps {
   onClose: () => void;
   /** Pre-built navigation URL for the Start Match button. Omit if match isn't configured yet. */
   startUrl?: string | null;
+  /** Called when Start Match is clicked but the match isn't configured yet. */
+  onStartWithoutConfig?: () => void;
 }
 
-export function GamePlayer({ game, onClose, startUrl }: GamePlayerProps) {
+export function GamePlayer({ game, onClose, startUrl, onStartWithoutConfig }: GamePlayerProps) {
   const navigate = useNavigate();
 
   if (!game) return null;
+
+  function handleStartMatch() {
+    if (startUrl) {
+      navigate(startUrl);
+    } else {
+      onStartWithoutConfig ? onStartWithoutConfig() : onClose();
+    }
+  }
 
   return (
     <div
@@ -34,9 +44,9 @@ export function GamePlayer({ game, onClose, startUrl }: GamePlayerProps) {
         <span className="text-sm font-medium text-muted-foreground">{game.name}</span>
 
         <button
-          onClick={() => startUrl ? navigate(startUrl) : onClose()}
+          onClick={handleStartMatch}
           className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors bg-red-600 text-white hover:bg-red-700"
-          aria-label={startUrl ? "Start scouting match" : "Configure match first"}
+          aria-label={startUrl ? "Start scouting match" : "Configure match in Settings first"}
           title={startUrl ? undefined : "Set up a match in Settings first"}
         >
           <Play className="w-3.5 h-3.5 fill-current" />
