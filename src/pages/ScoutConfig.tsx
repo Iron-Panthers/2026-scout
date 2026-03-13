@@ -69,6 +69,9 @@ export default function ScoutConfig() {
   const [pendingChange, setPendingChange] = useState<{type: 'role' | 'matchType', value: string} | null>(null);
   const [showTeamNumberUnlockDialog, setShowTeamNumberUnlockDialog] = useState(false);
 
+  // Tab state
+  const [activeTab, setActiveTab] = useState("config");
+
   // Game shop state
   const [gameProfile, setGameProfile] = useState<GameProfile | null>(null);
   const [gameProfileLoading, setGameProfileLoading] = useState(false);
@@ -395,7 +398,7 @@ export default function ScoutConfig() {
       </Button>
       </div>
       <div className="flex w-full max-w-sm flex-col gap-6">
-        <Tabs defaultValue="config" className="">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="">
           <TabsContent value="config" className="">
             {/* Robot Image */}
             <div className="w-full h-40 bg-muted rounded-lg border-2 border-border overflow-hidden mb-2">
@@ -757,7 +760,15 @@ export default function ScoutConfig() {
       />
 
       {/* Full-screen game player */}
-      <GamePlayer game={activeGame} onClose={() => setActiveGame(null)} startUrl={startUrl} />
+      <GamePlayer
+        game={activeGame}
+        onClose={() => setActiveGame(null)}
+        startUrl={startUrl}
+        onStartWithoutConfig={() => {
+          setActiveGame(null);
+          setActiveTab("config");
+        }}
+      />
     </div>
   );
 }
