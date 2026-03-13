@@ -44,6 +44,17 @@ export const pitScoutingQuestions: PitScoutingQuestion[] = [
     placeholder: "e.g., 2.5",
     required: true,
   },
+  {
+    id: "shooting-method",
+    type: "checkbox",
+    label: "What is their shooting mechanism?",
+    options: [
+      "Turret",
+      "Drum shooter",
+      "Other/None"
+    ],
+    required: true,
+  },
 
   // Capabilities
   {
@@ -72,7 +83,8 @@ export const pitScoutingQuestions: PitScoutingQuestion[] = [
     required: true,
     options: [
       "Can go over bump",
-      "Can go over trench",
+      "Can go under trench",
+      "Cannot do either"
     ],
   },
 
