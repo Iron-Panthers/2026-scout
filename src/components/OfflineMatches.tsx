@@ -38,6 +38,8 @@ import {
   submitScoutingData,
   submitQualScoutingData,
   resolveMatchId,
+  migrateScoutingData,
+  CURRENT_SCHEMA_VERSION,
 } from "@/lib/scoutingSchema";
 import { supabase } from "@/lib/supabase";
 import { compressState } from "@/lib/stateCompression";
@@ -189,20 +191,29 @@ export default function OfflineMatches() {
         throw new Error("Could not resolve match ID");
       }
 
+      // Migrate schema if needed before submitting
+      const storedVersion = match.schemaVersion ?? 1;
+      const scoutingData =
+        storedVersion < CURRENT_SCHEMA_VERSION
+          ? migrateScoutingData(match.scoutingData, storedVersion, CURRENT_SCHEMA_VERSION)
+          : match.scoutingData;
+
       // Submit to database (qual ranking vs quant scouting)
       if (match.role === "qualRed" || match.role === "qualBlue") {
         await submitQualScoutingData(
           matchId,
           match.role,
-          match.scoutingData,
+          scoutingData,
           match.scouterId || user?.id
         );
       } else {
         await submitScoutingData(
           matchId,
           match.role,
-          match.scoutingData,
-          match.scouterId || user?.id
+          scoutingData,
+          match.scouterId || user?.id,
+          scoutingData.team_number ?? 0,
+          scoutingData.match_type ?? "qual"
         );
       }
 

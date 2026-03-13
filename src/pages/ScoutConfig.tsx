@@ -39,11 +39,13 @@ import { getGameProfile, purchaseGame } from "@/lib/gameProfiles";
 import { GameCard } from "@/components/GameCard";
 import { GamePurchaseDialog } from "@/components/GamePurchaseDialog";
 import { GamePlayer } from "@/components/GamePlayer";
+import { useSettings } from "@/contexts/SettingsContext";
 
 export default function ScoutConfig() {
   const { match_id: param_match_id } = useParams();
   const [search_params] = useSearchParams();
   const { user } = useAuth();
+  const { settings } = useSettings();
   const navigate = useNavigate();
 
   const [match_id, setMatchId] = useState(param_match_id || "");
@@ -98,12 +100,19 @@ export default function ScoutConfig() {
         setEventName(events[0].name || "");
         console.warn("No active event found, using first event");
       } else {
-        console.warn("No events found");
+        // No events available (likely offline) — fall back to cached setting
+        const cachedCode = settings["active-event-code"];
+        if (cachedCode) {
+          setEventCode(cachedCode);
+          console.warn("No events found, using cached event code from settings:", cachedCode);
+        } else {
+          console.warn("No events found");
+        }
       }
     };
 
     loadActiveEvent();
-  }, []);
+  }, [settings["active-event-code"]]);
 
   // Load match data if match_id is provided
   useEffect(() => {

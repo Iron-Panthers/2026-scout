@@ -10,9 +10,9 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { CalendarIcon, Save, PlusCircle } from "lucide-react";
+import { CalendarIcon, Save, PlusCircle, Star } from "lucide-react";
 import { format } from "date-fns";
-import { updateEvent } from "@/lib/matches";
+import { updateEvent, setActiveEvent } from "@/lib/matches";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import type { Event, Profile, MatchAssignment } from "@/types";
@@ -39,6 +39,7 @@ export function EventInformationTab({
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isAddingMatches, setIsAddingMatches] = useState(false);
+  const [isSettingActive, setIsSettingActive] = useState(false);
   const [editedEvent, setEditedEvent] = useState<Partial<Event>>({
     name: currentEvent?.name || "",
     event_code: currentEvent?.event_code || "",
@@ -66,6 +67,28 @@ export function EventInformationTab({
       onEventUpdate?.();
     }
     setIsSaving(false);
+  };
+
+  const handleSetActive = async () => {
+    if (!currentEvent || isAllEvents) return;
+
+    setIsSettingActive(true);
+    const success = await setActiveEvent(currentEvent.id);
+
+    if (success) {
+      toast({
+        title: "Active Event Set",
+        description: `${currentEvent.name} is now the active event.`,
+      });
+      onEventUpdate?.();
+    } else {
+      toast({
+        title: "Error",
+        description: "Failed to set active event.",
+        variant: "destructive",
+      });
+    }
+    setIsSettingActive(false);
   };
 
   const handleCancel = () => {
@@ -158,13 +181,32 @@ export function EventInformationTab({
                     </Button>
                   </>
                 ) : (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setIsEditing(true)}
-                  >
-                    Edit Event
-                  </Button>
+                  <>
+                    {!currentEvent?.is_active && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleSetActive}
+                        disabled={isSettingActive}
+                      >
+                        <Star className="h-4 w-4 mr-2" />
+                        {isSettingActive ? "Setting..." : "Set as Active"}
+                      </Button>
+                    )}
+                    {currentEvent?.is_active && (
+                      <span className="flex items-center gap-1 text-sm text-yellow-500 font-medium px-2">
+                        <Star className="h-4 w-4 fill-yellow-500" />
+                        Active Event
+                      </span>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsEditing(true)}
+                    >
+                      Edit Event
+                    </Button>
+                  </>
                 )}
               </div>
             )}
