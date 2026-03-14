@@ -97,6 +97,15 @@ export const pitScoutingQuestions: PitScoutingQuestion[] = [
     required: true,
   },
 
+  // Autonomous
+  {
+    id: "auto-paths",
+    type: "textarea",
+    label: "Describe your auto paths",
+    placeholder: "Describe the autonomous paths your robot can run...",
+    required: true,
+  },
+
   // Additional Notes
   {
     id: "additional-notes",
