@@ -353,35 +353,6 @@ export default function ManagerDashboard() {
       // Capture previous state for rollback
       const previousAssignment = currentMatch.assignments[selectedCell.role];
 
-      // 1. Update UI immediately (optimistic)
-      setMatches((prevMatches) =>
-        prevMatches.map((match) =>
-          match.matchNumber === selectedCell.matchNumber
-            ? {
-                ...match,
-                assignments: {
-                  ...match.assignments,
-                  [selectedCell.role]: {
-                    id: profile.id,
-                    name: profile.name || "Unknown",
-                    initials: (profile.name || "U")
-                      .split(" ")
-                      .map((n) => n[0])
-                      .join("")
-                      .toUpperCase()
-                      .slice(0, 2),
-                    avatar: profile.avatar_url || "",
-                  },
-                },
-              }
-            : match
-        )
-      );
-
-      // 2. Close dialog immediately (instant feedback)
-      setDialogOpen(false);
-      setSelectedCell(null);
-
       // 3. Fire database operation in background
       updateMatchAssignment(
         currentMatch.matchId,
@@ -432,6 +403,35 @@ export default function ManagerDashboard() {
             variant: "destructive",
           });
         });
+
+      // 2. Close dialog immediately (instant feedback)
+      setDialogOpen(false);
+      setSelectedCell(null);
+
+      // 1. Update UI immediately (optimistic)
+      setMatches((prevMatches) =>
+        prevMatches.map((match) =>
+          match.matchNumber === selectedCell.matchNumber
+            ? {
+                ...match,
+                assignments: {
+                  ...match.assignments,
+                  [selectedCell.role]: {
+                    id: profile.id,
+                    name: profile.name || "Unknown",
+                    initials: (profile.name || "U")
+                      .split(" ")
+                      .map((n) => n[0])
+                      .join("")
+                      .toUpperCase()
+                      .slice(0, 2),
+                    avatar: profile.avatar_url || "",
+                  },
+                },
+              }
+            : match
+        )
+      );
     },
     [selectedCell, matches, toast]
   );
