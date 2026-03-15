@@ -43,6 +43,9 @@ export interface QualScoutingData {
   match_number: number;
   match_type: "qual";
   role: string; // "qualRed" or "qualBlue"
+  team1: number; // First team in alliance (TBA position order)
+  team2: number; // Second team in alliance (TBA position order)
+  team3: number; // Third team in alliance (TBA position order)
   rankings: number[]; // team numbers ordered best→worst
   teamOptions: Record<string, { outpostFed: boolean; passed: boolean }>;
   comments: string;
@@ -151,6 +154,9 @@ export class ScoutingReducer<T extends Record<string, any> = ScoutingData> {
       event_code,
       match_number,
       match_type: "qual",
+      team1: teamNumbers[0] ?? 0,
+      team2: teamNumbers[1] ?? 0,
+      team3: teamNumbers[2] ?? 0,
       rankings: teamNumbers,
       teamOptions,
       comments: "",

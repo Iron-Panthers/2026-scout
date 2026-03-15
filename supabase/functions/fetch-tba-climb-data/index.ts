@@ -30,57 +30,12 @@ Deno.serve(async (_req) => {
   try {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Step 1: Get active events
-    const { data: activeEvents, error: eventsError } = await supabase
-      .from("events")
-      .select("id, event_code")
-      .eq("is_active", true);
-
-    if (eventsError) {
-      console.error("Events query error:", eventsError);
-      return new Response(JSON.stringify({ error: eventsError.message }), { status: 500 });
-    }
-
-    if (!activeEvents || activeEvents.length === 0) {
-      return new Response(JSON.stringify({ message: "No active events" }), { status: 200 });
-    }
-
-    const activeEventIds = activeEvents.map((e: any) => e.id);
-    // Build event_id → event_code lookup
-    const eventCodeMap = new Map<string, string>();
-    for (const e of activeEvents) {
-      if (e.event_code) eventCodeMap.set(e.id, e.event_code);
-    }
-
-    // Step 2: Get matches for active events
-    const { data: matches, error: matchesError } = await supabase
-      .from("matches")
-      .select("id, match_number, event_id")
-      .in("event_id", activeEventIds);
-
-    if (matchesError) {
-      console.error("Matches query error:", matchesError);
-      return new Response(JSON.stringify({ error: matchesError.message }), { status: 500 });
-    }
-
-    if (!matches || matches.length === 0) {
-      return new Response(JSON.stringify({ message: "No matches for active events" }), { status: 200 });
-    }
-
-    const matchIds = matches.map((m: any) => m.id);
-    // Build match_id → { match_number, event_id } lookup
-    const matchInfoMap = new Map<string, { matchNumber: number; eventId: string }>();
-    for (const m of matches) {
-      matchInfoMap.set(m.id, { matchNumber: m.match_number, eventId: m.event_id });
-    }
-
-    // Step 3: Get submissions missing tba_data, excluding qual roles
+    // Single query: get submissions missing tba_data with match/event info via joins
     const { data: submissions, error: subsError } = await supabase
       .from("scouting_submissions")
-      .select("id, role, match_id")
+      .select("id, role, match_id, matches!inner(match_number, event_id, events!inner(event_code))")
       .is("tba_data", null)
-      .in("role", ["red1", "red2", "red3", "blue1", "blue2", "blue3"])
-      .in("match_id", matchIds);
+      .in("role", ["red1", "red2", "red3", "blue1", "blue2", "blue3"]);
 
     if (subsError) {
       console.error("Submissions query error:", subsError);
@@ -91,26 +46,26 @@ Deno.serve(async (_req) => {
       return new Response(JSON.stringify({ message: "No submissions to update" }), { status: 200 });
     }
 
-    // Step 4: Group submissions by TBA match key
+    // Group submissions by TBA match key to minimize API calls
     const matchGroups = new Map<string, {
       submissions: Array<{ id: string; role: string }>;
     }>();
 
     for (const sub of submissions) {
-      const matchInfo = matchInfoMap.get(sub.match_id);
-      if (!matchInfo) continue;
+      const match = sub.matches as any;
+      const eventCode = match?.events?.event_code;
+      const matchNumber = match?.match_number;
 
-      const eventCode = eventCodeMap.get(matchInfo.eventId);
-      if (!eventCode) continue;
+      if (!eventCode || !matchNumber) continue;
 
-      const matchKey = `${eventCode}_qm${matchInfo.matchNumber}`;
+      const matchKey = `${eventCode}_qm${matchNumber}`;
       if (!matchGroups.has(matchKey)) {
         matchGroups.set(matchKey, { submissions: [] });
       }
       matchGroups.get(matchKey)!.submissions.push({ id: sub.id, role: sub.role });
     }
 
-    // Step 5: Fetch TBA data for each unique match and update submissions
+    // Fetch TBA data for each unique match and update submissions
     let updated = 0;
     let skipped = 0;
     let errors = 0;
