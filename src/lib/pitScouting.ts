@@ -25,7 +25,7 @@ export async function submitPitScouting(
   formData: PitScoutingFormData,
   photoUrl: string | null = null
 ): Promise<PitScoutingSubmission> {
-  formData.event_code = getEvents().find((e) => e.id === eventId)?.event_code || "UNKNOWN";
+  formData.event_code = (await getEvents()).find((e) => e.id === eventId)?.event_code || "UNKNOWN";
 
   const { data, error } = await supabase
     .from("pit_scouting_submissions")
