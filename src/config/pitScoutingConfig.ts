@@ -71,10 +71,10 @@ export const pitScoutingQuestions: PitScoutingQuestion[] = [
   },
   {
     id: "outpost-interaction",
-    type: "radio",
-    label: "Do they interact with outpost?",
+    type: "text",
+    label: "How comfortable are your drivers with feeding the outpost?",
     required: true,
-    options: ["Yes", "No"],
+    placeholder: "e.g., Very comfortable, Somewhat comfortable, Not comfortable",
   },
   {
     id: "terrain-capability",
