@@ -363,14 +363,14 @@ export default function Scouting() {
           {/* +5 */}
           <button
             className="flex-1 flex flex-col items-center justify-center
-              bg-amber-50 dark:bg-amber-950/30
-              hover:bg-amber-100 dark:hover:bg-amber-900/40
-              active:bg-amber-200 dark:active:bg-amber-900/50
+              bg-emerald-50 dark:bg-emerald-950/30
+              hover:bg-emerald-100 dark:hover:bg-emerald-900/40
+              active:bg-emerald-200 dark:active:bg-emerald-900/50
               transition-colors"
             onPointerDown={(e) => { e.preventDefault(); addShots(5); }}
           >
-            <div className="w-20 h-20 rounded-full border-2 border-amber-300/60 dark:border-amber-600/40 flex items-center justify-center bg-white/40 dark:bg-amber-950/20">
-              <span className="text-2xl font-bold text-amber-600 dark:text-amber-400 tabular-nums">+5</span>
+            <div className="w-20 h-20 rounded-full border-2 border-emerald-300/60 dark:border-emerald-600/40 flex items-center justify-center bg-white/40 dark:bg-emerald-950/20">
+              <span className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">+5</span>
             </div>
           </button>
         </div>
