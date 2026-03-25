@@ -162,8 +162,6 @@ export default function Scouting() {
 
   // ── Derived ─────────────────────────────────────────────────────────────
   const shotCount = state.shots.length;
-  const bumpCount = state.events.filter((e) => e.name === "bump").length;
-  const trenchCount = state.events.filter((e) => e.name === "trench").length;
   const headerLabel = `Team ${team_number || "?"} — Match ${match_number || "?"}`;
 
   const addShots = (count: number) => {
@@ -182,8 +180,6 @@ export default function Scouting() {
       const key = e.key.toLowerCase();
       if (key === (settings["kb-add5"] ?? "z")) { e.preventDefault(); addShots(5); }
       else if (key === (settings["kb-add20"] ?? "x")) { e.preventDefault(); addShots(20); }
-      else if (key === (settings["kb-bump"] ?? "b")) { e.preventDefault(); logEvent("bump"); }
-      else if (key === (settings["kb-trench"] ?? "t")) { e.preventDefault(); logEvent("trench"); }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
@@ -343,22 +339,22 @@ export default function Scouting() {
 
         {/* Col 1: Shot buttons + score badge */}
         <div className="relative flex flex-col flex-[5] border-r border-border">
-          {/* +20 */}
+          {/* +1 */}
           <button
             className="flex-1 flex flex-col items-center justify-center
               bg-amber-100 dark:bg-amber-950/50
               hover:bg-amber-200 dark:hover:bg-amber-900/60
               active:bg-amber-300 dark:active:bg-amber-900/70
               border-b border-border transition-colors"
-            onPointerDown={(e) => { e.preventDefault(); addShots(20); }}
+            onPointerDown={(e) => { e.preventDefault(); addShots(1); }}
           >
             <div className="w-20 h-20 rounded-full border-2 border-amber-400/70 dark:border-amber-500/50 flex items-center justify-center bg-amber-50/60 dark:bg-amber-900/30">
-              <span className="text-2xl font-bold text-amber-700 dark:text-amber-300 tabular-nums">+20</span>
+              <span className="text-2xl font-bold text-amber-700 dark:text-amber-300 tabular-nums">+1</span>
             </div>
           </button>
 
           {/* Score badge straddling the border */}
-          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10 pointer-events-none">
+          <div className="absolute left-full top-1/2 -translate-x-1/2 -translate-y-1/2 z-10 pointer-events-none">
             <div className="bg-card border-2 border-border rounded-full w-14 h-14 flex items-center justify-center shadow-md">
               <span className="text-2xl font-black tabular-nums text-foreground leading-none">{shotCount}</span>
             </div>
@@ -379,42 +375,20 @@ export default function Scouting() {
           </button>
         </div>
 
-        {/* Col 2: Bump + Trench — no right border in portrait (it's the last col) */}
+        {/* Col 2: +20 */}
         <div className="flex flex-col flex-[5] portrait:border-r-0 landscape:border-r landscape:border-border">
-          {/* Bump */}
+          {/* +20 */}
           <button
             className="relative flex-1 flex flex-col items-center justify-center overflow-hidden
               bg-sky-100 dark:bg-sky-950/50
               hover:bg-sky-200 dark:hover:bg-sky-900/60
               active:bg-sky-300 dark:active:bg-sky-900/70
               border-b border-border transition-colors"
-            onPointerDown={(e) => { e.preventDefault(); logEvent("bump"); }}
+            onPointerDown={(e) => { e.preventDefault(); addShots(20); }}
           >
-            <span
-              className="absolute font-black select-none leading-none text-sky-400/25 dark:text-sky-400/20 tabular-nums"
-              style={{ fontSize: "clamp(5rem, 20vw, 10rem)" }}
-            >
-              {bumpCount}
-            </span>
-            <span className="relative text-3xl font-semibold text-sky-800 dark:text-sky-200">Bump</span>
-          </button>
-
-          {/* Trench */}
-          <button
-            className="relative flex-1 flex flex-col items-center justify-center overflow-hidden
-              bg-emerald-100 dark:bg-emerald-950/50
-              hover:bg-emerald-200 dark:hover:bg-emerald-900/60
-              active:bg-emerald-300 dark:active:bg-emerald-900/70
-              transition-colors"
-            onPointerDown={(e) => { e.preventDefault(); logEvent("trench"); }}
-          >
-            <span
-              className="absolute font-black select-none leading-none text-emerald-400/25 dark:text-emerald-400/20 tabular-nums"
-              style={{ fontSize: "clamp(5rem, 20vw, 10rem)" }}
-            >
-              {trenchCount}
-            </span>
-            <span className="relative text-3xl font-semibold text-emerald-800 dark:text-emerald-200">Trench</span>
+            <div className="w-20 h-20 rounded-full border-2 border-sky-400/70 dark:border-sky-500/50 flex items-center justify-center bg-sky-50/60 dark:bg-sky-900/30">
+              <span className="text-2xl font-bold text-sky-700 dark:text-sky-300 tabular-nums">+20</span>
+            </div>
           </button>
         </div>
 
