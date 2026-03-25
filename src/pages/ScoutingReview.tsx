@@ -21,6 +21,7 @@ import {
 import { compressState, decompressState, decodeLegacyBase64Url } from "@/lib/stateCompression";
 import { supabase } from "@/lib/supabase";
 import { Checkbox } from "@/components/ui/checkbox";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@radix-ui/react-dropdown-menu";
 
 
 export default function ScoutingReview() {
@@ -81,6 +82,7 @@ export default function ScoutingReview() {
   const [qrCodeError, setQrCodeError] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [showManagerModal, setShowManagerModal] = useState(false);
+  const [robotProblems, setRobotProblems] = useState("");
 
   // Check if URL is too large for QR code (QR codes have limits around 2953 bytes for alphanumeric)
   useEffect(() => {
@@ -445,6 +447,8 @@ export default function ScoutingReview() {
   const handleSubmit = async () => {
     const matchId = resolvedMatchId || state?.matchId;
 
+    state.robot_problems = state.robot_problems === null ? null : robotProblems + "-" + state.robot_problems;
+
     console.log("Submitting with matchId:", matchId, "Type:", typeof matchId);
     console.log("Full state:", state);
 
@@ -550,36 +554,69 @@ export default function ScoutingReview() {
           </div>
           {state.role !== "qualRed" && state.role !== "qualBlue" && (
             <>
-              <div className="mb-6">
-                <label className="block uppercase text-xs font-medium tracking-wider text-muted-foreground m-5 mb-2 flex items-center">
+              <div className="flex items-center m-5 mb-2 tracking-wider">
+                <label className="uppercase text-xs font-medium text-muted-foreground mr-5">
                   Robot Problems?&nbsp;&nbsp;&nbsp;
-                  <Checkbox className="w-7 h-7 border-b-gray-500" checked={state.robot_problems !== null} onCheckedChange={(checked) =>
-                    handleFieldChange(
-                      "robot_problems",
-                      checked ? writtenTempState.problems || "" : null
-                    )
+                  <Checkbox className="w-7 h-7 border-b-gray-500" checked={state.robot_problems !== null} onCheckedChange={(checked) => {
+                      handleFieldChange(
+                        "robot_problems",
+                        checked ? writtenTempState.problems || "" : null
+                      );
+                      if (checked && !robotProblems) setRobotProblems("Lost Connection");
+                    }
                   }/>
                 </label>
                 {state.robot_problems !== null &&
-                  <>
-                    <textarea
-                      className={`w-full bg-background rounded-lg px-4 py-3 text-foreground text-base font-normal focus:outline-none transition disabled:opacity-60 ${
-                        state.robot_problems.trim().length < 5
-                          ? "border-2 border-destructive focus:ring-2 focus:ring-destructive/50"
-                          : "border border-border focus:ring-2 focus:ring-primary/80"
-                      }`}
-                      rows={2}
-                      value={state.robot_problems}
-                      onChange={(e) => { handleFieldChange("robot_problems", e.target.value); writtenTempState.problems = e.target.value; setWrittenTempState(writtenTempState); }}
-                      style={{ fontFamily: "inherit", resize: "vertical" }}
-                    />
-                    {state.robot_problems.trim().length < 5 && (
-                      <p className="text-xs text-destructive mt-1">Description required (min. 5 characters)</p>
-                    )}
-                  </>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild className="w-50">
+                      <p className="px-7 bg-accent-foreground/10 p-2 border-b rounded-lg">
+                        {robotProblems}
+                      </p>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent collisionPadding={{ bottom: 56 }} className="w-fit h-fit rounded-lg shadow-md border border-primary bg-popover">
+                      <DropdownMenuItem
+                        className="p-2 px-7 bg-accent-foreground/10 border-b rounded-lg"
+                        onClick={() => setRobotProblems("Lost Connection")}
+                      >
+                        Lost Connection
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="p-2 px-7 bg-accent-foreground/10 border-b rounded-lg"
+                        onClick={() => setRobotProblems("Heavy Browning")}
+                      >
+                        Heavy Browning
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="p-2 px-7 bg-accent-foreground/10 border-b rounded-lg"
+                        onClick={() => setRobotProblems("Something Broke")}
+                      >
+                        Something Broke
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="p-2 px-7 bg-accent-foreground/10 border-b rounded-lg"
+                        onClick={() => setRobotProblems("Not Present")}
+                      >
+                        Not Present
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 }
               </div>
-              <div className="mb-6">
+              { state.robot_problems !== null && robotProblems !== "Not Present" &&
+                  <textarea
+                    className={`w-full bg-background rounded-lg px-4 py-3 text-foreground text-base font-normal focus:outline-none transition disabled:opacity-60 ${
+                      state.robot_problems !== null && (state.robot_problems === "" || state.robot_problems.trim().length < 5)
+                        ? "border-2 border-destructive focus:ring-2 focus:ring-destructive/50"
+                        : "border border-border focus:ring-2 focus:ring-primary/80"
+                    }`}
+                    rows={3}
+                    value={state.robot_problems}
+                    onChange={(e) => handleFieldChange("robot_problems", e.target.value)}
+                    style={{ fontFamily: "inherit", resize: "vertical" }}
+                    placeholder="Please describe what went wrong..."
+                  />
+                }
+              <div className="mb-6 mt-8">
                 <label className="block uppercase text-xs font-medium tracking-wider text-muted-foreground m-5 mb-2 flex items-center">
                   Scouting Errors?&nbsp;&nbsp;&nbsp;
                   <Checkbox className="w-7 h-7 border-b-gray-500" checked={state.errors !== null} onCheckedChange={(checked) =>
