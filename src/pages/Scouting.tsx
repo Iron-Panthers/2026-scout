@@ -339,17 +339,17 @@ export default function Scouting() {
 
         {/* Col 1: Shot buttons + score badge */}
         <div className="relative flex flex-col flex-[5] border-r border-border">
-          {/* +20 */}
+          {/* +1 */}
           <button
             className="flex-1 flex flex-col items-center justify-center
               bg-amber-100 dark:bg-amber-950/50
               hover:bg-amber-200 dark:hover:bg-amber-900/60
               active:bg-amber-300 dark:active:bg-amber-900/70
               border-b border-border transition-colors"
-            onPointerDown={(e) => { e.preventDefault(); addShots(20); }}
+            onPointerDown={(e) => { e.preventDefault(); addShots(1); }}
           >
             <div className="w-20 h-20 rounded-full border-2 border-amber-400/70 dark:border-amber-500/50 flex items-center justify-center bg-amber-50/60 dark:bg-amber-900/30">
-              <span className="text-2xl font-bold text-amber-700 dark:text-amber-300 tabular-nums">+20</span>
+              <span className="text-2xl font-bold text-amber-700 dark:text-amber-300 tabular-nums">+1</span>
             </div>
           </button>
 
@@ -375,19 +375,19 @@ export default function Scouting() {
           </button>
         </div>
 
-        {/* Col 2: +1 */}
+        {/* Col 2: +20 */}
         <div className="flex flex-col flex-[5] portrait:border-r-0 landscape:border-r landscape:border-border">
-          {/* +1 */}
+          {/* +20 */}
           <button
             className="relative flex-1 flex flex-col items-center justify-center overflow-hidden
               bg-sky-100 dark:bg-sky-950/50
               hover:bg-sky-200 dark:hover:bg-sky-900/60
               active:bg-sky-300 dark:active:bg-sky-900/70
               border-b border-border transition-colors"
-            onPointerDown={(e) => { e.preventDefault(); addShots(1); }}
+            onPointerDown={(e) => { e.preventDefault(); addShots(20); }}
           >
             <div className="w-20 h-20 rounded-full border-2 border-sky-400/70 dark:border-sky-500/50 flex items-center justify-center bg-sky-50/60 dark:bg-sky-900/30">
-              <span className="text-2xl font-bold text-sky-700 dark:text-sky-300 tabular-nums">+1</span>
+              <span className="text-2xl font-bold text-sky-700 dark:text-sky-300 tabular-nums">+20</span>
             </div>
           </button>
         </div>
