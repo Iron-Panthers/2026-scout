@@ -51,8 +51,9 @@
     "title": "Keybinds",
     "description": "Keyboard shortcuts for quantitative scouting (click a key to rebind)",
     "fields": [
-      { "id": "kb-add5", "label": "+5 Shots", "type": "keybind", "defaultValue": "z" },
-      { "id": "kb-add20", "label": "+20 Shots", "type": "keybind", "defaultValue": "x" }
+      { "id": "kb-add1", "label": "+1 Shots", "type": "keybind", "defaultValue": "z" },
+      { "id": "kb-add5", "label": "+5 Shots", "type": "keybind", "defaultValue": "x" },
+      { "id": "kb-add20", "label": "+20 Shots", "type": "keybind", "defaultValue": "c" }
     ]
   }
 }

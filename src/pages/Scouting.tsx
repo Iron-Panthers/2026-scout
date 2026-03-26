@@ -178,8 +178,9 @@ export default function Scouting() {
       const { addShots, logEvent, settings, frame } = keybindActionsRef.current;
       if (frame !== 1) return;
       const key = e.key.toLowerCase();
-      if (key === (settings["kb-add5"] ?? "z")) { e.preventDefault(); addShots(5); }
-      else if (key === (settings["kb-add20"] ?? "x")) { e.preventDefault(); addShots(20); }
+      if (key === (settings["kb-add1"] ?? "z")) { e.preventDefault(); addShots(1); }
+      else if (key === (settings["kb-add5"] ?? "x")) { e.preventDefault(); addShots(5); }
+      else if (key === (settings["kb-add20"] ?? "c")) { e.preventDefault(); addShots(20); }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
