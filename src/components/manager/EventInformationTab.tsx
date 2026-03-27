@@ -10,12 +10,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { CalendarIcon, Save, PlusCircle, Star } from "lucide-react";
-import { format } from "date-fns";
+import { CalendarIcon, Save, PlusCircle, Star, MinusCircle } from "lucide-react";
+import { format, set } from "date-fns";
 import { updateEvent, setActiveEvent } from "@/lib/matches";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import type { Event, Profile, MatchAssignment } from "@/types";
+import { ConfirmationDialog } from "./ConfirmationDialog";
 
 interface EventInformationTabProps {
   selectedEvent: string;
@@ -36,9 +37,11 @@ export function EventInformationTab({
   const isAllEvents = selectedEvent === "all";
   const { toast } = useToast();
 
+  const [subtractMatchDialog, setSubtractMatchDialog] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [isAddingMatches, setIsAddingMatches] = useState(false);
+  const [isAddingMatches, setIsAddingMatches] = useState(0);
+  const [isSubtractingMatches, setIsSubtractingMatches] = useState(false);
   const [isSettingActive, setIsSettingActive] = useState(false);
   const [editedEvent, setEditedEvent] = useState<Partial<Event>>({
     name: currentEvent?.name || "",
@@ -103,10 +106,15 @@ export function EventInformationTab({
     setIsEditing(false);
   };
 
-  const handleAddMatches = async () => {
+  const handleAddMatches = async (numMatches) => {
     if (!currentEvent || isAllEvents) return;
 
-    setIsAddingMatches(true);
+    if (numMatches > 0) {
+      setIsAddingMatches(numMatches);
+    }
+    else {
+      setIsSubtractingMatches(true);
+    }
 
     try {
       // Get the highest match number for this event
@@ -123,22 +131,47 @@ export function EventInformationTab({
       const eventCode = currentEvent.event_code || currentEvent.name.replace(/\s+/g, "").toLowerCase();
 
       // Create 10 new matches
-      const newMatches = Array.from({ length: 10 }, (_, i) => ({
-        name: `${eventCode}-Q${highestMatchNumber + i + 1}`,
-        match_number: highestMatchNumber + i + 1,
-        event_id: currentEvent.id,
-      }));
+      if (numMatches > 0) {
+        const newMatches = Array.from({ length: numMatches }, (_, i) => ({
+          name: `${eventCode}-Q${highestMatchNumber + i + 1}`,
+          match_number: highestMatchNumber + i + 1,
+          event_id: currentEvent.id,
+        }));
 
-      const { error: insertError } = await supabase
+        const { error: insertError } = await supabase
         .from("matches")
         .insert(newMatches);
 
-      if (insertError) throw insertError;
+        if (insertError) throw insertError;
 
-      toast({
-        title: "Matches Added",
-        description: `Added matches ${highestMatchNumber + 1} through ${highestMatchNumber + 10}`,
-      });
+        if (numMatches === 1) {
+          toast({
+            title: "Match Added",
+            description: `Added match ${highestMatchNumber + 1}`,
+          });
+        }
+        else {
+          toast({
+            title: "Matches Added",
+            description: `Added matches ${highestMatchNumber + 1} through ${highestMatchNumber + numMatches}`,
+          });
+        }
+      }
+      else {
+        // Delete the match with the highest match number
+        const { error: deleteError } = await supabase
+          .from("matches")
+          .delete()
+          .eq("event_id", currentEvent.id)
+          .eq("match_number", highestMatchNumber);
+
+        if (deleteError) throw deleteError;
+
+        toast({
+          title: "Matche Removed",
+          description: `Removed match ${highestMatchNumber}`,
+        });
+      }
 
       onEventUpdate?.();
     } catch (error: any) {
@@ -149,7 +182,8 @@ export function EventInformationTab({
         variant: "destructive",
       });
     } finally {
-      setIsAddingMatches(false);
+      setIsAddingMatches(0);
+      setIsSubtractingMatches(false);
     }
   };
 
@@ -291,16 +325,48 @@ export function EventInformationTab({
                 <div className="flex items-center gap-2 mt-1">
                   <p className="text-lg font-semibold">{matches.length}</p>
                   {!isAllEvents && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleAddMatches}
-                      disabled={isAddingMatches}
-                      className="h-7"
-                    >
-                      <PlusCircle className="h-3 w-3 mr-1" />
-                      {isAddingMatches ? "Adding..." : "+10"}
-                    </Button>
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => { handleAddMatches(10) }}
+                        disabled={isAddingMatches == 10}
+                        className="h-7"
+                      >
+                        <PlusCircle className="h-3 w-3 mr-1" />
+                        {isAddingMatches == 10 ? "Adding..." : "+10"}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => { handleAddMatches(5) }}
+                        disabled={isAddingMatches == 5}
+                        className="h-7"
+                      >
+                        <PlusCircle className="h-3 w-3 mr-1" />
+                        {isAddingMatches == 5 ? "Adding..." : "+5"}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => { handleAddMatches(1) }}
+                        disabled={isAddingMatches == 1}
+                        className="h-7"
+                      >
+                        <PlusCircle className="h-3 w-3 mr-1" />
+                        {isAddingMatches == 1 ? "Adding..." : "+1"}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-red-500"
+                        onClick={() => { setSubtractMatchDialog(true) }}
+                        disabled={isSubtractingMatches}
+                      >
+                        <MinusCircle className="h-3 w-3 mr-1" />
+                        {isAddingMatches ? "Subtracting..." : "-1"}
+                      </Button>
+                    </>
                   )}
                 </div>
               </div>
@@ -434,7 +500,12 @@ export function EventInformationTab({
           </div>
         </CardContent>
       </Card>
-
+      <ConfirmationDialog 
+        open={subtractMatchDialog}
+        prompt="remove the last match of the dataset. If there is any data, it could be lost to the void"
+        onOpenChange={() => { setSubtractMatchDialog(false) }}
+        onRespond={(confirmed) => { if (confirmed) handleAddMatches(-1) }}>
+      </ConfirmationDialog>
       <Card>
         <CardHeader>
           <CardTitle>
