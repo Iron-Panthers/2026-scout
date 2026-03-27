@@ -406,7 +406,7 @@ export default function ManagerDashboard() {
 
       // 2. Close dialog immediately (instant feedback)
       setDialogOpen(false);
-      setSelefctedCell(null);
+      setSelectedCell(null);
 
       // 1. Update UI immediately (optimistic)
       setMatches((prevMatches) =>
