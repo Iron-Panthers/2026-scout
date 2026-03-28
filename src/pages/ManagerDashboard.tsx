@@ -329,9 +329,9 @@ export default function ManagerDashboard() {
         (submissions || []).map((s) => [`${s.match_id}:${s.role}`, s.scouter_id])
       );
 
-      qualSubmissions?.forEach(s => {
-        scoutersMap.add(`${s.match_id}:${s.role}`, s.scouter_id);
-      });
+      // qualSubmissions?.forEach(s => {
+      //   scoutersMap.(`${s.match_id}:${s.role}`, s.scouter_id);
+      // });
 
       setCompletedSubmissions(completedSet);
       setActualScouters(scoutersMap);
