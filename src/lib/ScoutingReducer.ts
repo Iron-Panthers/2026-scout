@@ -48,7 +48,9 @@ export interface QualScoutingData {
   team3: number; // Third team in alliance (TBA position order)
   rankings: number[]; // team numbers ordered best→worst
   teamOptions: Record<string, { outpostFed: boolean; passed: boolean }>;
-  comments: string;
+  commentsTeam1: string;
+  commentsTeam2: string;
+  commentsTeam3: string;
 }
 
 /**
