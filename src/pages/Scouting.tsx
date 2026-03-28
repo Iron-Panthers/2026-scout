@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { compressState } from "@/lib/stateCompression";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Undo2, ArrowRight, ArrowLeft, Check, MoreVertical, RotateCcw } from "lucide-react";
+import { Undo2, ArrowRight, ArrowLeft, Check, MoreVertical, RotateCcw, Trash } from "lucide-react";
 import { useScoutingReducer } from "@/lib/useScoutingReducer";
 import { useMatchTimer } from "@/lib/useMatchTimer";
 import { useSettings } from "@/contexts/SettingsContext";
@@ -18,6 +18,7 @@ export default function Scouting() {
   const match_number = parseInt(searchParams.get("match_number") || "0");
   const team_number = parseInt(searchParams.get("team_number") || "0");
   const match_type = searchParams.get("match_type") || "qual";
+  const canDelete = useState(true);
 
   const { state, set, logEvent, undo, canUndo } = useScoutingReducer(
     match_id || "",
@@ -206,6 +207,20 @@ export default function Scouting() {
     >
       <Undo2 className="w-6 h-6" />
       <span className="text-xs font-medium">Undo</span>
+    </button>
+  );
+
+  const deleteBtn = (extraClass = "") => (
+    <button
+      className={`flex flex-col items-center justify-center gap-1 transition-colors
+        ${primaryPos
+          ? "bg-red-100 dark:bg-red-950/50 hover:bg-red-200 dark:hover:bg-red-900/60 active:bg-red-300 dark:active:bg-red-900/70 text-red-700 dark:text-red-300"
+          : "bg-muted/40 text-muted-foreground/40 pointer-events-none"
+        } ${extraClass}`}
+      onPointerDown={(e) => { e.preventDefault(); if (primaryPos) { set("primaryShotPosition", null); set("secondaryShotPosition", null); } }}
+    >
+      <Trash className="w-6 h-6" />
+      <span className="text-xs font-medium">Reset Pins</span>
     </button>
   );
 
@@ -466,6 +481,7 @@ export default function Scouting() {
         {/* Sidebar: Back | Undo | Finish — landscape only */}
         <div className="portrait:hidden landscape:flex w-24 flex-col border-l border-border shrink-0">
           {backBtn("flex-1 border-b border-border")}
+          {deleteBtn("flex-1 border-b border-border")}
           {undoBtn("flex-1 border-b border-border")}
           {finishBtn("flex-1")}
         </div>
@@ -474,6 +490,7 @@ export default function Scouting() {
       {/* Bottom bar: Back | Undo | Finish — portrait only */}
       <div className="portrait:flex landscape:hidden h-20 shrink-0 border-t border-border">
         {backBtn("flex-1 border-r border-border")}
+        {deleteBtn("flex-1 border-b border-border")}
         {undoBtn("flex-1 border-r border-border")}
         {finishBtn("flex-1")}
       </div>
