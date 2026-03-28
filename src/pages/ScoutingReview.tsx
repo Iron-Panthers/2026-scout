@@ -754,7 +754,7 @@ export default function ScoutingReview() {
             className="h-10 px-6 rounded-lg font-medium border border-border text-foreground hover:bg-surface-elevated hover:border-primary transition"
             onClick={() => navigate("/dashboard")}
           >
-            Back to Scouting
+            Back to Dashboard
           </Button>
           <Button
             variant="default"
