@@ -39,8 +39,8 @@ interface SubmissionWithDetails {
   match_id: string;
   role: string;
   scouting_data: Record<string, unknown>;
-  schema_version: number;
-  team_num: number;
+  schema_version: number | string;
+  team_num: number | string;
   match_type: string;
   time: string;
   scouter_id?: string;
@@ -133,8 +133,22 @@ export function ScoutingDataTab({ selectedEvent, events: _events }: ScoutingData
           .in("match_id", matchIds)
           .order("created_at", { ascending: false });
 
+        const { data: qualData, error: qualError } = await supabase
+          .from("qual_scouting_submissions")
+          .select("*, matches(match_number, event_id), profiles(name)")
+          .in("match_id", matchIds)
+          .order("created_at", { ascending: false });
+
+        var qualSubmissions = [];
+        qualData?.forEach(d => {
+          const sub = d as SubmissionWithDetails;
+          sub.team_num = d.scouting_data.team1 + ", " + d.scouting_data.team2 + ", " + d.scouting_data.team3;
+          sub.schema_version = "Qual" + d.schema_version;
+          qualSubmissions.push(sub);
+        });
+
         if (error) throw error;
-        setSubmissions((data as SubmissionWithDetails[]) || []);
+        setSubmissions((data as SubmissionWithDetails[]).concat(qualSubmissions) || []);
       } else {
         const { data, error } = await supabase
           .from("scouting_submissions")
@@ -239,6 +253,13 @@ export function ScoutingDataTab({ selectedEvent, events: _events }: ScoutingData
   // Edit handlers
   const handleEditClick = (submission: SubmissionWithDetails) => {
     setEditTarget(submission);
+
+    if (submission.role.includes("qual")) { 
+      const og = submission.scouting_data.comments !== null;
+      const newComments = submission.scouting_data.commentsTeam1 !== null;
+      if (og && newComments) delete submission.scouting_data.comments
+      if (submission.scouting_data.robot_problems) delete submission.scouting_data.robot_problems
+    }
     setEditData(submission.scouting_data);
     setEditConfirming(false);
   };
