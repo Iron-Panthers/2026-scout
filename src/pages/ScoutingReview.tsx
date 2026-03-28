@@ -207,7 +207,7 @@ export default function ScoutingReview() {
     const commentsTooShort = scoutingType === "qual" ? (!state?.commentsTeam1 || state?.commentsTeam1.trim().length < 5 || 
       !state?.commentsTeam2 || state?.commentsTeam2.trim().length < 5 ||
       !state?.commentsTeam3 || state?.commentsTeam3.trim().length < 5) : (!state?.comments || state.comments.trim().length < 5);
-    const robotProblemsTooShort = state?.robot_problems !== null && state?.robot_problems !== undefined && state.robot_problems.trim().length < 5;
+    const robotProblemsTooShort = state?.robot_problems !== null && robotProblems !== "Not Present" && state?.robot_problems !== undefined && state.robot_problems.trim().length < 5;
     const errorsTooShort = state?.errors !== null && state?.errors !== undefined && state.errors.trim().length < 5;
     const defenseTooShort = state?.defenseDescription !== null && state?.defenseDescription !== undefined && state.defenseDescription.trim().length < 5;
 
