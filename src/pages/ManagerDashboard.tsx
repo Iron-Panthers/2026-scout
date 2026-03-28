@@ -308,6 +308,11 @@ export default function ManagerDashboard() {
         .select("match_id, role, scouter_id")
         .in("match_id", matchIds);
 
+      const { data: qualSubmissions, qualError } = await supabase
+        .from("qual_scouting_submissions")
+        .select("match_id, role, scouter_id")
+        .in("match_id", matchIds);
+
       if (error) throw error;
 
       // Create Set of "matchId:role" strings for quick lookup
@@ -315,10 +320,18 @@ export default function ManagerDashboard() {
         (submissions || []).map((s) => `${s.match_id}:${s.role}`)
       );
 
+      qualSubmissions?.forEach(sub => {
+        completedSet.add(`${sub.match_id}:${sub.role}`);
+      });
+
       // Create Map of "matchId:role" -> scouter_id
       const scoutersMap = new Map(
         (submissions || []).map((s) => [`${s.match_id}:${s.role}`, s.scouter_id])
       );
+
+      qualSubmissions?.forEach(s => {
+        scoutersMap.add(`${s.match_id}:${s.role}`, s.scouter_id);
+      });
 
       setCompletedSubmissions(completedSet);
       setActualScouters(scoutersMap);
