@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -38,6 +38,8 @@ export function EventInformationTab({
   const { toast } = useToast();
 
   const [subtractMatchDialog, setSubtractMatchDialog] = useState(false);
+  const [deleteEventDialog1, setDeleteEventDialog1] = useState(false);
+  const [deleteEventDialog2, setDeleteEventDialog2] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isAddingMatches, setIsAddingMatches] = useState(0);
@@ -105,6 +107,34 @@ export function EventInformationTab({
     });
     setIsEditing(false);
   };
+
+  const handleDeleteEvent = async () => {
+    try {
+      const { error } = await supabase
+        .from("events")
+        .delete()
+        .eq("event_code", editedEvent.event_code);
+
+      if (error) throw error;
+
+      toast({
+        title: "Deleted",
+        description: `Event ${editedEvent.name} (${editedEvent.event_code}) has been permanently deleted.`,
+      });
+
+      handleCancel();
+    } catch (error) {
+      console.error("Error deleting submission:", error);
+      toast({
+        title: "Delete Failed",
+        description: "Could not delete this event",
+        variant: "destructive",
+      });
+    }
+    // } finally {
+    //   setIsDeleting(false);
+    // }
+  }
 
   const handleAddMatches = async (numMatches) => {
     if (!currentEvent || isAllEvents) return;
@@ -187,6 +217,10 @@ export function EventInformationTab({
     }
   };
 
+  useEffect(() => {
+    setIsEditing(false);
+  }, [ selectedEvent ])
+
   return (
     <div className="space-y-6">
       <Card>
@@ -236,7 +270,7 @@ export function EventInformationTab({
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setIsEditing(true)}
+                      onClick={() => { setEditedEvent(currentEvent); setIsEditing(true); } }
                     >
                       Edit Event
                     </Button>
@@ -464,47 +498,88 @@ export function EventInformationTab({
               </div>
             </div>
 
-            <div>
-              <Label className="text-sm font-medium text-muted-foreground">
-                Scouting Map URL
-              </Label>
-              {isEditing ? (
-                <Input
-                  value={editedEvent.scouting_map_url || ""}
-                  onChange={(e) =>
-                    setEditedEvent({
-                      ...editedEvent,
-                      scouting_map_url: e.target.value,
-                    })
-                  }
-                  placeholder="https://example.com/map.png"
-                  className="mt-1"
-                />
-              ) : (
-                <p className="text-lg">
-                  {currentEvent?.scouting_map_url ? (
-                    <a
-                      href={currentEvent.scouting_map_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-500 hover:underline"
-                    >
-                      View Map
-                    </a>
-                  ) : (
-                    "Not set"
-                  )}
-                </p>
-              )}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">
+                  Scouting Map URL
+                </Label>
+                {isEditing ? (
+                  <Input
+                    value={editedEvent.scouting_map_url || ""}
+                    onChange={(e) =>
+                      setEditedEvent({
+                        ...editedEvent,
+                        scouting_map_url: e.target.value,
+                      })
+                    }
+                    placeholder="https://example.com/map.png"
+                    className="mt-1"
+                  />
+                ) : (
+                  <p className="text-lg">
+                    {currentEvent?.scouting_map_url ? (
+                      <a
+                        href={currentEvent.scouting_map_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-500 hover:underline"
+                      >
+                        View Map
+                      </a>
+                    ) : (
+                      "Not set"
+                    )}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">
+                  Delete Event
+                </Label>
+                {isEditing ? (
+                  <Button
+                    className="mt-1 w-40"
+                    size="default"
+                    onClick={() => setDeleteEventDialog1(true)}
+                  >
+                    Delete Event
+                  </Button>
+                ) : (
+                  <Button
+                    className="mt-1 w-40"
+                    size="default"
+                    variant={ "outline" }
+                    disabled={true}
+                  >
+                    Delete Event
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         </CardContent>
       </Card>
       <ConfirmationDialog 
+        title="Are you Sure?"
         open={subtractMatchDialog}
-        prompt="remove the last match of the dataset. If there is any data, it could be lost to the void"
+        prompt="You are about to remove the last match of the dataset. If there is any data, it could be lost to the void!"
         onOpenChange={() => { setSubtractMatchDialog(false) }}
         onRespond={(confirmed) => { if (confirmed) handleAddMatches(-1) }}>
+      </ConfirmationDialog>
+      <ConfirmationDialog 
+        title="Are you Sure?"
+        open={deleteEventDialog1}
+        prompt={`You are about to delete ${editedEvent.name} (${editedEvent.event_code}). If there is any data, it could be lost to the void!`}
+        onOpenChange={() => { setDeleteEventDialog1(false) }}
+        onRespond={(confirmed) => { if (confirmed) setDeleteEventDialog2(true) }}>
+      </ConfirmationDialog>
+      <ConfirmationDialog 
+        title="Are you REALLLY Sure?"
+        open={deleteEventDialog2}
+        prompt="This act is very dangerous! I hope you know what you're doing."
+        onOpenChange={() => { setDeleteEventDialog2(false) }}
+        onRespond={(confirmed) => { if (confirmed) handleDeleteEvent() }}>
       </ConfirmationDialog>
       <Card>
         <CardHeader>

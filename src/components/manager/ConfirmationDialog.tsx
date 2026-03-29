@@ -21,6 +21,7 @@ interface ConfirmationDialogProps {
 
 export function ConfirmationDialog({
   open,
+  title,
   prompt,
   onOpenChange,
   onRespond,
@@ -29,9 +30,9 @@ export function ConfirmationDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Are you Sure?</DialogTitle>
+          <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
-            You are about to {prompt}.
+            {prompt}
           </DialogDescription>
         </DialogHeader>
 
