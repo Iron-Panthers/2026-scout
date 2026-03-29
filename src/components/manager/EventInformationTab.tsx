@@ -10,18 +10,21 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { CalendarIcon, Save, PlusCircle, Star, MinusCircle } from "lucide-react";
+import { CalendarIcon, Save, PlusCircle, Star, MinusCircle, Trash2 } from "lucide-react";
 import { format, set } from "date-fns";
 import { updateEvent, setActiveEvent } from "@/lib/matches";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import type { Event, Profile, MatchAssignment } from "@/types";
 import { ConfirmationDialog } from "./ConfirmationDialog";
+import UserProfileMenu from "../UserProfileMenu";
+import { AddScoutsDialog } from "./AddScoutsDialog";
 
 interface EventInformationTabProps {
   selectedEvent: string;
   events: Event[];
   matches: MatchAssignment[];
+  allScouts: Profile[];
   availableScouts: Profile[];
   onEventUpdate?: () => void;
 }
@@ -30,6 +33,7 @@ export function EventInformationTab({
   selectedEvent,
   events,
   matches,
+  allScouts,
   availableScouts,
   onEventUpdate,
 }: EventInformationTabProps) {
@@ -40,6 +44,8 @@ export function EventInformationTab({
   const [subtractMatchDialog, setSubtractMatchDialog] = useState(false);
   const [deleteEventDialog1, setDeleteEventDialog1] = useState(false);
   const [deleteEventDialog2, setDeleteEventDialog2] = useState(false);
+  const [addScouterDialog, setAddScouterDialog] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isAddingMatches, setIsAddingMatches] = useState(0);
@@ -216,6 +222,17 @@ export function EventInformationTab({
       setIsSubtractingMatches(false);
     }
   };
+
+  const handleDeleteClick = async (profile) => {
+    const event = events.find(e => e.id === selectedEvent);
+    event.users = event.users.filter(u => u !== profile.id);
+    setIsLoading(true);
+    await updateEvent(event?.id, { users: event.users });
+    availableScouts = event?.users;
+
+    onEventUpdate();
+    setIsLoading(false);
+  }
 
   useEffect(() => {
     setIsEditing(false);
@@ -581,6 +598,14 @@ export function EventInformationTab({
         onOpenChange={() => { setDeleteEventDialog2(false) }}
         onRespond={(confirmed) => { if (confirmed) handleDeleteEvent() }}>
       </ConfirmationDialog>
+      <AddScoutsDialog
+        open={addScouterDialog}
+        onOpenChange={() => setAddScouterDialog(false)}
+        availableScouts={availableScouts}
+        allScouts={allScouts}
+        event={events.find(e => e.id === selectedEvent)}
+        onSave={(users) => { console.log(users); events.find(e => e.id === selectedEvent).users = users; availableScouts = users; onEventUpdate() }}
+      ></AddScoutsDialog>
       <Card>
         <CardHeader>
           <CardTitle>
@@ -626,13 +651,18 @@ export function EventInformationTab({
           <CardTitle>Scout List</CardTitle>
         </CardHeader>
         <CardContent>
+        <Button className="m-2 ml-0 mt-0 w-50" onClick={() => setAddScouterDialog(true)}>
+          <PlusCircle className="h-4 w-4 mr-2" />
+          Add Scouters
+        </Button>
+
           <div className="space-y-2">
             {availableScouts.length === 0 ? (
               <p className="text-muted-foreground text-center py-8">
                 No scouts available
               </p>
             ) : (
-              availableScouts.map((profile) => {
+              availableScouts.sort((a,b) => a.name?.localeCompare(b.name)).map((profile) => {
                 const initials = (profile.name || "U")
                   .split(" ")
                   .map((n) => n[0])
@@ -644,17 +674,27 @@ export function EventInformationTab({
                     key={profile.id}
                     className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors"
                   >
-                    <Avatar className="h-10 w-10">
-                      <AvatarFallback className="text-sm bg-primary/20 text-primary">
-                        {initials}
-                      </AvatarFallback>
-                    </Avatar>
+                    <UserProfileMenu
+                      userName={profile.name}
+                      userInitials={initials}
+                      avatarUrl={profile.avatar_url}
+                    />
                     <div className="flex-1">
                       <p className="font-medium">{profile.name || "Unknown"}</p>
                       <p className="text-sm text-muted-foreground">
                         {profile.role} {profile.is_manager && "• Manager"}
                       </p>
                     </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDeleteClick(profile)}
+                      className="h-8 w-8 p-0 mr-5 text-muted-foreground hover:text-destructive"
+                      title="Delete submission"
+                      disabled={isLoading}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 );
               })
