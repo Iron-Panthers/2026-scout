@@ -481,17 +481,17 @@ export default function Scouting() {
         {/* Sidebar: Back | Undo | Finish — landscape only */}
         <div className="portrait:hidden landscape:flex w-24 flex-col border-l border-border shrink-0">
           {backBtn("flex-1 border-b border-border")}
-          {deleteBtn("flex-1 border-b border-border")}
-          {undoBtn("flex-1 border-b border-border")}
           {finishBtn("flex-1")}
+          {undoBtn("flex-1 border-b border-border")}
+          {deleteBtn("flex-1 border-b border-border")}
         </div>
       </div>
 
       {/* Bottom bar: Back | Undo | Finish — portrait only */}
       <div className="portrait:flex landscape:hidden h-20 shrink-0 border-t border-border">
         {backBtn("flex-1 border-r border-border")}
-        {deleteBtn("flex-1 border-b border-border")}
         {undoBtn("flex-1 border-r border-border")}
+        {deleteBtn("flex-1 border-b border-border")}
         {finishBtn("flex-1")}
       </div>
     </div>
