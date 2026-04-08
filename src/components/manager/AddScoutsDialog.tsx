@@ -70,10 +70,10 @@ export function AddScoutsDialog({
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            Assign Scouters to {event.name}
+            Assign Scouters to {event?.name}
           </DialogTitle>
           <DialogDescription>
-            Add more scouters to the roster for the event: {event.name}.
+            Add more scouters to the roster for the event: {event?.name}.
           </DialogDescription>
         </DialogHeader>
 
