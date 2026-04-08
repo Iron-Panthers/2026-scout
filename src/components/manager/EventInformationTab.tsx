@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -10,17 +10,21 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { CalendarIcon, Save, PlusCircle, Star } from "lucide-react";
-import { format } from "date-fns";
+import { CalendarIcon, Save, PlusCircle, Star, MinusCircle, Trash2 } from "lucide-react";
+import { format, set } from "date-fns";
 import { updateEvent, setActiveEvent } from "@/lib/matches";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import type { Event, Profile, MatchAssignment } from "@/types";
+import { ConfirmationDialog } from "./ConfirmationDialog";
+import UserProfileMenu from "../UserProfileMenu";
+import { AddScoutsDialog } from "./AddScoutsDialog";
 
 interface EventInformationTabProps {
   selectedEvent: string;
   events: Event[];
   matches: MatchAssignment[];
+  allScouts: Profile[];
   availableScouts: Profile[];
   onEventUpdate?: () => void;
 }
@@ -29,6 +33,7 @@ export function EventInformationTab({
   selectedEvent,
   events,
   matches,
+  allScouts,
   availableScouts,
   onEventUpdate,
 }: EventInformationTabProps) {
@@ -36,9 +41,15 @@ export function EventInformationTab({
   const isAllEvents = selectedEvent === "all";
   const { toast } = useToast();
 
+  const [subtractMatchDialog, setSubtractMatchDialog] = useState(false);
+  const [deleteEventDialog1, setDeleteEventDialog1] = useState(false);
+  const [deleteEventDialog2, setDeleteEventDialog2] = useState(false);
+  const [addScouterDialog, setAddScouterDialog] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [isAddingMatches, setIsAddingMatches] = useState(false);
+  const [isAddingMatches, setIsAddingMatches] = useState(0);
+  const [isSubtractingMatches, setIsSubtractingMatches] = useState(false);
   const [isSettingActive, setIsSettingActive] = useState(false);
   const [editedEvent, setEditedEvent] = useState<Partial<Event>>({
     name: currentEvent?.name || "",
@@ -103,10 +114,43 @@ export function EventInformationTab({
     setIsEditing(false);
   };
 
-  const handleAddMatches = async () => {
+  const handleDeleteEvent = async () => {
+    try {
+      const { error } = await supabase
+        .from("events")
+        .delete()
+        .eq("event_code", editedEvent.event_code);
+
+      if (error) throw error;
+
+      toast({
+        title: "Deleted",
+        description: `Event ${editedEvent.name} (${editedEvent.event_code}) has been permanently deleted.`,
+      });
+
+      handleCancel();
+    } catch (error) {
+      console.error("Error deleting submission:", error);
+      toast({
+        title: "Delete Failed",
+        description: "Could not delete this event",
+        variant: "destructive",
+      });
+    }
+    // } finally {
+    //   setIsDeleting(false);
+    // }
+  }
+
+  const handleAddMatches = async (numMatches) => {
     if (!currentEvent || isAllEvents) return;
 
-    setIsAddingMatches(true);
+    if (numMatches > 0) {
+      setIsAddingMatches(numMatches);
+    }
+    else {
+      setIsSubtractingMatches(true);
+    }
 
     try {
       // Get the highest match number for this event
@@ -123,22 +167,47 @@ export function EventInformationTab({
       const eventCode = currentEvent.event_code || currentEvent.name.replace(/\s+/g, "").toLowerCase();
 
       // Create 10 new matches
-      const newMatches = Array.from({ length: 10 }, (_, i) => ({
-        name: `${eventCode}-Q${highestMatchNumber + i + 1}`,
-        match_number: highestMatchNumber + i + 1,
-        event_id: currentEvent.id,
-      }));
+      if (numMatches > 0) {
+        const newMatches = Array.from({ length: numMatches }, (_, i) => ({
+          name: `${eventCode}-Q${highestMatchNumber + i + 1}`,
+          match_number: highestMatchNumber + i + 1,
+          event_id: currentEvent.id,
+        }));
 
-      const { error: insertError } = await supabase
+        const { error: insertError } = await supabase
         .from("matches")
         .insert(newMatches);
 
-      if (insertError) throw insertError;
+        if (insertError) throw insertError;
 
-      toast({
-        title: "Matches Added",
-        description: `Added matches ${highestMatchNumber + 1} through ${highestMatchNumber + 10}`,
-      });
+        if (numMatches === 1) {
+          toast({
+            title: "Match Added",
+            description: `Added match ${highestMatchNumber + 1}`,
+          });
+        }
+        else {
+          toast({
+            title: "Matches Added",
+            description: `Added matches ${highestMatchNumber + 1} through ${highestMatchNumber + numMatches}`,
+          });
+        }
+      }
+      else {
+        // Delete the match with the highest match number
+        const { error: deleteError } = await supabase
+          .from("matches")
+          .delete()
+          .eq("event_id", currentEvent.id)
+          .eq("match_number", highestMatchNumber);
+
+        if (deleteError) throw deleteError;
+
+        toast({
+          title: "Matche Removed",
+          description: `Removed match ${highestMatchNumber}`,
+        });
+      }
 
       onEventUpdate?.();
     } catch (error: any) {
@@ -149,9 +218,25 @@ export function EventInformationTab({
         variant: "destructive",
       });
     } finally {
-      setIsAddingMatches(false);
+      setIsAddingMatches(0);
+      setIsSubtractingMatches(false);
     }
   };
+
+  const handleDeleteClick = async (profile) => {
+    const event = events.find(e => e.id === selectedEvent);
+    event.users = event.users.filter(u => u !== profile.id);
+    setIsLoading(true);
+    await updateEvent(event?.id, { users: event.users });
+    availableScouts = event?.users;
+
+    onEventUpdate();
+    setIsLoading(false);
+  }
+
+  useEffect(() => {
+    setIsEditing(false);
+  }, [ selectedEvent ])
 
   return (
     <div className="space-y-6">
@@ -202,7 +287,7 @@ export function EventInformationTab({
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setIsEditing(true)}
+                      onClick={() => { setEditedEvent(currentEvent); setIsEditing(true); } }
                     >
                       Edit Event
                     </Button>
@@ -291,16 +376,48 @@ export function EventInformationTab({
                 <div className="flex items-center gap-2 mt-1">
                   <p className="text-lg font-semibold">{matches.length}</p>
                   {!isAllEvents && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleAddMatches}
-                      disabled={isAddingMatches}
-                      className="h-7"
-                    >
-                      <PlusCircle className="h-3 w-3 mr-1" />
-                      {isAddingMatches ? "Adding..." : "+10"}
-                    </Button>
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => { handleAddMatches(10) }}
+                        disabled={isAddingMatches == 10}
+                        className="h-7"
+                      >
+                        <PlusCircle className="h-3 w-3 mr-1" />
+                        {isAddingMatches == 10 ? "Adding..." : "+10"}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => { handleAddMatches(5) }}
+                        disabled={isAddingMatches == 5}
+                        className="h-7"
+                      >
+                        <PlusCircle className="h-3 w-3 mr-1" />
+                        {isAddingMatches == 5 ? "Adding..." : "+5"}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => { handleAddMatches(1) }}
+                        disabled={isAddingMatches == 1}
+                        className="h-7"
+                      >
+                        <PlusCircle className="h-3 w-3 mr-1" />
+                        {isAddingMatches == 1 ? "Adding..." : "+1"}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-red-500"
+                        onClick={() => { setSubtractMatchDialog(true) }}
+                        disabled={isSubtractingMatches}
+                      >
+                        <MinusCircle className="h-3 w-3 mr-1" />
+                        {isAddingMatches ? "Subtracting..." : "-1"}
+                      </Button>
+                    </>
                   )}
                 </div>
               </div>
@@ -398,43 +515,97 @@ export function EventInformationTab({
               </div>
             </div>
 
-            <div>
-              <Label className="text-sm font-medium text-muted-foreground">
-                Scouting Map URL
-              </Label>
-              {isEditing ? (
-                <Input
-                  value={editedEvent.scouting_map_url || ""}
-                  onChange={(e) =>
-                    setEditedEvent({
-                      ...editedEvent,
-                      scouting_map_url: e.target.value,
-                    })
-                  }
-                  placeholder="https://example.com/map.png"
-                  className="mt-1"
-                />
-              ) : (
-                <p className="text-lg">
-                  {currentEvent?.scouting_map_url ? (
-                    <a
-                      href={currentEvent.scouting_map_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-500 hover:underline"
-                    >
-                      View Map
-                    </a>
-                  ) : (
-                    "Not set"
-                  )}
-                </p>
-              )}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">
+                  Scouting Map URL
+                </Label>
+                {isEditing ? (
+                  <Input
+                    value={editedEvent.scouting_map_url || ""}
+                    onChange={(e) =>
+                      setEditedEvent({
+                        ...editedEvent,
+                        scouting_map_url: e.target.value,
+                      })
+                    }
+                    placeholder="https://example.com/map.png"
+                    className="mt-1"
+                  />
+                ) : (
+                  <p className="text-lg">
+                    {currentEvent?.scouting_map_url ? (
+                      <a
+                        href={currentEvent.scouting_map_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-500 hover:underline"
+                      >
+                        View Map
+                      </a>
+                    ) : (
+                      "Not set"
+                    )}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">
+                  Delete Event
+                </Label>
+                {isEditing ? (
+                  <Button
+                    className="mt-1 w-40"
+                    size="default"
+                    onClick={() => setDeleteEventDialog1(true)}
+                  >
+                    Delete Event
+                  </Button>
+                ) : (
+                  <Button
+                    className="mt-1 w-40"
+                    size="default"
+                    variant={ "outline" }
+                    disabled={true}
+                  >
+                    Delete Event
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         </CardContent>
       </Card>
-
+      <ConfirmationDialog 
+        title="Are you Sure?"
+        open={subtractMatchDialog}
+        prompt="You are about to remove the last match of the dataset. If there is any data, it could be lost to the void!"
+        onOpenChange={() => { setSubtractMatchDialog(false) }}
+        onRespond={(confirmed) => { if (confirmed) handleAddMatches(-1) }}>
+      </ConfirmationDialog>
+      <ConfirmationDialog 
+        title="Are you Sure?"
+        open={deleteEventDialog1}
+        prompt={`You are about to delete ${editedEvent.name} (${editedEvent.event_code}). If there is any data, it could be lost to the void!`}
+        onOpenChange={() => { setDeleteEventDialog1(false) }}
+        onRespond={(confirmed) => { if (confirmed) setDeleteEventDialog2(true) }}>
+      </ConfirmationDialog>
+      <ConfirmationDialog 
+        title="Are you REALLLY Sure?"
+        open={deleteEventDialog2}
+        prompt="This act is very dangerous! I hope you know what you're doing."
+        onOpenChange={() => { setDeleteEventDialog2(false) }}
+        onRespond={(confirmed) => { if (confirmed) handleDeleteEvent() }}>
+      </ConfirmationDialog>
+      <AddScoutsDialog
+        open={addScouterDialog}
+        onOpenChange={() => setAddScouterDialog(false)}
+        availableScouts={availableScouts}
+        allScouts={allScouts}
+        event={events.find(e => e.id === selectedEvent)}
+        onSave={(users) => { console.log(users); events.find(e => e.id === selectedEvent).users = users; availableScouts = users; onEventUpdate() }}
+      ></AddScoutsDialog>
       <Card>
         <CardHeader>
           <CardTitle>
@@ -480,13 +651,18 @@ export function EventInformationTab({
           <CardTitle>Scout List</CardTitle>
         </CardHeader>
         <CardContent>
+        <Button className="m-2 ml-0 mt-0 w-50" onClick={() => setAddScouterDialog(true)}>
+          <PlusCircle className="h-4 w-4 mr-2" />
+          Add Scouters
+        </Button>
+
           <div className="space-y-2">
             {availableScouts.length === 0 ? (
               <p className="text-muted-foreground text-center py-8">
                 No scouts available
               </p>
             ) : (
-              availableScouts.map((profile) => {
+              availableScouts.sort((a,b) => a.name?.localeCompare(b.name)).map((profile) => {
                 const initials = (profile.name || "U")
                   .split(" ")
                   .map((n) => n[0])
@@ -498,17 +674,27 @@ export function EventInformationTab({
                     key={profile.id}
                     className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors"
                   >
-                    <Avatar className="h-10 w-10">
-                      <AvatarFallback className="text-sm bg-primary/20 text-primary">
-                        {initials}
-                      </AvatarFallback>
-                    </Avatar>
+                    <UserProfileMenu
+                      userName={profile.name}
+                      userInitials={initials}
+                      avatarUrl={profile.avatar_url}
+                    />
                     <div className="flex-1">
                       <p className="font-medium">{profile.name || "Unknown"}</p>
                       <p className="text-sm text-muted-foreground">
                         {profile.role} {profile.is_manager && "• Manager"}
                       </p>
                     </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDeleteClick(profile)}
+                      className="h-8 w-8 p-0 mr-5 text-muted-foreground hover:text-destructive"
+                      title="Delete submission"
+                      disabled={isLoading}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 );
               })

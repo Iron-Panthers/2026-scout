@@ -295,7 +295,7 @@ export default function QualScouting() {
                       dispatchSet(`teamOptions.${teamNum}.outpostFed`, !opts.outpostFed);
                     }}
                   >
-                    Outpost Fed
+                    Got Beached
                   </button>
                   <button
                     className={`px-3 py-1 rounded-md text-xs font-semibold border transition-colors

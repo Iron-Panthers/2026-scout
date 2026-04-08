@@ -204,8 +204,10 @@ export default function ScoutingReview() {
   // Check dependencies and resolve matchId if needed
   const checkDependencies = async () => {
     // Check all required/filled fields before opening modal
-    const commentsTooShort = !state?.comments || state.comments.trim().length < 5;
-    const robotProblemsTooShort = state?.robot_problems !== null && state?.robot_problems !== undefined && state.robot_problems.trim().length < 5;
+    const commentsTooShort = scoutingType === "qual" ? (!state?.commentsTeam1 || state?.commentsTeam1.trim().length < 5 || 
+      !state?.commentsTeam2 || state?.commentsTeam2.trim().length < 5 ||
+      !state?.commentsTeam3 || state?.commentsTeam3.trim().length < 5) : (!state?.comments || state.comments.trim().length < 5);
+    const robotProblemsTooShort = state?.robot_problems !== null && robotProblems !== "Not Present" && state?.robot_problems !== undefined && state.robot_problems.trim().length < 5;
     const errorsTooShort = state?.errors !== null && state?.errors !== undefined && state.errors.trim().length < 5;
     const defenseTooShort = state?.defenseDescription !== null && state?.defenseDescription !== undefined && state.defenseDescription.trim().length < 5;
 
@@ -252,7 +254,7 @@ export default function ScoutingReview() {
       {
         label: "Comments",
         status: "pending" as const,
-        value: state?.comments ? "Provided" : "Not set",
+        value: !commentsTooShort ? "Provided" : "Not set",
       },
       {
         label: "Match ID",
@@ -288,7 +290,7 @@ export default function ScoutingReview() {
     const updatedDeps = [...deps];
 
     // Check comments
-    if (state?.comments && state.comments.trim().length >= 5) {
+    if (!commentsTooShort) {
       updatedDeps[0] = {
         ...updatedDeps[0],
         status: "success",
@@ -533,23 +535,88 @@ export default function ScoutingReview() {
             Additional Notes
           </h2>
           <div className="mb-6">
-            <label className="block uppercase text-xs font-medium tracking-wider text-muted-foreground mb-2">
-              Comments <span className="text-destructive">*</span>
-            </label>
-            <textarea
-              className={`w-full bg-background rounded-lg px-4 py-3 text-foreground text-base font-normal focus:outline-none transition disabled:opacity-60 ${
-                !state.comments || state.comments.trim().length < 5
-                  ? "border-2 border-destructive focus:ring-2 focus:ring-destructive/50"
-                  : "border border-border focus:ring-2 focus:ring-primary/80"
-              }`}
-              rows={3}
-              value={state.comments}
-              onChange={(e) => handleFieldChange("comments", e.target.value)}
-              style={{ fontFamily: "inherit", resize: "vertical" }}
-              placeholder="Please describe what happened during this match..."
-            />
-            {(!state.comments || state.comments.trim().length < 5) && (
-              <p className="text-xs text-destructive mt-1">Comments are required (min. 5 characters)</p>
+            {state.role !== "qualRed" && state.role !== "qualBlue" && (
+              <>
+              <label className="block uppercase text-xs font-medium tracking-wider text-muted-foreground mb-2">
+                Comments <span className="text-destructive">*</span>
+              </label>
+              <textarea
+                className={`w-full bg-background rounded-lg px-4 py-3 text-foreground text-base font-normal focus:outline-none transition disabled:opacity-60 ${
+                  !state.comments || state.comments.trim().length < 5
+                    ? "border-2 border-destructive focus:ring-2 focus:ring-destructive/50"
+                    : "border border-border focus:ring-2 focus:ring-primary/80"
+                }`}
+                rows={3}
+                value={state.comments}
+                onChange={(e) => handleFieldChange("comments", e.target.value)}
+                style={{ fontFamily: "inherit", resize: "vertical" }}
+                placeholder="Please describe what happened during this match..."
+              />
+              {(!state.comments || state.comments.trim().length < 5) && (
+                <p className="text-xs text-destructive mt-1">Comments are required (min. 5 characters)</p>
+              )}
+              </>
+            )}
+            { (state.role === "qualRed" || state.role === "qualBlue")&& (
+              <>
+              {/* Comments 1 */}
+              <label className="block uppercase text-xs font-medium tracking-wider text-muted-foreground mb-2">
+                Comments for Team {state.team1} <span className="text-destructive">*</span>
+              </label>
+              <textarea
+                className={`w-full bg-background rounded-lg px-4 py-3 text-foreground text-base font-normal focus:outline-none transition disabled:opacity-60 ${
+                  !state.commentsTeam1 || state.commentsTeam1.trim().length < 5
+                    ? "border-2 border-destructive focus:ring-2 focus:ring-destructive/50"
+                    : "border border-border focus:ring-2 focus:ring-primary/80"
+                }`}
+                rows={2}
+                value={state.commentsTeam1}
+                onChange={(e) => handleFieldChange("commentsTeam1", e.target.value)}
+                style={{ fontFamily: "inherit", resize: "vertical" }}
+                placeholder={`Please describe what happened to ${state.team1} this match... `}
+              />
+              {(!state.commentsTeam1 || state.commentsTeam1.trim().length < 5) && (
+                <p className="text-xs text-destructive mt-1">Comments are required (min. 5 characters)</p>
+              )}
+              {/* Comments 2 */}
+              <label className="block uppercase text-xs font-medium tracking-wider text-muted-foreground mb-2 mt-5">
+                Comments for Team {state.team2} <span className="text-destructive">*</span>
+              </label>
+              <textarea
+                className={`w-full bg-background rounded-lg px-4 py-3 text-foreground text-base font-normal focus:outline-none transition disabled:opacity-60 ${
+                  !state.commentsTeam2 || state.commentsTeam2.trim().length < 5
+                    ? "border-2 border-destructive focus:ring-2 focus:ring-destructive/50"
+                    : "border border-border focus:ring-2 focus:ring-primary/80"
+                }`}
+                rows={2}
+                value={state.commentsTeam2}
+                onChange={(e) => handleFieldChange("commentsTeam2", e.target.value)}
+                style={{ fontFamily: "inherit", resize: "vertical" }}
+                placeholder={`Please describe what happened to ${state.team2} this match... `}
+              />
+              {(!state.commentsTeam2 || state.commentsTeam2.trim().length < 5) && (
+                <p className="text-xs text-destructive mt-1">Comments are required (min. 5 characters)</p>
+              )}
+              {/* Comments 3 */}
+              <label className="block uppercase text-xs font-medium tracking-wider text-muted-foreground mb-2 mt-5">
+                Comments for Team {state.team3} <span className="text-destructive">*</span>
+              </label>
+              <textarea
+                className={`w-full bg-background rounded-lg px-4 py-3 text-foreground text-base font-normal focus:outline-none transition disabled:opacity-60 ${
+                  !state.commentsTeam3 || state.commentsTeam3.trim().length < 5
+                    ? "border-2 border-destructive focus:ring-2 focus:ring-destructive/50"
+                    : "border border-border focus:ring-2 focus:ring-primary/80"
+                }`}
+                rows={2}
+                value={state.commentsTeam3}
+                onChange={(e) => handleFieldChange("commentsTeam3", e.target.value)}
+                style={{ fontFamily: "inherit", resize: "vertical" }}
+                placeholder={`Please describe what happened to ${state.team3} this match... `}
+              />
+              {(!state.commentsTeam3 || state.commentsTeam3.trim().length < 5) && (
+                <p className="text-xs text-destructive mt-1">Comments are required (min. 5 characters)</p>
+              )}
+              </>
             )}
           </div>
           {state.role !== "qualRed" && state.role !== "qualBlue" && (
@@ -687,7 +754,7 @@ export default function ScoutingReview() {
             className="h-10 px-6 rounded-lg font-medium border border-border text-foreground hover:bg-surface-elevated hover:border-primary transition"
             onClick={() => navigate("/dashboard")}
           >
-            Back to Scouting
+            Back to Dashboard
           </Button>
           <Button
             variant="default"

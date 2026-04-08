@@ -339,6 +339,7 @@ export async function updateEvent(
     start_date?: string;
     end_date?: string;
     scouting_map_url?: string;
+    users?: [];
   }
 ): Promise<boolean> {
   const { error } = await supabase

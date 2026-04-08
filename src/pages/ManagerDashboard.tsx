@@ -85,6 +85,7 @@ export default function ManagerDashboard() {
 
   // State for available scouts (converted from Profile to Scout format)
   const [availableScouts, setAvailableScouts] = useState<Profile[]>([]);
+  const [allScouts, setAllScouts] = useState<Profile[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<string>("all");
   const [allDbMatches, setAllDbMatches] = useState<Match[]>([]);
@@ -171,13 +172,14 @@ export default function ManagerDashboard() {
 
   // Load available scouts and existing match assignments from database
   const loadData = useCallback(async () => {
+    // console.log("trying to load data", selectedEvent)
     try {
       const [{ matches: dbMatches, profiles }, eventsData] = await Promise.all([
         getMatchesWithProfiles(),
         getEvents(),
       ]);
       const profilesArray = Array.from(profiles.values());
-      setAvailableScouts(profilesArray);
+      setAllScouts(profilesArray);
       setEvents(eventsData);
       setAllDbMatches(dbMatches);
 
@@ -186,11 +188,34 @@ export default function ManagerDashboard() {
       if (!initialEventSet.current && eventsData.length > 0) {
         initialEventSet.current = true;
         // Events are already sorted by start_date descending from getEvents()
+        var temp = "";
         if (eventsData.filter((a) => a.is_active).length > 0) {
-          setSelectedEvent(eventsData.filter((a) => a.is_active)[0].id);
+          // setSelectedEvent(eventsData.filter((a) => a.is_active)[0].id);
+          temp = eventsData.filter((a) => a.is_active)[0].id;
         } else {
-          setSelectedEvent(eventsData[0].id);
+          // setSelectedEvent(eventsData[0].id);
+          temp = eventsData[0].id;
         }
+
+        if (temp !== "all") {
+          const newScouts = eventsData.find(e => e.id === temp)?.users.map(u => profilesArray.find(scout => scout.id === u)).filter(u => u !== undefined); 
+          setAvailableScouts([...new Map(newScouts.map(u => [u.id, u])).values()]); 
+          // console.log("skdfhdfhsjkdf", eventsData, profilesArray)
+        }
+      }
+      else if (selectedEvent !== "all") {
+        // console.log("reloaded");
+        var temp = "";
+        // if (eventsData.filter((a) => a.is_active).length > 0) {
+        //   // setSelectedEvent(eventsData.filter((a) => a.is_active)[0].id);
+        //   temp = eventsData.filter((a) => a.is_active)[0].id;
+        // } else {
+        //   // setSelectedEvent(eventsData[0].id);
+        //   temp = eventsData[0].id;
+        // }
+        const newScouts = eventsData.find(e => e.id === selectedEvent)?.users.map(u => profilesArray.find(scout => scout.id === u)).filter(u => u !== undefined); 
+        setAvailableScouts([...new Map(newScouts.map(u => [u.id, u])).values()]); 
+        // setAvailableScouts(eventsData.find(e => e.id === temp)?.users.map(u => profilesArray.find(scout => scout.id === u)));
       }
     } catch (error) {
       console.error("Failed to load data:", error);
@@ -291,6 +316,7 @@ export default function ManagerDashboard() {
   // Reset to page 1 only when the selected event changes, not on every data reload
   useEffect(() => {
     setCurrentPage(1);
+    // console.log('event changed', selectedEvent)
   }, [selectedEvent]);
 
   // Load submission status for all match/role combinations
@@ -308,6 +334,11 @@ export default function ManagerDashboard() {
         .select("match_id, role, scouter_id")
         .in("match_id", matchIds);
 
+      const { data: qualSubmissions, qualError } = await supabase
+        .from("qual_scouting_submissions")
+        .select("match_id, role, scouter_id")
+        .in("match_id", matchIds);
+
       if (error) throw error;
 
       // Create Set of "matchId:role" strings for quick lookup
@@ -315,10 +346,18 @@ export default function ManagerDashboard() {
         (submissions || []).map((s) => `${s.match_id}:${s.role}`)
       );
 
+      qualSubmissions?.forEach(sub => {
+        completedSet.add(`${sub.match_id}:${sub.role}`);
+      });
+
       // Create Map of "matchId:role" -> scouter_id
       const scoutersMap = new Map(
         (submissions || []).map((s) => [`${s.match_id}:${s.role}`, s.scouter_id])
       );
+
+      // qualSubmissions?.forEach(s => {
+      //   scoutersMap.(`${s.match_id}:${s.role}`, s.scouter_id);
+      // });
 
       setCompletedSubmissions(completedSet);
       setActualScouters(scoutersMap);
@@ -702,7 +741,7 @@ export default function ManagerDashboard() {
         </div>
 
         {/* Tabs for Navigation */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full overflow-x-scroll">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
             {/* Mobile: Dropdown Menu */}
             <div className="md:hidden w-full">
@@ -728,7 +767,7 @@ export default function ManagerDashboard() {
                       </div>
                     )}
                     {activeTab === "create" && (
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 overflow-x-hidden">
                         <PlusCircle className="h-4 w-4" />
                         Create Event
                       </div>
@@ -837,7 +876,11 @@ export default function ManagerDashboard() {
 
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">Event:</span>
-              <Select value={selectedEvent} onValueChange={setSelectedEvent}>
+              <Select value={selectedEvent} onValueChange={(v) => { setSelectedEvent(v); 
+                  const newScouts = events.find(e => e.id === v)?.users.map(u => allScouts.find(scout => scout.id === u)).filter(u => u !== undefined); 
+                  setAvailableScouts([...new Map(newScouts.map(u => [u.id, u])).values()]); 
+                  // console.log(v, [...new Map(newScouts.map(u => [u.id, u])).values()], events, selectedEvent, allScouts); 
+                }}>
                 <SelectTrigger className="w-[200px]">
                   <SelectValue placeholder="Select event" />
                 </SelectTrigger>
@@ -1045,7 +1088,10 @@ export default function ManagerDashboard() {
               events={events}
               matches={matches}
               availableScouts={availableScouts}
-              onEventUpdate={loadData}
+              allScouts={allScouts}
+              onEventUpdate={useCallback(async () => {
+                loadData();
+              }, [selectedEvent])}
             />
           </TabsContent>
 
@@ -1096,9 +1142,9 @@ export default function ManagerDashboard() {
                       <SelectValue placeholder="Select a scout" />
                     </SelectTrigger>
                     <SelectContent>
-                      {availableScouts.map((scout) => (
-                        <SelectItem key={scout.id} value={scout.id}>
-                          {scout.name || scout.id}
+                      {availableScouts.map((availableScout) => (
+                        <SelectItem key={availableScout.id} value={availableScout.id}>
+                          {availableScout.name || availableScout.id}
                         </SelectItem>
                       ))}
                     </SelectContent>

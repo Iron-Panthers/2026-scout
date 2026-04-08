@@ -29,6 +29,7 @@ export interface Event {
   scouting_map_url: string | null; // URL to the scouting map image
   created_at: string;
   updated_at: string;
+  users: string[];
 }
 
 // Scouting Event (action logged during match)

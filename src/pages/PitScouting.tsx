@@ -597,6 +597,15 @@ export default function PitScouting() {
 
             <Card>
               <CardHeader>
+                <CardTitle>Robot & Team Information</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {pitScoutingQuestions.map(renderQuestion)}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
                 <CardTitle>Robot Photo</CardTitle>
               </CardHeader>
               <CardContent>
@@ -605,15 +614,6 @@ export default function PitScouting() {
                   onPhotoCleared={() => setPhoto(null)}
                   disabled={isSubmitting}
                 />
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Robot & Team Information</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {pitScoutingQuestions.map(renderQuestion)}
               </CardContent>
             </Card>
 

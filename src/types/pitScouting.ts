@@ -15,6 +15,7 @@ export interface PitScoutingFormData {
   weight?: string;
   dimensions?: string;
   drivetrain?: string;
+  event_code?: string;
   "hopper-space"?: string;
   "shooting-intake-speed"?: string;
   "shooting-method"?: string[];

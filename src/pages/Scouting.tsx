@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { compressState } from "@/lib/stateCompression";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Undo2, ArrowRight, ArrowLeft, Check, MoreVertical, RotateCcw } from "lucide-react";
+import { Undo2, ArrowRight, ArrowLeft, Check, MoreVertical, RotateCcw, Trash } from "lucide-react";
 import { useScoutingReducer } from "@/lib/useScoutingReducer";
 import { useMatchTimer } from "@/lib/useMatchTimer";
 import { useSettings } from "@/contexts/SettingsContext";
@@ -17,7 +17,8 @@ export default function Scouting() {
   const event_code = searchParams.get("event_code") || "";
   const match_number = parseInt(searchParams.get("match_number") || "0");
   const team_number = parseInt(searchParams.get("team_number") || "0");
-  const match_type = searchParams.get("type") || "qual";
+  const match_type = searchParams.get("match_type") || "qual";
+  const canDelete = useState(true);
 
   const { state, set, logEvent, undo, canUndo } = useScoutingReducer(
     match_id || "",
@@ -178,8 +179,9 @@ export default function Scouting() {
       const { addShots, logEvent, settings, frame } = keybindActionsRef.current;
       if (frame !== 1) return;
       const key = e.key.toLowerCase();
-      if (key === (settings["kb-add5"] ?? "z")) { e.preventDefault(); addShots(5); }
-      else if (key === (settings["kb-add20"] ?? "x")) { e.preventDefault(); addShots(20); }
+      if (key === (settings["kb-add1"] ?? "z")) { e.preventDefault(); addShots(1); }
+      else if (key === (settings["kb-add5"] ?? "x")) { e.preventDefault(); addShots(5); }
+      else if (key === (settings["kb-add20"] ?? "c")) { e.preventDefault(); addShots(20); }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
@@ -205,6 +207,20 @@ export default function Scouting() {
     >
       <Undo2 className="w-6 h-6" />
       <span className="text-xs font-medium">Undo</span>
+    </button>
+  );
+
+  const deleteBtn = (extraClass = "") => (
+    <button
+      className={`flex flex-col items-center justify-center gap-1 transition-colors
+        ${primaryPos
+          ? "bg-red-100 dark:bg-red-950/50 hover:bg-red-200 dark:hover:bg-red-900/60 active:bg-red-300 dark:active:bg-red-900/70 text-red-700 dark:text-red-300"
+          : "bg-muted/40 text-muted-foreground/40 pointer-events-none"
+        } ${extraClass}`}
+      onPointerDown={(e) => { e.preventDefault(); if (primaryPos) { set("primaryShotPosition", null); set("secondaryShotPosition", null); } }}
+    >
+      <Trash className="w-6 h-6" />
+      <span className="text-xs font-medium">Reset Pins</span>
     </button>
   );
 
@@ -339,17 +355,17 @@ export default function Scouting() {
 
         {/* Col 1: Shot buttons + score badge */}
         <div className="relative flex flex-col flex-[5] border-r border-border">
-          {/* +1 */}
+          {/* +20 */}
           <button
             className="flex-1 flex flex-col items-center justify-center
               bg-amber-100 dark:bg-amber-950/50
               hover:bg-amber-200 dark:hover:bg-amber-900/60
               active:bg-amber-300 dark:active:bg-amber-900/70
               border-b border-border transition-colors"
-            onPointerDown={(e) => { e.preventDefault(); addShots(1); }}
+            onPointerDown={(e) => { e.preventDefault(); addShots(20); }}
           >
             <div className="w-20 h-20 rounded-full border-2 border-amber-400/70 dark:border-amber-500/50 flex items-center justify-center bg-amber-50/60 dark:bg-amber-900/30">
-              <span className="text-2xl font-bold text-amber-700 dark:text-amber-300 tabular-nums">+1</span>
+              <span className="text-2xl font-bold text-amber-700 dark:text-amber-300 tabular-nums">+20</span>
             </div>
           </button>
 
@@ -363,31 +379,31 @@ export default function Scouting() {
           {/* +5 */}
           <button
             className="flex-1 flex flex-col items-center justify-center
-              bg-amber-50 dark:bg-amber-950/30
-              hover:bg-amber-100 dark:hover:bg-amber-900/40
-              active:bg-amber-200 dark:active:bg-amber-900/50
+              bg-emerald-50 dark:bg-emerald-950/30
+              hover:bg-emerald-100 dark:hover:bg-emerald-900/40
+              active:bg-emerald-200 dark:active:bg-emerald-900/50
               transition-colors"
             onPointerDown={(e) => { e.preventDefault(); addShots(5); }}
           >
-            <div className="w-20 h-20 rounded-full border-2 border-amber-300/60 dark:border-amber-600/40 flex items-center justify-center bg-white/40 dark:bg-amber-950/20">
-              <span className="text-2xl font-bold text-amber-600 dark:text-amber-400 tabular-nums">+5</span>
+            <div className="w-20 h-20 rounded-full border-2 border-emerald-300/60 dark:border-emerald-600/40 flex items-center justify-center bg-white/40 dark:bg-emerald-950/20">
+              <span className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">+5</span>
             </div>
           </button>
         </div>
 
-        {/* Col 2: +20 */}
+        {/* Col 2: +1 */}
         <div className="flex flex-col flex-[5] portrait:border-r-0 landscape:border-r landscape:border-border">
-          {/* +20 */}
+          {/* +1 */}
           <button
             className="relative flex-1 flex flex-col items-center justify-center overflow-hidden
               bg-sky-100 dark:bg-sky-950/50
               hover:bg-sky-200 dark:hover:bg-sky-900/60
               active:bg-sky-300 dark:active:bg-sky-900/70
               border-b border-border transition-colors"
-            onPointerDown={(e) => { e.preventDefault(); addShots(20); }}
+            onPointerDown={(e) => { e.preventDefault(); addShots(1); }}
           >
             <div className="w-20 h-20 rounded-full border-2 border-sky-400/70 dark:border-sky-500/50 flex items-center justify-center bg-sky-50/60 dark:bg-sky-900/30">
-              <span className="text-2xl font-bold text-sky-700 dark:text-sky-300 tabular-nums">+20</span>
+              <span className="text-2xl font-bold text-sky-700 dark:text-sky-300 tabular-nums">+1</span>
             </div>
           </button>
         </div>
@@ -465,8 +481,9 @@ export default function Scouting() {
         {/* Sidebar: Back | Undo | Finish — landscape only */}
         <div className="portrait:hidden landscape:flex w-24 flex-col border-l border-border shrink-0">
           {backBtn("flex-1 border-b border-border")}
-          {undoBtn("flex-1 border-b border-border")}
           {finishBtn("flex-1")}
+          {undoBtn("flex-1 border-b border-border")}
+          {deleteBtn("flex-1 border-b border-border")}
         </div>
       </div>
 
@@ -474,6 +491,7 @@ export default function Scouting() {
       <div className="portrait:flex landscape:hidden h-20 shrink-0 border-t border-border">
         {backBtn("flex-1 border-r border-border")}
         {undoBtn("flex-1 border-r border-border")}
+        {deleteBtn("flex-1 border-b border-border")}
         {finishBtn("flex-1")}
       </div>
     </div>
