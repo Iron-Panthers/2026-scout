@@ -149,6 +149,7 @@ export default function ManagerDashboard() {
       roleMapping.forEach(({ role, scouterId }) => {
         if (scouterId) {
           const profile = availableScouts.find((p) => p.id === scouterId);
+          const backupProfile = allScouts.find((p) => p.id === scouterId);
           if (profile) {
             assignments[role] = {
               id: profile.id,
@@ -160,6 +161,21 @@ export default function ManagerDashboard() {
                 .toUpperCase()
                 .slice(0, 2),
               avatar: profile.avatar_url || "",
+              registered: true
+            };
+          }
+          else if (backupProfile) {
+            assignments[role] = {
+              id: backupProfile.id,
+              name: backupProfile.name || "Unknown",
+              initials: (backupProfile.name || "U")
+                .split(" ")
+                .map((n) => n[0])
+                .join("")
+                .toUpperCase()
+                .slice(0, 2),
+              avatar: backupProfile.avatar_url || "",
+              registered: false
             };
           }
         }
@@ -586,6 +602,7 @@ export default function ManagerDashboard() {
       const allMatchIds = paginatedMatches
         .filter((m) => m.matchId)
         .map((m) => m.matchId!);
+        // console.log(paginatedMatches)
 
       if (prev.size === allMatchIds.length && allMatchIds.length > 0) {
         // All selected, deselect all
