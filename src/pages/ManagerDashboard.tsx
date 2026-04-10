@@ -213,11 +213,10 @@ export default function ManagerDashboard() {
           temp = eventsData[0].id;
         }
 
-        if (temp !== "all") {
-          const newScouts = eventsData.find(e => e.id === temp)?.users.map(u => profilesArray.find(scout => scout.id === u)).filter(u => u !== undefined); 
-          setAvailableScouts([...new Map(newScouts.map(u => [u.id, u])).values()]); 
-          // console.log("skdfhdfhsjkdf", eventsData, profilesArray)
-        }
+        setSelectedEvent(temp);
+        const newScouts = eventsData.find(e => e.id === temp)?.users.map(u => profilesArray.find(scout => scout.id === u)).filter(u => u !== undefined); 
+        setAvailableScouts([...new Map(newScouts.map(u => [u.id, u])).values()]); 
+        // console.log("skdfhdfhsjkdf", eventsData, profilesArray)
       }
       else if (selectedEvent !== "all") {
         // console.log("reloaded");
