@@ -20,7 +20,7 @@ export const pitScoutingQuestions: PitScoutingQuestion[] = [
     id: "dimensions",
     type: "text",
     label: "What are your drivebase dimensions?",
-    placeholder: "e.g., 28 x 32 inches (L x W)",
+    placeholder: "e.g., 28 x 32 x 22 inches (L x W x H)",
     required: true,
   },
   {
@@ -28,7 +28,7 @@ export const pitScoutingQuestions: PitScoutingQuestion[] = [
     type: "radio",
     label: "What type of drivetrain does the robot have?",
     required: true,
-    options: ["Swerve", "Mecanum", "Tank", "West Coast", "Other"],
+    options: ["Swerve", "Mecanum", "Tank", "Other"],
   },
   {
     id: "hopper-space",
@@ -40,7 +40,7 @@ export const pitScoutingQuestions: PitScoutingQuestion[] = [
   {
     id: "shooting-intake-speed",
     type: "text",
-    label: "What is their stated shooting/intake speed (shots per second)?",
+    label: "What is their shooting speed (shots per second)?",
     placeholder: "e.g., 2.5",
     required: true,
   },
@@ -72,14 +72,14 @@ export const pitScoutingQuestions: PitScoutingQuestion[] = [
   {
     id: "outpost-interaction",
     type: "text",
-    label: "How comfortable are your drivers with feeding the outpost?",
+    label: "How comfortable are your drivers with pushing fuel into the outpost?",
     required: true,
     placeholder: "e.g., Very comfortable, Somewhat comfortable, Not comfortable",
   },
   {
     id: "terrain-capability",
     type: "checkbox",
-    label: "Can you go over the bump and/or trench?",
+    label: "Which field elements can you go through?",
     required: true,
     options: [
       "Can go over bump",
@@ -92,7 +92,7 @@ export const pitScoutingQuestions: PitScoutingQuestion[] = [
   {
     id: "driver-competitions",
     type: "text",
-    label: "How many competitions have your drivers driven at?",
+    label: "How many competitions have your drivers driven at (years is fine if they're not sure)?",
     placeholder: "Enter number of competitions",
     required: true,
   },
@@ -102,7 +102,7 @@ export const pitScoutingQuestions: PitScoutingQuestion[] = [
     id: "auto-paths",
     type: "textarea",
     label: "Describe your auto paths",
-    placeholder: "Describe the autonomous paths your robot can run...",
+    placeholder: "Include field elements, # of passes... be as specific as possible",
     required: true,
   },
 
@@ -110,8 +110,8 @@ export const pitScoutingQuestions: PitScoutingQuestion[] = [
   {
     id: "additional-notes",
     type: "textarea",
-    label: "Additional notes or observations",
-    placeholder: "Any other relevant information...",
+    label: "Miscellaneous notes or fun facts?",
+    placeholder: "Blah blah blah blah...",
     required: true,
   },
 ];
