@@ -226,7 +226,7 @@ export function ScoutingDataTab({ selectedEvent, events: _events }: ScoutingData
     setIsDeleting(true);
     try {
       const { error } = await supabase
-        .from("scouting_submissions")
+        .from(deleteTarget.role.includes('qual') ? 'qual_scouting_submissions' : "scouting_submissions")
         .delete()
         .eq("id", deleteTarget.id);
 
