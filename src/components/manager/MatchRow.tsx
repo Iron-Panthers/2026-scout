@@ -54,6 +54,7 @@ export const MatchRow = memo(
         </TableCell>
         {roles.map((role) => {
           const assignment = match.assignments[role];
+          // console.log(match.assignments, role)
           const isCompleted =
             match.matchId &&
             completedSubmissions.has(`${match.matchId}:${role}`);
@@ -68,6 +69,7 @@ export const MatchRow = memo(
 
           // Check if actual scouter is different from assigned
           const isDifferentScouter = actualScouter && assignment && actualScouter.id !== assignment.id;
+          // console.log(actualScouter?.name, assignment, actualScouter?.id, assignment?.id)
 
           const cellColorClass = isCompleted
             ? "bg-green-900/30"
@@ -96,6 +98,11 @@ export const MatchRow = memo(
                     {isDifferentScouter && actualScouter && (
                       <span className="text-[9px] text-orange-400 font-semibold">
                         ✓ by {actualScouter.name?.split(' ')[0] || 'Other'}
+                      </span>
+                    )}
+                    {!assignment.registered && (
+                      <span className="text-[9px] text-gray-400 font-semibold">
+                        Not registered for Event
                       </span>
                     )}
                   </button>

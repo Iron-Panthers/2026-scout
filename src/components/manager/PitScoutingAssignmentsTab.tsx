@@ -31,6 +31,9 @@ import { RecursiveJsonEditor } from "@/components/RecursiveJsonEditor";
 import { useToast } from "@/hooks/use-toast";
 import type { Event, Profile, PitScoutingAssignment } from "@/types";
 import type { PitScoutingSubmission } from "@/types/pitScouting";
+import { PhotoUpload } from "../PhotoUpload";
+import { useAuth } from "@/contexts/AuthContext";
+import { uploadPitPhoto } from "@/lib/photoUpload";
 
 interface PitScoutingAssignmentsTabProps {
   selectedEvent: string;
@@ -44,6 +47,7 @@ export function PitScoutingAssignmentsTab({
   availableScouts,
 }: PitScoutingAssignmentsTabProps) {
   const { toast } = useToast();
+  const { user, profile, loading } = useAuth();
   const [teams, setTeams] = useState<TBATeamSimple[]>([]);
   const [assignments, setAssignments] = useState<PitScoutingAssignment[]>([]);
   const [submissions, setSubmissions] = useState<PitScoutingSubmission[]>([]);
@@ -51,7 +55,8 @@ export function PitScoutingAssignmentsTab({
   const [loadingTeams, setLoadingTeams] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [assigningTeam, setAssigningTeam] = useState<number | null>(null);
-
+  const [editPhoto, setEditPhoto] = useState<File | null>(null);
+  
   // Edit state
   const [editTarget, setEditTarget] = useState<PitScoutingSubmission | null>(null);
   const [editData, setEditData] = useState<Record<string, unknown>>({});
@@ -195,9 +200,17 @@ export function PitScoutingAssignmentsTab({
     if (!editTarget) return;
     setIsSaving(true);
     try {
+      let photoUrl: string | null = null;
+      if (editPhoto !== null) {
+        console.log(user, profile, loading, editPhoto)
+
+        const { publicUrl } = await uploadPitPhoto(editPhoto, user.id, events.find(e => e.id === selectedEvent)?.event_code || "", Number(assigningTeam));
+        photoUrl = publicUrl;
+      }
+
       const { error } = await supabase
         .from("pit_scouting_submissions")
-        .update({ pit_data: editData })
+        .update(photoUrl !== null ? { pit_data: editData, photo_url: photoUrl } : { pit_data: editData })
         .eq("id", editTarget.id);
 
       if (error) throw error;
@@ -548,6 +561,11 @@ export function PitScoutingAssignmentsTab({
                 value={editData}
                 onChange={(newVal) => setEditData(newVal as Record<string, unknown>)}
               />
+              <PhotoUpload
+                onPhotoSelected={setEditPhoto}
+                onPhotoCleared={() => setEditPhoto(null)}
+                disabled={false}
+              />
             </div>
           )}
 
@@ -563,13 +581,13 @@ export function PitScoutingAssignmentsTab({
           <DialogFooter>
             {editConfirming ? (
               <>
-                <Button
+                `<Button
                   variant="outline"
                   onClick={() => setEditConfirming(false)}
                   disabled={isSaving}
                 >
                   Back to Edit
-                </Button>
+                </Button>`
                 <Button onClick={handleEditConfirm} disabled={isSaving}>
                   {isSaving ? (
                     <>

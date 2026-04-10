@@ -149,6 +149,7 @@ export default function ManagerDashboard() {
       roleMapping.forEach(({ role, scouterId }) => {
         if (scouterId) {
           const profile = availableScouts.find((p) => p.id === scouterId);
+          const backupProfile = allScouts.find((p) => p.id === scouterId);
           if (profile) {
             assignments[role] = {
               id: profile.id,
@@ -160,6 +161,21 @@ export default function ManagerDashboard() {
                 .toUpperCase()
                 .slice(0, 2),
               avatar: profile.avatar_url || "",
+              registered: true
+            };
+          }
+          else if (backupProfile) {
+            assignments[role] = {
+              id: backupProfile.id,
+              name: backupProfile.name || "Unknown",
+              initials: (backupProfile.name || "U")
+                .split(" ")
+                .map((n) => n[0])
+                .join("")
+                .toUpperCase()
+                .slice(0, 2),
+              avatar: backupProfile.avatar_url || "",
+              registered: false
             };
           }
         }
@@ -172,7 +188,7 @@ export default function ManagerDashboard() {
 
   // Load available scouts and existing match assignments from database
   const loadData = useCallback(async () => {
-    console.log("trying to load data", selectedEvent)
+    // console.log("trying to load data", selectedEvent)
     try {
       const [{ matches: dbMatches, profiles }, eventsData] = await Promise.all([
         getMatchesWithProfiles(),
@@ -190,29 +206,32 @@ export default function ManagerDashboard() {
         // Events are already sorted by start_date descending from getEvents()
         var temp = "";
         if (eventsData.filter((a) => a.is_active).length > 0) {
-          setSelectedEvent(eventsData.filter((a) => a.is_active)[0].id);
+          // setSelectedEvent(eventsData.filter((a) => a.is_active)[0].id);
           temp = eventsData.filter((a) => a.is_active)[0].id;
         } else {
-          setSelectedEvent(eventsData[0].id);
+          // setSelectedEvent(eventsData[0].id);
           temp = eventsData[0].id;
         }
 
         if (temp !== "all") {
-          setAvailableScouts(eventsData.find(e => e.id === temp)?.users.map(u => profilesArray.find(scout => scout.id === u)));
-          console.log("skdfhdfhsjkdf", eventsData, profilesArray)
+          const newScouts = eventsData.find(e => e.id === temp)?.users.map(u => profilesArray.find(scout => scout.id === u)).filter(u => u !== undefined); 
+          setAvailableScouts([...new Map(newScouts.map(u => [u.id, u])).values()]); 
+          // console.log("skdfhdfhsjkdf", eventsData, profilesArray)
         }
       }
       else if (selectedEvent !== "all") {
-        console.log("reloaded");
+        // console.log("reloaded");
         var temp = "";
-        if (eventsData.filter((a) => a.is_active).length > 0) {
-          setSelectedEvent(eventsData.filter((a) => a.is_active)[0].id);
-          temp = eventsData.filter((a) => a.is_active)[0].id;
-        } else {
-          setSelectedEvent(eventsData[0].id);
-          temp = eventsData[0].id;
-        }
-        setAvailableScouts(eventsData.find(e => e.id === temp)?.users.map(u => profilesArray.find(scout => scout.id === u)));
+        // if (eventsData.filter((a) => a.is_active).length > 0) {
+        //   // setSelectedEvent(eventsData.filter((a) => a.is_active)[0].id);
+        //   temp = eventsData.filter((a) => a.is_active)[0].id;
+        // } else {
+        //   // setSelectedEvent(eventsData[0].id);
+        //   temp = eventsData[0].id;
+        // }
+        const newScouts = eventsData.find(e => e.id === selectedEvent)?.users.map(u => profilesArray.find(scout => scout.id === u)).filter(u => u !== undefined); 
+        setAvailableScouts([...new Map(newScouts.map(u => [u.id, u])).values()]); 
+        // setAvailableScouts(eventsData.find(e => e.id === temp)?.users.map(u => profilesArray.find(scout => scout.id === u)));
       }
     } catch (error) {
       console.error("Failed to load data:", error);
@@ -313,6 +332,7 @@ export default function ManagerDashboard() {
   // Reset to page 1 only when the selected event changes, not on every data reload
   useEffect(() => {
     setCurrentPage(1);
+    // console.log('event changed', selectedEvent)
   }, [selectedEvent]);
 
   // Load submission status for all match/role combinations
@@ -582,6 +602,7 @@ export default function ManagerDashboard() {
       const allMatchIds = paginatedMatches
         .filter((m) => m.matchId)
         .map((m) => m.matchId!);
+        // console.log(paginatedMatches)
 
       if (prev.size === allMatchIds.length && allMatchIds.length > 0) {
         // All selected, deselect all
@@ -737,7 +758,7 @@ export default function ManagerDashboard() {
         </div>
 
         {/* Tabs for Navigation */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full overflow-x-scroll">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
             {/* Mobile: Dropdown Menu */}
             <div className="md:hidden w-full">
@@ -763,7 +784,7 @@ export default function ManagerDashboard() {
                       </div>
                     )}
                     {activeTab === "create" && (
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 overflow-x-hidden">
                         <PlusCircle className="h-4 w-4" />
                         Create Event
                       </div>
@@ -872,7 +893,11 @@ export default function ManagerDashboard() {
 
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">Event:</span>
-              <Select value={selectedEvent} onValueChange={() => { setSelectedEvent(); setAvailableScouts(eventsData.find(e => e.id === selectedEvent)?.users.map(u => allScouts.find(scout => scout.id === u))); }}>
+              <Select value={selectedEvent} onValueChange={(v) => { setSelectedEvent(v); 
+                  const newScouts = events.find(e => e.id === v)?.users.map(u => allScouts.find(scout => scout.id === u)).filter(u => u !== undefined); 
+                  setAvailableScouts([...new Map(newScouts.map(u => [u.id, u])).values()]); 
+                  // console.log(v, [...new Map(newScouts.map(u => [u.id, u])).values()], events, selectedEvent, allScouts); 
+                }}>
                 <SelectTrigger className="w-[200px]">
                   <SelectValue placeholder="Select event" />
                 </SelectTrigger>
@@ -1081,7 +1106,9 @@ export default function ManagerDashboard() {
               matches={matches}
               availableScouts={availableScouts}
               allScouts={allScouts}
-              onEventUpdate={loadData}
+              onEventUpdate={useCallback(async () => {
+                loadData();
+              }, [selectedEvent])}
             />
           </TabsContent>
 
@@ -1132,9 +1159,9 @@ export default function ManagerDashboard() {
                       <SelectValue placeholder="Select a scout" />
                     </SelectTrigger>
                     <SelectContent>
-                      {availableScouts.map((scout) => (
-                        <SelectItem key={scout.id} value={scout.id}>
-                          {scout.name || scout.id}
+                      {availableScouts.map((availableScout) => (
+                        <SelectItem key={availableScout.id} value={availableScout.id}>
+                          {availableScout.name || availableScout.id}
                         </SelectItem>
                       ))}
                     </SelectContent>
