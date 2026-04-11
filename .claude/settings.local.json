@@ -30,7 +30,8 @@
       "Bash(find:*)",
       "Bash(ls:*)",
       "mcp__supabase__list_edge_functions",
-      "mcp__supabase__get_project_url"
+      "mcp__supabase__get_project_url",
+      "WebFetch(domain:api.statbotics.io)"
     ]
   },
   "enableAllProjectMcpServers": true,
