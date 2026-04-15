@@ -269,12 +269,7 @@ export default function Scouting() {
   // ── Options overlay ──────────────────────────────────────────────────────
   const phaseOptions = [
     { phase: "auto" as const, label: "Auto" },
-    { phase: "transition-shift" as const, label: "T-Shift" },
-    { phase: "phase1" as const, label: "Shift 1" },
-    { phase: "phase2" as const, label: "Shift 2" },
-    { phase: "phase3" as const, label: "Shift 3" },
-    { phase: "phase4" as const, label: "Shift 4" },
-    { phase: "endgame" as const, label: "Endgame" },
+    { phase: "transition-shift" as const, label: "Teleop" },
   ];
 
   const handleResetMatch = () => {
