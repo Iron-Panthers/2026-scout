@@ -618,8 +618,10 @@ export default function ManagerDashboard() {
 
     const matchIds = Array.from(selectedMatches);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
       const { error } = await supabase.functions.invoke("send-forced-notifications", {
         body: { matchIds },
+        headers: session ? { Authorization: `Bearer ${session.access_token}` } : undefined,
       });
       if (error) throw error;
       toast({ title: "Notifications sent", description: `Sent to scouts in ${matchIds.length} match${matchIds.length !== 1 ? "es" : ""}.` });
