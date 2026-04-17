@@ -663,20 +663,33 @@ export default function ScoutConfig() {
               </div>
             )}
           </TabsContent>
+          <TabsContent value="betting" className="p-0 m-0 fixed inset-0 z-40 bg-background" style={{ bottom: "2.5rem" }}>
+            <iframe
+              src="/betting"
+              className="w-full h-full border-none block"
+              title="Betting Markets"
+            />
+          </TabsContent>
 
           {/* Tab Buttons - Fixed at bottom */}
           <TabsList className="fixed h-10 left-0 right-0 w-full text-center bottom-0 bg-background border-t border-border z-50">
             <TabsTrigger
               value="config"
-              className="w-2/5 py-2 data-[state=active]:border-t-2 data-[state=active]:border-primary bg-background hover:bg-accent hover:text-accent-foreground mx-1"
+              className="w-1/4 py-2 data-[state=active]:border-t-2 data-[state=active]:border-primary bg-background hover:bg-accent hover:text-accent-foreground mx-1"
             >
               Settings
             </TabsTrigger>
             <TabsTrigger
               value="game"
-              className="w-2/5 py-2 data-[state=active]:border-t-2 data-[state=active]:border-primary bg-background hover:bg-accent hover:text-accent-foreground mx-1"
+              className="w-1/4 py-2 data-[state=active]:border-t-2 data-[state=active]:border-primary bg-background hover:bg-accent hover:text-accent-foreground mx-1"
             >
               Games
+            </TabsTrigger>
+            <TabsTrigger
+              value="betting"
+              className="w-1/4 py-2 data-[state=active]:border-t-2 data-[state=active]:border-primary bg-background hover:bg-accent hover:text-accent-foreground mx-1"
+            >
+              Prediction
             </TabsTrigger>
           </TabsList>
         </Tabs>

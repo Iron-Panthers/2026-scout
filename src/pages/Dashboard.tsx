@@ -10,7 +10,7 @@ import {
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { ClipboardList, Wrench, X, RefreshCw } from "lucide-react";
+import { ClipboardList, Wrench, X, RefreshCw, TrendingUp } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { getUserMatches, removeUserFromMatch, getEvents } from "@/lib/matches";
@@ -336,6 +336,17 @@ export default function Dashboard() {
               Pit Scouting
             </Link>
           </Button>
+          {/* <Button
+            size="lg"
+            variant="outline"
+            className="col-span-2 h-14 text-base font-semibold flex flex-row gap-2 border-yellow-700/40 text-yellow-400 hover:bg-yellow-900/20 hover:text-yellow-300"
+            asChild
+          >
+            <Link to="/betting">
+              <TrendingUp className="h-5 w-5" />
+              Betting Markets
+            </Link>
+          </Button> */}
         </div>
 
         {/* Pit Scouting Assignments Section */}
