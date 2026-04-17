@@ -14,7 +14,7 @@ import { getGameProfile } from "@/lib/gameProfiles";
 import {
   getMatchBets, getMatchUserBet, placeBet, cancelBet,
   computeOddsFromBets, estimatePayout, settleMatchBets,
-  cacheMatchOdds, getCachedMatchOdds,
+  cacheMatchOdds, getCachedMatchOdds, blendOddsRedPct,
 } from "@/lib/betting";
 import {
   getStatboticsMatch, getCachedStatboticsMatch, getMatchLabel, wasUpset,
@@ -169,13 +169,13 @@ interface AllianceCardProps {
 function AllianceCard({ alliance, teamKeys, teamInfo }: AllianceCardProps) {
   const isRed = alliance === "red";
   return (
-    <Card className={`flex-1 ${isRed ? "bg-red-900/10 border-red-700/40" : "bg-blue-900/10 border-blue-700/40"} border`}>
-      <CardHeader className="pb-2 pt-3 px-3">
+    <Card className={`flex-1 ${isRed ? "bg-red-900/10 border-red-700/40" : "bg-blue-900/10 border-blue-700/40"} border p-6`}>
+      <CardHeader className="pb-0 pt-3 px-3">
         <CardTitle className={`text-xs font-bold uppercase tracking-wider ${isRed ? "text-red-400" : "text-blue-400"}`}>
-          {isRed ? "🔴 Red Alliance" : "🔵 Blue Alliance"}
+          {isRed ? "Red Alliance" : "Blue Alliance"}
         </CardTitle>
       </CardHeader>
-      <CardContent className="pt-0 pb-3 px-3 space-y-2">
+      <CardContent className="p-0 pb-4 px-3 space-y-3">
         {teamKeys.map((key) => {
           const num = parseInt(key.replace("frc", ""));
           const info = teamInfo.get(num);
@@ -552,6 +552,21 @@ export default function MatchBetting() {
   const currentOdds = odds ?? { redPct: 50, bluePct: 50, totalPool: 0, betCount: 0, history: [], redTotal: 0, blueTotal: 0 };
   const sbRedProb = sbMatch?.pred.red_win_prob;
 
+  // Blended display odds: combines Statbotics prediction with bet-pool distribution.
+  // When few bets are placed, Statbotics dominates; as pool grows, bets take over.
+  const blendedRedPct = sbRedProb !== undefined
+    ? blendOddsRedPct(currentOdds.redPct, sbRedProb, currentOdds.totalPool)
+    : currentOdds.redPct;
+  const blendedBluePct = 100 - blendedRedPct;
+
+  const blendedHistory = sbRedProb !== undefined
+    ? (currentOdds.history ?? []).map((pt) => {
+        const pool = pt.redTotal + pt.blueTotal;
+        const blended = blendOddsRedPct(pt.redPct, sbRedProb, pool);
+        return { ...pt, redPct: blended, bluePct: 100 - blended };
+      })
+    : (currentOdds.history ?? []);
+
   const estPayout = selectedAlliance
     ? estimatePayout(betAmount, selectedAlliance, currentOdds as MatchOdds, sbRedProb)
     : null;
@@ -649,14 +664,14 @@ export default function MatchBetting() {
           </Card>
         )}
 
-        {/* Bet-based odds display */}
+        {/* Combined odds display */}
         <div className="grid grid-cols-2 gap-3">
           <div className="bg-red-900/20 border border-red-700/30 rounded-xl p-4 text-center">
             <div className="text-[10px] text-red-400 font-semibold uppercase tracking-wider mb-1">
               Red Alliance
             </div>
             <div className="text-4xl font-black text-red-300">
-              {Math.round(currentOdds.redPct)}%
+              {Math.round(blendedRedPct)}%
             </div>
             <div className="text-xs text-muted-foreground mt-1">
               {currentOdds.redTotal} pts bet
@@ -667,7 +682,7 @@ export default function MatchBetting() {
               Blue Alliance
             </div>
             <div className="text-4xl font-black text-blue-300">
-              {Math.round(currentOdds.bluePct)}%
+              {Math.round(blendedBluePct)}%
             </div>
             <div className="text-xs text-muted-foreground mt-1">
               {currentOdds.blueTotal} pts bet
@@ -680,13 +695,13 @@ export default function MatchBetting() {
           <CardContent className="p-3">
             <div className="flex items-center justify-between mb-1">
               <span className="text-xs text-muted-foreground font-medium">
-                Bet-based win probability over time
+                Combined win probability (bets + Statbotics)
               </span>
               <span className="text-xs text-muted-foreground">
                 Pool: {currentOdds.totalPool} pts
               </span>
             </div>
-            <OddsChart history={currentOdds.history ?? []} isLive={!matchComplete && isOnline} />
+            <OddsChart history={blendedHistory} isLive={!matchComplete && isOnline} />
           </CardContent>
         </Card>
 
@@ -892,11 +907,11 @@ export default function MatchBetting() {
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" className="flex-1 border-red-700/40 text-red-400 hover:bg-red-900/20"
                   onClick={() => handleSettle("red")} disabled={settling || !isOnline}>
-                  {settling ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "🔴 Red Wins"}
+                  {settling ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Red Wins"}
                 </Button>
                 <Button variant="outline" size="sm" className="flex-1 border-blue-700/40 text-blue-400 hover:bg-blue-900/20"
                   onClick={() => handleSettle("blue")} disabled={settling || !isOnline}>
-                  {settling ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "🔵 Blue Wins"}
+                  {settling ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Blue Wins"}
                 </Button>
                 <Button variant="outline" size="sm" className="border-gray-700/40 text-muted-foreground hover:bg-muted/20"
                   onClick={() => handleSettle("tie")} disabled={settling || !isOnline}>

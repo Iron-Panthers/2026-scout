@@ -336,7 +336,7 @@ export default function Dashboard() {
               Pit Scouting
             </Link>
           </Button>
-          <Button
+          {/* <Button
             size="lg"
             variant="outline"
             className="col-span-2 h-14 text-base font-semibold flex flex-row gap-2 border-yellow-700/40 text-yellow-400 hover:bg-yellow-900/20 hover:text-yellow-300"
@@ -346,7 +346,7 @@ export default function Dashboard() {
               <TrendingUp className="h-5 w-5" />
               Betting Markets
             </Link>
-          </Button>
+          </Button> */}
         </div>
 
         {/* Pit Scouting Assignments Section */}

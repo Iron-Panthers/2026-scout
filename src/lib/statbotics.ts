@@ -109,7 +109,7 @@ export async function getStatboticsEventMatches(
   } catch { /* ignore */ }
 
   const data = await sbFetch<StatboticsMatch[]>(
-    `/event_matches?event=${eventCode}&limit=200`
+    `/matches?event=${eventCode}&limit=200`
   );
   if (!data || !Array.isArray(data)) return [];
 

@@ -91,6 +91,33 @@ export function computeOddsFromBets(bets: Bet[]): MatchOdds {
 }
 
 // ---------------------------------------------------------------------------
+// Blended display odds (bet pool + Statbotics)
+// ---------------------------------------------------------------------------
+
+/**
+ * Blend bet-based red% with Statbotics predicted red win probability.
+ *
+ * Uses a pool-weighted formula so Statbotics dominates when few bets have
+ * been placed and smoothly shifts toward pure bet-based odds as the pool grows.
+ *
+ *   betWeight = pool / (pool + ALPHA)
+ *
+ * At pool = 0   → 100% Statbotics
+ * At pool = ALPHA → 50 / 50 blend
+ * At pool → ∞   → 100% bet-based
+ */
+const BLEND_ALPHA = 50; // pts of pool = 50 / 50 crossover
+
+export function blendOddsRedPct(
+  betRedPct: number,
+  sbRedWinProb: number, // 0–1
+  totalPool: number
+): number {
+  const betWeight = totalPool / (totalPool + BLEND_ALPHA);
+  return betWeight * betRedPct + (1 - betWeight) * sbRedWinProb * 100;
+}
+
+// ---------------------------------------------------------------------------
 // Probability-adjusted payout formula
 // ---------------------------------------------------------------------------
 /**
@@ -112,11 +139,9 @@ export function calcPayout(
   winnerPredictedProb: number  // Statbotics predicted prob for the winning side
 ): number {
   if (amount <= 0 || winnerPool <= 0) return amount; // refund edge case
-  const p = Math.max(0.01, Math.min(0.99, winnerPredictedProb)); // clamp
-  const fairMultiplier = 1.0 / p;
-  const maxMultiplier = totalPool / winnerPool;
-  const effectiveMultiplier = Math.min(fairMultiplier, maxMultiplier);
-  return Math.floor(amount * effectiveMultiplier);
+  const p = Math.max(0, Math.min(1, winnerPredictedProb)); // clamp
+  const multiplier = 2 * Math.pow(1 - p, 1.6) + 1.2; // baseline 0.2x
+  return Math.floor(amount * multiplier);
 }
 
 /**

@@ -8,7 +8,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Settings, User, LogOut, Users, LayoutDashboard } from "lucide-react";
+import { Settings, User, LogOut, Users, LayoutDashboard, TrendingUp } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import type { UserProfileMenuProps } from "@/types";
@@ -52,9 +52,13 @@ export default function UserProfileMenu({
           <Settings className="mr-2 h-4 w-4" />
           <span>Settings</span>
         </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => navigate("/betting")}>
+          <TrendingUp className="mr-2 h-4 w-4" />
+          <span>Predictions</span>
+        </DropdownMenuItem>
         {isManager && (
           <>
-            <DropdownMenuSeparator />
             {isOnManagerDashboard ? (
               <DropdownMenuItem onClick={() => navigate("/dashboard")}>
                 <LayoutDashboard className="mr-2 h-4 w-4" />
