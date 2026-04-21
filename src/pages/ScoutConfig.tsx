@@ -665,7 +665,7 @@ export default function ScoutConfig() {
           </TabsContent>
           <TabsContent value="betting" className="p-0 m-0 fixed inset-0 z-40 bg-background" style={{ bottom: "2.5rem" }}>
             <iframe
-              src="/betting"
+              src="/betting?isIframe=true"
               className="w-full h-full border-none block"
               title="Betting Markets"
             />
