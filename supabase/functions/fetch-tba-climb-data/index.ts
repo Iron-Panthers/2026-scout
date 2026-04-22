@@ -17,13 +17,13 @@ const TBA_AUTH_KEY = Deno.env.get("TBA_AUTH_KEY")!;
 const TBA_BASE_URL = "https://www.thebluealliance.com/api/v3";
 
 // Role → TBA score_breakdown field mapping
-const ROLE_TO_TBA: Record<string, { alliance: "red" | "blue"; field: string }> = {
-  red1:  { alliance: "red",  field: "endGameTowerRobot1" },
-  red2:  { alliance: "red",  field: "endGameTowerRobot2" },
-  red3:  { alliance: "red",  field: "endGameTowerRobot3" },
-  blue1: { alliance: "blue", field: "endGameTowerRobot1" },
-  blue2: { alliance: "blue", field: "endGameTowerRobot2" },
-  blue3: { alliance: "blue", field: "endGameTowerRobot3" },
+const ROLE_TO_TBA: Record<string, { alliance: "red" | "blue"; field: string[] }> = {
+  red1:  { alliance: "red",  field: [ "endGameTowerRobot1", "autoTowerRobot1" ] },
+  red2:  { alliance: "red",  field: [ "endGameTowerRobot2", "autoTowerRobot2" ] },
+  red3:  { alliance: "red",  field: [ "endGameTowerRobot3", "autoTowerRobot3" ] },
+  blue1: { alliance: "blue", field: [ "endGameTowerRobot1", "autoTowerRobot1" ] },
+  blue2: { alliance: "blue", field: [ "endGameTowerRobot2", "autoTowerRobot2" ] },
+  blue3: { alliance: "blue", field: [ "endGameTowerRobot3", "autoTowerRobot3" ] },
 };
 
 Deno.serve(async (_req) => {
@@ -105,8 +105,9 @@ Deno.serve(async (_req) => {
             continue;
           }
 
-          const climbValue = scoreBreakdown[mapping.alliance]?.[mapping.field];
-          const tbaData = { climb: climbValue ?? "Unknown" };
+          const climbEndgameValue = scoreBreakdown[mapping.alliance]?.[mapping.field[0]];
+          const climbAutoValue = scoreBreakdown[mapping.alliance]?.[mapping.field[1]];
+          const tbaData = { endgameClimb: climbEndgameValue ?? "Unknown", autoClimb: climbAutoValue ?? "Unknown" };
 
           const { error: updateError } = await supabase
             .from("scouting_submissions")

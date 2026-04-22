@@ -213,11 +213,10 @@ export default function ManagerDashboard() {
           temp = eventsData[0].id;
         }
 
-        if (temp !== "all") {
-          const newScouts = eventsData.find(e => e.id === temp)?.users.map(u => profilesArray.find(scout => scout.id === u)).filter(u => u !== undefined); 
-          setAvailableScouts([...new Map(newScouts.map(u => [u.id, u])).values()]); 
-          // console.log("skdfhdfhsjkdf", eventsData, profilesArray)
-        }
+        setSelectedEvent(temp);
+        const newScouts = eventsData.find(e => e.id === temp)?.users.map(u => profilesArray.find(scout => scout.id === u)).filter(u => u !== undefined); 
+        setAvailableScouts([...new Map(newScouts.map(u => [u.id, u])).values()]); 
+        // console.log("skdfhdfhsjkdf", eventsData, profilesArray)
       }
       else if (selectedEvent !== "all") {
         // console.log("reloaded");
@@ -614,6 +613,23 @@ export default function ManagerDashboard() {
     });
   }, [paginatedMatches]);
 
+  const handleSendNotifications = useCallback(async () => {
+    if (selectedMatches.size === 0) return;
+
+    const matchIds = Array.from(selectedMatches);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const { error } = await supabase.functions.invoke("send-forced-notifications", {
+        body: { matchIds },
+        headers: session ? { Authorization: `Bearer ${session.access_token}` } : undefined,
+      });
+      if (error) throw error;
+      toast({ title: "Notifications sent", description: `Sent to scouts in ${matchIds.length} match${matchIds.length !== 1 ? "es" : ""}.` });
+    } catch (err: any) {
+      toast({ title: "Failed to send notifications", description: err.message || "Unknown error", variant: "destructive" });
+    }
+  }, [selectedMatches, toast]);
+
   const handleQuickApplyToSelected = useCallback(
     async (rosterId: string) => {
       if (selectedMatches.size === 0) return;
@@ -931,6 +947,12 @@ export default function ManagerDashboard() {
                     {selectedMatches.size} match{selectedMatches.size !== 1 ? "es" : ""} selected
                   </span>
                   <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      onClick={handleSendNotifications}
+                    >
+                      Send Notification
+                    </Button>
                     <Button
                       variant="outline"
                       size="sm"

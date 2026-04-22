@@ -6,6 +6,7 @@ import { ScoutingReducer, type QualScoutingData } from "@/lib/ScoutingReducer";
 import { TeamImage } from "@/components/TeamImage";
 import { Loader2 } from "lucide-react";
 import { compressState } from "@/lib/stateCompression";
+import { Input } from "@/components/ui/input";
 
 // Row height used for drag hit-test
 const ROW_HEIGHT = 96; // px, must match rendered height
@@ -31,6 +32,7 @@ export default function QualScouting() {
   const manualTeam2 = parseInt(searchParams.get("team2") || "0");
   const manualTeam3 = parseInt(searchParams.get("team3") || "0");
   const hasManualTeams = manualTeam1 > 0 || manualTeam2 > 0 || manualTeam3 > 0;
+  const centerAutoTime = useState<(number | null)[]>([null, null, null]);
 
   const alliance = role === "qualRed" ? "red" : "blue";
 
@@ -226,94 +228,135 @@ export default function QualScouting() {
               : -1;
 
             return state.rankings.map((teamNum, index) => {
-            const isDraggingThis = drag.dragging && drag.dragIndex === index;
-            let translateY = 0;
-            if (isDraggingThis) {
-              translateY = drag.currentY - drag.startY;
-            } else if (drag.dragging) {
-              const di = drag.dragIndex;
-              if (di < ghostIndex && index > di && index <= ghostIndex) {
-                translateY = -ROW_SLOT;
-              } else if (di > ghostIndex && index >= ghostIndex && index < di) {
-                translateY = ROW_SLOT;
+              const isDraggingThis = drag.dragging && drag.dragIndex === index;
+              let translateY = 0;
+              if (isDraggingThis) {
+                translateY = drag.currentY - drag.startY;
+              } else if (drag.dragging) {
+                const di = drag.dragIndex;
+                if (di < ghostIndex && index > di && index <= ghostIndex) {
+                  translateY = -ROW_SLOT;
+                } else if (di > ghostIndex && index >= ghostIndex && index < di) {
+                  translateY = ROW_SLOT;
+                }
               }
-            }
-            const opts = state.teamOptions[String(teamNum)] ?? {
-              outpostFed: false,
-              passed: false,
-            };
+              const opts = state.teamOptions[String(teamNum)] ?? {
+                outpostFed: false,
+                passed: false,
+                autoCenter: 0
+              };
 
-            return (
-              <div
-                key={teamNum}
-                style={{
-                  transform: `translateY(${translateY}px)`,
-                  zIndex: isDraggingThis ? 10 : 1,
-                  transition: isDraggingThis ? "none" : "transform 0.15s ease",
-                  height: ROW_HEIGHT,
-                }}
-                className={`relative flex items-center gap-3 px-3 rounded-xl border-2 cursor-grab active:cursor-grabbing touch-none
-                  ${rowBg[teamColorIndex.current[teamNum] ?? index]} ${rowBorder[teamColorIndex.current[teamNum] ?? index]}
-                  ${isDraggingThis ? "shadow-2xl scale-[1.02] opacity-95" : ""}
-                `}
-                onPointerDown={(e) => onDragPointerDown(e, index)}
-              >
-                {/* Drag handle (visual only) */}
-                <div className="shrink-0 text-muted-foreground pointer-events-none">
-                  <GripVertical className="w-5 h-5" />
-                </div>
+              return (
+                <div
+                  key={teamNum}
+                  style={{
+                    transform: `translateY(${translateY}px)`,
+                    zIndex: isDraggingThis ? 10 : 1,
+                    transition: isDraggingThis ? "none" : "transform 0.15s ease",
+                    height: ROW_HEIGHT,
+                  }}
+                  className={`relative flex items-center gap-3 px-3 rounded-xl border-2 cursor-grab active:cursor-grabbing
+                    ${rowBg[teamColorIndex.current[teamNum] ?? index]} ${rowBorder[teamColorIndex.current[teamNum] ?? index]}
+                    ${isDraggingThis ? "shadow-2xl scale-[1.02] opacity-95" : ""}
+                  `}
+                  onPointerDown={(e) => onDragPointerDown(e, index)}
+                >
+                  {/* Drag handle (visual only) */}
+                  <div className="shrink-0 text-muted-foreground pointer-events-none">
+                    <GripVertical className="w-5 h-5" />
+                  </div>
 
-                {/* Rank badge */}
-                <span className="text-xs font-bold text-muted-foreground w-4 shrink-0">
-                  {index + 1}
-                </span>
+                  {/* Rank badge */}
+                  <span className="text-xs font-bold text-muted-foreground w-4 shrink-0">
+                    {index + 1}
+                  </span>
 
-                {/* Team photo */}
-                <div className="w-14 h-14 rounded-lg overflow-hidden border border-border shrink-0">
-                  <TeamImage
-                    teamNumber={teamNum}
-                    className="w-full h-full object-cover"
-                    fallbackClassName="w-full h-full flex items-center justify-center bg-muted"
-                  />
-                </div>
+                  {/* Team photo */}
+                  <div className="w-14 h-14 rounded-lg overflow-hidden border border-border shrink-0">
+                    <TeamImage
+                      teamNumber={teamNum}
+                      className="w-full h-full object-cover"
+                      fallbackClassName="w-full h-full flex items-center justify-center bg-muted"
+                    />
+                  </div>
 
-                {/* Team number */}
-                <span className="text-2xl font-black tabular-nums flex-1 min-w-0 truncate">
-                  {teamNum || "?"}
-                </span>
+                  {/* Team number */}
+                  <span className="text-2xl font-black tabular-nums flex-1 min-w-0 truncate">
+                    {teamNum || "?"}
+                  </span>
 
-                {/* Toggle buttons */}
-                <div className="flex flex-col gap-1.5 shrink-0">
+                  {/* Toggle buttons */}
+                  { opts.autoCenter !== -1 && (
+                    <>
+                      <span className="w-24 float-end">
+                        Time for auto to reach center: {opts.autoCenter}s
+                      </span>
+                      <div className="flex flex-col gap-0 shrink-0">
+                        <button
+                          className={`w-10 px-3 py-1 rounded-md text-xs font-semibold border transition-colors bg-green-500 text-white border-violet-500"`}
+                          onPointerDown={(e) => {
+                            e.stopPropagation();
+                            dispatchSet(`teamOptions.${teamNum}.autoCenter`, opts.autoCenter + 1);
+                          }}
+                        >
+                          +1s
+                        </button>
+                        <button
+                          className={`w-10 px-3 py-1 rounded-md text-xs font-semibold border transition-colors bg-red-500 text-white border-violet-500"`}
+                          onPointerDown={(e) => {
+                            e.stopPropagation();
+                            dispatchSet(`teamOptions.${teamNum}.autoCenter`, opts.autoCenter - 1);
+                          }}
+                        >
+                          -1s
+                        </button>
+                      </div>
+                    </>
+                  )}
+                  <div className="flex flex-col gap-1 shrink-0">
                   <button
-                    className={`px-3 py-1 rounded-md text-xs font-semibold border transition-colors
-                      ${opts.outpostFed
-                        ? "bg-violet-500 text-white border-violet-500"
-                        : "bg-transparent text-muted-foreground border-border"
-                      }`}
-                    onPointerDown={(e) => {
-                      e.stopPropagation();
-                      dispatchSet(`teamOptions.${teamNum}.outpostFed`, !opts.outpostFed);
-                    }}
-                  >
-                    Got Beached
-                  </button>
-                  <button
-                    className={`px-3 py-1 rounded-md text-xs font-semibold border transition-colors
-                      ${opts.passed
-                        ? "bg-sky-500 text-white border-sky-500"
-                        : "bg-transparent text-muted-foreground border-border"
-                      }`}
-                    onPointerDown={(e) => {
-                      e.stopPropagation();
-                      dispatchSet(`teamOptions.${teamNum}.passed`, !opts.passed);
-                    }}
-                  >
-                    Passed
-                  </button>
+                      className={`px-3 py-1 rounded-md text-xs font-semibold border transition-colors
+                        ${opts.autoCenter !== -1
+                          ? "bg-yellow-500 text-white border-yellow-500"
+                          : "bg-transparent text-muted-foreground border-border"
+                        }`}
+                      onPointerDown={(e) => {
+                        e.stopPropagation();
+                        dispatchSet(`teamOptions.${teamNum}.autoCenter`, opts.autoCenter === -1 ? 0 : -1);
+                      }}
+                    >
+                      Center Auto
+                    </button>
+                    <button
+                      className={`px-3 py-1 rounded-md text-xs font-semibold border transition-colors
+                        ${opts.outpostFed
+                          ? "bg-violet-500 text-white border-violet-500"
+                          : "bg-transparent text-muted-foreground border-border"
+                        }`}
+                      onPointerDown={(e) => {
+                        e.stopPropagation();
+                        dispatchSet(`teamOptions.${teamNum}.outpostFed`, !opts.outpostFed);
+                      }}
+                    >
+                      Got Beached
+                    </button>
+                    <button
+                      className={`px-3 py-1 rounded-md text-xs font-semibold border transition-colors
+                        ${opts.passed
+                          ? "bg-sky-500 text-white border-sky-500"
+                          : "bg-transparent text-muted-foreground border-border"
+                        }`}
+                      onPointerDown={(e) => {
+                        e.stopPropagation();
+                        dispatchSet(`teamOptions.${teamNum}.passed`, !opts.passed);
+                      }}
+                    >
+                      Passed
+                    </button>
+                  </div>
                 </div>
-              </div>
-            );
-          });
+              );
+            });
           })()}
         </div>
 

@@ -50,8 +50,8 @@ export default function ScoutConfig() {
 
   const [match_id, setMatchId] = useState(param_match_id || "");
   const [matchType, setMatchType] = useState("Qualification");
-  const [matchNumber, setMatchNumber] = useState(0);
-  const [teamNumber, setTeamNumber] = useState(0);
+  const [matchNumber, setMatchNumber] = useState("");
+  const [teamNumber, setTeamNumber] = useState("");
   const [role, setRole] = useState(search_params.get("role") || "");
   const [eventId, setEventId] = useState("");
   const [eventCode, setEventCode] = useState("");
@@ -211,7 +211,7 @@ export default function ScoutConfig() {
   }, [param_match_id, user?.id]);
 
   const updateTeamNum = async () => {
-    if (matchType === "Practice" || matchType === "Playoff") return;
+    if (matchType === "Practice" || matchType === "Playoff" || matchType === "Final") return;
     if (!matchNumber || !role || !eventCode) return;
 
     const isQualRole = role === "qualRed" || role === "qualBlue";
@@ -563,6 +563,12 @@ export default function ScoutConfig() {
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         className="p-2 px-7 bg-accent-foreground/10 border-b rounded-lg"
+                        onClick={() => handleMatchTypeChange("Final")}
+                      >
+                        Final
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="p-2 px-7 bg-accent-foreground/10 border-b rounded-lg"
                         onClick={() => handleMatchTypeChange("Practice")}
                       >
                         Practice
@@ -659,7 +665,7 @@ export default function ScoutConfig() {
           </TabsContent>
           <TabsContent value="betting" className="p-0 m-0 fixed inset-0 z-40 bg-background" style={{ bottom: "2.5rem" }}>
             <iframe
-              src="/betting"
+              src="/betting?isIframe=true"
               className="w-full h-full border-none block"
               title="Betting Markets"
             />

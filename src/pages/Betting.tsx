@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft, TrendingUp, Coins, Trophy, RefreshCw, WifiOff, Zap, Target,
   ChevronLeft, ChevronRight,
@@ -202,7 +202,6 @@ function SpotlightCard({ match, odds, tba, sb, userBetAlliance, onClick }: Marke
 // ---------------------------------------------------------------------------
 function GridCard({ match, odds, tba, sb, userBetAlliance, onClick }: MarketCardProps) {
   const rawRedPct = odds?.redPct ?? 50;
-  console.log(match.name, odds, sb)
   const redPct = sb
     ? blendOddsRedPct(rawRedPct, sb.pred.red_win_prob, odds?.totalPool ?? 0)
     : rawRedPct;
@@ -717,6 +716,8 @@ export default function Betting() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const isOnline = useOnlineStatus();
+  const [searchParams] = useSearchParams();
+  const isInIframe = searchParams.get('isIframe') ?? false;
 
   const [event, setEvent] = useState<Event | null>(null);
   const [matches, setMatches] = useState<Match[]>([]);
@@ -843,9 +844,11 @@ export default function Betting() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6 max-w-2xl mx-auto">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
+            {!isInIframe && (
+              <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+            )}
             <div>
               <h1 className="text-2xl font-bold flex items-center gap-2">
                 <TrendingUp className="h-6 w-6 text-primary" />
