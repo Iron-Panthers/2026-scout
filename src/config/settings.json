@@ -24,11 +24,16 @@
     "description": "Customize how the app looks and feels",
     "fields": [
       {
-        "id": "dark-mode",
-        "label": "Dark Mode",
-        "description": "Use dark mode (recommended)",
-        "type": "switch",
-        "defaultValue": true,
+        "id": "theme",
+        "label": "Theme",
+        "description": "Choose your preferred color theme",
+        "type": "select",
+        "options": [
+          { "value": "dark", "label": "Dark" },
+          { "value": "light", "label": "Light" },
+          { "value": "ben", "label": "Ben Mode" }
+        ],
+        "defaultValue": "dark",
         "editable": true
       }
     ]
