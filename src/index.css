@@ -241,6 +241,7 @@ html[data-theme="ben"] {
   background-size: auto;
   background-repeat: repeat;
   background-attachment: fixed;
+  background-position: center;
 }
 
 html[data-theme="ben"] body {
@@ -253,6 +254,7 @@ html[data-theme="ben"] body {
   background-size: auto !important;
   background-repeat: repeat !important;
   background-color: transparent !important;
+  background-position: center;
 }
 
 @layer base {
