@@ -198,6 +198,33 @@ export default function Settings() {
                   );
                 }
 
+                if (field.type === "select") {
+                  const current = (settings[field.id] ?? field.defaultValue) as string;
+                  return (
+                    <div key={field.id} className="space-y-2">
+                      <Label>{field.label}</Label>
+                      {field.description && (
+                        <p className="text-sm text-muted-foreground">{field.description}</p>
+                      )}
+                      <div className="flex gap-2 flex-wrap">
+                        {field.options.map((opt: { value: string; label: string }) => (
+                          <button
+                            key={opt.value}
+                            onClick={() => updateSetting(field.id, opt.value)}
+                            className={`px-4 py-2 rounded-md border text-sm font-medium transition-colors
+                              ${current === opt.value
+                                ? "border-primary bg-primary/10 text-primary"
+                                : "border-border bg-muted text-foreground hover:bg-muted/70"
+                              }`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                }
+
                 if (field.type === "keybind") {
                   const isRecording = recording === field.id;
                   const currentKey = (settings[field.id] ?? field.defaultValue) as string;

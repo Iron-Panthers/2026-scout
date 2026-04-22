@@ -48,6 +48,15 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     }
   }, [user?.id]);
 
+  // Apply theme class/data-attribute whenever theme setting changes
+  useEffect(() => {
+    const theme = settings["theme"] ?? "dark";
+    const html = document.documentElement;
+    html.classList.toggle("dark", theme === "dark" || theme === "ben");
+    html.setAttribute("data-theme", theme);
+    localStorage.setItem("app-theme", theme);
+  }, [settings["theme"]]);
+
   const updateSetting = (key: string, value: any) => {
     const newSettings = { ...settings, [key]: value };
     setSettings(newSettings);
