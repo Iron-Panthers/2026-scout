@@ -499,6 +499,7 @@ export default function Scouting() {
         show={!hasStarted}
         onStartMatch={startMatch}
         matchNumber={match_number}
+        teamNumber={team_number}
         role={role}
       />
       {optionsOpen && OptionsOverlay()}

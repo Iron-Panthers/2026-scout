@@ -8,6 +8,7 @@ interface StartMatchOverlayProps {
   onStartMatch: () => void;
   /** Match number */
   matchNumber?: number;
+  teamNumber: number;
   /** Role */
   role?: string;
 }
@@ -16,6 +17,7 @@ export default function StartMatchOverlay({
   show,
   onStartMatch,
   matchNumber,
+  teamNumber,
   role,
 }: StartMatchOverlayProps) {
   if (!show) return null;
@@ -36,12 +38,17 @@ export default function StartMatchOverlay({
             Ready to Scout
           </h2>
           {matchNumber && (
-            <p className="text-sm sm:text-base text-muted-foreground">
+            <p className="text-sm sm:text-base text-muted-foreground mb-0">
               Match #{matchNumber}
             </p>
           )}
+          {teamNumber && (
+            <b className="text-sm sm:text-base text-muted-foreground">
+              Team {teamNumber}
+            </b>
+          )}
           {role && (
-            <p className="text-xs text-muted-foreground">Role: {role}</p>
+            <p className="text-xs text-muted-foreground mt-2">Role: {role}</p>
           )}
         </div>
 
