@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/command";
 import CosmeticAvatar from "@/components/CosmeticAvatar";
 import type { Profile } from "@/types";
+import { Badge } from "@/components/ui/badge";
 
 // Instant dialog content without animations
 function InstantDialogContent({
@@ -75,14 +76,26 @@ const ScoutItem = memo(({ profile, onSelect, equippedCosmetics }: { profile: Pro
       onSelect={onSelect}
       className="flex items-center gap-3 px-4 py-3 cursor-pointer"
     >
-      <CosmeticAvatar
-        avatarUrl={profile.avatar_url || ""}
-        initials={initials}
-        equippedCosmetics={equippedCosmetics ?? {}}
-        size="md"
-      />
+      <div className="relative">
+        <CosmeticAvatar
+          avatarUrl={profile.avatar_url || ""}
+          initials={initials}
+          equippedCosmetics={equippedCosmetics ?? {}}
+          size="md"
+        />
+        {profile.clocked_in && (
+          <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-green-500 border-2 border-background" />
+        )}
+      </div>
       <div className="flex-1">
-        <p className="font-medium">{profile.name || "Unknown"}</p>
+        <div className="flex items-center gap-2">
+          <p className="font-medium">{profile.name || "Unknown"}</p>
+          {profile.clocked_in && (
+            <Badge className="h-4 px-1.5 text-[10px] bg-green-600/20 text-green-400 border border-green-600/30 font-medium">
+              Active
+            </Badge>
+          )}
+        </div>
         <p className="text-sm text-muted-foreground">
           {profile.role}
         </p>
@@ -100,18 +113,33 @@ export function ScoutAssignmentDialog({
   onAssignScout,
   cosmeticsMap = {},
 }: ScoutAssignmentDialogProps) {
+  // Sort clocked-in scouts to the top
+  const sortedScouts = useMemo(
+    () => [...availableScouts].sort((a, b) => (b.clocked_in ? 1 : 0) - (a.clocked_in ? 1 : 0)),
+    [availableScouts]
+  );
+
+  const clockedInCount = sortedScouts.filter((s) => s.clocked_in).length;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <InstantDialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Assign Scout</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            Assign Scout
+            {clockedInCount > 0 && (
+              <Badge className="bg-green-600/20 text-green-400 border border-green-600/30 text-xs font-medium">
+                {clockedInCount} active
+              </Badge>
+            )}
+          </DialogTitle>
         </DialogHeader>
         <Command className="rounded-lg border shadow-md">
           <CommandInput placeholder="Search scouts..." />
           <CommandList>
             <CommandEmpty>No scouts found.</CommandEmpty>
             <CommandGroup>
-              {availableScouts.map((profile) => (
+              {sortedScouts.map((profile) => (
                 <ScoutItem
                   key={profile.id}
                   profile={profile}

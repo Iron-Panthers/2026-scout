@@ -13,6 +13,8 @@ export interface Profile {
   role: "scout" | "manager" | "admin";
   is_manager: boolean;
   avatar_url: string | null;
+  clocked_in: boolean;
+  clocked_in_at: string | null;
   created_at: string;
   updated_at: string;
 }
