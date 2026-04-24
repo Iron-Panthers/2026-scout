@@ -1,5 +1,5 @@
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -8,9 +8,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Settings, User, LogOut, Users, LayoutDashboard, TrendingUp } from "lucide-react";
+import { Settings, User, LogOut, Users, LayoutDashboard, TrendingUp, ShoppingBag } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { getGameProfile } from "@/lib/gameProfiles";
+import CosmeticAvatar from "@/components/CosmeticAvatar";
 import type { UserProfileMenuProps } from "@/types";
 
 export default function UserProfileMenu({
@@ -20,25 +22,37 @@ export default function UserProfileMenu({
 }: Omit<UserProfileMenuProps, "isManager">) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { profile, signOut } = useAuth();
+  const { profile, signOut, user } = useAuth();
   const isManager = profile?.is_manager || false;
   const isOnManagerDashboard = location.pathname === "/manager";
+
+  const [equippedCosmetics, setEquippedCosmetics] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!user?.id) return;
+    getGameProfile(user.id).then((gp) => {
+      if (gp?.equipped_cosmetics) setEquippedCosmetics(gp.equipped_cosmetics);
+    });
+  }, [user?.id]);
 
   const handleSignOut = async () => {
     await signOut();
     navigate("/login");
   };
 
+  // suppress unused warning — userName is kept for aria-label accessibility
+  void userName;
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="relative h-10 w-10 rounded-full">
-          <Avatar className="h-10 w-10">
-            <AvatarImage src={avatarUrl} alt={userName} />
-            <AvatarFallback className="bg-primary text-primary-foreground">
-              {userInitials}
-            </AvatarFallback>
-          </Avatar>
+        <Button variant="ghost" className="relative h-10 w-10 rounded-full overflow-visible p-0">
+          <CosmeticAvatar
+            avatarUrl={avatarUrl}
+            initials={userInitials}
+            equippedCosmetics={equippedCosmetics}
+            size="md"
+          />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
@@ -53,6 +67,10 @@ export default function UserProfileMenu({
           <span>Settings</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => navigate("/shop")}>
+          <ShoppingBag className="mr-2 h-4 w-4" />
+          <span>Shop</span>
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={() => navigate("/betting")}>
           <TrendingUp className="mr-2 h-4 w-4" />
           <span>Predictions</span>

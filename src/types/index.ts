@@ -13,6 +13,8 @@ export interface Profile {
   role: "scout" | "manager" | "admin";
   is_manager: boolean;
   avatar_url: string | null;
+  clocked_in: boolean;
+  clocked_in_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -165,6 +167,8 @@ export interface GameProfile {
   user_id: string;
   points: number;
   unlocked_games: string[];
+  owned_cosmetics: string[];
+  equipped_cosmetics: Record<string, string>; // slot -> cosmetic id
   created_at: string;
   updated_at: string;
 }

@@ -10,13 +10,14 @@ import {
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { ClipboardList, Wrench, X, RefreshCw, TrendingUp } from "lucide-react";
+import { ClipboardList, Wrench, X, RefreshCw, LogIn, LogOut } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { getUserMatches, removeUserFromMatch, getEvents } from "@/lib/matches";
 import { getMatchTeam } from "@/lib/blueAlliance";
 import { filterMatchesWithoutSubmissions } from "@/lib/scoutingSchema";
 import { getUserPitAssignments, type UserPitAssignment } from "@/lib/pitScoutingAssignments";
+import { clockIn, clockOut } from "@/lib/profiles";
 import { supabase } from "@/lib/supabase";
 import DashboardHeader from "@/components/DashboardHeader";
 import UserProfileMenu from "@/components/UserProfileMenu";
@@ -34,7 +35,7 @@ interface UserMatch {
 }
 
 export default function Dashboard() {
-  const { user, profile, getAvatarUrl } = useAuth();
+  const { user, profile, getAvatarUrl, refreshProfile } = useAuth();
   const [matches, setMatches] = useState<UserMatch[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedMatch, setSelectedMatch] = useState<UserMatch | null>(null);
@@ -44,6 +45,7 @@ export default function Dashboard() {
   );
   const [pitAssignments, setPitAssignments] = useState<UserPitAssignment[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [clockingIn, setClocingIn] = useState(false);
 
   const navigate = useNavigate();
 
@@ -281,6 +283,22 @@ export default function Dashboard() {
     }
   };
 
+  const handleClockIn = async () => {
+    if (!user?.id) return;
+    setClocingIn(true);
+    await clockIn(user.id);
+    await refreshProfile();
+    setClocingIn(false);
+  };
+
+  const handleClockOut = async () => {
+    if (!user?.id) return;
+    setClocingIn(true);
+    await clockOut(user.id);
+    await refreshProfile();
+    setClocingIn(false);
+  };
+
   const handleQueueScouting = async () => {
     console.log("Selected match:", selectedMatch);
     console.log("Match ID:", selectedMatch.match.id);
@@ -316,11 +334,63 @@ export default function Dashboard() {
         </div>
 
         {/* Action Buttons */}
-        <div className="grid grid-cols-2 gap-4 mb-8">
+        <div className="grid grid-cols-3 gap-4 mb-1">
+          {/* Clock In / Out */}
+          <div className="mb-6 space-y-2 h-full">
+            {profile?.clocked_in ? (
+              <div className="flex items-center justify-between p-4 bg-red-900/20 border border-red-700/40 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <div className="mx-5 h-3 w-3 rounded-full bg-red-500 animate-pulse" />
+                  <div>
+                    <p className="font-semibold text-red-400">Clocked In</p>
+                    <p className="text-xs text-muted-foreground">You're available for scouting</p>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={clockingIn}
+                  className="h-16 border-red-700/40 text-red-400 hover:bg-red-900/20 hover:text-red-300"
+                  onClick={handleClockOut}
+                >
+                  <LogOut className="h-4 w-4 mr-1.5" />
+                  Clock Out
+                </Button>
+              </div>
+            ) : (
+              <Button
+                size="lg"
+                disabled={clockingIn}
+                className="w-full h-full text-lg"
+                onClick={handleClockIn}
+              >
+                <LogIn className="h-6 w-6 mr-2" />
+                Clock In
+              </Button>
+            )}
+
+            {/* No matches left — offer clock off */}
+            {profile?.clocked_in && !loading && matches.length === 0 && (
+              <div className="flex items-center justify-between p-3 bg-yellow-900/20 border border-yellow-700/40 rounded-lg">
+                <p className="text-sm text-yellow-400 font-medium">No more matches assigned. Ready to clock off?</p>
+                <Button
+                  size="sm"
+                  disabled={clockingIn}
+                  variant="outline"
+                  className="border-yellow-700/40 text-yellow-400 hover:bg-yellow-900/30 ml-3 shrink-0"
+                  onClick={handleClockOut}
+                >
+                  <LogOut className="h-4 w-4 mr-1.5" />
+                  Clock Off
+                </Button>
+              </div>
+            )}
+          </div>
           <Button
             size="lg"
             className="h-24 text-lg font-semibold flex flex-col gap-2"
             onClick={() => navigate("/config/")}
+            disabled={!profile?.clocked_in}
           >
             <ClipboardList className="h-8 w-8" />
             Match Scouting
@@ -329,7 +399,7 @@ export default function Dashboard() {
             size="lg"
             variant="secondary"
             className="h-24 text-lg font-semibold flex flex-col gap-2"
-            asChild
+            disabled={!profile?.clocked_in}
           >
             <Link to="/pit-scouting">
               <Wrench className="h-8 w-8" />
@@ -348,10 +418,16 @@ export default function Dashboard() {
             </Link>
           </Button> */}
         </div>
+        {/* Last match prompt */}
+        {profile?.clocked_in && !loading && matches.length === 1 && (
+          <div className="p-3 bg-yellow-900/20 border border-yellow-700/40 rounded-lg">
+            <p className="text-sm text-yellow-400">This is your last assigned match — remember to clock out when you're done!</p>
+          </div>
+        )}
 
         {/* Pit Scouting Assignments Section */}
         {pitAssignments.length > 0 && (
-          <div className="mb-8">
+          <div className="my-8">
             <h2 className="text-2xl font-bold mb-4">
               Your Pit Scouting Assignments
             </h2>
@@ -428,7 +504,7 @@ export default function Dashboard() {
         )}
 
         {/* Scheduled Matches Section */}
-        <div className="mb-8">
+        <div className="my-8">
           <div className="flex items-center gap-3 mb-4">
             <h2 className="text-2xl font-bold">Your Assigned Matches</h2>
             <Button

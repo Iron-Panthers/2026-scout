@@ -92,6 +92,32 @@ export async function uploadAvatar(
   return publicUrl;
 }
 
+export async function clockIn(userId: string): Promise<boolean> {
+  const { error } = await supabase
+    .from("profiles")
+    .update({ clocked_in: true, clocked_in_at: new Date().toISOString() })
+    .eq("id", userId);
+
+  if (error) {
+    console.error("Error clocking in:", error);
+    return false;
+  }
+  return true;
+}
+
+export async function clockOut(userId: string): Promise<boolean> {
+  const { error } = await supabase
+    .from("profiles")
+    .update({ clocked_in: false })
+    .eq("id", userId);
+
+  if (error) {
+    console.error("Error clocking out:", error);
+    return false;
+  }
+  return true;
+}
+
 export async function createProfile(
   userId: string,
   name: string

@@ -19,6 +19,7 @@ import SimpleRealtimeTest from "./pages/SimpleRealtimeTest";
 import PushTest from "./pages/PushTest";
 import Betting from "./pages/Betting";
 import MatchBetting from "./pages/MatchBetting";
+import Shop from "./pages/Shop";
 import { Toaster } from "./components/ui/toaster";
 import UpdateBanner from "./components/UpdateBanner";
 import NotificationNavigationListener from "./components/NotificationNavigationListener";
@@ -137,6 +138,15 @@ function App() {
               }
             />
             <Route path="/review/:encoded" element={<ScoutingReview />} />
+            {/* Shop */}
+            <Route
+              path="/shop"
+              element={
+                <ProtectedRoute>
+                  <Shop />
+                </ProtectedRoute>
+              }
+            />
             {/* Betting */}
             <Route
               path="/betting"
