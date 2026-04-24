@@ -76,10 +76,12 @@ interface MarketCardProps {
   tba?: TBAMatchData;
   sb?: StatboticsMatch;
   userBetAlliance?: "red" | "blue";
+  tbaLoading?: boolean;
+  sbLoading?: boolean;
   onClick: () => void;
 }
 
-function SpotlightCard({ match, odds, tba, sb, userBetAlliance, onClick }: MarketCardProps) {
+function SpotlightCard({ match, odds, tba, sb, userBetAlliance, tbaLoading, sbLoading, onClick }: MarketCardProps) {
   const rawRedPct = odds?.redPct ?? 50;
   const redPct = sb
     ? blendOddsRedPct(rawRedPct, sb.pred.red_win_prob, odds?.totalPool ?? 0)
@@ -145,13 +147,19 @@ function SpotlightCard({ match, odds, tba, sb, userBetAlliance, onClick }: Marke
       </div>
 
       {/* Teams */}
-      {tba && (
+      {tba ? (
         <div className="flex items-center gap-2 text-xs text-muted-foreground mb-4">
           <span className="text-red-400 font-medium">{teamNums(tba.alliances.red.team_keys)}</span>
           <span className="text-muted-foreground/30">vs</span>
           <span className="text-blue-400 font-medium">{teamNums(tba.alliances.blue.team_keys)}</span>
         </div>
-      )}
+      ) : tbaLoading ? (
+        <div className="flex items-center gap-1.5 mb-4">
+          <div className="h-2.5 w-24 rounded bg-muted/60 animate-pulse" />
+          <span className="text-muted-foreground/30 text-xs">vs</span>
+          <div className="h-2.5 w-24 rounded bg-muted/60 animate-pulse" />
+        </div>
+      ) : null}
 
       {/* Big split */}
       <div className="grid grid-cols-2 gap-3 mb-4">
@@ -180,7 +188,7 @@ function SpotlightCard({ match, odds, tba, sb, userBetAlliance, onClick }: Marke
       </div>
 
       {/* Statbotics thin bar */}
-      {sbRedPct !== null && (
+      {sbRedPct !== null ? (
         <>
           <div className="flex h-1.5 rounded overflow-hidden mt-2">
             <div className="bg-red-500/40 transition-all" style={{ width: `${sbRedPct}%` }} />
@@ -192,7 +200,9 @@ function SpotlightCard({ match, odds, tba, sb, userBetAlliance, onClick }: Marke
             <span>{(100 - sbRedPct).toFixed(1)}%</span>
           </div>
         </>
-      )}
+      ) : sbLoading ? (
+        <div className="h-1.5 rounded bg-muted/40 animate-pulse mt-2" />
+      ) : null}
     </div>
   );
 }
@@ -200,7 +210,7 @@ function SpotlightCard({ match, odds, tba, sb, userBetAlliance, onClick }: Marke
 // ---------------------------------------------------------------------------
 // Grid card — compact, lives in the 2-col grid below the spotlight
 // ---------------------------------------------------------------------------
-function GridCard({ match, odds, tba, sb, userBetAlliance, onClick }: MarketCardProps) {
+function GridCard({ match, odds, tba, sb, userBetAlliance, tbaLoading, sbLoading, onClick }: MarketCardProps) {
   const rawRedPct = odds?.redPct ?? 50;
   const redPct = sb
     ? blendOddsRedPct(rawRedPct, sb.pred.red_win_prob, odds?.totalPool ?? 0)
@@ -232,13 +242,18 @@ function GridCard({ match, odds, tba, sb, userBetAlliance, onClick }: MarketCard
         )}
       </div>
 
-      {tba && (
+      {tba ? (
         <div className="text-[10px] text-muted-foreground mb-2 leading-tight">
           <span className="text-red-400">{teamNums(tba.alliances.red.team_keys)}</span>
           <span className="text-muted-foreground/30"> vs </span>
           <span className="text-blue-400">{teamNums(tba.alliances.blue.team_keys)}</span>
         </div>
-      )}
+      ) : tbaLoading ? (
+        <div className="flex items-center gap-1 mb-2">
+          <div className="h-2 w-16 rounded bg-muted/60 animate-pulse" />
+          <div className="h-2 w-16 rounded bg-muted/60 animate-pulse" />
+        </div>
+      ) : null}
 
       {/* Split */}
       <div className="flex items-center justify-between mb-1.5">
@@ -255,9 +270,15 @@ function GridCard({ match, odds, tba, sb, userBetAlliance, onClick }: MarketCard
 
       <div className="flex items-center justify-between text-[10px] text-muted-foreground/60">
         <span>
-          {flavor === "coinflip" && <span className="text-yellow-400">🪙 Coin Flip</span>}
-          {flavor === "dominant" && <span className="text-pink-400">⚡ Dominant</span>}
-          {flavor === "heavy"    && <span className="text-purple-400">Heavy Fav.</span>}
+          {sb ? (
+            <>
+              {flavor === "coinflip" && <span className="text-yellow-400">🪙 Coin Flip</span>}
+              {flavor === "dominant" && <span className="text-pink-400">⚡ Dominant</span>}
+              {flavor === "heavy"    && <span className="text-purple-400">Heavy Fav.</span>}
+            </>
+          ) : sbLoading ? (
+            <div className="h-2 w-12 rounded bg-muted/60 animate-pulse" />
+          ) : null}
         </span>
         <span>{odds?.betCount ?? 0} bets · {odds?.totalPool ?? 0} pts</span>
       </div>
@@ -274,10 +295,12 @@ interface MarketGridProps {
   tbaMap: Map<number, TBAMatchData>;
   sbMap: Map<number, StatboticsMatch>;
   myBetByMatch: Map<string, BetWithMatch>;
+  tbaLoading: boolean;
+  sbLoading: boolean;
   navigate: (path: string) => void;
 }
 
-function MarketGrid({ openMatches, oddsMap, tbaMap, sbMap, myBetByMatch, navigate }: MarketGridProps) {
+function MarketGrid({ openMatches, oddsMap, tbaMap, sbMap, myBetByMatch, tbaLoading, sbLoading, navigate }: MarketGridProps) {
   const [spotlightIndex, setSpotlightIndex] = useState(0);
   const [fading, setFading] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -370,6 +393,8 @@ function MarketGrid({ openMatches, oddsMap, tbaMap, sbMap, myBetByMatch, navigat
           tba={tbaMap.get(spotlight.match_number)}
           sb={sbMap.get(spotlight.match_number)}
           userBetAlliance={myBetByMatch.get(spotlight.id)?.alliance as "red" | "blue" | undefined}
+          tbaLoading={tbaLoading && !tbaMap.get(spotlight.match_number)}
+          sbLoading={sbLoading && !sbMap.get(spotlight.match_number)}
           onClick={() => navigate(`/betting/${spotlight.id}`)}
         />
       </div>
@@ -414,6 +439,8 @@ function MarketGrid({ openMatches, oddsMap, tbaMap, sbMap, myBetByMatch, navigat
               tba={tbaMap.get(match.match_number)}
               sb={sbMap.get(match.match_number)}
               userBetAlliance={myBetByMatch.get(match.id)?.alliance as "red" | "blue" | undefined}
+              tbaLoading={tbaLoading && !tbaMap.get(match.match_number)}
+              sbLoading={sbLoading && !sbMap.get(match.match_number)}
               onClick={() => navigate(`/betting/${match.id}`)}
             />
           ))}
@@ -728,20 +755,18 @@ export default function Betting() {
   const [points, setPoints] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [tbaLoading, setTbaLoading] = useState(false);
+  const [sbLoading, setSbLoading] = useState(false);
 
   const load = useCallback(async () => {
     if (!user?.id) return;
 
-    // Sync match results from TBA + Statbotics before reading local DB state,
-    // so winning_alliance is current before we render bets/settled state.
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      await supabase.functions.invoke("sync-match-results", {
+    // Fire sync in the background — don't block rendering on it
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      supabase.functions.invoke("sync-match-results", {
         headers: session ? { Authorization: `Bearer ${session.access_token}` } : undefined,
-      });
-    } catch {
-      // Non-fatal — page still loads from DB even if sync fails
-    }
+      }).catch(() => {});
+    });
 
     const [activeEvent, gameProfile, userBets] = await Promise.all([
       getActiveEvent(),
@@ -763,36 +788,41 @@ export default function Betting() {
 
     const rows = (matchRows ?? []) as Match[];
     setMatches(rows);
+    // Show the UI immediately — TBA/SB/odds load in the background
+    setLoading(false);
 
     const ids = rows.map((m) => m.id);
-    const odds = await getBulkMatchOdds(ids);
-    setOddsMap(odds);
+    const code = activeEvent.event_code;
 
-    if (activeEvent.event_code) {
-      const code = activeEvent.event_code;
-      const [tba, sb] = await Promise.all([
-        getEventMatches(code),
-        getStatboticsEventMatches(code),
-      ]);
+    // Odds, TBA, and Statbotics all load in parallel without blocking render
+    getBulkMatchOdds(ids).then((odds) => setOddsMap(odds)).catch(() => {});
 
-      if (tba) {
-        const map = new Map<number, TBAMatchData>();
-        (tba as TBAMatchData[]).forEach((m) => {
-          if (m.comp_level === "qm" || (m as any).key?.includes("_qm")) map.set(m.match_number, m);
-        });
-        setTbaMap(map);
-      }
+    if (code) {
+      setTbaLoading(true);
+      setSbLoading(true);
 
-      if (sb && sb.length > 0) {
-        const map = new Map<number, StatboticsMatch>();
-        sb.forEach((m) => {
-          if (m.key?.includes("_qm")) map.set(m.match_number, m);
-        });
-        if (map.size > 0) setSbMap(map);
-      }
+      getEventMatches(code).then((tba) => {
+        if (tba) {
+          const map = new Map<number, TBAMatchData>();
+          (tba as TBAMatchData[]).forEach((m) => {
+            if (m.comp_level === "qm" || (m as any).key?.includes("_qm")) map.set(m.match_number, m);
+          });
+          setTbaMap(map);
+        }
+        setTbaLoading(false);
+      }).catch(() => setTbaLoading(false));
+
+      getStatboticsEventMatches(code).then((sb) => {
+        if (sb && sb.length > 0) {
+          const map = new Map<number, StatboticsMatch>();
+          sb.forEach((m) => {
+            if (m.key?.includes("_qm")) map.set(m.match_number, m);
+          });
+          if (map.size > 0) setSbMap(map);
+        }
+        setSbLoading(false);
+      }).catch(() => setSbLoading(false));
     }
-
-    setLoading(false);
   }, [user?.id]);
 
   useEffect(() => { load(); }, [load]);
@@ -919,6 +949,8 @@ export default function Betting() {
                 tbaMap={tbaMap}
                 sbMap={sbMap}
                 myBetByMatch={myBetByMatch}
+                tbaLoading={tbaLoading}
+                sbLoading={sbLoading}
                 navigate={navigate}
               />
             </TabsContent>
