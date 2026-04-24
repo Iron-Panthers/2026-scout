@@ -381,7 +381,7 @@ export default function Dashboard() {
           <Button
             size="lg"
             variant="secondary"
-            className="h-24 text-lg font-semibold flex flex-col gap-2 bg-green-900/40 hover:bg-green-800/50 border-green-700/50 text-green-400"
+            className="h-24 text-lg font-semibold flex flex-col gap-2"
             disabled={!profile?.clocked_in}
           >
             <Link to="/pit-scouting">
