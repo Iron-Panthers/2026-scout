@@ -199,13 +199,45 @@ export async function getTeamInfo(teamNumber: number) {
   return await tbaFetch(`/team/${teamKey}`);
 }
 
+const TBA_EV_CACHE_PFX = "tba_ev_";
+const TBA_EV_CACHE_TTL = 5 * 60 * 1000; // 5 min
+
 /**
- * Gets all matches for an event
+ * Gets all matches for an event (with 5-min localStorage cache)
  * @param eventCode - The event code (e.g., "2024cmp", "2024caln")
  * @returns Array of matches or null if not found
  */
 export async function getEventMatches(eventCode: string) {
-  return await tbaFetch<TBAMatch[]>(`/event/${eventCode}/matches`);
+  const cKey = TBA_EV_CACHE_PFX + eventCode;
+  try {
+    const raw = localStorage.getItem(cKey);
+    if (raw) {
+      const { data, ts } = JSON.parse(raw) as { data: TBAMatch[]; ts: number };
+      if (Date.now() - ts < TBA_EV_CACHE_TTL) return data;
+    }
+  } catch { /* ignore */ }
+
+  const data = await tbaFetch<TBAMatch[]>(`/event/${eventCode}/matches`);
+  if (data) {
+    try {
+      localStorage.setItem(cKey, JSON.stringify({ data, ts: Date.now() }));
+    } catch { /* ignore */ }
+  }
+  return data;
+}
+
+/**
+ * Returns cached TBA event matches without making a network request.
+ * Returns null if nothing is cached or cache is stale.
+ */
+export function getCachedEventMatches(eventCode: string): TBAMatch[] | null {
+  try {
+    const raw = localStorage.getItem(TBA_EV_CACHE_PFX + eventCode);
+    if (!raw) return null;
+    const { data, ts } = JSON.parse(raw) as { data: TBAMatch[]; ts: number };
+    if (Date.now() - ts < TBA_EV_CACHE_TTL) return data;
+  } catch { /* ignore */ }
+  return null;
 }
 
 export interface TBATeamSimple {
