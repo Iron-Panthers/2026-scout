@@ -351,7 +351,7 @@ export default function Dashboard() {
                   size="sm"
                   disabled={clockingIn}
                   className="h-16 border-red-700/40 text-red-400 hover:bg-red-900/20 hover:text-red-300"
-                  onClick={handleClockOut}
+                  onPointerDown={(e) => { e.preventDefault(); handleClockOut(); }}
                 >
                   <LogOut className="h-4 w-4 mr-1.5" />
                   Clock Out
@@ -362,7 +362,7 @@ export default function Dashboard() {
                 size="lg"
                 disabled={clockingIn}
                 className="w-full h-full text-lg"
-                onClick={handleClockIn}
+                onPointerDown={(e) => { e.preventDefault(); handleClockIn(); }}
               >
                 <LogIn className="h-6 w-6 mr-2" />
                 Clock In
@@ -381,10 +381,10 @@ export default function Dashboard() {
           <Button
             size="lg"
             variant="secondary"
-            className="h-24 text-lg font-semibold flex flex-col gap-2"
+            className="h-24 text-lg font-semibold flex flex-col gap-2 items-center"
             disabled={!profile?.clocked_in}
           >
-            <Link to="/pit-scouting">
+            <Link to="/pit-scouting" className="flex flex-col items-center gap-2">
               <Wrench className="h-8 w-8" />
               Pit Scouting
             </Link>
