@@ -12,9 +12,9 @@ interface CosmeticAvatarProps {
 }
 
 const sizeConfig = {
-  sm: { wrapperClass: "size-8", emojiHat: "text-sm", emojiPlant: "text-xs", hatOffset: "-top-2.5", plantOffset: "-bottom-1.5 -right-1.5" },
-  md: { wrapperClass: "size-10", emojiHat: "text-base", emojiPlant: "text-sm", hatOffset: "-top-3", plantOffset: "-bottom-2 -right-2" },
-  lg: { wrapperClass: "size-16", emojiHat: "text-2xl", emojiPlant: "text-lg", hatOffset: "-top-5", plantOffset: "-bottom-2 -right-2" },
+  sm: { wrapperClass: "size-8", emojiHat: "text-sm", emojiDecoration: "text-xs", hatOffset: "-top-2.5", decorationOffset: "-bottom-1.5 -right-1.5" },
+  md: { wrapperClass: "size-10", emojiHat: "text-base", emojiDecoration: "text-sm", hatOffset: "-top-3", decorationOffset: "-bottom-2 -right-2" },
+  lg: { wrapperClass: "size-16", emojiHat: "text-2xl", emojiDecoration: "text-lg", hatOffset: "-top-5", decorationOffset: "-bottom-2 -right-2" },
 };
 
 export default function CosmeticAvatar({
@@ -27,9 +27,9 @@ export default function CosmeticAvatar({
   const cfg = sizeConfig[size];
 
   const hatId = equippedCosmetics["hat"];
-  const plantId = equippedCosmetics["plant"];
+  const decorationId = equippedCosmetics["decoration"];
   const hatEmoji = hatId ? COSMETICS.find((c) => c.id === hatId)?.emoji : null;
-  const plantEmoji = plantId ? COSMETICS.find((c) => c.id === plantId)?.emoji : null;
+  const decorationEmoji = decorationId ? COSMETICS.find((c) => c.id === decorationId)?.emoji : null;
 
   return (
     <div className={cn("relative inline-flex shrink-0", cfg.wrapperClass, className)}>
@@ -51,16 +51,16 @@ export default function CosmeticAvatar({
         </span>
       )}
 
-      {plantEmoji && (
+      {decorationEmoji && (
         <span
           className={cn(
             "absolute leading-none select-none pointer-events-none",
-            cfg.emojiPlant,
-            cfg.plantOffset
+            cfg.emojiDecoration,
+            cfg.decorationOffset
           )}
           aria-hidden
         >
-          {plantEmoji}
+          {decorationEmoji}
         </span>
       )}
     </div>
