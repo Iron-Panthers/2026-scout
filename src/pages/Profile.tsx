@@ -1,12 +1,12 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Mail, Calendar, CheckCircle2, Clock, Camera } from "lucide-react";
+import { ArrowLeft, Mail, Calendar, CheckCircle2, Clock, Camera, Pencil, Save, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect, useRef, useState } from "react";
 import { getUserMatches } from "@/lib/matches";
-import { uploadAvatar } from "@/lib/profiles";
+import { uploadAvatar, updateProfile } from "@/lib/profiles";
 import { getGameProfile } from "@/lib/gameProfiles";
 import CosmeticAvatar from "@/components/CosmeticAvatar";
 import type { Match } from "@/types";
@@ -19,6 +19,9 @@ export default function Profile() {
   const [uploading, setUploading] = useState(false);
   const [equippedCosmetics, setEquippedCosmetics] = useState<Record<string, string>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editedName, setEditedName] = useState("");
+  const [savingName, setSavingName] = useState(false);
 
   useEffect(() => {
     const loadMatches = async () => {
@@ -61,6 +64,28 @@ export default function Profile() {
     // Reset input so the same file can be re-selected
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
+
+  const handleStartEditName = () => {
+    setEditedName(userName);
+    setIsEditingName(true);
+  };
+
+  const handleSaveName = async () => {
+    if (!authUser?.id || !editedName.trim()) return;
+    setSavingName(true);
+    const success = await updateProfile(authUser.id, { name: editedName.trim() });
+    if (success) {
+      await refreshProfile();
+    }
+    setSavingName(false);
+    setIsEditingName(false);
+  };
+
+  const handleCancelEditName = () => {
+    setIsEditingName(false);
+    setEditedName("");
+  };
+
   const email = authUser?.email || "";
   const userRole = profile?.role || "scout";
   const isManager = profile?.is_manager || false;
@@ -117,7 +142,48 @@ export default function Profile() {
                 </button>
               </div>
               <div className="flex-1 text-center md:text-left">
-                <h1 className="text-3xl font-bold mb-2">{userName}</h1>
+                {isEditingName ? (
+                  <div className="flex items-center gap-2 justify-center md:justify-start">
+                    <input
+                      type="text"
+                      value={editedName}
+                      onChange={(e) => setEditedName(e.target.value)}
+                      className="text-2xl font-bold bg-background border border-input rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary"
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleSaveName();
+                        if (e.key === "Escape") handleCancelEditName();
+                      }}
+                    />
+                    <Button
+                      size="sm"
+                      variant="default"
+                      onClick={handleSaveName}
+                      disabled={savingName}
+                    >
+                      <Save className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={handleCancelEditName}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 justify-center md:justify-start">
+                    <h1 className="text-3xl font-bold mb-2">{userName}</h1>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={handleStartEditName}
+                      className="mb-2"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
                 <div className="flex gap-2 justify-center md:justify-start mb-4">
                   <Badge variant="secondary">
                     {userRole.charAt(0).toUpperCase() + userRole.slice(1)}
