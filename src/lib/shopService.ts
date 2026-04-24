@@ -70,7 +70,7 @@ export async function purchaseCosmetic(
 
 /**
  * Equip a cosmetic to its slot.
- * slot is the category ("hat" or "plant").
+ * slot is the category ("hat" or "cosmetic").
  */
 export async function equipCosmetic(
   userId: string,

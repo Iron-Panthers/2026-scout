@@ -1,4 +1,4 @@
-export type CosmeticCategory = "hat" | "plant";
+export type CosmeticCategory = "hat" | "decoration";
 
 export interface CosmeticDefinition {
   id: string;
@@ -14,7 +14,7 @@ export const COSMETICS: CosmeticDefinition[] = [
   {
     id: "hat_cowboy",
     name: "Cowboy Hat",
-    description: "Yeehaw! The classic ranch look.",
+    description: "Feel the Texan spirit :p",
     category: "hat",
     emoji: "🤠",
     cost: 25,
@@ -22,7 +22,7 @@ export const COSMETICS: CosmeticDefinition[] = [
   {
     id: "hat_graduation",
     name: "Graduation Cap",
-    description: "Certified genius on the field.",
+    description: "Don't worry, you'll get this someday.",
     category: "hat",
     emoji: "🎓",
     cost: 15,
@@ -30,7 +30,7 @@ export const COSMETICS: CosmeticDefinition[] = [
   {
     id: "hat_crown",
     name: "Crown",
-    description: "Reserved for the most dedicated scouts.",
+    description: "MY GLORIOUS QUEEN (OR KING)",
     category: "hat",
     emoji: "👑",
     cost: 100,
@@ -38,7 +38,7 @@ export const COSMETICS: CosmeticDefinition[] = [
   {
     id: "hat_party",
     name: "Party Hat",
-    description: "Every match is a celebration.",
+    description: "Celebrateeee",
     category: "hat",
     emoji: "🎉",
     cost: 30,
@@ -46,7 +46,7 @@ export const COSMETICS: CosmeticDefinition[] = [
   {
     id: "hat_top",
     name: "Top Hat",
-    description: "Exceedingly distinguished.",
+    description: "Haur Haur Haur Haur Haur",
     category: "hat",
     emoji: "🎩",
     cost: 50,
@@ -54,59 +54,67 @@ export const COSMETICS: CosmeticDefinition[] = [
   {
     id: "hat_santa",
     name: "Santa Hat",
-    description: "Ho ho ho! Spreading cheer on the field.",
+    description: "Feeling quite jolly today, eh?",
     category: "hat",
     emoji: "🎅",
     cost: 40,
   },
-  // --- Plants ---
+  // --- Cosmetics ---
   {
-    id: "plant_cherry",
+    id: "decoration_cherry",
     name: "Cherry Blossom",
-    description: "A fleeting moment of beauty.",
-    category: "plant",
+    description: "Wowwww so pretty",
+    category: "decoration",
     emoji: "🌸",
     cost: 10,
   },
   {
-    id: "plant_sunflower",
+    id: "decoration_sunflower",
     name: "Sunflower",
-    description: "Always looking on the bright side.",
-    category: "plant",
+    description: "Wowwww so sunny",
+    category: "decoration",
     emoji: "🌻",
     cost: 15,
   },
   {
-    id: "plant_cactus",
+    id: "decoration_cactus",
     name: "Cactus",
-    description: "Low maintenance. High personality.",
-    category: "plant",
+    description: "Wowwww so prickly",
+    category: "decoration",
     emoji: "🌵",
     cost: 20,
   },
   {
-    id: "plant_potted",
+    id: "decoration_potted",
     name: "Potted Plant",
-    description: "Brings life to any corner.",
-    category: "plant",
+    description: "Wowwww so... potted?",
+    category: "decoration",
     emoji: "🪴",
     cost: 20,
   },
   {
-    id: "plant_mushroom",
+    id: "decoration_mushroom",
     name: "Mushroom",
-    description: "Fungi to be around.",
-    category: "plant",
+    description: "Wowwww so poisonous",
+    category: "decoration",
     emoji: "🍄",
     cost: 25,
   },
   {
-    id: "plant_four_leaf",
+    id: "decoration_four_leaf",
     name: "Four Leaf Clover",
-    description: "Bring a little luck to your bets.",
-    category: "plant",
+    description: "Wowwww so lucky",
+    category: "decoration",
     emoji: "🍀",
     cost: 35,
+  },
+  {
+    id: "decoration_six_seven",
+    name: "6 7",
+    description: "If gambling got you here, congratulations. You have our recognition.",
+    category: "decoration",
+    emoji: "6️⃣7️⃣",
+    cost: 1000000,
   },
 ];
 

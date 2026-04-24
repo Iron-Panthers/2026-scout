@@ -206,7 +206,7 @@ export default function Shop() {
   }
 
   const hats = COSMETICS.filter((c) => c.category === "hat");
-  const plants = COSMETICS.filter((c) => c.category === "plant");
+  const decorations = COSMETICS.filter((c) => c.category === "decoration");
 
   function renderGrid(items: CosmeticDefinition[]) {
     return (
@@ -283,8 +283,8 @@ export default function Shop() {
             <TabsTrigger value="hats" className="flex-1 gap-1.5">
               Hats
             </TabsTrigger>
-            <TabsTrigger value="plants" className="flex-1 gap-1.5">
-              Plants
+            <TabsTrigger value="decorations" className="flex-1 gap-1.5">
+              Decorations
             </TabsTrigger>
             <TabsTrigger value="games" className="flex-1 gap-1.5">
               Games
@@ -293,8 +293,8 @@ export default function Shop() {
           <TabsContent value="hats" className="mt-4">
             {renderGrid(hats)}
           </TabsContent>
-          <TabsContent value="plants" className="mt-4">
-            {renderGrid(plants)}
+          <TabsContent value="decorations" className="mt-4">
+            {renderGrid(decorations)}
           </TabsContent>
           <TabsContent value="games" className="mt-4">
             <div className="grid grid-cols-2 gap-3">
