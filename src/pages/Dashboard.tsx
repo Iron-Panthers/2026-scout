@@ -368,23 +368,6 @@ export default function Dashboard() {
                 Clock In
               </Button>
             )}
-
-            {/* No matches left — offer clock off */}
-            {profile?.clocked_in && !loading && matches.length === 0 && (
-              <div className="flex items-center justify-between p-3 bg-yellow-900/20 border border-yellow-700/40 rounded-lg">
-                <p className="text-sm text-yellow-400 font-medium">No more matches assigned. Ready to clock off?</p>
-                <Button
-                  size="sm"
-                  disabled={clockingIn}
-                  variant="outline"
-                  className="border-yellow-700/40 text-yellow-400 hover:bg-yellow-900/30 ml-3 shrink-0"
-                  onClick={handleClockOut}
-                >
-                  <LogOut className="h-4 w-4 mr-1.5" />
-                  Clock Off
-                </Button>
-              </div>
-            )}
           </div>
           <Button
             size="lg"
@@ -398,7 +381,7 @@ export default function Dashboard() {
           <Button
             size="lg"
             variant="secondary"
-            className="h-24 text-lg font-semibold flex flex-col gap-2"
+            className="h-24 text-lg font-semibold flex flex-col gap-2 bg-green-900/40 hover:bg-green-800/50 border-green-700/50 text-green-400"
             disabled={!profile?.clocked_in}
           >
             <Link to="/pit-scouting">
