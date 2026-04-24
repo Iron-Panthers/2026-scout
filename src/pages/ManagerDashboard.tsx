@@ -48,6 +48,7 @@ import { PitScoutingAssignmentsTab } from "@/components/manager/PitScoutingAssig
 import { ScoutingDataTab } from "@/components/manager/ScoutingDataTab";
 import { useToast } from "@/hooks/use-toast";
 import { awardPoints } from "@/lib/gameProfiles";
+import { getEquippedCosmeticsMap } from "@/lib/shopService";
 import type {
   Profile,
   Role,
@@ -86,6 +87,7 @@ export default function ManagerDashboard() {
   // State for available scouts (converted from Profile to Scout format)
   const [availableScouts, setAvailableScouts] = useState<Profile[]>([]);
   const [allScouts, setAllScouts] = useState<Profile[]>([]);
+  const [cosmeticsMap, setCosmeticsMap] = useState<Record<string, Record<string, string>>>({});
   const [events, setEvents] = useState<Event[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<string>("all");
   const [allDbMatches, setAllDbMatches] = useState<Match[]>([]);
@@ -197,6 +199,8 @@ export default function ManagerDashboard() {
       const profilesArray = Array.from(profiles.values());
       setAllScouts(profilesArray);
       setEvents(eventsData);
+      // Fetch cosmetics for all scouts in the background
+      getEquippedCosmeticsMap(profilesArray.map((p) => p.id)).then(setCosmeticsMap);
       setAllDbMatches(dbMatches);
 
       // Only set the selected event on the very first load so realtime updates
@@ -1062,6 +1066,7 @@ export default function ManagerDashboard() {
                         completedSubmissions={completedSubmissions}
                         actualScouters={actualScouters}
                         availableScouts={availableScouts}
+                        cosmeticsMap={cosmeticsMap}
                         isSelected={selectedMatches.has(match.matchId || "")}
                         onToggleSelect={handleToggleMatch}
                       />
@@ -1243,6 +1248,7 @@ export default function ManagerDashboard() {
           onOpenChange={setDialogOpen}
           availableScouts={availableScouts}
           onAssignScout={handleAssignScout}
+          cosmeticsMap={cosmeticsMap}
         />
       </main>
     </div>

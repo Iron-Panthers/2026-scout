@@ -16,7 +16,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import CosmeticAvatar from "@/components/CosmeticAvatar";
 import type { Profile } from "@/types";
 
 // Instant dialog content without animations
@@ -54,10 +54,11 @@ interface ScoutAssignmentDialogProps {
   onOpenChange: (open: boolean) => void;
   availableScouts: Profile[];
   onAssignScout: (profile: Profile) => void;
+  cosmeticsMap?: Record<string, Record<string, string>>;
 }
 
 // Memoized scout item to prevent re-renders
-const ScoutItem = memo(({ profile, onSelect }: { profile: Profile; onSelect: () => void }) => {
+const ScoutItem = memo(({ profile, onSelect, equippedCosmetics }: { profile: Profile; onSelect: () => void; equippedCosmetics?: Record<string, string> }) => {
   const initials = useMemo(() =>
     (profile.name || "U")
       .split(" ")
@@ -74,12 +75,12 @@ const ScoutItem = memo(({ profile, onSelect }: { profile: Profile; onSelect: () 
       onSelect={onSelect}
       className="flex items-center gap-3 px-4 py-3 cursor-pointer"
     >
-      <Avatar className="h-10 w-10">
-        <AvatarImage src={profile.avatar_url || ""} />
-        <AvatarFallback className="text-sm bg-primary/20 text-primary">
-          {initials}
-        </AvatarFallback>
-      </Avatar>
+      <CosmeticAvatar
+        avatarUrl={profile.avatar_url || ""}
+        initials={initials}
+        equippedCosmetics={equippedCosmetics ?? {}}
+        size="md"
+      />
       <div className="flex-1">
         <p className="font-medium">{profile.name || "Unknown"}</p>
         <p className="text-sm text-muted-foreground">
@@ -97,6 +98,7 @@ export function ScoutAssignmentDialog({
   onOpenChange,
   availableScouts,
   onAssignScout,
+  cosmeticsMap = {},
 }: ScoutAssignmentDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -114,6 +116,7 @@ export function ScoutAssignmentDialog({
                   key={profile.id}
                   profile={profile}
                   onSelect={() => onAssignScout(profile)}
+                  equippedCosmetics={cosmeticsMap[profile.id]}
                 />
               ))}
             </CommandGroup>

@@ -5,15 +5,16 @@ interface GameCardProps {
   game: GameDefinition;
   isUnlocked: boolean;
   userPoints: number;
+  isPlayable: boolean;
   onBuy: () => void;
   onPlay: () => void;
 }
 
-export function GameCard({ game, isUnlocked, userPoints, onBuy, onPlay }: GameCardProps) {
+export function GameCard({ game, isUnlocked, userPoints, isPlayable, onBuy, onPlay }: GameCardProps) {
   const canAfford = userPoints >= game.cost;
 
   function handleClick() {
-    if (isUnlocked) {
+    if (isUnlocked && isPlayable) {
       onPlay();
     } else {
       onBuy();
@@ -48,7 +49,7 @@ export function GameCard({ game, isUnlocked, userPoints, onBuy, onPlay }: GameCa
         )}
 
         {/* Play overlay for unlocked games on hover */}
-        {isUnlocked && (
+        {isUnlocked && isPlayable && (
           <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 bg-background/40 transition-opacity">
             <Play className="w-8 h-8 text-foreground fill-foreground" />
           </div>

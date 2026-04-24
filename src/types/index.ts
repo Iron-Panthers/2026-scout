@@ -165,6 +165,8 @@ export interface GameProfile {
   user_id: string;
   points: number;
   unlocked_games: string[];
+  owned_cosmetics: string[];
+  equipped_cosmetics: Record<string, string>; // slot -> cosmetic id
   created_at: string;
   updated_at: string;
 }

@@ -1,7 +1,7 @@
 import { memo } from "react";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { TableRow, TableCell } from "@/components/ui/table";
+import CosmeticAvatar from "@/components/CosmeticAvatar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, X, Check } from "lucide-react";
 import type { Role, MatchAssignment, Profile } from "@/types";
@@ -21,6 +21,7 @@ interface MatchRowProps {
   completedSubmissions: Set<string>;
   actualScouters: Map<string, string>; // Map of "matchId:role" -> scouter_id
   availableScouts: Profile[]; // All profiles to look up names
+  cosmeticsMap?: Record<string, Record<string, string>>; // userId -> equipped cosmetics
   isSelected?: boolean;
   onToggleSelect?: (matchId: string) => void;
 }
@@ -34,6 +35,7 @@ export const MatchRow = memo(
     completedSubmissions,
     actualScouters,
     availableScouts,
+    cosmeticsMap = {},
     isSelected = false,
     onToggleSelect,
   }: MatchRowProps) => {
@@ -83,12 +85,13 @@ export const MatchRow = memo(
                     onClick={() => onOpenDialog(match.matchNumber, role)}
                     className="flex flex-col items-center gap-0.5 md:gap-1 hover:bg-accent/50 rounded-md p-1.5 md:p-2 transition-colors w-full"
                   >
-                    <Avatar className="h-8 w-8 md:h-10 md:w-10">
-                      <AvatarImage src={assignment.avatar} />
-                      <AvatarFallback className="text-xs bg-primary/20 text-primary">
-                        {assignment.initials}
-                      </AvatarFallback>
-                    </Avatar>
+                    <CosmeticAvatar
+                      avatarUrl={assignment.avatar}
+                      initials={assignment.initials}
+                      equippedCosmetics={cosmeticsMap[assignment.id] ?? {}}
+                      size="sm"
+                      className="h-8 w-8 md:h-10 md:w-10"
+                    />
                     <span className="text-[10px] leading-tight md:text-xs font-medium text-center">
                       {assignment.name}
                     </span>

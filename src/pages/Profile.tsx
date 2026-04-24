@@ -1,6 +1,5 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Mail, Calendar, CheckCircle2, Clock, Camera } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -8,6 +7,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useEffect, useRef, useState } from "react";
 import { getUserMatches } from "@/lib/matches";
 import { uploadAvatar } from "@/lib/profiles";
+import { getGameProfile } from "@/lib/gameProfiles";
+import CosmeticAvatar from "@/components/CosmeticAvatar";
 import type { Match } from "@/types";
 
 export default function Profile() {
@@ -16,6 +17,7 @@ export default function Profile() {
   const [userMatches, setUserMatches] = useState<Match[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [equippedCosmetics, setEquippedCosmetics] = useState<Record<string, string>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -27,6 +29,13 @@ export default function Profile() {
       }
     };
     loadMatches();
+  }, [authUser?.id]);
+
+  useEffect(() => {
+    if (!authUser?.id) return;
+    getGameProfile(authUser.id).then((gp) => {
+      if (gp?.equipped_cosmetics) setEquippedCosmetics(gp.equipped_cosmetics);
+    });
   }, [authUser?.id]);
 
   const userName =
@@ -84,12 +93,13 @@ export default function Profile() {
           <CardContent className="pt-6">
             <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
               <div className="relative shrink-0">
-                <Avatar className="h-32 w-32">
-                  <AvatarImage src={avatarUrl} alt={userName} />
-                  <AvatarFallback className="text-4xl bg-primary text-primary-foreground">
-                    {userInitials}
-                  </AvatarFallback>
-                </Avatar>
+                <CosmeticAvatar
+                  avatarUrl={avatarUrl}
+                  initials={userInitials}
+                  equippedCosmetics={equippedCosmetics}
+                  size="lg"
+                  className="h-32 w-32"
+                />
                 <input
                   ref={fileInputRef}
                   type="file"
