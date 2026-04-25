@@ -112,15 +112,6 @@ export const COSMETICS: CosmeticDefinition[] = [
     cost: 35,
   },
   {
-    id: "decoration_cooper_pfp",
-    name: "Cooper's Profile Picture",
-    description: "Look! You have a pet!",
-    category: "decoration",
-    emoji: "https://media.tenor.com/msEscC7u-HwAAAAM/stan-twt-reaction-meme.gif",
-    emojiType: "image",
-    cost: 100,
-  },
-  {
     id: "decoration_six_seven",
     name: "6 7",
     description: "If gambling got you here, congratulations. You have our recognition.",
