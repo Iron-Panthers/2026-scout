@@ -1,11 +1,14 @@
 export type CosmeticCategory = "hat" | "decoration";
 
+export type EmojiType = "emoji" | "image";
+
 export interface CosmeticDefinition {
   id: string;
   name: string;
   description: string;
   category: CosmeticCategory;
-  emoji: string;
+  emoji: string; // Emoji character or URL to png/gif
+  emojiType?: EmojiType; // "emoji" for standard emoji, "image" for png/gif URL
   cost: number;
 }
 
@@ -115,6 +118,16 @@ export const COSMETICS: CosmeticDefinition[] = [
     category: "decoration",
     emoji: "6️⃣7️⃣",
     cost: 1000000,
+  },
+  // Example of image-based emoji (png/gif)
+  {
+    id: "hat_custom",
+    name: "Custom Hat",
+    description: "Upload your own hat image",
+    category: "hat",
+    emoji: "/uploads/custom-hat.png",
+    emojiType: "image",
+    cost: 50,
   },
 ];
 
