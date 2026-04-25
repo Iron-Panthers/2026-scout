@@ -5,7 +5,7 @@ const TBA_BASE_URL = "https://www.thebluealliance.com/api/v3";
 const TBA_AUTH_KEY = import.meta.env.VITE_TBA_AUTH_KEY;
 
 // Current competition year
-export const CURRENT_YEAR = 2025;
+export const CURRENT_YEAR = 2026;
 
 if (!TBA_AUTH_KEY) {
   console.warn("Missing TBA_AUTH_KEY environment variable");
