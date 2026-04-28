@@ -210,7 +210,7 @@ export default function Shop() {
 
   function renderGrid(items: CosmeticDefinition[]) {
     return (
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
         {items.map((item) => (
           <CosmeticCard
             key={item.id}
@@ -228,8 +228,8 @@ export default function Shop() {
   }
 
   return (
-    <div className="min-h-screen bg-background my-15">
-      <div className="max-w-xl mx-auto px-4 py-6 space-y-5">
+    <div className="min-h-screen bg-background">
+      <div className="max-w-xl mx-auto md:max-w-none px-4 py-6 space-y-5">
         {/* Header */}
         <div className="flex items-center justify-between">
           <Button variant="ghost" size="sm" className="gap-2 px-2" onClick={() => navigate(-1)}>
@@ -249,72 +249,79 @@ export default function Shop() {
           </Badge>
         </div>
 
-        {/* Avatar preview */}
-        <Card className="border-border/50">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-4">
-              <CosmeticAvatar
-                avatarUrl={getAvatarUrl()}
-                initials={initials}
-                equippedCosmetics={equipped}
-                size="lg"
-              />
-              <div>
-                <p className="font-medium">{userName}</p>
-                <p className="text-sm text-muted-foreground">
-                  {Object.keys(equipped).length === 0
-                    ? "No cosmetics equipped"
-                    : Object.entries(equipped)
-                        .map(([_slot, id]) => {
-                          const item = COSMETICS.find((c) => c.id === id);
-                          return item ? `${item.emoji} ${item.name}` : null;
-                        })
-                        .filter(Boolean)
-                        .join("  ·  ")}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Tabs */}
-        <Tabs defaultValue="hats">
-          <TabsList className="w-full">
-            <TabsTrigger value="hats" className="flex-1 gap-1.5">
-              Hats
-            </TabsTrigger>
-            <TabsTrigger value="decorations" className="flex-1 gap-1.5">
-              Decorations
-            </TabsTrigger>
-            <TabsTrigger value="games" className="flex-1 gap-1.5">
-              Games
-            </TabsTrigger>
-          </TabsList>
-          <TabsContent value="hats" className="mt-4">
-            {renderGrid(hats)}
-          </TabsContent>
-          <TabsContent value="decorations" className="mt-4">
-            {renderGrid(decorations)}
-          </TabsContent>
-          <TabsContent value="games" className="mt-4">
-            <div className="grid grid-cols-2 gap-3">
-              {GAMES.map((game) => {
-                const isUnlocked = (gameProfile?.unlocked_games ?? []).includes(game.id) || game.cost === 0;
-                return (
-                  <GameCard
-                    key={game.id}
-                    game={game}
-                    isUnlocked={isUnlocked}
-                    userPoints={points}
-                    isPlayable={false}
-                    onBuy={() => setBuyGameTarget(game)}
-                    onPlay={() => setPlayingGame(game)}
+        {/* Main layout: stacked on mobile, sidebar+content on md+ */}
+        <div className="flex flex-col md:flex-row gap-5 justify-center">
+          {/* Avatar sidebar */}
+          <div className="w-full md:w-56 md:shrink-0 md:sticky md:top-6">
+            <Card className="border-border/50">
+              <CardContent className="p-4">
+                <div className="flex md:flex-col items-center md:items-center gap-4 md:gap-3 md:text-center">
+                  <CosmeticAvatar
+                    avatarUrl={getAvatarUrl()}
+                    initials={initials}
+                    equippedCosmetics={equipped}
+                    size="lg"
                   />
-                );
-              })}
-            </div>
-          </TabsContent>
-        </Tabs>
+                  <div className="md:w-full">
+                    <p className="font-medium">{userName}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 leading-snug">
+                      {Object.keys(equipped).length === 0
+                        ? "No cosmetics equipped"
+                        : Object.entries(equipped)
+                            .map(([_slot, id]) => {
+                              const item = COSMETICS.find((c) => c.id === id);
+                              return item ? `${item.emoji} ${item.name}` : null;
+                            })
+                            .filter(Boolean)
+                            .join("  ·  ")}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Tabs */}
+          <div className="flex-1 min-w-0">
+            <Tabs defaultValue="hats">
+              <TabsList className="w-full">
+                <TabsTrigger value="hats" className="flex-1 gap-1.5">
+                  Hats
+                </TabsTrigger>
+                <TabsTrigger value="decorations" className="flex-1 gap-1.5">
+                  Decorations
+                </TabsTrigger>
+                <TabsTrigger value="games" className="flex-1 gap-1.5">
+                  Games
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="hats" className="mt-4">
+                {renderGrid(hats)}
+              </TabsContent>
+              <TabsContent value="decorations" className="mt-4">
+                {renderGrid(decorations)}
+              </TabsContent>
+              <TabsContent value="games" className="mt-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                  {GAMES.map((game) => {
+                    const isUnlocked = (gameProfile?.unlocked_games ?? []).includes(game.id) || game.cost === 0;
+                    return (
+                      <GameCard
+                        key={game.id}
+                        game={game}
+                        isUnlocked={isUnlocked}
+                        userPoints={points}
+                        isPlayable={false}
+                        onBuy={() => setBuyGameTarget(game)}
+                        onPlay={() => setPlayingGame(game)}
+                      />
+                    );
+                  })}
+                </div>
+              </TabsContent>
+            </Tabs>
+          </div>
+        </div>
       </div>
 
       {/* Buy confirmation dialog */}
