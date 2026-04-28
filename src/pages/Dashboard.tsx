@@ -345,7 +345,7 @@ export default function Dashboard() {
         <Button
           size="lg"
           disabled={clockingIn}
-          className="w-full h-full text-lg"
+          className="w-full h-20 lg:h-full text-lg"
           onClick={handleClockIn}
         >
           <LogIn className="h-6 w-6 mr-2" />
