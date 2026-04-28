@@ -319,6 +319,42 @@ export default function Dashboard() {
     navigate(`/config/${matchId}?role=${selectedMatch?.role}`);
   };
 
+  const clockInBar = (
+    <>
+      {profile?.clocked_in ? (
+        <div className="flex items-center justify-between p-4 bg-red-900/20 border border-red-700/40 rounded-lg">
+          <div className="flex items-center gap-3">
+            <div className="mx-5 h-3 w-3 rounded-full bg-red-500 animate-pulse" />
+            <div>
+              <p className="font-semibold text-red-400">Clocked In</p>
+              <p className="text-xs text-muted-foreground">You're available to scout</p>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={clockingIn}
+            className="h-16 border-red-700/40 text-red-400 hover:bg-red-900/20 hover:text-red-300"
+            onClick={handleClockOut}
+          >
+            <LogOut className="h-4 w-4 mr-1.5" />
+            Clock Out
+          </Button>
+        </div>
+      ) : (
+        <Button
+          size="lg"
+          disabled={clockingIn}
+          className="w-full h-full text-lg"
+          onClick={handleClockIn}
+        >
+          <LogIn className="h-6 w-6 mr-2" />
+          Clock In
+        </Button>
+      )}
+    </>
+  );
+
   return (
     <div className="min-h-screen bg-background">
       {/* Main Content */}
@@ -333,41 +369,16 @@ export default function Dashboard() {
           />
         </div>
 
+        {/* Clock In bar — above grid on small screens */}
+        <div className="lg:hidden mb-4 space-y-2">
+          {clockInBar}
+        </div>
+
         {/* Action Buttons */}
-        <div className="grid grid-cols-3 gap-4 mb-1">
-          {/* Clock In / Out */}
-          <div className="mb-6 space-y-2 h-full">
-            {profile?.clocked_in ? (
-              <div className="flex items-center justify-between p-4 bg-red-900/20 border border-red-700/40 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <div className="mx-5 h-3 w-3 rounded-full bg-red-500 animate-pulse" />
-                  <div>
-                    <p className="font-semibold text-red-400">Clocked In</p>
-                    <p className="text-xs text-muted-foreground">You're available for scouting</p>
-                  </div>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={clockingIn}
-                  className="h-16 border-red-700/40 text-red-400 hover:bg-red-900/20 hover:text-red-300"
-                  onPointerDown={(e) => { e.preventDefault(); handleClockOut(); }}
-                >
-                  <LogOut className="h-4 w-4 mr-1.5" />
-                  Clock Out
-                </Button>
-              </div>
-            ) : (
-              <Button
-                size="lg"
-                disabled={clockingIn}
-                className="w-full h-full text-lg"
-                onPointerDown={(e) => { e.preventDefault(); handleClockIn(); }}
-              >
-                <LogIn className="h-6 w-6 mr-2" />
-                Clock In
-              </Button>
-            )}
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-0">
+          {/* Clock In / Out — in grid on sm+ screens */}
+          <div className="hidden lg:block mb-6 space-y-2 h-full">
+            {clockInBar}
           </div>
           <Button
             size="lg"
@@ -389,17 +400,7 @@ export default function Dashboard() {
               Pit Scouting
             </Link>
           </Button>
-          {/* <Button
-            size="lg"
-            variant="outline"
-            className="col-span-2 h-14 text-base font-semibold flex flex-row gap-2 border-yellow-700/40 text-yellow-400 hover:bg-yellow-900/20 hover:text-yellow-300"
-            asChild
-          >
-            <Link to="/betting">
-              <TrendingUp className="h-5 w-5" />
-              Betting Markets
-            </Link>
-          </Button> */}
+          
         </div>
         {/* Last match prompt */}
         {profile?.clocked_in && !loading && matches.length === 1 && (
