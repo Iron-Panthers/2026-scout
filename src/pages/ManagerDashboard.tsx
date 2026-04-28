@@ -201,6 +201,7 @@ export default function ManagerDashboard() {
       setEvents(eventsData);
       // Fetch cosmetics for all scouts in the background
       getEquippedCosmeticsMap(profilesArray.map((p) => p.id)).then(setCosmeticsMap);
+      // const cosmap = await getEquippedCosmeticsMap(profilesArray.map((p) => p.id));
       setAllDbMatches(dbMatches);
 
       // Only set the selected event on the very first load so realtime updates
@@ -1133,6 +1134,7 @@ export default function ManagerDashboard() {
               matches={matches}
               availableScouts={availableScouts}
               allScouts={allScouts}
+              cosmeticsMap={cosmeticsMap}
               onEventUpdate={useCallback(async () => {
                 loadData();
               }, [selectedEvent])}

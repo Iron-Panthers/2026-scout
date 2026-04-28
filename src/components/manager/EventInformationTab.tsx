@@ -19,6 +19,7 @@ import type { Event, Profile, MatchAssignment } from "@/types";
 import { ConfirmationDialog } from "./ConfirmationDialog";
 import UserProfileMenu from "../UserProfileMenu";
 import { AddScoutsDialog } from "./AddScoutsDialog";
+import CosmeticAvatar from "../CosmeticAvatar";
 
 interface EventInformationTabProps {
   selectedEvent: string;
@@ -26,6 +27,7 @@ interface EventInformationTabProps {
   matches: MatchAssignment[];
   allScouts: Profile[];
   availableScouts: Profile[];
+  cosmeticsMap?: Record<string, Record<string, string>>; // userId -> equipped cosmetics
   onEventUpdate?: () => void;
 }
 
@@ -35,6 +37,7 @@ export function EventInformationTab({
   matches,
   allScouts,
   availableScouts,
+  cosmeticsMap = {},
   onEventUpdate,
 }: EventInformationTabProps) {
   const currentEvent = events.find((e) => e.id === selectedEvent);
@@ -674,10 +677,12 @@ export function EventInformationTab({
                     key={profile.id}
                     className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-accent/50 transition-colors"
                   >
-                    <UserProfileMenu
-                      userName={profile.name}
-                      userInitials={initials}
+                    <CosmeticAvatar
+                      initials={initials}
                       avatarUrl={profile.avatar_url}
+                      className=""
+                      equippedCosmetics={cosmeticsMap[profile.id]}
+                      key={profile.id}
                     />
                     <div className="flex-1">
                       <p className="font-medium">{profile.name || "Unknown"}</p>
