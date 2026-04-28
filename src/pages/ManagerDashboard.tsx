@@ -748,7 +748,7 @@ export default function ManagerDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background my-15">
       <main className="container mx-auto p-4 md:p-6 max-w-[1600px]">
         {/* Header Section */}
         <div className="flex items-start justify-between mb-8">

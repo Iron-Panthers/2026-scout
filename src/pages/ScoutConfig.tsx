@@ -350,7 +350,7 @@ export default function ScoutConfig() {
 
   return (
     <div
-      className="min-h-screen flex flex-col"
+      className="min-h-screen flex flex-col my-15"
       style={{ padding: "20px" }}
     >
       {/* Back Button */}

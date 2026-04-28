@@ -255,7 +255,7 @@ export default function QualScouting() {
                     transition: isDraggingThis ? "none" : "transform 0.15s ease",
                     height: ROW_HEIGHT,
                   }}
-                  className={`relative flex items-center gap-3 px-3 rounded-xl border-2 cursor-grab active:cursor-grabbing
+                  className={`relative flex items-center gap-3 px-3 rounded-xl border-2 cursor-grab active:cursor-grabbing my-15
                     ${rowBg[teamColorIndex.current[teamNum] ?? index]} ${rowBorder[teamColorIndex.current[teamNum] ?? index]}
                     ${isDraggingThis ? "shadow-2xl scale-[1.02] opacity-95" : ""}
                   `}

@@ -73,7 +73,7 @@ export default function Settings() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background my-15">
       <main className="container mx-auto p-6 max-w-4xl">
         {/* Back Button */}
         <Button variant="ghost" className="mb-6" onClick={() => navigate(-1)}>

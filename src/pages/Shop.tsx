@@ -228,7 +228,7 @@ export default function Shop() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background my-15">
       <div className="max-w-xl mx-auto px-4 py-6 space-y-5">
         {/* Header */}
         <div className="flex items-center justify-between">
