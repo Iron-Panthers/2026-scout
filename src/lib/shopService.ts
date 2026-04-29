@@ -2,6 +2,8 @@ import { supabase } from "@/lib/supabase";
 import { getGameProfile } from "@/lib/gameProfiles";
 import type { GameProfile } from "@/types";
 
+export const CRATE_COST = 50;
+
 export type { GameProfile };
 
 /**
@@ -97,6 +99,49 @@ export async function equipCosmetic(
   }
 
   return { success: true };
+}
+
+/**
+ * Open a mystery crate: deduct CRATE_COST points and record the won item.
+ * The client-side rolls the item; this function just records the transaction.
+ */
+export async function openCrate(
+  userId: string,
+  itemId: string,
+): Promise<{ success: boolean; newPoints: number; isDuplicate: boolean; error?: string }> {
+  const profile = await getGameProfile(userId);
+  if (!profile) {
+    return { success: false, newPoints: 0, isDuplicate: false, error: "Could not load your profile." };
+  }
+
+  if (profile.points < CRATE_COST) {
+    return {
+      success: false,
+      newPoints: profile.points,
+      isDuplicate: false,
+      error: `Not enough points. You need ${CRATE_COST} but have ${profile.points}.`,
+    };
+  }
+
+  const isDuplicate = (profile.owned_cosmetics ?? []).includes(itemId);
+  const newPoints = profile.points - CRATE_COST;
+  const newOwned = isDuplicate
+    ? (profile.owned_cosmetics ?? [])
+    : [...(profile.owned_cosmetics ?? []), itemId];
+
+  const { data, error } = await supabase
+    .from("game_profiles")
+    .update({ points: newPoints, owned_cosmetics: newOwned })
+    .eq("user_id", userId)
+    .select()
+    .single();
+
+  if (error) {
+    console.error("[shopService] openCrate error:", error);
+    return { success: false, newPoints: profile.points, isDuplicate: false, error: "Failed to open crate." };
+  }
+
+  return { success: true, newPoints: (data as GameProfile).points, isDuplicate };
 }
 
 /**

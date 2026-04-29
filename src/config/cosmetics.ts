@@ -1,4 +1,5 @@
 export type CosmeticCategory = "hat" | "decoration";
+export type CrateRarity = "common" | "uncommon" | "rare" | "ultra-rare" | "legendary";
 
 export type EmojiType = "emoji" | "image";
 
@@ -10,7 +11,41 @@ export interface CosmeticDefinition {
   emoji: string; // Emoji character or URL to png/gif
   emojiType?: EmojiType; // "emoji" for standard emoji, "image" for png/gif URL
   cost: number;
+  rarity: CrateRarity;
 }
+
+export const RARITY_CONFIG: Record<CrateRarity, { label: string; color: string; glowColor: string; bgColor: string }> = {
+  common: {
+    label: "Common",
+    color: "#9ca3af",
+    glowColor: "rgba(156,163,175,0.75)",
+    bgColor: "rgba(55,65,81,0.9)",
+  },
+  uncommon: {
+    label: "Uncommon",
+    color: "#22c55e",
+    glowColor: "rgba(34,197,94,0.75)",
+    bgColor: "rgba(20,83,45,0.9)",
+  },
+  rare: {
+    label: "Rare",
+    color: "#3b82f6",
+    glowColor: "rgba(59,130,246,0.75)",
+    bgColor: "rgba(30,58,138,0.9)",
+  },
+  "ultra-rare": {
+    label: "Ultra Rare",
+    color: "#a855f7",
+    glowColor: "rgba(168,85,247,0.75)",
+    bgColor: "rgba(88,28,135,0.9)",
+  },
+  legendary: {
+    label: "LEGENDARY",
+    color: "#f59e0b",
+    glowColor: "rgba(245,158,11,0.9)",
+    bgColor: "rgba(120,53,15,0.9)",
+  },
+};
 
 export const COSMETICS: CosmeticDefinition[] = [
   // --- Hats ---
@@ -21,6 +56,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     category: "hat",
     emoji: "🤠",
     cost: 25,
+    rarity: "rare",
   },
   {
     id: "hat_graduation",
@@ -29,6 +65,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     category: "hat",
     emoji: "🎓",
     cost: 15,
+    rarity: "common",
   },
   {
     id: "hat_crown",
@@ -37,6 +74,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     category: "hat",
     emoji: "👑",
     cost: 100,
+    rarity: "legendary",
   },
   {
     id: "hat_party",
@@ -45,6 +83,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     category: "hat",
     emoji: "🎉",
     cost: 30,
+    rarity: "uncommon",
   },
   {
     id: "hat_top",
@@ -53,6 +92,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     category: "hat",
     emoji: "🎩",
     cost: 50,
+    rarity: "ultra-rare",
   },
   {
     id: "hat_santa",
@@ -61,6 +101,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     category: "hat",
     emoji: "🎅",
     cost: 40,
+    rarity: "rare",
   },
   // --- Cosmetics ---
   {
@@ -70,6 +111,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     category: "decoration",
     emoji: "🌸",
     cost: 10,
+    rarity: "common",
   },
   {
     id: "decoration_sunflower",
@@ -78,6 +120,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     category: "decoration",
     emoji: "🌻",
     cost: 15,
+    rarity: "common",
   },
   {
     id: "decoration_cactus",
@@ -86,6 +129,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     category: "decoration",
     emoji: "🌵",
     cost: 20,
+    rarity: "common",
   },
   {
     id: "decoration_potted",
@@ -94,6 +138,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     category: "decoration",
     emoji: "🪴",
     cost: 20,
+    rarity: "common",
   },
   {
     id: "decoration_mushroom",
@@ -102,6 +147,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     category: "decoration",
     emoji: "🍄",
     cost: 25,
+    rarity: "uncommon",
   },
   {
     id: "decoration_four_leaf",
@@ -110,6 +156,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     category: "decoration",
     emoji: "🍀",
     cost: 35,
+    rarity: "rare",
   },
   {
     id: "decoration_six_seven",
@@ -118,6 +165,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     category: "decoration",
     emoji: "6️⃣7️⃣",
     cost: 1000000,
+    rarity: "legendary",
   },
   {
     id: "decoration_rainbow",
@@ -126,6 +174,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     category: "decoration",
     emoji: "🌈",
     cost: 30,
+    rarity: "uncommon",
   },
   {
     id: "decoration_fire",
@@ -134,6 +183,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     category: "decoration",
     emoji: "🔥",
     cost: 20,
+    rarity: "uncommon",
   },
   {
     id: "decoration_snowflake",
@@ -142,6 +192,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     category: "decoration",
     emoji: "❄️",
     cost: 15,
+    rarity: "common",
   },
   {
     id: "decoration_lightning",
@@ -150,6 +201,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     category: "decoration",
     emoji: "⚡",
     cost: 25,
+    rarity: "uncommon",
   },
   {
     id: "decoration_star",
@@ -158,6 +210,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     category: "decoration",
     emoji: "🌠",
     cost: 40,
+    rarity: "rare",
   },
   {
     id: "decoration_comet",
@@ -166,6 +219,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     category: "decoration",
     emoji: "☄️",
     cost: 45,
+    rarity: "rare",
   },
   {
     id: "decoration_gem",
@@ -174,6 +228,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     category: "decoration",
     emoji: "💎",
     cost: 75,
+    rarity: "ultra-rare",
   },
   {
     id: "decoration_trophy",
@@ -182,6 +237,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     category: "decoration",
     emoji: "🏆",
     cost: 60,
+    rarity: "ultra-rare",
   },
   {
     id: "decoration_robot",
@@ -190,6 +246,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     category: "decoration",
     emoji: "🤖",
     cost: 35,
+    rarity: "rare",
   },
   {
     id: "decoration_wrench",
@@ -198,6 +255,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     category: "decoration",
     emoji: "🔧",
     cost: 20,
+    rarity: "common",
   },
   {
     id: "decoration_gear",
@@ -206,6 +264,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     category: "decoration",
     emoji: "⚙️",
     cost: 20,
+    rarity: "common",
   },
   {
     id: "decoration_magnet",
@@ -214,6 +273,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     category: "decoration",
     emoji: "🧲",
     cost: 25,
+    rarity: "uncommon",
   },
   {
     id: "decoration_satellite",
@@ -222,6 +282,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     category: "decoration",
     emoji: "🛰️",
     cost: 50,
+    rarity: "rare",
   },
   {
     id: "decoration_alien",
@@ -230,6 +291,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     category: "decoration",
     emoji: "👽",
     cost: 30,
+    rarity: "uncommon",
   },
   {
     id: "decoration_ghost",
@@ -238,6 +300,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     category: "decoration",
     emoji: "👻",
     cost: 25,
+    rarity: "uncommon",
   },
   {
     id: "decoration_dragon",
@@ -246,6 +309,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     category: "decoration",
     emoji: "🐉",
     cost: 80,
+    rarity: "ultra-rare",
   },
   {
     id: "decoration_shark",
@@ -254,6 +318,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     category: "decoration",
     emoji: "🦈",
     cost: 40,
+    rarity: "rare",
   },
   {
     id: "decoration_eagle",
@@ -262,6 +327,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     category: "decoration",
     emoji: "🦅",
     cost: 35,
+    rarity: "rare",
   },
   {
     id: "decoration_penguin",
@@ -270,6 +336,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     category: "decoration",
     emoji: "🐧",
     cost: 20,
+    rarity: "uncommon",
   },
   {
     id: "decoration_cat",
@@ -278,6 +345,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     category: "decoration",
     emoji: "🐱",
     cost: 15,
+    rarity: "common",
   },
   {
     id: "decoration_fox",
@@ -286,6 +354,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     category: "decoration",
     emoji: "🦊",
     cost: 25,
+    rarity: "uncommon",
   },
   {
     id: "decoration_panda",
@@ -294,6 +363,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     category: "decoration",
     emoji: "🐼",
     cost: 30,
+    rarity: "uncommon",
   },
   {
     id: "decoration_pizza",
@@ -302,6 +372,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     category: "decoration",
     emoji: "🍕",
     cost: 10,
+    rarity: "common",
   },
   {
     id: "decoration_boba",
@@ -310,6 +381,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     category: "decoration",
     emoji: "🧋",
     cost: 15,
+    rarity: "common",
   },
   {
     id: "decoration_soda",
@@ -318,6 +390,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     category: "decoration",
     emoji: "🥤",
     cost: 10,
+    rarity: "common",
   },
   {
     id: "decoration_moon",
@@ -326,6 +399,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     category: "decoration",
     emoji: "🌙",
     cost: 20,
+    rarity: "common",
   },
   {
     id: "decoration_sun",
@@ -334,6 +408,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     category: "decoration",
     emoji: "☀️",
     cost: 20,
+    rarity: "common",
   },
   {
     id: "decoration_volcano",
@@ -342,6 +417,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     category: "decoration",
     emoji: "🌋",
     cost: 35,
+    rarity: "rare",
   },
   {
     id: "decoration_crystal_ball",
@@ -350,6 +426,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     category: "decoration",
     emoji: "🔮",
     cost: 55,
+    rarity: "ultra-rare",
   },
   {
     id: "decoration_dice",
@@ -358,6 +435,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     category: "decoration",
     emoji: "🎲",
     cost: 20,
+    rarity: "uncommon",
   },
   {
     id: "decoration_joystick",
@@ -366,6 +444,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     category: "decoration",
     emoji: "🕹️",
     cost: 30,
+    rarity: "rare",
   },
 ];
 
