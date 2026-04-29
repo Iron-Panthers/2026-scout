@@ -431,7 +431,7 @@ function MarketGrid({ openMatches, oddsMap, tbaMap, sbMap, myBetByMatch, tbaLoad
       {/* Responsive grid — 2 cols on mobile, 3 on md, 4 on lg+ */}
       {rest.length > 0 && (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-          {rest.map((match) => (
+          {openMatches.map((match) => (
             <GridCard
               key={match.id}
               match={match}
@@ -765,6 +765,8 @@ export default function Betting() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       supabase.functions.invoke("sync-match-results", {
         headers: session ? { Authorization: `Bearer ${session.access_token}` } : undefined,
+      }).then((e) => {
+        console.log("ur mom", e)
       }).catch(() => {});
     });
 
@@ -813,15 +815,55 @@ export default function Betting() {
       }).catch(() => setTbaLoading(false));
 
       getStatboticsEventMatches(code).then((sb) => {
+        const map = new Map<number, StatboticsMatch>();
         if (sb && sb.length > 0) {
-          const map = new Map<number, StatboticsMatch>();
           sb.forEach((m) => {
             if (m.key?.includes("_qm")) map.set(m.match_number, m);
           });
-          if (map.size > 0) setSbMap(map);
         }
+        // Fall back to DB-stored predictions for matches the API didn't return
+        for (const m of rows) {
+          if (!map.has(m.match_number) && m.statbotics_red_win_prob != null) {
+            map.set(m.match_number, {
+              key: `${code}_qm${m.match_number}`,
+              event: code,
+              match_number: m.match_number,
+              comp_level: "qm",
+              pred: {
+                winner: null,
+                red_win_prob: m.statbotics_red_win_prob,
+                red_score: 0,
+                blue_score: 0,
+              },
+              result: { winner: null, red_score: null, blue_score: null, red_auto_points: null, blue_auto_points: null },
+            });
+          }
+        }
+        if (map.size > 0) setSbMap(map);
         setSbLoading(false);
-      }).catch(() => setSbLoading(false));
+      }).catch(() => {
+        // API failed — build map entirely from DB predictions
+        const map = new Map<number, StatboticsMatch>();
+        for (const m of rows) {
+          if (m.statbotics_red_win_prob != null) {
+            map.set(m.match_number, {
+              key: `${code}_qm${m.match_number}`,
+              event: code,
+              match_number: m.match_number,
+              comp_level: "qm",
+              pred: {
+                winner: null,
+                red_win_prob: m.statbotics_red_win_prob,
+                red_score: 0,
+                blue_score: 0,
+              },
+              result: { winner: null, red_score: null, blue_score: null, red_auto_points: null, blue_auto_points: null },
+            });
+          }
+        }
+        if (map.size > 0) setSbMap(map);
+        setSbLoading(false);
+      });
     }
   }, [user?.id]);
 

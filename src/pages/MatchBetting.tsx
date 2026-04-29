@@ -376,12 +376,30 @@ export default function MatchBetting() {
         }
       }
 
-      // Statbotics — offline fallback
+      // Statbotics — try API first, then localStorage cache, then DB-stored value
       let sb: StatboticsMatch | null = null;
       if (eventCode) {
         sb = isOnline
           ? await getStatboticsMatch(eventCode, m.match_number)
           : getCachedStatboticsMatch(eventCode, m.match_number);
+
+        // Fall back to DB-stored prediction when API and cache both miss
+        if (!sb && m.statbotics_red_win_prob != null) {
+          sb = {
+            key: `${eventCode}_qm${m.match_number}`,
+            event: eventCode,
+            match_number: m.match_number,
+            comp_level: "qm",
+            pred: {
+              winner: null,
+              red_win_prob: m.statbotics_red_win_prob,
+              red_score: 0,
+              blue_score: 0,
+            },
+            result: { winner: null, red_score: null, blue_score: null, red_auto_points: null, blue_auto_points: null },
+          };
+        }
+
         if (sb && !cancelled) setSbMatch(sb);
       }
 
@@ -786,11 +804,11 @@ export default function MatchBetting() {
                       currentOdds as MatchOdds, sbRedProb)} pts if {userBet.alliance} wins
                   </div>
                 </div>
-                <Button variant="ghost" size="sm"
+                {/* <Button variant="ghost" size="sm"
                   className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
                   onClick={handleCancelBet} disabled={cancelling || !isOnline}>
                   {cancelling ? <Loader2 className="h-4 w-4 animate-spin" /> : "Cancel"}
-                </Button>
+                </Button> */}
               </div>
             </CardContent>
           </Card>

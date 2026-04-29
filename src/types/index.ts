@@ -62,6 +62,7 @@ export interface Match {
   blue3_scouter_id: string | null;
   qual_blue_scouter_id: string | null;
   winning_alliance: "red" | "blue" | "tie" | null;
+  statbotics_red_win_prob: number | null;
   created_at: string;
   updated_at: string;
 }

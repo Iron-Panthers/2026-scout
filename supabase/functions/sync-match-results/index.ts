@@ -47,6 +47,11 @@ interface StatboticsMatch {
   key: string;
   comp_level: string;
   match_number: number;
+  pred: {
+    red_win_prob: number; // 0–1
+    red_score: number;
+    blue_score: number;
+  } | null;
   result: {
     winner: "red" | "blue" | "tie" | null;
     red_score: number | null;
@@ -154,33 +159,46 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 4. Update matches that now have a result but don't in DB yet
+    // 4. Update matches: winning_alliance for newly-played matches,
+    //    and statbotics_red_win_prob whenever Statbotics has prediction data.
     let updated = 0;
     let alreadySettled = 0;
+    let predUpdated = 0;
 
     for (const dbMatch of dbMatches) {
-      if (dbMatch.winning_alliance) {
-        alreadySettled++;
-        continue;
-      }
-
-      // TBA is the authoritative source; Statbotics is the fallback
       const tba = tbaByNum.get(dbMatch.match_number);
       const sb = sbByNum.get(dbMatch.match_number);
 
-      const winner = (tba ? tbaWinner(tba) : null) ?? sb?.result?.winner ?? null;
+      const fieldsToUpdate: Record<string, unknown> = {};
 
-      if (!winner) continue; // match not played yet
+      // Store Statbotics win probability whenever available
+      return json({ sb?.pred, sb.pred.red_win_prob }, 200);
+      if (sb?.pred && typeof sb.pred.red_win_prob === "number") {
+        fieldsToUpdate.statbotics_red_win_prob = sb.pred.red_win_prob;
+      }
+
+      if (dbMatch.winning_alliance) {
+        alreadySettled++;
+      } else {
+        // TBA is the authoritative source; Statbotics is the fallback
+        const winner = (tba ? tbaWinner(tba) : null) ?? sb?.result?.winner ?? null;
+        if (winner) fieldsToUpdate.winning_alliance = winner;
+      }
+
+      if (Object.keys(fieldsToUpdate).length === 0) continue;
 
       const { error: updateError } = await supabase
         .from("matches")
-        .update({ winning_alliance: winner })
+        .update(fieldsToUpdate)
         .eq("id", dbMatch.id);
 
-      if (!updateError) updated++;
+      if (!updateError) {
+        if (fieldsToUpdate.winning_alliance) updated++;
+        if (fieldsToUpdate.statbotics_red_win_prob !== undefined) predUpdated++;
+      }
     }
 
-    return json({ updated, alreadySettled, eventCode }, 200);
+    return json({ updated, alreadySettled, predUpdated, eventCode }, 200);
   } catch (err: any) {
     console.error("sync-match-results error:", err);
     return json({ error: err.message }, 500);
