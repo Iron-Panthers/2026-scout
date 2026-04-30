@@ -66,6 +66,7 @@ export async function getStatboticsMatch(
 ): Promise<StatboticsMatch | null> {
   const matchKey = `${eventCode}_qm${matchNumber}`;
   const cKey = CACHE_PFX + matchKey;
+  let pred_time = null;
 
   try {
     const raw = localStorage.getItem(cKey);
@@ -76,12 +77,13 @@ export async function getStatboticsMatch(
         stable: boolean;
       };
       console.log(data, ts, stable, raw, cKey)
+      if (data.predicted_time) pred_time = data.predicted_time;
       if (stable || Date.now() - ts < TTL_PENDING) return data;
     }
   } catch { /* ignore */ }
 
   const data = await sbFetch<StatboticsMatch>(`/match/${matchKey}`);
-  if (!data) return null;
+  if (!data) return { result: null, time: pred_time };
 
   try {
     const stable = !!data.result?.winner;

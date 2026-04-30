@@ -397,7 +397,7 @@ export default function MatchBetting() {
         console.log(sb, results)
 
         // Fall back to DB-stored prediction when API and cache both miss
-        if (!sb && m.statbotics_red_win_prob != null) {
+        if (!sb.result && m.statbotics_red_win_prob != null) {
           sb = {
             key: `${eventCode}_qm${m.match_number}`,
             event: eventCode,
@@ -409,32 +409,43 @@ export default function MatchBetting() {
               red_score: 0,
               blue_score: 0,
             },
+            time: sb?.time,
             result: results,
           };
         }
 
         if (sb && !cancelled) setSbMatch(sb);
 
+        const pred_time = sb?.time ?? localStorage.getItem(`pred_time_match_${match_id}`)?.predTime
+        if (!pred_time) {
+          console.log('Error getting pred time');
+          setLoading(true);
+          return;
+        }
+        console.log(sb, localStorage.getItem(`pred_time_match_${match_id}`), match)
+
         // Save pred_time to DB + localStorage when Statbotics provides match time
-        if (sb?.time && isOnline && !cancelled) {
-          const predTimeIso = new Date(sb.time * 1000).toISOString();
+        if (pred_time && isOnline && !cancelled) {
+          // console.log(pred_time,new Date(pred_time * 1000),new Date(pred_time * 1000).toISO, new Date(new Date(pred_time * 1000).toLocaleTimeString()))
+          const predTimeIso = new Date(pred_time * 1000).toISOString();
           console.log(`[MatchBetting] Match ${m.match_number} pred_time: ${predTimeIso}`);
           try {
             localStorage.setItem(
               `pred_time_match_${match_id}`,
-              JSON.stringify({ matchId: match_id, matchNumber: m.match_number, predTime: predTimeIso, fetchedAt: new Date().toISOString() })
+              JSON.stringify({ matchId: match_id, matchNumber: m.match_number, predTime: pred_time, fetchedAt: new Date().toISOString() })
             );
           } catch { /* ignore */ }
           // Only write to DB if the value changed
-          if (m.pred_time !== predTimeIso) {
-            const { data: updatedMatch } = await supabase
-              .from("matches")
-              .update({ pred_time: predTimeIso })
-              .eq("id", match_id)
-              .select()
-              .maybeSingle();
-            if (updatedMatch && !cancelled) setMatch(updatedMatch as Match);
-          }
+          // if (m.pred_time !== predTimeIso) {
+          console.log('updated match', predTimeIso)
+          const { data: updatedMatch } = await supabase
+            .from("matches")
+            .update({ pred_time: predTimeIso })
+            .eq("id", match_id)
+            .select()
+            .maybeSingle();
+          if (updatedMatch && !cancelled) setMatch(updatedMatch as Match);
+          // }
         }
       }
 
@@ -506,7 +517,6 @@ export default function MatchBetting() {
           await refreshUserBet();
           await refreshPoints();
         }
-        console.log('match settled', data);
       }
     }
 
@@ -552,9 +562,11 @@ export default function MatchBetting() {
   // ---------------------------------------------------------------------------
   useEffect(() => {
     const predTime = match?.pred_time;
+    console.log(match, predTime)
     if (!predTime) { setTimeUntilMatch(null); return; }
 
     const predTs = new Date(predTime).getTime();
+    console.log(predTs, predTime)
     const update = () => setTimeUntilMatch(predTs - Date.now());
 
     update();
@@ -674,6 +686,18 @@ export default function MatchBetting() {
     return `${s}s`;
   }
 
+  /** Returns the predicted start time formatted in the user's local timezone. */
+  function formatLocalMatchTime(isoString: string): string {
+    return new Date(isoString).toLocaleString(undefined, {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      timeZoneName: "short",
+    });
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -703,6 +727,11 @@ export default function MatchBetting() {
             <div>
               <h1 className="text-xl font-bold">{match.name}</h1>
               {event && <p className="text-xs text-muted-foreground">{event.name}</p>}
+              {predTime && (
+                <p className="text-xs text-muted-foreground">
+                  {bettingClosed ? "Started" : "Starts"} {formatLocalMatchTime(predTime)}
+                </p>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -921,7 +950,7 @@ export default function MatchBetting() {
           <Card className="border-red-700/30 bg-red-900/10">
             <CardContent className="pt-4 pb-4 flex items-center gap-3 text-sm text-red-300">
               <Clock className="h-4 w-4 shrink-0" />
-              Betting is closed — this match has started. No new bets can be placed.
+              Betting is closed — this match has started or is about to. No new bets can be placed.
             </CardContent>
           </Card>
         )}
