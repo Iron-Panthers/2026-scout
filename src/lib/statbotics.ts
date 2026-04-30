@@ -45,7 +45,7 @@ export interface StatboticsMatch {
 async function sbFetch<T>(endpoint: string): Promise<T | null> {
   try {
     const r = await fetch(BASE_URL + endpoint, {
-      signal: AbortSignal.timeout(6000),
+      signal: AbortSignal.timeout(160000),
     });
     if (!r.ok) return null;
     return (await r.json()) as T;
@@ -73,6 +73,7 @@ export async function getStatboticsMatch(
         ts: number;
         stable: boolean;
       };
+      console.log(data, ts, stable, raw, cKey)
       if (stable || Date.now() - ts < TTL_PENDING) return data;
     }
   } catch { /* ignore */ }

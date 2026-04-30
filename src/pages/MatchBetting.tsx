@@ -382,6 +382,7 @@ export default function MatchBetting() {
         sb = isOnline
           ? await getStatboticsMatch(eventCode, m.match_number)
           : getCachedStatboticsMatch(eventCode, m.match_number);
+        console.log(sb)
 
         // Fall back to DB-stored prediction when API and cache both miss
         if (!sb && m.statbotics_red_win_prob != null) {
@@ -400,6 +401,7 @@ export default function MatchBetting() {
           };
         }
 
+        console.log(sb)
         if (sb && !cancelled) setSbMatch(sb);
       }
 
@@ -444,6 +446,7 @@ export default function MatchBetting() {
           getMatchUserBet(match_id!, user!.id),
           getGameProfile(user!.id),
         ]);
+        console.log(ub, gp)
         setUserBet(ub);
         setPoints(gp?.points ?? 0);
       }
@@ -470,6 +473,7 @@ export default function MatchBetting() {
           await refreshUserBet();
           await refreshPoints();
         }
+        console.log('match settled', data);
       }
     }
 
