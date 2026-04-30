@@ -790,11 +790,35 @@ export default function Betting() {
 
     const rows = (matchRows ?? []) as Match[];
     setMatches(rows);
-    // Show the UI immediately — TBA/SB/odds load in the background
-    setLoading(false);
 
     const ids = rows.map((m) => m.id);
     const code = activeEvent.event_code;
+
+    // Seed sbMap from DB-stored predictions immediately — API will update in background
+    if (code) {
+      const dbMap = new Map<number, StatboticsMatch>();
+      for (const m of rows) {
+        if (m.statbotics_red_win_prob != null) {
+          dbMap.set(m.match_number, {
+            key: `${code}_qm${m.match_number}`,
+            event: code,
+            match_number: m.match_number,
+            comp_level: "qm",
+            pred: {
+              winner: null,
+              red_win_prob: m.statbotics_red_win_prob,
+              red_score: 0,
+              blue_score: 0,
+            },
+            result: { winner: null, red_score: null, blue_score: null, red_auto_points: null, blue_auto_points: null },
+          });
+        }
+      }
+      if (dbMap.size > 0) setSbMap(dbMap);
+    }
+
+    // Show the UI immediately — TBA/SB/odds load in the background
+    setLoading(false);
 
     // Odds, TBA, and Statbotics all load in parallel without blocking render
     getBulkMatchOdds(ids).then((odds) => setOddsMap(odds)).catch(() => {});
@@ -821,7 +845,7 @@ export default function Betting() {
             if (m.key?.includes("_qm")) map.set(m.match_number, m);
           });
         }
-        // Fall back to DB-stored predictions for matches the API didn't return
+        // Fill in any gaps from DB predictions
         for (const m of rows) {
           if (!map.has(m.match_number) && m.statbotics_red_win_prob != null) {
             map.set(m.match_number, {
@@ -841,29 +865,7 @@ export default function Betting() {
         }
         if (map.size > 0) setSbMap(map);
         setSbLoading(false);
-      }).catch(() => {
-        // API failed — build map entirely from DB predictions
-        const map = new Map<number, StatboticsMatch>();
-        for (const m of rows) {
-          if (m.statbotics_red_win_prob != null) {
-            map.set(m.match_number, {
-              key: `${code}_qm${m.match_number}`,
-              event: code,
-              match_number: m.match_number,
-              comp_level: "qm",
-              pred: {
-                winner: null,
-                red_win_prob: m.statbotics_red_win_prob,
-                red_score: 0,
-                blue_score: 0,
-              },
-              result: { winner: null, red_score: null, blue_score: null, red_auto_points: null, blue_auto_points: null },
-            });
-          }
-        }
-        if (map.size > 0) setSbMap(map);
-        setSbLoading(false);
-      });
+      }).catch(() => setSbLoading(false));
     }
   }, [user?.id]);
 
