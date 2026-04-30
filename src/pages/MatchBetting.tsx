@@ -480,11 +480,12 @@ export default function MatchBetting() {
       }
 
       // Bets — offline uses cache
+      let loadedBets: Bet[] = [];
       if (isOnline) {
-        const fresh = await getMatchBets(match_id!);
+        loadedBets = await getMatchBets(match_id!);
         if (!cancelled) {
-          setBets(fresh);
-          const computed = computeOddsFromBets(fresh);
+          setBets(loadedBets);
+          const computed = computeOddsFromBets(loadedBets);
           setOdds(computed);
           cacheMatchOdds(match_id!, computed);
         }
@@ -499,24 +500,26 @@ export default function MatchBetting() {
           getMatchUserBet(match_id!, user!.id),
           getGameProfile(user!.id),
         ]);
-        console.log(ub, gp)
         setUserBet(ub);
         setPoints(gp?.points ?? 0);
       }
 
       setLoading(false);
 
-      // Auto-settle if Statbotics has a result and match isn't settled yet
+      // Auto-settle: fire when a winner is known (from Statbotics/TBA or already stored
+      // in the DB by sync-match-results) AND there are still pending bets to process.
+      const knownWinner = (m.winning_alliance ?? sb?.result?.winner) as "red" | "blue" | "tie" | null | undefined;
+      const hasPendingBets = loadedBets.some((b) => b.status === "pending");
       if (
         isOnline &&
         !settledRef.current &&
-        sb?.result?.winner &&
-        !m.winning_alliance
+        knownWinner &&
+        hasPendingBets
       ) {
         settledRef.current = true;
         if (!cancelled) setAutoSettling(true);
-        const prob = sb.pred.red_win_prob;
-        await settleMatchBets(match_id!, sb.result.winner, prob);
+        const prob = sb?.pred?.red_win_prob ?? 0.5;
+        await settleMatchBets(match_id!, knownWinner, prob);
         // Reload match + user data
         const { data: refreshed } = await supabase
           .from("matches").select("*").eq("id", match_id).maybeSingle();

@@ -425,10 +425,11 @@ export async function settleMatchBets(
     .eq("id", matchId)
     .maybeSingle();
 
-  console.log('attempting to resettle', winningAlliance, matchRow)
-  if (matchRow?.winning_alliance) {
-    return { success: true }; // already done
-  }
+  // If winning_alliance is already set (e.g. by sync-match-results edge function),
+  // use that as the authoritative winner rather than returning early — pending bets
+  // may not have been processed yet.
+  const effectiveWinner: "red" | "blue" | "tie" =
+    (matchRow?.winning_alliance as "red" | "blue" | "tie" | null) ?? winningAlliance;
 
   const matchPredTime: string | null = matchRow?.pred_time ?? null;
 
@@ -437,15 +438,16 @@ export async function settleMatchBets(
     .select("*")
     .eq("match_id", matchId)
     .eq("status", "pending");
-  console.log('all bets::',bets)
 
   if (error) return { success: false, error: "Failed to fetch bets." };
 
-  // Update match result first (prevents duplicate settlement races)
-  await supabase
-    .from("matches")
-    .update({ winning_alliance: winningAlliance })
-    .eq("id", matchId);
+  // Set winning_alliance if not already set (prevents duplicate settlement races)
+  if (!matchRow?.winning_alliance) {
+    await supabase
+      .from("matches")
+      .update({ winning_alliance: effectiveWinner })
+      .eq("id", matchId);
+  }
 
   if (!bets || bets.length === 0) return { success: true };
 
@@ -457,13 +459,13 @@ export async function settleMatchBets(
     .reduce((s, b) => s + b.amount, 0);
   const totalPool = redTotal + blueTotal;
 
-  const winnerPool = winningAlliance === "red" ? redTotal : blueTotal;
+  const winnerPool = effectiveWinner === "red" ? redTotal : blueTotal;
 
   // Predicted probability for the winning side
   const p_winner =
-    winningAlliance === "tie"
+    effectiveWinner === "tie"
       ? 0.5
-      : (winningAlliance === "red"
+      : (effectiveWinner === "red"
       ? statboticsRedWinProb
       : 1 - statboticsRedWinProb);
 
@@ -473,16 +475,14 @@ export async function settleMatchBets(
 
     const timeDecayFactor = computeTimeDecayFactor(bet.created_at, matchPredTime);
 
-    if (winningAlliance === "tie") {
+    if (effectiveWinner === "tie") {
       // Refund on tie (no time decay on refunds)
       payout = bet.amount;
       status = "won";
-    } else if (bet.alliance === winningAlliance) {
+    } else if (bet.alliance === effectiveWinner) {
       status = "won";
       payout = calcPayout(bet.amount, winnerPool, totalPool, p_winner, timeDecayFactor);
     }
-
-    console.log(status, winningAlliance, bet)
 
     await supabase.from("bets").update({ status, payout }).eq("id", bet.id);
 
