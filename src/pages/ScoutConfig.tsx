@@ -45,7 +45,7 @@ export default function ScoutConfig() {
   const { match_id: param_match_id } = useParams();
   const [search_params] = useSearchParams();
   const { user } = useAuth();
-  const { settings } = useSettings();
+  const { settings, updateSetting } = useSettings();
   const navigate = useNavigate();
 
   const [match_id, setMatchId] = useState(param_match_id || "");
