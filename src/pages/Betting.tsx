@@ -26,6 +26,7 @@ import type { StatboticsMatch } from "@/lib/statbotics";
 interface TBAMatchData {
   match_number: number;
   comp_level: string;
+  predicted_time?: number; // Unix timestamp from TBA
   alliances: {
     red: { team_keys: string[] };
     blue: { team_keys: string[] };
@@ -46,6 +47,29 @@ function getBetStatusColor(status: string) {
 }
 
 // ---------------------------------------------------------------------------
+// Countdown hook — ticks every second, returns seconds left (or null)
+// ---------------------------------------------------------------------------
+function useTimeRemaining(predTime: string | null | undefined): number | null {
+  const [secondsLeft, setSecondsLeft] = useState<number | null>(() => {
+    if (!predTime) return null;
+    const diff = Math.floor((new Date(predTime).getTime() - Date.now()) / 1000);
+    return diff > 0 ? diff : null;
+  });
+
+  useEffect(() => {
+    if (!predTime) return;
+    const update = () => {
+      const diff = Math.floor((new Date(predTime).getTime() - Date.now()) / 1000);
+      setSecondsLeft(diff > 0 ? diff : null);
+    };
+    const id = setInterval(update, 1000);
+    return () => clearInterval(id);
+  }, [predTime]);
+
+  return secondsLeft;
+}
+
+// ---------------------------------------------------------------------------
 // Interest scoring — drives spotlight selection and grid ordering
 // ---------------------------------------------------------------------------
 function matchInterestScore(
@@ -59,8 +83,8 @@ function matchInterestScore(
     const pMax = Math.max(sb.pred.red_win_prob, 1 - sb.pred.red_win_prob);
     if (pMax < 0.57) score += 100;   // coin flip — most interesting
     else if (pMax > 0.85) score += 70; // dominant — also dramatic
-    else if (pMax > 0.70) score += 40; // heavy favourite
-    else score += 20;                  // slight favourite
+    else if (pMax > 0.70) score += 40; // heavy favorite
+    else score += 20;                  // slight favorite
   }
   if (odds) score += Math.min(40, odds.betCount * 8); // activity bonus
   if (hasBet) score += 55;  // user cares about their own bets
@@ -82,7 +106,11 @@ interface MarketCardProps {
 }
 
 function SpotlightCard({ match, odds, tba, sb, userBetAlliance, tbaLoading, sbLoading, onClick }: MarketCardProps) {
-  const bettingClosed = !!match.pred_time && Date.now() >= new Date(match.pred_time).getTime();
+  const effectivePredTime = match.pred_time
+    ?? (tba?.predicted_time ? new Date(tba.predicted_time * 1000).toISOString() : null);
+  const bettingClosed = !!effectivePredTime && Date.now() >= new Date(effectivePredTime).getTime();
+  const secondsLeft = useTimeRemaining(effectivePredTime);
+  const showCountdown = !bettingClosed && secondsLeft !== null && secondsLeft < 15 * 60;
 
   const rawRedPct = odds?.redPct ?? 50;
   const redPct = sb
@@ -139,6 +167,12 @@ function SpotlightCard({ match, odds, tba, sb, userBetAlliance, tbaLoading, sbLo
             <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${
               userBetAlliance === "red" ? "text-red-400 border-red-600/30 bg-red-900/10" : "text-blue-400 border-blue-600/30 bg-blue-900/10"}`}>
               Your bet: {userBetAlliance.toUpperCase()}
+            </Badge>
+          )}
+          {showCountdown && (
+            <Badge variant="outline" className="text-orange-400 border-orange-500/40 bg-orange-900/15 text-[10px] px-1.5 py-0 gap-1 animate-pulse">
+              <Clock className="h-2.5 w-2.5" />
+              {Math.floor(secondsLeft! / 60)}m {secondsLeft! % 60}s
             </Badge>
           )}
           {bettingClosed && (
@@ -218,7 +252,11 @@ function SpotlightCard({ match, odds, tba, sb, userBetAlliance, tbaLoading, sbLo
 // Grid card — compact, lives in the 2-col grid below the spotlight
 // ---------------------------------------------------------------------------
 function GridCard({ match, odds, tba, sb, userBetAlliance, tbaLoading, sbLoading, onClick }: MarketCardProps) {
-  const bettingClosed = !!match.pred_time && Date.now() >= new Date(match.pred_time).getTime();
+  const effectivePredTime = match.pred_time
+    ?? (tba?.predicted_time ? new Date(tba.predicted_time * 1000).toISOString() : null);
+  const bettingClosed = !!effectivePredTime && Date.now() >= new Date(effectivePredTime).getTime();
+  const secondsLeft = useTimeRemaining(effectivePredTime);
+  const showCountdown = !bettingClosed && secondsLeft !== null && secondsLeft < 15 * 60;
 
   const rawRedPct = odds?.redPct ?? 50;
   const redPct = sb
@@ -244,6 +282,11 @@ function GridCard({ match, odds, tba, sb, userBetAlliance, tbaLoading, sbLoading
       <div className="flex items-start justify-between mb-1.5">
         <span className="font-bold text-sm leading-tight">{match.name}</span>
         <div className="flex items-center gap-1 shrink-0 ml-1">
+          {showCountdown && (
+            <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-orange-900/30 text-orange-400 flex items-center gap-0.5 animate-pulse">
+              <Clock className="h-2.5 w-2.5" /> {Math.floor(secondsLeft! / 60)}m {secondsLeft! % 60}s
+            </span>
+          )}
           {bettingClosed && (
             <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-red-900/30 text-red-400 flex items-center gap-0.5">
               <Clock className="h-2.5 w-2.5" /> CLOSED
@@ -288,8 +331,8 @@ function GridCard({ match, odds, tba, sb, userBetAlliance, tbaLoading, sbLoading
         <span>
           {sb ? (
             <>
-              {flavor === "coinflip" && <span className="text-yellow-400">🪙 Coin Flip</span>}
-              {flavor === "dominant" && <span className="text-pink-400">⚡ Dominant</span>}
+              {flavor === "coinflip" && <span className="text-yellow-400">Coin Flip</span>}
+              {flavor === "dominant" && <span className="text-pink-400">Dominant</span>}
               {flavor === "heavy"    && <span className="text-purple-400">Heavy Fav.</span>}
             </>
           ) : sbLoading ? (
@@ -550,7 +593,10 @@ function OpenMatchCard({ match, odds, tba, sb, userBetAlliance, onClick }: OpenM
           </div>
         )}
 
-        <OddsBar redPct={redPct} />
+        <div className="flex h-3 rounded overflow-hidden">
+          <div className="bg-red-600/70 transition-all" style={{ width: `${redPct}%` }} />
+          <div className="bg-blue-600/70 transition-all" style={{ width: `${100 - redPct}%` }} />
+        </div>
         <div className="flex justify-between text-xs text-muted-foreground -mt-1">
           <span className="text-red-400 font-medium">Red {Math.round(redPct)}%</span>
           <span className="text-xs text-muted-foreground/50">bet odds</span>
@@ -782,8 +828,6 @@ export default function Betting() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       supabase.functions.invoke("sync-match-results", {
         headers: session ? { Authorization: `Bearer ${session.access_token}` } : undefined,
-      }).then((e) => {
-        console.log("ur mom", e)
       }).catch(() => {});
     });
 
@@ -953,7 +997,7 @@ export default function Betting() {
             <div>
               <h1 className="text-2xl font-bold flex items-center gap-2">
                 <TrendingUp className="h-6 w-6 text-primary" />
-                Betting Markets
+                Prediction Markets
               </h1>
               {event && <p className="text-sm text-muted-foreground">{event.name}</p>}
             </div>
