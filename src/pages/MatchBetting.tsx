@@ -45,7 +45,7 @@ function OddsChart({ history, isLive }: OddsChartProps) {
   const n = pts.length;
 
   const px = (i: number) => PL + (i / (n - 1)) * cw;
-  const py = (pct: number) => PT + (1 - pct / 100) * ch;
+  const py = (pct: number) => PT + (pct / 100) * ch;
 
   const redD = [
     `M ${px(0)} ${PT}`,
