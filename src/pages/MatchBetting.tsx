@@ -224,7 +224,7 @@ function ResultCard({ sbMatch, winner }: ResultCardProps) {
           <div className="flex gap-2">
             {upset && (
               <Badge className="bg-yellow-600/20 text-yellow-300 border-yellow-600/30 text-xs">
-                ⚡ UPSET
+                UPSET
               </Badge>
             )}
             <Badge className={winner === "red" ? "bg-red-600/20 text-red-300 border-red-600/30 text-xs"

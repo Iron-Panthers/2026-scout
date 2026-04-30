@@ -155,12 +155,12 @@ function SpotlightCard({ match, odds, tba, sb, userBetAlliance, tbaLoading, sbLo
           </Badge>
           {sb && (
             <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${flavorBadgeClass}`}>
-              {flavor === "coinflip" ? "🪙 " : flavor === "dominant" ? "⚡ " : ""}{matchLabel}
+              {matchLabel}
             </Badge>
           )}
           {isUpsetAlert && (
             <Badge variant="outline" className="text-orange-300 border-orange-600/30 bg-orange-900/10 text-[10px] px-1.5 py-0">
-              ⚡ Upset Alert
+              Upset Alert
             </Badge>
           )}
           {userBetAlliance && (
@@ -560,14 +560,12 @@ function OpenMatchCard({ match, odds, tba, sb, userBetAlliance, onClick }: OpenM
             <span className="font-bold text-base">{match.name}</span>
             {sb && (
               <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${flavorBadge[flavor]}`}>
-                {flavor === "coinflip" && "🪙 "}
-                {flavor === "dominant" && "⚡ "}
                 {matchLabel}
               </Badge>
             )}
             {isUpsetAlert && (
               <Badge variant="outline" className="text-orange-300 border-orange-600/30 bg-orange-900/10 text-[10px] px-1.5 py-0">
-                ⚡ Upset Alert
+                Upset Alert
               </Badge>
             )}
             {userBetAlliance && (
@@ -661,7 +659,7 @@ function CompletedMatchCard({ match, odds, tba, sb, userBet, onClick }: Complete
               )}
               {isUpset && (
                 <Badge className="bg-yellow-600/20 text-yellow-300 border-yellow-600/30 text-[10px] px-1.5 py-0">
-                  ⚡ UPSET
+                  UPSET
                 </Badge>
               )}
               {userBet && (
@@ -1094,7 +1092,7 @@ export default function Betting() {
                       <>
                         <div className="flex items-center gap-2 text-xs text-yellow-400 font-semibold uppercase tracking-wider">
                           <span className="h-px flex-1 bg-yellow-700/30" />
-                          ⚡ Upsets
+                          Upsets
                           <span className="h-px flex-1 bg-yellow-700/30" />
                         </div>
                         {upsets.map((match) => (
