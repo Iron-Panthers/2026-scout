@@ -18,6 +18,7 @@ export default function Scouting() {
   const match_number = parseInt(searchParams.get("match_number") || "0");
   const team_number = parseInt(searchParams.get("team_number") || "0");
   const match_type = searchParams.get("match_type") || "qual";
+  const isGuest = searchParams.get("g") ?? false;
   const canDelete = useState(true);
 
   const { state, set, logEvent, undo, canUndo } = useScoutingReducer(
@@ -188,7 +189,7 @@ export default function Scouting() {
   }, []);
 
   const handleFinish = () => {
-    navigate(`/review/${compressState(state)}?type=quant`);
+    navigate(`/review/${compressState(state)}?type=quant` + (isGuest ? "&g=true" : ""));
   };
 
   // Use preview coords during drag, otherwise committed state
@@ -286,7 +287,7 @@ export default function Scouting() {
       >
         <button
           className="w-full flex items-center gap-3 px-4 py-3 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors text-rose-600 dark:text-rose-400 border-b border-border"
-          onPointerDown={(e) => { e.preventDefault(); navigate("/dashboard"); }}
+          onPointerDown={(e) => { e.preventDefault(); navigate(isGuest ? "/guest" : "/dashboard"); }}
         >
           <ArrowLeft className="w-4 h-4 shrink-0" />
           <span className="text-sm font-medium">Back to Dashboard</span>

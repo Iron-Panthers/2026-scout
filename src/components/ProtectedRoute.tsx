@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface ProtectedRouteProps {
@@ -12,6 +12,12 @@ export default function ProtectedRoute({
   requireManager = false,
 }: ProtectedRouteProps) {
   const { user, profile, loading } = useAuth();
+  const [searchParams] = useSearchParams();
+  const guest = searchParams.get('g') ?? false;
+
+  if (guest) {
+    return <>{children}</>;
+  }
 
   if (loading) {
     return (

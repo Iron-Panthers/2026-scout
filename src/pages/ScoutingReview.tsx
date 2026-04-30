@@ -33,6 +33,7 @@ export default function ScoutingReview() {
 
   // Check if opened with manager parameter
   const isManagerMode = searchParams.get("forScoutingManager") === "true";
+  const isGuest = searchParams.get("g") ?? false;
 
   // Decode state from compressed URL param
   let initialState: any = null;
@@ -159,8 +160,8 @@ export default function ScoutingReview() {
         if (compressed !== encoded) {
           const typeParam = searchParams.get("type");
           const newUrl = typeParam
-            ? `/review/${compressed}?type=${typeParam}`
-            : `/review/${compressed}`;
+            ? `/review/${compressed}?type=${typeParam}` + (isGuest ? "&g=true" : "")
+            : `/review/${compressed}` + (isGuest ? "?g=true" : "");
           // Use navigate with replace:true so React Router stays in sync
           // and the basename is correctly included (important for production deployments)
           navigate(newUrl, { replace: true });
@@ -499,7 +500,7 @@ export default function ScoutingReview() {
       });
 
       setShowStatusModal(false);
-      navigate("/dashboard");
+      navigate(isGuest ? "/guest" : "/dashboard");
     } catch (error) {
       console.error("Error submitting scouting data:", error);
       toast({
@@ -752,7 +753,7 @@ export default function ScoutingReview() {
           <Button
             variant="outline"
             className="h-10 px-6 rounded-lg font-medium border border-border text-foreground hover:bg-surface-elevated hover:border-primary transition"
-            onClick={() => navigate("/dashboard")}
+            onClick={() => navigate(isGuest ? "/guest" : "/dashboard")}
           >
             Back to Dashboard
           </Button>

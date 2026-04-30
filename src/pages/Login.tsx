@@ -335,11 +335,14 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={toggleMode}
-                  className="text-primary hover:underline font-medium"
+                  className="text-primary hover:underline font-medium mb-2"
                   disabled={loading}
                 >
                   Sign up
                 </button>
+                <br/>
+                Offline?{" "}
+                <button type="button" onClick={() => { navigate("/guest"); }} className="text-primary hover:underline font-medium" disabled={loading}>Sign in as Guest</button>
               </>
             ) : (
               <>

@@ -23,6 +23,7 @@ import Shop from "./pages/Shop";
 import { Toaster } from "./components/ui/toaster";
 import UpdateBanner from "./components/UpdateBanner";
 import NotificationNavigationListener from "./components/NotificationNavigationListener";
+import GuestDashboard from "./pages/GuestDashboard";
 
 function App() {
   return (
@@ -38,6 +39,12 @@ function App() {
                 <ProtectedRoute>
                   <Dashboard />
                 </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/guest"
+              element={
+                <GuestDashboard />
               }
             />
             <Route

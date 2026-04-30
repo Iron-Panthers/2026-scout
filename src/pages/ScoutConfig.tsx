@@ -53,6 +53,7 @@ export default function ScoutConfig() {
   const [matchNumber, setMatchNumber] = useState("");
   const [teamNumber, setTeamNumber] = useState("");
   const [role, setRole] = useState(search_params.get("role") || "");
+  const isGuest = search_params.get("g") ?? false;
   const [eventId, setEventId] = useState("");
   const [eventCode, setEventCode] = useState("");
   const [eventName, setEventName] = useState("");
@@ -355,7 +356,7 @@ export default function ScoutConfig() {
     >
       {/* Back Button */}
       <div className="w-full max-w-sm mx-auto mb-4">
-        <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard")}>
+        <Button variant="ghost" size="sm" onClick={() => navigate(isGuest ? "/guest" : "/dashboard")}>
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Dashboard
         </Button>
@@ -394,7 +395,7 @@ export default function ScoutConfig() {
               ? `/qual-scouting?${params.toString()}`
               : `/scouting?${params.toString()}`;
             console.log("Navigation URL:", url);
-            navigate(url);
+            navigate(url + (isGuest ? "&g=true" : ""));
           }
         }}
         size="lg"
