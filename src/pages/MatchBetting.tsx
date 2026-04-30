@@ -621,7 +621,7 @@ export default function MatchBetting() {
   }
 
   return (
-    <div className="min-h-screen bg-background my-15">
+    <div className="min-h-screen bg-background my-5">
       <main className="container mx-auto p-4 max-w-2xl space-y-4 pb-10">
         {/* Header */}
         <div className="flex items-center justify-between">

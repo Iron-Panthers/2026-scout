@@ -523,7 +523,7 @@ export default function ScoutingReview() {
     );
   }
   return (
-    <main className="max-w-2xl mx-auto px-4 py-10 md:py-16 my-15">
+    <main className="max-w-2xl mx-auto px-4 py-10 md:py-16 my-5">
       <div className="bg-card border border-border rounded-2xl shadow-sm p-8 md:p-10">
         <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-8 tracking-tight text-center">
           Review &amp; Submit

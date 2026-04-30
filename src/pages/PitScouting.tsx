@@ -401,7 +401,7 @@ export default function PitScouting() {
   );
 
   return (
-    <div className="min-h-screen bg-background my-15">
+    <div className="min-h-screen bg-background my-5">
       <main className="container mx-auto p-6 max-w-4xl">
         <Button variant="ghost" className="mb-6" onClick={() => navigate(rescoutMode ? "/dashboard" : -1 as any)}>
           <ArrowLeft className="mr-2 h-4 w-4" />

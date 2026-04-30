@@ -356,7 +356,7 @@ export default function Dashboard() {
   );
 
   return (
-    <div className="min-h-screen bg-background my-15">
+    <div className="min-h-screen bg-background my-5">
       {/* Main Content */}
       <main className="container mx-auto p-6 max-w-7xl">
         {/* Header Section */}
