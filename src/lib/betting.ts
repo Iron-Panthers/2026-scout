@@ -142,7 +142,7 @@ export function computeTimeDecayFactor(
   if (!predTime) return 1.0;
   const betTs = new Date(betCreatedAt).getTime();
   const predTs = new Date(predTime).getTime();
-  const timeRemaining = predTs - betTs; // ms between bet placement and match start
+  const timeRemaining = -(betTs - predTs); // ms between bet placement and match start
 
   if (timeRemaining <= 0) return 0;
   if (timeRemaining >= FULL_VALUE_MS) return 1.0;
@@ -175,8 +175,8 @@ export function calcPayout(
 ): number {
   if (amount <= 0 || winnerPool <= 0) return amount; // refund edge case
   const p = Math.max(0, Math.min(1, winnerPredictedProb)); // clamp
-  const multiplier = 2 * Math.pow(1 - p, 1.6) + 1.2; // baseline 0.2x
-  return Math.floor(amount * multiplier * Math.max(0, Math.min(1, timeDecayFactor)));
+  const multiplier = 2 * Math.pow(1 - p, 1.6) + 1.6; // baseline 0.2x
+  return Math.floor(amount * multiplier * Math.max(0, Math.min(1, timeDecayFactor * 4)));
 }
 
 /**
@@ -211,7 +211,7 @@ export function estimatePayout(
     ? computeTimeDecayFactor(new Date().toISOString(), predTime)
     : 1.0;
 
-  return Math.max(calcPayout(amount, newAllianceTotal, newTotalPool, p, timeDecayFactor), 10);
+  return Math.max(calcPayout(amount, newAllianceTotal, newTotalPool, p, timeDecayFactor), amount + 10);
 }
 
 // ---------------------------------------------------------------------------
@@ -424,12 +424,14 @@ export async function settleMatchBets(
     .select("winning_alliance, pred_time")
     .eq("id", matchId)
     .maybeSingle();
+  // console.log('input', winningAlliance, matchRow)
 
   // If winning_alliance is already set (e.g. by sync-match-results edge function),
   // use that as the authoritative winner rather than returning early — pending bets
   // may not have been processed yet.
   const effectiveWinner: "red" | "blue" | "tie" =
     (matchRow?.winning_alliance as "red" | "blue" | "tie" | null) ?? winningAlliance;
+  // console.log(effectiveWinner)
 
   const matchPredTime: string | null = matchRow?.pred_time ?? null;
 
@@ -438,6 +440,7 @@ export async function settleMatchBets(
     .select("*")
     .eq("match_id", matchId)
     .eq("status", "pending");
+  console.log('bets:', bets)
 
   if (error) return { success: false, error: "Failed to fetch bets." };
 
@@ -447,6 +450,7 @@ export async function settleMatchBets(
       .from("matches")
       .update({ winning_alliance: effectiveWinner })
       .eq("id", matchId);
+    // console.log('set supabase winner:', effectiveWinner)
   }
 
   if (!bets || bets.length === 0) return { success: true };
@@ -460,6 +464,7 @@ export async function settleMatchBets(
   const totalPool = redTotal + blueTotal;
 
   const winnerPool = effectiveWinner === "red" ? redTotal : blueTotal;
+  // console.log('winner:', redTotal, blueTotal, totalPool, winnerPool)
 
   // Predicted probability for the winning side
   const p_winner =
@@ -473,7 +478,7 @@ export async function settleMatchBets(
     let payout = 0;
     let status: "won" | "lost" = "lost";
 
-    const timeDecayFactor = computeTimeDecayFactor(bet.created_at, matchPredTime);
+    const timeDecayFactor = computeTimeDecayFactor(matchPredTime, bet.created_at);
 
     if (effectiveWinner === "tie") {
       // Refund on tie (no time decay on refunds)
@@ -481,9 +486,11 @@ export async function settleMatchBets(
       status = "won";
     } else if (bet.alliance === effectiveWinner) {
       status = "won";
+      // console.log(winnerPool, totalPool, p_winner, timeDecayFactor, matchRow?.pred_time, bet.created_at)
       payout = calcPayout(bet.amount, winnerPool, totalPool, p_winner, timeDecayFactor);
     }
 
+    // console.log('bet:', bet, status, payout)
     await supabase.from("bets").update({ status, payout }).eq("id", bet.id);
 
     if (payout > 0) {
