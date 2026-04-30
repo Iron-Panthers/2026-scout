@@ -47,6 +47,8 @@ interface StatboticsMatch {
   key: string;
   comp_level: string;
   match_number: number;
+  /** Unix timestamp (seconds) of predicted match start time */
+  time?: number | null;
   pred: {
     red_win_prob: number; // 0–1
     red_score: number;
@@ -171,10 +173,12 @@ Deno.serve(async (req) => {
 
       const fieldsToUpdate: Record<string, unknown> = {};
 
-      // Store Statbotics win probability whenever available
-      return json({ sb?.pred, sb.pred.red_win_prob }, 200);
+      // Store Statbotics win probability and pred_time whenever available
       if (sb?.pred && typeof sb.pred.red_win_prob === "number") {
         fieldsToUpdate.statbotics_red_win_prob = sb.pred.red_win_prob;
+      }
+      if (sb?.time) {
+        fieldsToUpdate.pred_time = new Date(sb.time * 1000).toISOString();
       }
 
       if (dbMatch.winning_alliance) {

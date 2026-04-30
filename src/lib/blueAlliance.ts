@@ -89,6 +89,16 @@ async function tbaFetch<T>(endpoint: string): Promise<T | null> {
   }
 }
 
+export async function getMatchScores(
+  eventCode: string,
+  matchNumber: number
+): Promise<number[] | null> {
+  const matchKey = `${eventCode}_qm${matchNumber}`;
+  const match = await tbaFetch<TBAMatch>(`/match/${matchKey}`);
+  if (!match) return null;
+  return [ match.alliances.red.score, match.alliances.blue.score ]
+}
+
 /**
  * Gets the team number that should be in a specific match role
  * @param eventCode - The event code (e.g., "2024cmp", "2024caln")

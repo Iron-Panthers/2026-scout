@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
-  ArrowLeft, Coins, WifiOff, CheckCircle2, XCircle, Loader2, Zap,
+  ArrowLeft, Coins, WifiOff, CheckCircle2, XCircle, Loader2, Zap, Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,11 +15,12 @@ import {
   getMatchBets, getMatchUserBet, placeBet, cancelBet,
   computeOddsFromBets, estimatePayout, settleMatchBets,
   cacheMatchOdds, getCachedMatchOdds, blendOddsRedPct,
+  computeTimeDecayFactor, FULL_VALUE_MS,
 } from "@/lib/betting";
 import {
   getStatboticsMatch, getCachedStatboticsMatch, getMatchLabel, wasUpset,
 } from "@/lib/statbotics";
-import { getEventMatches, getEventTeams } from "@/lib/blueAlliance";
+import { getEventMatches, getEventTeams, getMatchScores } from "@/lib/blueAlliance";
 import type { Match, Event } from "@/types";
 import type { Bet, MatchOdds, OddsHistoryPoint } from "@/types/betting";
 import type { StatboticsMatch } from "@/lib/statbotics";
@@ -326,6 +327,8 @@ export default function MatchBetting() {
   const [tbaMatch, setTbaMatch] = useState<TBAMatchFull | null>(null);
   const [teamInfo, setTeamInfo] = useState<Map<number, TBATeamSimple>>(new Map());
 
+  const [timeUntilMatch, setTimeUntilMatch] = useState<number | null>(null); // ms remaining
+
   const [loading, setLoading] = useState(true);
   const [autoSettling, setAutoSettling] = useState(false);
   const [selectedAlliance, setSelectedAlliance] = useState<"red" | "blue" | null>(null);
@@ -379,10 +382,19 @@ export default function MatchBetting() {
       // Statbotics — try API first, then localStorage cache, then DB-stored value
       let sb: StatboticsMatch | null = null;
       if (eventCode) {
+        const tba_scores = await getMatchScores(eventCode, m.match_number);
+        let results = {}
+        if (tba_scores !== null && tba_scores.length == 2 && tba_scores[0] >= 0 && tba_scores[1] >= 0) {
+          results = {
+            winner: tba_scores[0] > tba_scores[1] ? 'red' : 'blue', red_score: tba_scores[0], blue_score: tba_scores[1]
+          };
+        }
+        // console.log(tba_scores)
+
         sb = isOnline
           ? await getStatboticsMatch(eventCode, m.match_number)
           : getCachedStatboticsMatch(eventCode, m.match_number);
-        console.log(sb)
+        console.log(sb, results)
 
         // Fall back to DB-stored prediction when API and cache both miss
         if (!sb && m.statbotics_red_win_prob != null) {
@@ -397,12 +409,33 @@ export default function MatchBetting() {
               red_score: 0,
               blue_score: 0,
             },
-            result: { winner: null, red_score: null, blue_score: null, red_auto_points: null, blue_auto_points: null },
+            result: results,
           };
         }
 
-        console.log(sb)
         if (sb && !cancelled) setSbMatch(sb);
+
+        // Save pred_time to DB + localStorage when Statbotics provides match time
+        if (sb?.time && isOnline && !cancelled) {
+          const predTimeIso = new Date(sb.time * 1000).toISOString();
+          console.log(`[MatchBetting] Match ${m.match_number} pred_time: ${predTimeIso}`);
+          try {
+            localStorage.setItem(
+              `pred_time_match_${match_id}`,
+              JSON.stringify({ matchId: match_id, matchNumber: m.match_number, predTime: predTimeIso, fetchedAt: new Date().toISOString() })
+            );
+          } catch { /* ignore */ }
+          // Only write to DB if the value changed
+          if (m.pred_time !== predTimeIso) {
+            const { data: updatedMatch } = await supabase
+              .from("matches")
+              .update({ pred_time: predTimeIso })
+              .eq("id", match_id)
+              .select()
+              .maybeSingle();
+            if (updatedMatch && !cancelled) setMatch(updatedMatch as Match);
+          }
+        }
       }
 
       // TBA — best-effort
@@ -515,6 +548,21 @@ export default function MatchBetting() {
   }, [match_id, isOnline]);
 
   // ---------------------------------------------------------------------------
+  // Countdown timer — ticks every second while pred_time is in the future
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    const predTime = match?.pred_time;
+    if (!predTime) { setTimeUntilMatch(null); return; }
+
+    const predTs = new Date(predTime).getTime();
+    const update = () => setTimeUntilMatch(predTs - Date.now());
+
+    update();
+    const timer = setInterval(update, 1000);
+    return () => clearInterval(timer);
+  }, [match?.pred_time]);
+
+  // ---------------------------------------------------------------------------
   // Actions
   // ---------------------------------------------------------------------------
   async function handlePlaceBet() {
@@ -589,8 +637,16 @@ export default function MatchBetting() {
       })
     : (currentOdds.history ?? []);
 
+  // Time-decay derived values
+  const predTime = match?.pred_time ?? null;
+  const bettingClosed = !!predTime && Date.now() >= new Date(predTime).getTime();
+  const currentDecayFactor = predTime && !bettingClosed
+    ? computeTimeDecayFactor(new Date().toISOString(), predTime)
+    : bettingClosed ? 0 : 1.0;
+  const inDecayWindow = currentDecayFactor < 1.0 && !bettingClosed;
+
   const estPayout = selectedAlliance
-    ? estimatePayout(betAmount, selectedAlliance, currentOdds as MatchOdds, sbRedProb)
+    ? estimatePayout(betAmount, selectedAlliance, currentOdds as MatchOdds, sbRedProb, predTime)
     : null;
 
   // Winning alliance is complete if Statbotics result says so OR match row says so
@@ -607,6 +663,17 @@ export default function MatchBetting() {
   // ---------------------------------------------------------------------------
   // Render helpers
   // ---------------------------------------------------------------------------
+  function formatTimeRemaining(ms: number): string {
+    if (ms <= 0) return "Match started";
+    const totalSec = Math.floor(ms / 1000);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    if (h > 0) return `${h}h ${m}m ${s}s`;
+    if (m > 0) return `${m}m ${s}s`;
+    return `${s}s`;
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -639,6 +706,27 @@ export default function MatchBetting() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {/* Time remaining badge — always shown when pred_time is known */}
+            {predTime && (
+              bettingClosed ? (
+                <Badge variant="outline" className="text-red-400 border-red-600/30 gap-1 text-xs">
+                  <Clock className="h-3 w-3" /> BETTING CLOSED
+                </Badge>
+              ) : timeUntilMatch !== null ? (
+                <Badge
+                  variant="outline"
+                  className={`gap-1 text-xs ${
+                    timeUntilMatch < 5 * 60 * 1000
+                      ? "text-red-400 border-red-600/30"
+                      : timeUntilMatch < FULL_VALUE_MS
+                      ? "text-yellow-400 border-yellow-600/30"
+                      : "text-green-400 border-green-600/30"
+                  }`}
+                >
+                  <Clock className="h-3 w-3" /> {formatTimeRemaining(timeUntilMatch)}
+                </Badge>
+              ) : null
+            )}
             {!isOnline && (
               <Badge variant="outline" className="text-yellow-400 border-yellow-600/30 gap-1 text-xs">
                 <WifiOff className="h-3 w-3" /> Cached
@@ -828,13 +916,35 @@ export default function MatchBetting() {
           </Card>
         )}
 
-        {/* Bet form — only when open and no existing bet */}
-        {!matchComplete && !isSettled && !userBet && isOnline && (
+        {/* Betting closed — pred_time has passed */}
+        {!matchComplete && !isSettled && !userBet && bettingClosed && (
+          <Card className="border-red-700/30 bg-red-900/10">
+            <CardContent className="pt-4 pb-4 flex items-center gap-3 text-sm text-red-300">
+              <Clock className="h-4 w-4 shrink-0" />
+              Betting is closed — this match has started. No new bets can be placed.
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Bet form — only when open, pred_time not passed, and no existing bet */}
+        {!matchComplete && !isSettled && !userBet && !bettingClosed && isOnline && (
           <Card>
             <CardHeader className="pb-2 pt-4">
               <CardTitle className="text-base">Place a Bet</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Time decay warning */}
+              {inDecayWindow && timeUntilMatch !== null && (
+                <div className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs bg-yellow-900/20 border border-yellow-700/30 text-yellow-300">
+                  <Clock className="h-3.5 w-3.5 shrink-0" />
+                  <span>
+                    <span className="font-semibold">Late bet penalty:</span> Bets placed this close to the match start are worth less.
+                    Current payout multiplier: <span className="font-bold">{Math.round(currentDecayFactor * 100)}%</span>.
+                    Betting closes in <span className="font-bold">{formatTimeRemaining(timeUntilMatch)}</span>.
+                  </span>
+                </div>
+              )}
+
               {/* Alliance selector */}
               <div className="grid grid-cols-2 gap-3">
                 {(["red", "blue"] as const).map((side) => {
@@ -884,6 +994,12 @@ export default function MatchBetting() {
                       {estPayout - betAmount >= 0 ? "+" : ""}{estPayout - betAmount} pts
                     </span>
                   </div>
+                  {inDecayWindow && (
+                    <div className="flex justify-between text-yellow-400/80">
+                      <span>Time penalty applied</span>
+                      <span className="font-semibold">{Math.round(currentDecayFactor * 100)}% of full value</span>
+                    </div>
+                  )}
                   {sbRedProb !== undefined && (
                     <p className="text-[10px] text-muted-foreground">
                       Adjusted for Statbotics prediction. Upsets pay more than favorites.
@@ -904,7 +1020,7 @@ export default function MatchBetting() {
           </Card>
         )}
 
-        {!matchComplete && !isSettled && !userBet && !isOnline && (
+        {!matchComplete && !isSettled && !userBet && !bettingClosed && !isOnline && (
           <Card className="border-yellow-700/30">
             <CardContent className="pt-4 pb-4 flex items-center gap-3 text-sm text-muted-foreground">
               <WifiOff className="h-4 w-4 text-yellow-400 shrink-0" />

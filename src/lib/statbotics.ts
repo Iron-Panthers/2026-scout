@@ -34,6 +34,8 @@ export interface StatboticsMatch {
   event: string;
   match_number: number;
   comp_level: string;
+  /** Unix timestamp (seconds) of predicted match start time. May be null/absent. */
+  time?: number | null;
   pred: StatboticsPred;
   result: StatboticsResult;
 }
@@ -84,6 +86,12 @@ export async function getStatboticsMatch(
   try {
     const stable = !!data.result?.winner;
     localStorage.setItem(cKey, JSON.stringify({ data, ts: Date.now(), stable }));
+    // Log pred_time separately for easy access and debugging
+    if (data.time) {
+      const predTimeIso = new Date(data.time * 1000).toISOString();
+      localStorage.setItem(`pred_time_${matchKey}`, predTimeIso);
+      console.log(`[Statbotics] ${matchKey} predicted start: ${predTimeIso}`);
+    }
   } catch { /* ignore */ }
 
   return data;
@@ -124,6 +132,11 @@ export async function getStatboticsEventMatches(
         CACHE_PFX + m.key,
         JSON.stringify({ data: m, ts: Date.now() - (TTL_PLAYED - ttl), stable })
       );
+      // Log pred_time for each match
+      if (m.time) {
+        const predTimeIso = new Date(m.time * 1000).toISOString();
+        localStorage.setItem(`pred_time_${m.key}`, predTimeIso);
+      }
     }
   } catch { /* ignore */ }
 

@@ -118,6 +118,38 @@ export function blendOddsRedPct(
 }
 
 // ---------------------------------------------------------------------------
+// Time-decay: bets placed close to pred_time are worth less
+// ---------------------------------------------------------------------------
+
+/**
+ * How far before pred_time bets still get full value (60 minutes).
+ * Within this window, value decays via a sqrt curve down to 0 at pred_time.
+ */
+export const FULL_VALUE_MS = 60 * 60 * 1000; // 60 min
+
+/**
+ * Returns a multiplier (0–1) based on when the bet was placed relative to pred_time.
+ *
+ * - Bet placed > 60 min before pred_time → 1.0 (full value)
+ * - Bet placed 0–60 min before pred_time → sqrt(minutesLeft / 60) decay curve
+ * - Bet placed at/after pred_time        → 0.0  (should be blocked at placement)
+ * - pred_time is null/unknown            → 1.0 (no decay)
+ */
+export function computeTimeDecayFactor(
+  betCreatedAt: string,
+  predTime: string | null
+): number {
+  if (!predTime) return 1.0;
+  const betTs = new Date(betCreatedAt).getTime();
+  const predTs = new Date(predTime).getTime();
+  const timeRemaining = predTs - betTs; // ms between bet placement and match start
+
+  if (timeRemaining <= 0) return 0;
+  if (timeRemaining >= FULL_VALUE_MS) return 1.0;
+  return Math.sqrt(timeRemaining / FULL_VALUE_MS);
+}
+
+// ---------------------------------------------------------------------------
 // Probability-adjusted payout formula
 // ---------------------------------------------------------------------------
 /**
@@ -131,30 +163,35 @@ export function blendOddsRedPct(
  *   • When underdog wins, winnerPool is small → maxMultiplier is high → pays fair odds
  *   • When favorite wins, fairMultiplier is small → caps payout → some points are burned
  *   • At 50/50 (no data): both equal → behaves like pure parimutuel
+ *
+ * @param timeDecayFactor - 0–1 multiplier from computeTimeDecayFactor (default 1.0)
  */
 export function calcPayout(
   amount: number,
   winnerPool: number,
   totalPool: number,
-  winnerPredictedProb: number  // Statbotics predicted prob for the winning side
+  winnerPredictedProb: number,  // Statbotics predicted prob for the winning side
+  timeDecayFactor: number = 1.0
 ): number {
   if (amount <= 0 || winnerPool <= 0) return amount; // refund edge case
   const p = Math.max(0, Math.min(1, winnerPredictedProb)); // clamp
   const multiplier = 2 * Math.pow(1 - p, 1.6) + 1.2; // baseline 0.2x
-  return Math.floor(amount * multiplier);
+  return Math.floor(amount * multiplier * Math.max(0, Math.min(1, timeDecayFactor)));
 }
 
 /**
  * Estimated payout if the user places `amount` on `alliance` right now.
- * Uses the same probability-adjusted formula as settlement.
+ * Uses the same probability-adjusted formula as settlement, including time decay.
  *
  * @param statboticsRedWinProb - Statbotics prediction (for red). Pass undefined for 50/50.
+ * @param predTime - ISO string of predicted match start. Used to compute time decay.
  */
 export function estimatePayout(
   amount: number,
   alliance: BetAlliance,
   odds: MatchOdds,
-  statboticsRedWinProb?: number
+  statboticsRedWinProb?: number,
+  predTime?: string | null
 ): number {
   if (amount <= 0) return 0;
 
@@ -170,7 +207,11 @@ export function estimatePayout(
         : 1 - statboticsRedWinProb
       : 0.5;
 
-  return calcPayout(amount, newAllianceTotal, newTotalPool, p);
+  const timeDecayFactor = predTime
+    ? computeTimeDecayFactor(new Date().toISOString(), predTime)
+    : 1.0;
+
+  return calcPayout(amount, newAllianceTotal, newTotalPool, p, timeDecayFactor);
 }
 
 // ---------------------------------------------------------------------------
@@ -289,12 +330,16 @@ export async function placeBet(
 
   const { data: match } = await supabase
     .from("matches")
-    .select("winning_alliance")
+    .select("winning_alliance, pred_time")
     .eq("id", matchId)
     .maybeSingle();
 
   if (match?.winning_alliance) {
     return { success: false, error: "This match has already been settled." };
+  }
+
+  if (match?.pred_time && new Date(match.pred_time) <= new Date()) {
+    return { success: false, error: "Betting is closed — this match has already started." };
   }
 
   const existing = await getMatchUserBet(matchId, userId);
@@ -376,13 +421,15 @@ export async function settleMatchBets(
   // Check not already settled
   const { data: matchRow } = await supabase
     .from("matches")
-    .select("winning_alliance")
+    .select("winning_alliance, pred_time")
     .eq("id", matchId)
     .maybeSingle();
 
   if (matchRow?.winning_alliance) {
     return { success: true }; // already done
   }
+
+  const matchPredTime: string | null = matchRow?.pred_time ?? null;
 
   const { data: bets, error } = await supabase
     .from("bets")
@@ -422,13 +469,15 @@ export async function settleMatchBets(
     let payout = 0;
     let status: "won" | "lost" = "lost";
 
+    const timeDecayFactor = computeTimeDecayFactor(bet.created_at, matchPredTime);
+
     if (winningAlliance === "tie") {
-      // Refund on tie
+      // Refund on tie (no time decay on refunds)
       payout = bet.amount;
       status = "won";
     } else if (bet.alliance === winningAlliance) {
       status = "won";
-      payout = calcPayout(bet.amount, winnerPool, totalPool, p_winner);
+      payout = calcPayout(bet.amount, winnerPool, totalPool, p_winner, timeDecayFactor);
     }
 
     await supabase.from("bets").update({ status, payout }).eq("id", bet.id);
