@@ -211,7 +211,7 @@ export function estimatePayout(
     ? computeTimeDecayFactor(new Date().toISOString(), predTime)
     : 1.0;
 
-  return calcPayout(amount, newAllianceTotal, newTotalPool, p, timeDecayFactor);
+  return Math.max(calcPayout(amount, newAllianceTotal, newTotalPool, p, timeDecayFactor), 10);
 }
 
 // ---------------------------------------------------------------------------
@@ -425,6 +425,7 @@ export async function settleMatchBets(
     .eq("id", matchId)
     .maybeSingle();
 
+  console.log('attempting to resettle', winningAlliance, matchRow)
   if (matchRow?.winning_alliance) {
     return { success: true }; // already done
   }
@@ -436,6 +437,7 @@ export async function settleMatchBets(
     .select("*")
     .eq("match_id", matchId)
     .eq("status", "pending");
+  console.log('all bets::',bets)
 
   if (error) return { success: false, error: "Failed to fetch bets." };
 
@@ -461,9 +463,9 @@ export async function settleMatchBets(
   const p_winner =
     winningAlliance === "tie"
       ? 0.5
-      : winningAlliance === "red"
+      : (winningAlliance === "red"
       ? statboticsRedWinProb
-      : 1 - statboticsRedWinProb;
+      : 1 - statboticsRedWinProb);
 
   for (const bet of bets as Bet[]) {
     let payout = 0;
@@ -479,6 +481,8 @@ export async function settleMatchBets(
       status = "won";
       payout = calcPayout(bet.amount, winnerPool, totalPool, p_winner, timeDecayFactor);
     }
+
+    console.log(status, winningAlliance, bet)
 
     await supabase.from("bets").update({ status, payout }).eq("id", bet.id);
 

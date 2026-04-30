@@ -205,12 +205,17 @@ function AllianceCard({ alliance, teamKeys, teamInfo }: AllianceCardProps) {
 interface ResultCardProps {
   sbMatch: StatboticsMatch;
   winner: "red" | "blue" | "tie";
+  dbRedScore?: number | null;
+  dbBlueScore?: number | null;
 }
 
-function ResultCard({ sbMatch, winner }: ResultCardProps) {
+function ResultCard({ sbMatch, winner, dbRedScore, dbBlueScore }: ResultCardProps) {
   const upset = wasUpset(winner, sbMatch.pred.red_win_prob);
-  const red = sbMatch.result.red_score ?? 0;
-  const blue = sbMatch.result.blue_score ?? 0;
+  const sbRed = sbMatch.result.red_score;
+  const sbBlue = sbMatch.result.blue_score;
+  // Prefer Statbotics scores when valid (>= 0), fall back to DB-cached scores
+  const red = (sbRed != null && sbRed >= 0) ? sbRed : (dbRedScore ?? 0);
+  const blue = (sbBlue != null && sbBlue >= 0) ? sbBlue : (dbBlueScore ?? 0);
 
   return (
     <Card className={`border-2 ${winner === "red" ? "border-red-600/50 bg-red-900/10"
@@ -353,6 +358,7 @@ export default function MatchBetting() {
   const refreshUserBet = useCallback(async () => {
     if (!match_id || !user?.id) return;
     const ub = await getMatchUserBet(match_id, user.id);
+    console.log(ub)
     setUserBet(ub);
   }, [match_id, user?.id]);
 
@@ -388,11 +394,19 @@ export default function MatchBetting() {
           results = {
             winner: tba_scores[0] > tba_scores[1] ? 'red' : 'blue', red_score: tba_scores[0], blue_score: tba_scores[1]
           };
+          // Cache scores in DB to avoid repeated API calls
+          if (isOnline && (m.red_score !== tba_scores[0] || m.blue_score !== tba_scores[1])) {
+            void supabase.from("matches")
+              .update({ red_score: tba_scores[0], blue_score: tba_scores[1] })
+              .eq("id", match_id);
+          }
         }
 
         sb = isOnline
           ? await getStatboticsMatch(eventCode, m.match_number)
           : getCachedStatboticsMatch(eventCode, m.match_number);
+
+        console.log(sb, results)
 
         // Fall back to DB-stored prediction when API and cache both miss
         if (!sb.result && m.statbotics_red_win_prob != null) {
@@ -411,6 +425,9 @@ export default function MatchBetting() {
             result: results,
           };
         }
+
+        if (sb?.result.winner === null)
+          sb.result = results;
 
         if (sb && !cancelled) setSbMatch(sb);
 
@@ -789,7 +806,7 @@ export default function MatchBetting() {
 
         {/* Result card (if match is complete) */}
         {sbMatch && effectiveWinner && effectiveWinner !== "tie" && (
-          <ResultCard sbMatch={sbMatch} winner={effectiveWinner} />
+          <ResultCard sbMatch={sbMatch} winner={effectiveWinner} dbRedScore={match?.red_score} dbBlueScore={match?.blue_score} />
         )}
 
         {/* Statbotics prediction bar */}
@@ -871,7 +888,7 @@ export default function MatchBetting() {
               <div>
                 <div className={`font-semibold text-base ${userBet.status === "won" ? "text-green-300" : "text-red-300"}`}>
                   {userBet.status === "won"
-                    ? betWasUpset ? "🎉 Upset winner! You called it!" : "🎉 You won!"
+                    ? betWasUpset ? "Upset winner! You called it!" : "You won!"
                     : "Better luck next time"}
                 </div>
                 <div className="text-sm text-muted-foreground mt-0.5">

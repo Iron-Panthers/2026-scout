@@ -133,7 +133,7 @@ Deno.serve(async (req) => {
     // 2. Get all matches for this event from DB
     const { data: dbMatches, error: matchesError } = await supabase
       .from("matches")
-      .select("id, match_number, winning_alliance")
+      .select("id, match_number, winning_alliance, red_score, blue_score")
       .eq("event_id", event.id);
 
     if (matchesError || !dbMatches || dbMatches.length === 0) {
@@ -179,6 +179,22 @@ Deno.serve(async (req) => {
       }
       if (sb?.time) {
         fieldsToUpdate.pred_time = new Date(sb.time * 1000).toISOString();
+      }
+
+      // Save scores once available — prefer TBA (authoritative), fall back to Statbotics
+      if (dbMatch.red_score == null || dbMatch.blue_score == null) {
+        const tbaRed = tba?.alliances?.red?.score;
+        const tbaBlue = tba?.alliances?.blue?.score;
+        if (tbaRed != null && tbaBlue != null && tbaRed >= 0 && tbaBlue >= 0) {
+          fieldsToUpdate.red_score = tbaRed;
+          fieldsToUpdate.blue_score = tbaBlue;
+        } else if (
+          sb?.result?.red_score != null && sb?.result?.blue_score != null &&
+          sb.result.red_score >= 0 && sb.result.blue_score >= 0
+        ) {
+          fieldsToUpdate.red_score = sb.result.red_score;
+          fieldsToUpdate.blue_score = sb.result.blue_score;
+        }
       }
 
       if (dbMatch.winning_alliance) {

@@ -64,6 +64,8 @@ export interface Match {
   winning_alliance: "red" | "blue" | "tie" | null;
   statbotics_red_win_prob: number | null;
   pred_time: string | null;
+  red_score: number | null;
+  blue_score: number | null;
   created_at: string;
   updated_at: string;
 }

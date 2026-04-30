@@ -14,7 +14,7 @@ import { getActiveEvent } from "@/lib/matches";
 import { getGameProfile } from "@/lib/gameProfiles";
 import { getBulkMatchOdds, getUserBets, blendOddsRedPct } from "@/lib/betting";
 import { getStatboticsEventMatches, getMatchLabel, wasUpset } from "@/lib/statbotics";
-import { getEventMatches } from "@/lib/blueAlliance";
+import { getEventMatches, getMatchScores } from "@/lib/blueAlliance";
 import { supabase } from "@/lib/supabase";
 import type { Match, Event } from "@/types";
 import type { MatchOdds, BetWithMatch } from "@/types/betting";
@@ -635,8 +635,11 @@ interface CompletedMatchCardProps {
 
 function CompletedMatchCard({ match, odds, tba, sb, userBet, onClick }: CompletedMatchCardProps) {
   const winner = (match.winning_alliance ?? sb?.result?.winner) as "red" | "blue" | "tie" | null | undefined;
-  const red = sb?.result?.red_score;
-  const blue = sb?.result?.blue_score;
+  const sbRed = sb?.result?.red_score;
+  const sbBlue = sb?.result?.blue_score;
+  // Prefer Statbotics scores when valid (>= 0), fall back to DB-cached scores
+  const red = (sbRed != null && sbRed >= 0) ? sbRed : (match.red_score ?? null);
+  const blue = (sbBlue != null && sbBlue >= 0) ? sbBlue : (match.blue_score ?? null);
   const isUpset = sb && winner && winner !== "tie"
     ? wasUpset(winner, sb.pred.red_win_prob) : false;
 
@@ -869,7 +872,7 @@ export default function Betting() {
               red_score: 0,
               blue_score: 0,
             },
-            result: { winner: null, red_score: null, blue_score: null, red_auto_points: null, blue_auto_points: null },
+            result: { winner: m.winning_alliance ?? null, red_score: m.red_score ?? null, blue_score: m.blue_score ?? null, red_auto_points: null, blue_auto_points: null },
           });
         }
       }
@@ -923,7 +926,7 @@ export default function Betting() {
                 red_score: 0,
                 blue_score: 0,
               },
-              result: { winner: null, red_score: null, blue_score: null, red_auto_points: null, blue_auto_points: null },
+              result: { winner: m.winning_alliance ?? null, red_score: m.red_score ?? null, blue_score: m.blue_score ?? null, red_auto_points: null, blue_auto_points: null },
             });
           }
         }
@@ -950,7 +953,13 @@ export default function Betting() {
   // ---------------------------------------------------------------------------
   // Categorise
   // ---------------------------------------------------------------------------
-  const completedMatches = matches.filter((m) => {
+  const completedMatches = matches.map(m => {
+    if (m.winning_alliance === null) {
+      // console.log('null', m)
+    }
+
+    return m;
+  }).filter((m) => {
     if (m.winning_alliance) return true;
     return !!sbMap.get(m.match_number)?.result?.winner;
   });
@@ -1084,7 +1093,7 @@ export default function Betting() {
                   return sb && winner && winner !== "tie" &&
                     wasUpset(winner as "red" | "blue", sb.pred.red_win_prob);
                 });
-                const normal = completedMatches.sort((a,b) => b.match_number - a.match_number).filter((m) => !upsets.includes(m));
+                const normal = completedMatches.sort((a,b) => b.match_number - a.match_number);
 
                 return (
                   <>
