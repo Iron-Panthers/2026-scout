@@ -1042,7 +1042,7 @@ export default function Betting() {
                   return sb && winner && winner !== "tie" &&
                     wasUpset(winner as "red" | "blue", sb.pred.red_win_prob);
                 });
-                const normal = completedMatches.filter((m) => !upsets.includes(m));
+                const normal = completedMatches.sort((a,b) => b.match_number - a.match_number).filter((m) => !upsets.includes(m));
 
                 return (
                   <>
