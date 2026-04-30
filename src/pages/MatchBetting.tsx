@@ -389,12 +389,10 @@ export default function MatchBetting() {
             winner: tba_scores[0] > tba_scores[1] ? 'red' : 'blue', red_score: tba_scores[0], blue_score: tba_scores[1]
           };
         }
-        // console.log(tba_scores)
 
         sb = isOnline
           ? await getStatboticsMatch(eventCode, m.match_number)
           : getCachedStatboticsMatch(eventCode, m.match_number);
-        console.log(sb, results)
 
         // Fall back to DB-stored prediction when API and cache both miss
         if (!sb.result && m.statbotics_red_win_prob != null) {
@@ -422,11 +420,8 @@ export default function MatchBetting() {
           setLoading(true);
           return;
         }
-        console.log(sb, localStorage.getItem(`pred_time_match_${match_id}`), match)
-
         // Save pred_time to DB + localStorage when Statbotics provides match time
         if (pred_time && isOnline && !cancelled) {
-          // console.log(pred_time,new Date(pred_time * 1000),new Date(pred_time * 1000).toISO, new Date(new Date(pred_time * 1000).toLocaleTimeString()))
           const predTimeIso = new Date(pred_time * 1000).toISOString();
           console.log(`[MatchBetting] Match ${m.match_number} pred_time: ${predTimeIso}`);
           try {
@@ -436,8 +431,6 @@ export default function MatchBetting() {
             );
           } catch { /* ignore */ }
           // Only write to DB if the value changed
-          // if (m.pred_time !== predTimeIso) {
-          console.log('updated match', predTimeIso)
           const { data: updatedMatch } = await supabase
             .from("matches")
             .update({ pred_time: predTimeIso })
@@ -445,7 +438,6 @@ export default function MatchBetting() {
             .select()
             .maybeSingle();
           if (updatedMatch && !cancelled) setMatch(updatedMatch as Match);
-          // }
         }
       }
 
@@ -789,6 +781,12 @@ export default function MatchBetting() {
           </div>
         </div>
 
+        {!tbaMatch && (
+          <div className="p-3 bg-yellow-900/20 border border-yellow-700/40 rounded-lg">
+            <p className="text-sm text-yellow-400">Statbotics match data is loading... (percentages only represent betting, not predicted outcomes)</p>
+          </div>
+        )}
+
         {/* Result card (if match is complete) */}
         {sbMatch && effectiveWinner && effectiveWinner !== "tie" && (
           <ResultCard sbMatch={sbMatch} winner={effectiveWinner} />
@@ -925,11 +923,6 @@ export default function MatchBetting() {
                       currentOdds as MatchOdds, sbRedProb)} pts if {userBet.alliance} wins
                   </div>
                 </div>
-                {/* <Button variant="ghost" size="sm"
-                  className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
-                  onClick={handleCancelBet} disabled={cancelling || !isOnline}>
-                  {cancelling ? <Loader2 className="h-4 w-4 animate-spin" /> : "Cancel"}
-                </Button> */}
               </div>
             </CardContent>
           </Card>

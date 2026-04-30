@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft, TrendingUp, Coins, Trophy, RefreshCw, WifiOff, Zap, Target,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -82,6 +82,8 @@ interface MarketCardProps {
 }
 
 function SpotlightCard({ match, odds, tba, sb, userBetAlliance, tbaLoading, sbLoading, onClick }: MarketCardProps) {
+  const bettingClosed = !!match.pred_time && Date.now() >= new Date(match.pred_time).getTime();
+
   const rawRedPct = odds?.redPct ?? 50;
   const redPct = sb
     ? blendOddsRedPct(rawRedPct, sb.pred.red_win_prob, odds?.totalPool ?? 0)
@@ -137,6 +139,11 @@ function SpotlightCard({ match, odds, tba, sb, userBetAlliance, tbaLoading, sbLo
             <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${
               userBetAlliance === "red" ? "text-red-400 border-red-600/30 bg-red-900/10" : "text-blue-400 border-blue-600/30 bg-blue-900/10"}`}>
               Your bet: {userBetAlliance.toUpperCase()}
+            </Badge>
+          )}
+          {bettingClosed && (
+            <Badge variant="outline" className="text-red-400 border-red-600/30 bg-red-900/10 text-[10px] px-1.5 py-0 gap-1">
+              <Clock className="h-2.5 w-2.5" /> Betting Closed
             </Badge>
           )}
         </div>
@@ -211,6 +218,8 @@ function SpotlightCard({ match, odds, tba, sb, userBetAlliance, tbaLoading, sbLo
 // Grid card — compact, lives in the 2-col grid below the spotlight
 // ---------------------------------------------------------------------------
 function GridCard({ match, odds, tba, sb, userBetAlliance, tbaLoading, sbLoading, onClick }: MarketCardProps) {
+  const bettingClosed = !!match.pred_time && Date.now() >= new Date(match.pred_time).getTime();
+
   const rawRedPct = odds?.redPct ?? 50;
   const redPct = sb
     ? blendOddsRedPct(rawRedPct, sb.pred.red_win_prob, odds?.totalPool ?? 0)
@@ -221,7 +230,7 @@ function GridCard({ match, odds, tba, sb, userBetAlliance, tbaLoading, sbLoading
     ? getMatchLabel(sb.pred.red_win_prob)
     : { flavor: "slight" as const };
 
-  const borderClass =
+  const borderClass = bettingClosed ? "border-red-800/50 opacity-70" :
     flavor === "coinflip" ? "border-yellow-700/40" :
     flavor === "dominant" ? "border-pink-700/30" :
     flavor === "heavy"    ? "border-purple-700/30" :
@@ -234,12 +243,19 @@ function GridCard({ match, odds, tba, sb, userBetAlliance, tbaLoading, sbLoading
     >
       <div className="flex items-start justify-between mb-1.5">
         <span className="font-bold text-sm leading-tight">{match.name}</span>
-        {userBetAlliance && (
-          <span className={`text-[9px] font-bold px-1 py-0.5 rounded shrink-0 ml-1 ${
-            userBetAlliance === "red" ? "bg-red-600/20 text-red-400" : "bg-blue-600/20 text-blue-400"}`}>
-            BET
-          </span>
-        )}
+        <div className="flex items-center gap-1 shrink-0 ml-1">
+          {bettingClosed && (
+            <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-red-900/30 text-red-400 flex items-center gap-0.5">
+              <Clock className="h-2.5 w-2.5" /> CLOSED
+            </span>
+          )}
+          {userBetAlliance && (
+            <span className={`text-[9px] font-bold px-1 py-0.5 rounded ${
+              userBetAlliance === "red" ? "bg-red-600/20 text-red-400" : "bg-blue-600/20 text-blue-400"}`}>
+              BET
+            </span>
+          )}
+        </div>
       </div>
 
       {tba ? (
