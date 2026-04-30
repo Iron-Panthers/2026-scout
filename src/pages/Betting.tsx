@@ -757,6 +757,7 @@ export default function Betting() {
   const [refreshing, setRefreshing] = useState(false);
   const [tbaLoading, setTbaLoading] = useState(false);
   const [sbLoading, setSbLoading] = useState(false);
+  const [showSBloading, setShowSBLoading] = useState(false);
 
   const load = useCallback(async () => {
     if (!user?.id) return;
@@ -822,6 +823,11 @@ export default function Betting() {
 
     // Odds, TBA, and Statbotics all load in parallel without blocking render
     getBulkMatchOdds(ids).then((odds) => setOddsMap(odds)).catch(() => {});
+
+    setTimeout(() => {
+      if (sbLoading)
+        setShowSBLoading(true);
+    }, 5000)
 
     if (code) {
       setTbaLoading(true);
@@ -915,6 +921,11 @@ export default function Betting() {
   return (
     <div className="min-h-screen bg-background my-5">
       <main className="container mx-auto p-4 pb-10">
+        { showSBloading && (
+          <div className="p-3 bg-yellow-900/20 border border-yellow-700/40 rounded-lg mb-5">
+            <p className="text-sm text-yellow-400">Statbotics data is unable to be retrieved... Please connect to internet.</p>
+          </div>
+        )}
         {/* Header */}
         <div className="flex items-center justify-between mb-6 max-w-2xl mx-auto">
           <div className="flex items-center gap-3">
