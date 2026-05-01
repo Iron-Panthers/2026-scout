@@ -48,7 +48,7 @@ import { PitScoutingAssignmentsTab } from "@/components/manager/PitScoutingAssig
 import { ScoutingDataTab } from "@/components/manager/ScoutingDataTab";
 import { useToast } from "@/hooks/use-toast";
 import { awardPoints } from "@/lib/gameProfiles";
-import { getEquippedCosmeticsMap } from "@/lib/shopService";
+import { getEquippedCosmeticsMap, getPointsMap } from "@/lib/shopService";
 import type {
   Profile,
   Role,
@@ -88,6 +88,7 @@ export default function ManagerDashboard() {
   const [availableScouts, setAvailableScouts] = useState<Profile[]>([]);
   const [allScouts, setAllScouts] = useState<Profile[]>([]);
   const [cosmeticsMap, setCosmeticsMap] = useState<Record<string, Record<string, string>>>({});
+  const [pointsMap, setPointsMap] = useState<Record<string, number>>({});
   const [events, setEvents] = useState<Event[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<string>("all");
   const [allDbMatches, setAllDbMatches] = useState<Match[]>([]);
@@ -201,6 +202,7 @@ export default function ManagerDashboard() {
       setEvents(eventsData);
       // Fetch cosmetics for all scouts in the background
       getEquippedCosmeticsMap(profilesArray.map((p) => p.id)).then(setCosmeticsMap);
+      getPointsMap(profilesArray.map((p) => p.id)).then(setPointsMap);
       // const cosmap = await getEquippedCosmeticsMap(profilesArray.map((p) => p.id));
       setAllDbMatches(dbMatches);
 
@@ -789,7 +791,7 @@ export default function ManagerDashboard() {
                     {activeTab === "assignments" && (
                       <div className="flex items-center gap-2">
                         <Users className="h-4 w-4" />
-                        Match Assignments
+                        Matches
                       </div>
                     )}
                     {activeTab === "rosters" && (
@@ -801,25 +803,25 @@ export default function ManagerDashboard() {
                     {activeTab === "events" && (
                       <div className="flex items-center gap-2">
                         <Calendar className="h-4 w-4" />
-                        Event Information
+                        Info
                       </div>
                     )}
                     {activeTab === "create" && (
                       <div className="flex items-center gap-2 overflow-x-hidden">
                         <PlusCircle className="h-4 w-4" />
-                        Create Event
+                        New
                       </div>
                     )}
                     {activeTab === "pit" && (
                       <div className="flex items-center gap-2">
                         <Wrench className="h-4 w-4" />
-                        Pit Scouting
+                        Pits
                       </div>
                     )}
                     {activeTab === "data" && (
                       <div className="flex items-center gap-2">
                         <ClipboardList className="h-4 w-4" />
-                        Scouting Data
+                        Data
                       </div>
                     )}
                     {activeTab === "points" && (
@@ -834,7 +836,7 @@ export default function ManagerDashboard() {
                   <SelectItem value="assignments">
                     <div className="flex items-center gap-2">
                       <Users className="h-4 w-4" />
-                      Match Assignments
+                      Matches
                     </div>
                   </SelectItem>
                   <SelectItem value="rosters">
@@ -846,25 +848,25 @@ export default function ManagerDashboard() {
                   <SelectItem value="events">
                     <div className="flex items-center gap-2">
                       <Calendar className="h-4 w-4" />
-                      Event Information
+                      Info
                     </div>
                   </SelectItem>
                   <SelectItem value="create">
                     <div className="flex items-center gap-2">
                       <PlusCircle className="h-4 w-4" />
-                      Create Event
+                      New
                     </div>
                   </SelectItem>
                   <SelectItem value="pit">
                     <div className="flex items-center gap-2">
                       <Wrench className="h-4 w-4" />
-                      Pit Scouting
+                      Pits
                     </div>
                   </SelectItem>
                   <SelectItem value="data">
                     <div className="flex items-center gap-2">
                       <ClipboardList className="h-4 w-4" />
-                      Scouting Data
+                      Data
                     </div>
                   </SelectItem>
                   <SelectItem value="points">
@@ -884,7 +886,7 @@ export default function ManagerDashboard() {
                 className="flex items-center justify-center gap-2"
               >
                 <Users className="h-4 w-4" />
-                Match Assignments
+                Matches
               </TabsTrigger>
               <TabsTrigger value="rosters" className="flex items-center justify-center gap-2">
                 <ListChecks className="h-4 w-4" />
@@ -892,19 +894,19 @@ export default function ManagerDashboard() {
               </TabsTrigger>
               <TabsTrigger value="events" className="flex items-center justify-center gap-2">
                 <Calendar className="h-4 w-4" />
-                Event Information
+                Info
               </TabsTrigger>
               <TabsTrigger value="create" className="flex items-center justify-center gap-2">
                 <PlusCircle className="h-4 w-4" />
-                Create Event
+                New
               </TabsTrigger>
               <TabsTrigger value="pit" className="flex items-center justify-center gap-2">
                 <Wrench className="h-4 w-4" />
-                Pit Scouting
+                Pits
               </TabsTrigger>
               <TabsTrigger value="data" className="flex items-center justify-center gap-2">
                 <ClipboardList className="h-4 w-4" />
-                Scouting Data
+                Data
               </TabsTrigger>
               <TabsTrigger value="points" className="flex items-center justify-center gap-2">
                 <Coins className="h-4 w-4" />
@@ -1173,9 +1175,9 @@ export default function ManagerDashboard() {
           <TabsContent value="points" className="mt-0">
             <div className="max-w-md space-y-4">
               <div>
-                <h2 className="text-lg font-semibold">Award Points</h2>
+                <h2 className="text-lg font-semibold">Add Points</h2>
                 <p className="text-sm text-muted-foreground">
-                  Award points to scouts for good performance or participation.
+                  Give or take away points from scouts.
                 </p>
               </div>
 
@@ -1188,9 +1190,9 @@ export default function ManagerDashboard() {
                       <SelectValue placeholder="Select a scout" />
                     </SelectTrigger>
                     <SelectContent>
-                      {availableScouts.map((availableScout) => (
+                      {availableScouts.sort((a,b) => a.name?.localeCompare(b.name)).map((availableScout) => (
                         <SelectItem key={availableScout.id} value={availableScout.id}>
-                          {availableScout.name || availableScout.id}
+                          {availableScout.name || availableScout.id} <strong>({pointsMap[availableScout.id]}pts)</strong>
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -1199,13 +1201,13 @@ export default function ManagerDashboard() {
 
                 {/* Amount input */}
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Points to Award</label>
+                  <label className="text-sm font-medium">Add Points</label>
                   <div className="flex items-center gap-2">
                     <Coins className="w-4 h-4 text-yellow-500 shrink-0" />
                     <input
                       type="number"
                       min="1"
-                      placeholder="e.g. 50"
+                      placeholder="e.g. 50, -10"
                       value={awardAmount}
                       onChange={(e) => setAwardAmount(e.target.value)}
                       className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
@@ -1214,7 +1216,7 @@ export default function ManagerDashboard() {
                 </div>
 
                 <Button
-                  disabled={!awardTargetId || !awardAmount || Number(awardAmount) <= 0 || awardLoading}
+                  disabled={!awardTargetId || !awardAmount || awardLoading}
                   onClick={async () => {
                     if (!awardTargetId || !awardAmount) return;
                     setAwardLoading(true);

@@ -28,6 +28,24 @@ export async function getEquippedCosmeticsMap(
   return map;
 }
 
+export async function getPointsMap(
+  userIds: string[]
+): Promise<Record<string, number>> {
+  if (userIds.length === 0) return {};
+  const { data, error } = await supabase
+    .from("game_profiles")
+    .select("user_id, points")
+    .in("user_id", userIds);
+
+  if (error || !data) return {};
+
+  const map: Record<string, number> = {};
+  for (const row of data) {
+    map[row.user_id] = row.points ?? -1;
+  }
+  return map;
+}
+
 /**
  * Purchase a cosmetic item.
  * Deducts points and adds the cosmetic id to owned_cosmetics[].
