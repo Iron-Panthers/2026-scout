@@ -67,8 +67,8 @@ export function TeamImage({
                   updateSetting('theme', 'ben');
                   setTimeout(() => {
                     updateSetting('theme', 'dark');
-                  }, 5000);
-                }, 1000);
+                  }, 500);
+                }, 0);
               }
               else {
                 setPhotoUrl(pitPhoto);
@@ -91,8 +91,8 @@ export function TeamImage({
               updateSetting('theme', 'ben');
               setTimeout(() => {
                 updateSetting('theme', 'dark');
-              }, 5000);
-            }, 1000);
+              }, 500);
+            }, 0);
           }
           else {
             setPhotoUrl(tbaPhoto);
