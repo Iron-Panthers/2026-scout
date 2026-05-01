@@ -263,6 +263,7 @@ export async function getMatchUserBet(
     .eq("match_id", matchId)
     .eq("user_id", userId)
     .neq("status", "cancelled")
+    .limit(1)
     .maybeSingle();
 
   return (data as Bet) ?? null;
