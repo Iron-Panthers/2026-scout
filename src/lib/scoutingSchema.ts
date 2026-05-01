@@ -109,8 +109,8 @@ function migrateV1ToV2(data: Record<string, any>): Record<string, any> {
   ];
 
   const phaseStartTimes: Record<Phase, number> = {
-    "auto": 0, "transition-shift": 20, "phase1": 30,
-    "phase2": 55, "phase3": 80, "phase4": 105, "endgame": 130
+    "auto": 0, "transition-shift": 23, "phase1": 33,
+    "phase2": 58, "phase3": 83, "phase4": 108, "endgame": 133
   };
 
   // Convert phase-based counters to events
