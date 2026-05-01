@@ -358,7 +358,6 @@ export default function MatchBetting() {
   const refreshUserBet = useCallback(async () => {
     if (!match_id || !user?.id) return;
     const ub = await getMatchUserBet(match_id, user.id);
-    console.log(ub)
     setUserBet(ub);
   }, [match_id, user?.id]);
 
@@ -396,19 +395,15 @@ export default function MatchBetting() {
           };
           // Cache scores in DB to avoid repeated API calls
           if (isOnline && (m.red_score !== tba_scores[0] || m.blue_score !== tba_scores[1])) {
-            console.log('cached tba scores')
             void supabase.from("matches")
               .update({ red_score: tba_scores[0], blue_score: tba_scores[1] })
               .eq("id", match_id);
           }
         }
-        console.log('tba data', tba_scores)
 
         sb = isOnline
           ? await getStatboticsMatch(eventCode, m.match_number)
           : getCachedStatboticsMatch(eventCode, m.match_number);
-
-        console.log(sb, results)
 
         // Fall back to DB-stored prediction when API and cache both miss
         if (!sb.result && m.statbotics_red_win_prob != null) {
@@ -435,14 +430,12 @@ export default function MatchBetting() {
 
         const pred_time = sb?.time ?? localStorage.getItem(`pred_time_match_${match_id}`)?.predTime
         if (!pred_time) {
-          console.log('Error getting pred time');
           setLoading(true);
           return;
         }
         // Save pred_time to DB + localStorage when Statbotics provides match time
         if (pred_time && isOnline && !cancelled) {
           const predTimeIso = new Date(pred_time * 1000).toISOString();
-          console.log(`[MatchBetting] Match ${m.match_number} pred_time: ${predTimeIso}`);
           try {
             localStorage.setItem(
               `pred_time_match_${match_id}`,
@@ -504,7 +497,6 @@ export default function MatchBetting() {
         ]);
         setUserBet(ub);
         setPoints(gp?.points ?? 0);
-        console.log('Set user points to', gp, ub)
       }
 
       setLoading(false);
@@ -522,7 +514,6 @@ export default function MatchBetting() {
         settledRef.current = true;
         if (!cancelled) setAutoSettling(true);
         const prob = sb?.pred?.red_win_prob ?? 0.5;
-        console.log('trying to settle bets', knownWinner)
         await settleMatchBets(match_id!, knownWinner, prob);
         // Reload match + user data
         const { data: refreshed } = await supabase
@@ -578,11 +569,9 @@ export default function MatchBetting() {
   // ---------------------------------------------------------------------------
   useEffect(() => {
     const predTime = match?.pred_time;
-    console.log(match, predTime)
     if (!predTime) { setTimeUntilMatch(null); return; }
 
     const predTs = new Date(predTime).getTime();
-    console.log(predTs, predTime)
     const update = () => setTimeUntilMatch(predTs - Date.now());
 
     update();
@@ -631,7 +620,6 @@ export default function MatchBetting() {
     setSettling(true);
     const prob = sbMatch?.pred.red_win_prob ?? 0.5;
     const result = await settleMatchBets(match_id, winner, prob);
-    console.log('handled settle', match_id, winner, prob, "result", result)
     if (result.success) {
       setMatch((prev) => prev ? { ...prev, winning_alliance: winner } : prev);
       setFeedback({ ok: true, msg: `Match settled — ${winner.toUpperCase()} wins!` });
@@ -668,11 +656,11 @@ export default function MatchBetting() {
 
   // Time-decay derived values
   const predTime = match?.pred_time ?? null;
-  const bettingClosed = false;//!!predTime && Date.now() >= new Date(predTime).getTime();
+  const bettingClosed = !!predTime && Date.now() >= new Date(predTime).getTime();
   const currentDecayFactor = predTime && !bettingClosed
     ? computeTimeDecayFactor(new Date().toISOString(), predTime)
     : bettingClosed ? 0 : 1.0;
-  const inDecayWindow = true;//currentDecayFactor < 1.0 && !bettingClosed;
+  const inDecayWindow = currentDecayFactor < 1.0 && !bettingClosed;
 
   const estPayout = selectedAlliance
     ? estimatePayout(betAmount, selectedAlliance, currentOdds as MatchOdds, sbRedProb, predTime)
