@@ -14,7 +14,7 @@ import { getActiveEvent } from "@/lib/matches";
 import { getGameProfile } from "@/lib/gameProfiles";
 import { getBulkMatchOdds, getUserBets, blendOddsRedPct } from "@/lib/betting";
 import { getStatboticsEventMatches, getMatchLabel, wasUpset } from "@/lib/statbotics";
-import { getEventMatches, getMatchScores } from "@/lib/blueAlliance";
+import { getEventMatches, getMatchScores, getMatchTeam } from "@/lib/blueAlliance";
 import { supabase } from "@/lib/supabase";
 import type { Match, Event } from "@/types";
 import type { MatchOdds, BetWithMatch } from "@/types/betting";
@@ -88,6 +88,7 @@ function matchInterestScore(
   }
   if (odds) score += Math.min(40, odds.betCount * 8); // activity bonus
   if (hasBet) score += 55;  // user cares about their own bets
+
   return score;
 }
 
@@ -760,7 +761,7 @@ function Leaderboard({ userId }: { userId?: string }) {
         wins: stats.wins,
         total: stats.total,
       }));
-      list.sort((a, b) => b.net - a.net);
+      list.sort((a, b) => b.wins - a.wins);
       setEntries(list);
       setLoading(false);
     }
