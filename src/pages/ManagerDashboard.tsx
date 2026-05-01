@@ -133,6 +133,7 @@ export default function ManagerDashboard() {
   const [awardTargetId, setAwardTargetId] = useState<string>("");
   const [awardAmount, setAwardAmount] = useState<string>("");
   const [awardLoading, setAwardLoading] = useState(false);
+  const [awardSetLoading, setAwardSetLoading] = useState(false);
 
   // Helper function to convert database match to assignment format
   const convertMatchToAssignment = useCallback(
@@ -1216,7 +1217,8 @@ export default function ManagerDashboard() {
                 </div>
 
                 <Button
-                  disabled={!awardTargetId || !awardAmount || awardLoading}
+                  className="mr-1"
+                  disabled={!awardTargetId || !awardAmount || awardLoading || awardSetLoading}
                   onClick={async () => {
                     if (!awardTargetId || !awardAmount) return;
                     setAwardLoading(true);
@@ -1229,7 +1231,9 @@ export default function ManagerDashboard() {
                         description: `${awardAmount} points awarded to ${scout?.name ?? "scout"}.`,
                       });
                       setAwardAmount("");
-                      setAwardTargetId("");
+                      pointsMap[awardTargetId] += Number(awardAmount);
+                      setPointsMap(pointsMap);
+                      // setAwardTargetId("");
                     } else {
                       toast({
                         title: "Failed to award points",
@@ -1239,7 +1243,35 @@ export default function ManagerDashboard() {
                     }
                   }}
                 >
-                  {awardLoading ? "Awarding…" : "Award Points"}
+                  {awardLoading ? "Modifying..." : "Modify Points"}
+                </Button>
+                <Button
+                  disabled={!awardTargetId || !awardAmount || awardLoading || awardSetLoading}
+                  onClick={async () => {
+                    if (!awardTargetId || !awardAmount) return;
+                    setAwardSetLoading(true);
+                    const result = await awardPoints(awardTargetId, Number(awardAmount) - pointsMap[awardTargetId]);
+                    setAwardSetLoading(false);
+                    if (result.success) {
+                      const scout = availableScouts.find((s) => s.id === awardTargetId);
+                      toast({
+                        title: "Points sett",
+                        description: `Set ${scout?.name ?? "scout"}'s points to ${awardAmount}.`,
+                      });
+                      setAwardAmount("");
+                      pointsMap[awardTargetId] = Number(awardAmount);
+                      setPointsMap(pointsMap);
+                      // setAwardTargetId("");
+                    } else {
+                      toast({
+                        title: "Failed to set points",
+                        description: result.error ?? "Unknown error.",
+                        variant: "destructive",
+                      });
+                    }
+                  }}
+                >
+                  {awardSetLoading ? "Setting..." : "Set Points"}
                 </Button>
               </div>
             </div>
