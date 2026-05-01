@@ -665,7 +665,7 @@ export default function MatchBetting() {
 
   // Time-decay derived values
   const predTime = match?.pred_time ?? null;
-  const bettingClosed = !!predTime && Date.now() >= new Date(predTime).getTime();
+  const bettingClosed = false;//!!predTime && Date.now() >= new Date(predTime).getTime();
   const currentDecayFactor = predTime && !bettingClosed
     ? computeTimeDecayFactor(new Date().toISOString(), predTime)
     : bettingClosed ? 0 : 1.0;
