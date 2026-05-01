@@ -384,7 +384,6 @@ export default function Dashboard() {
             size="lg"
             className="h-24 text-lg font-semibold flex flex-col gap-2"
             onClick={() => navigate("/config/")}
-            disabled={!profile?.clocked_in}
           >
             <ClipboardList className="h-8 w-8" />
             Match Scouting
