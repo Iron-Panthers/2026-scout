@@ -343,9 +343,9 @@ export async function placeBet(
     return { success: false, error: "This match has already been settled." };
   }
 
-  if (match?.pred_time && new Date(match.pred_time) <= new Date()) {
-    return { success: false, error: "Betting is closed — this match has already started." };
-  }
+  // if (match?.pred_time && new Date(match.pred_time) <= new Date()) {
+  //   return { success: false, error: "Betting is closed — this match has already started." };
+  // }
 
   const existing = await getMatchUserBet(matchId, userId);
   if (existing) {
