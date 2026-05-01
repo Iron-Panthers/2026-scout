@@ -393,7 +393,6 @@ export default function Dashboard() {
             size="lg"
             variant="secondary"
             className="h-24 text-lg font-semibold flex flex-col gap-2 items-center"
-            disabled={!profile?.clocked_in}
           >
             <Link to="/pit-scouting" className="flex flex-col items-center gap-2">
               <Wrench className="h-8 w-8" />
@@ -402,12 +401,6 @@ export default function Dashboard() {
           </Button>
           
         </div>
-        {/* Last match prompt */}
-        {profile?.clocked_in && !loading && matches.length === 1 && (
-          <div className="p-3 bg-yellow-900/20 border border-yellow-700/40 rounded-lg">
-            <p className="text-sm text-yellow-400">This is your last assigned match — remember to clock out when you're done!</p>
-          </div>
-        )}
 
         {/* Pit Scouting Assignments Section */}
         {pitAssignments.length > 0 && (
