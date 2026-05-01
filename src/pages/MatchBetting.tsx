@@ -973,7 +973,7 @@ export default function MatchBetting() {
         {/* Bet form — only when open, pred_time not passed, and no existing bet */}
         {!matchComplete && !isSettled && !userBet && !bettingClosed && isOnline && (
           <Card>
-            <CardHeader className="pb-2 pt-4">
+            <CardHeader className="pb-0 pt-0">
               <CardTitle className="text-base">Place a Bet</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -982,8 +982,6 @@ export default function MatchBetting() {
                 <div className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs bg-yellow-900/20 border border-yellow-700/30 text-yellow-300">
                   <Clock className="h-3.5 w-3.5 shrink-0" />
                   <span>
-                    <span className="font-semibold">Late bet penalty:</span> Bets placed this close to the match start are worth less.
-                    Current payout multiplier: <span className="font-bold">{Math.round(currentDecayFactor * 100)}%</span>.
                     Betting closes in <span className="font-bold">{formatTimeRemaining(timeUntilMatch)}</span>.
                   </span>
                 </div>
@@ -1038,12 +1036,6 @@ export default function MatchBetting() {
                       {estPayout - betAmount >= 0 ? "+" : ""}{estPayout - betAmount} pts
                     </span>
                   </div>
-                  {inDecayWindow && (
-                    <div className="flex justify-between text-yellow-400/80">
-                      <span>Time penalty applied</span>
-                      <span className="font-semibold">{Math.round(currentDecayFactor * 100)}% of full value</span>
-                    </div>
-                  )}
                   {sbRedProb !== undefined && (
                     <p className="text-[10px] text-muted-foreground">
                       Adjusted for Statbotics prediction. Upsets pay more than favorites.
