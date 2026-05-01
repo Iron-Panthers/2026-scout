@@ -482,6 +482,8 @@ export async function settleMatchBets(
     let payout = 0;
     let status: "won" | "lost" = "lost";
 
+    if (bet.status !== 'pending') continue;
+
     const timeDecayFactor = computeTimeDecayFactor(matchPredTime, bet.created_at);
 
     if (effectiveWinner === "tie") {
