@@ -20,6 +20,7 @@ import { ConfirmationDialog } from "./ConfirmationDialog";
 import UserProfileMenu from "../UserProfileMenu";
 import { AddScoutsDialog } from "./AddScoutsDialog";
 import CosmeticAvatar from "../CosmeticAvatar";
+import { Badge } from "../ui/badge";
 
 interface EventInformationTabProps {
   selectedEvent: string;
@@ -689,7 +690,12 @@ export function EventInformationTab({
                       <p className="text-sm text-muted-foreground">
                         {profile.role} {profile.is_manager && "• Manager"}
                       </p>
-                    </div>
+                    </div> 
+                    {profile.clocked_in &&
+                      <Badge className="h-4 px-1.5 text-[10px] bg-green-600/20 text-green-400 border border-green-600/30 font-medium">
+                        Active
+                      </Badge>
+                    }
                     <Button
                       variant="ghost"
                       size="sm"
