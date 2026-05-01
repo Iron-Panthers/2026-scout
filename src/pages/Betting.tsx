@@ -1097,21 +1097,6 @@ export default function Betting() {
 
                 return (
                   <>
-                    {upsets.length > 0 && (
-                      <>
-                        <div className="flex items-center gap-2 text-xs text-yellow-400 font-semibold uppercase tracking-wider">
-                          <span className="h-px flex-1 bg-yellow-700/30" />
-                          Upsets
-                          <span className="h-px flex-1 bg-yellow-700/30" />
-                        </div>
-                        {upsets.map((match) => (
-                          <CompletedMatchCard key={match.id} match={match}
-                            odds={oddsMap.get(match.id)} tba={tbaMap.get(match.match_number)}
-                            sb={sbMap.get(match.match_number)} userBet={myBetByMatch.get(match.id)}
-                            onClick={() => navigate(`/betting/${match.id}`)} />
-                        ))}
-                      </>
-                    )}
                     {normal.length > 0 && (
                       <>
                         {upsets.length > 0 && (

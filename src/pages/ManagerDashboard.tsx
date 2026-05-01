@@ -1233,7 +1233,6 @@ export default function ManagerDashboard() {
                       setAwardAmount("");
                       pointsMap[awardTargetId] += Number(awardAmount);
                       setPointsMap(pointsMap);
-                      // setAwardTargetId("");
                     } else {
                       toast({
                         title: "Failed to award points",
