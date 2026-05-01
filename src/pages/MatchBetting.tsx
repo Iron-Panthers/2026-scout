@@ -502,6 +502,7 @@ export default function MatchBetting() {
         ]);
         setUserBet(ub);
         setPoints(gp?.points ?? 0);
+        console.log('Set user points to', gp, ub)
       }
 
       setLoading(false);
@@ -627,6 +628,7 @@ export default function MatchBetting() {
     setSettling(true);
     const prob = sbMatch?.pred.red_win_prob ?? 0.5;
     const result = await settleMatchBets(match_id, winner, prob);
+    console.log('handled settle', match_id, winner, prob, "result", result)
     if (result.success) {
       setMatch((prev) => prev ? { ...prev, winning_alliance: winner } : prev);
       setFeedback({ ok: true, msg: `Match settled — ${winner.toUpperCase()} wins!` });
@@ -641,7 +643,7 @@ export default function MatchBetting() {
   // ---------------------------------------------------------------------------
   // Derived
   // ---------------------------------------------------------------------------
-  const isSettled = !!match?.winning_alliance;
+  const isSettled = !!match?.winning_alliance && userBet?.status !== "pending";
   const isManager = profile?.is_manager ?? false;
   const currentOdds = odds ?? { redPct: 50, bluePct: 50, totalPool: 0, betCount: 0, history: [], redTotal: 0, blueTotal: 0 };
   const sbRedProb = sbMatch?.pred.red_win_prob;
