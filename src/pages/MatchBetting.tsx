@@ -390,17 +390,19 @@ export default function MatchBetting() {
       if (eventCode) {
         const tba_scores = await getMatchScores(eventCode, m.match_number);
         let results = {}
-        if (tba_scores !== null && tba_scores.length == 2 && tba_scores[0] >= 0 && tba_scores[1] >= 0) {
+        if (tba_scores !== null && tba_scores.length == 2 && tba_scores[0] > 0 && tba_scores[1] > 0) {
           results = {
             winner: tba_scores[0] > tba_scores[1] ? 'red' : 'blue', red_score: tba_scores[0], blue_score: tba_scores[1]
           };
           // Cache scores in DB to avoid repeated API calls
           if (isOnline && (m.red_score !== tba_scores[0] || m.blue_score !== tba_scores[1])) {
+            console.log('cached tba scores')
             void supabase.from("matches")
               .update({ red_score: tba_scores[0], blue_score: tba_scores[1] })
               .eq("id", match_id);
           }
         }
+        console.log('tba data', tba_scores)
 
         sb = isOnline
           ? await getStatboticsMatch(eventCode, m.match_number)
@@ -520,6 +522,7 @@ export default function MatchBetting() {
         settledRef.current = true;
         if (!cancelled) setAutoSettling(true);
         const prob = sb?.pred?.red_win_prob ?? 0.5;
+        console.log('trying to settle bets', knownWinner)
         await settleMatchBets(match_id!, knownWinner, prob);
         // Reload match + user data
         const { data: refreshed } = await supabase
