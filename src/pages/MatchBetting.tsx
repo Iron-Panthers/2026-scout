@@ -643,7 +643,7 @@ export default function MatchBetting() {
   // ---------------------------------------------------------------------------
   // Derived
   // ---------------------------------------------------------------------------
-  const isSettled = !!match?.winning_alliance;
+  const isSettled = !!match?.winning_alliance && userBet?.status !== "pending";
   const isManager = profile?.is_manager ?? false;
   const currentOdds = odds ?? { redPct: 50, bluePct: 50, totalPool: 0, betCount: 0, history: [], redTotal: 0, blueTotal: 0 };
   const sbRedProb = sbMatch?.pred.red_win_prob;

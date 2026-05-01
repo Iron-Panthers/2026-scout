@@ -174,12 +174,12 @@ export function calcPayout(
   timeDecayFactor: number = 1.0
 ): number {
   if (amount <= 0 || winnerPool <= 0) return amount; // refund edge case
-  // const p = Math.max(0, Math.min(1, winnerPredictedProb)); // clamp
-  // const multiplier = 2 * Math.pow(1 - p, 1.6) + 1.6; // baseline 0.2x
+  const p = Math.max(0, Math.min(1, winnerPredictedProb)); // clamp
+  const multiplier = 2 * Math.pow(1 - p, 1.6) + 1.6; // baseline 0.2x
   // return Math.floor(amount * multiplier * Math.max(0, Math.min(1, timeDecayFactor * 4)));
 
-  const inputPercent = amount / winnerPool * Math.min(1, Math.max(timeDecayFactor * 0.2 + 0.8, 0));
-  const outputMoney = Math.floor(inputPercent * totalPool);
+  const inputPercent = amount / winnerPool;// * Math.min(1, Math.max(timeDecayFactor * 0.2 + 0.8, 0));
+  const outputMoney = Math.floor(inputPercent * totalPool * multiplier);
   return Math.max(outputMoney, amount + 10);
 }
 
