@@ -669,7 +669,7 @@ export default function MatchBetting() {
   const currentDecayFactor = predTime && !bettingClosed
     ? computeTimeDecayFactor(new Date().toISOString(), predTime)
     : bettingClosed ? 0 : 1.0;
-  const inDecayWindow = currentDecayFactor < 1.0 && !bettingClosed;
+  const inDecayWindow = true;//currentDecayFactor < 1.0 && !bettingClosed;
 
   const estPayout = selectedAlliance
     ? estimatePayout(betAmount, selectedAlliance, currentOdds as MatchOdds, sbRedProb, predTime)
