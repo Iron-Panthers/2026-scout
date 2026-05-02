@@ -183,7 +183,7 @@ export default function QualScouting() {
       onPointerUp={onDragPointerUp}
     >
       {/* ── Header ──────────────────────────────────────────────────────── */}
-      <div className="h-12 border-b border-border flex items-center px-4 shrink-0 bg-card gap-2 mt-15 lg:mt-0">
+      <div className="h-12 border-b border-border flex items-center px-4 shrink-0 bg-card gap-2 mt-8 lg:mt-0">
         <button
           className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0"
           onPointerDown={(e) => { e.preventDefault(); navigate("/dashboard"); }}

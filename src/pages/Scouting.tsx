@@ -323,7 +323,7 @@ export default function Scouting() {
 
   // ── Header (shared) ─────────────────────────────────────────────────────
   const Header = () => (
-    <div className="h-12 border-b border-border flex items-center px-4 shrink-0 bg-card gap-2 mt-15 lg:mt-0">
+    <div className="h-12 border-b border-border flex items-center px-4 shrink-0 bg-card gap-2 mt-8 lg:mt-0">
       <span className="font-semibold text-sm">{headerLabel}</span>
       <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{role}</span>
       <div className="ml-auto flex items-center gap-1.5">
