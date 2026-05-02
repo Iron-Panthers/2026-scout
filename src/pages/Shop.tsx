@@ -17,7 +17,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { getGameProfile } from "@/lib/gameProfiles";
 import { purchaseCosmetic, equipCosmetic, unequipCosmetic, openCrate, CRATE_COST } from "@/lib/shopService";
 import { purchaseGame } from "@/lib/gameProfiles";
-import { COSMETICS, RARITY_CONFIG, type CosmeticDefinition, type CrateRarity } from "@/config/cosmetics";
+import { COSMETICS, RARITY_CONFIG, RARITY_VALUE, type CosmeticDefinition, type CrateRarity } from "@/config/cosmetics";
 import { GAMES } from "@/config/games";
 import CosmeticAvatar from "@/components/CosmeticAvatar";
 import { GameCard } from "@/components/GameCard";
@@ -51,6 +51,12 @@ function CosmeticCard({ item, owned, equipped, canAfford, onBuy, onEquip, onUneq
           ? "border-border hover:border-border/80 bg-card"
           : "border-border/40 bg-card/60 opacity-70"
       }`}
+      style={
+        {
+          borderColor: item.rarity !== 'common' ? RARITY_CONFIG[item.rarity].color : '',
+          // boxShadow: `0 0 6px 0px ${item.rarity !== 'common' && item.rarity !== 'uncommon' ? RARITY_CONFIG[item.rarity].color : 'transparent'}`
+        }
+      }
     >
       {equipped && (
         <div className="absolute top-2 right-2">
@@ -61,53 +67,61 @@ function CosmeticCard({ item, owned, equipped, canAfford, onBuy, onEquip, onUneq
         </div>
       )}
       {!equipped && owned && (
-        <div className="absolute top-2 right-2">
+        <div className="absolute top-2 right-2 flex">
           <Badge className="bg-green-600/20 text-green-400 border-green-600/30 text-xs">
             Owned
           </Badge>
         </div>
       )}
 
-      <CardContent className="p-4 flex flex-col items-center gap-3">
-        {/* Big emoji preview */}
-        <div className="text-5xl leading-none mt-2 select-none">{item.emoji}</div>
+      <CardContent className="h-50 p-4 flex flex-col justify-between pb-0">
+        <div className="h-full items-center gap-3 flex-col flex">
+          {/* Big emoji preview */}
+          {item.emoji && (
+            <div className="text-5xl leading-none mt-2 select-none">{item.emoji}</div>
+          )}
+          {item.url && (
+            <img className="w-10 leading-none mt-2 select-none" src={item.url} />
+          )}
 
-        <div className="text-center space-y-0.5 w-full">
-          <p className="font-semibold text-sm text-foreground">{item.name}</p>
-          <p className="text-xs text-muted-foreground leading-snug">{item.description}</p>
+          <div className="text-center space-y-0.5 w-full">
+            <p className="font-semibold text-sm text-foreground" style={{ color: RARITY_CONFIG[item.rarity].color }}>{item.name}</p>
+            <p className="text-xs text-muted-foreground leading-snug">{item.description}</p>
+          </div>
         </div>
 
-        {owned ? (
-          equipped ? (
-            <Button
-              size="sm"
-              variant="outline"
-              className="w-full text-xs border-yellow-500/40 text-yellow-400 hover:bg-yellow-500/10"
-              onClick={onUnequip}
-            >
-              Unequip
-            </Button>
+          {owned ? (
+            equipped ? (
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full text-xs border-yellow-500/40 text-yellow-400 hover:bg-yellow-500/10 mt-auto"
+                onClick={onUnequip}
+              >
+                Unequip
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                className="w-full text-xs bg-green-700 hover:bg-green-600 text-white mt-auto"
+                onClick={onEquip}
+              >
+                <Sparkles className="h-3 w-3 mr-1" />
+                Equip
+              </Button>
+            )
           ) : (
             <Button
               size="sm"
-              className="w-full text-xs bg-green-700 hover:bg-green-600 text-white"
-              onClick={onEquip}
+              className="w-full text-xs gap-1"
+              disabled={!canAfford || item.cost === 0}
+              onClick={onBuy}
+              style={{ backgroundColor: RARITY_CONFIG[item.rarity].bgColor }}
             >
-              <Sparkles className="h-3 w-3 mr-1" />
-              Equip
+              <Coins className="h-3 w-3" />
+              {item.cost === 0 ? 'Crate Exclusive' : `${item.cost} pts`}
             </Button>
-          )
-        ) : (
-          <Button
-            size="sm"
-            className="w-full text-xs gap-1"
-            disabled={!canAfford}
-            onClick={onBuy}
-          >
-            <Coins className="h-3 w-3" />
-            {item.cost} pts
-          </Button>
-        )}
+          )}
       </CardContent>
     </Card>
   );
@@ -221,8 +235,8 @@ export default function Shop() {
     loadProfile();
   }
 
-  const hats = COSMETICS.filter((c) => c.category === "hat");
-  const decorations = COSMETICS.filter((c) => c.category === "decoration");
+  const hats = COSMETICS.filter((c) => c.category === "hat").sort((a, b) => a.rarity === b.rarity ? a.cost - b.cost : RARITY_VALUE[a.rarity] - RARITY_VALUE[b.rarity]);
+  const decorations = COSMETICS.filter((c) => c.category === "decoration").sort((a, b) => a.rarity === b.rarity ? a.cost - b.cost : RARITY_VALUE[a.rarity] - RARITY_VALUE[b.rarity]);
 
   function renderGrid(items: CosmeticDefinition[]) {
     return (
@@ -286,7 +300,7 @@ export default function Shop() {
                         : Object.entries(equipped)
                             .map(([_slot, id]) => {
                               const item = COSMETICS.find((c) => c.id === id);
-                              return item ? `${item.emoji} ${item.name}` : null;
+                              return item ? item.name : null;
                             })
                             .filter(Boolean)
                             .join("  ·  ")}

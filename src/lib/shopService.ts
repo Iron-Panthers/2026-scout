@@ -2,7 +2,7 @@ import { supabase } from "@/lib/supabase";
 import { getGameProfile } from "@/lib/gameProfiles";
 import type { GameProfile } from "@/types";
 
-export const CRATE_COST = 50;
+export const CRATE_COST = 25;
 
 export type { GameProfile };
 

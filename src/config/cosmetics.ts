@@ -8,11 +8,19 @@ export interface CosmeticDefinition {
   name: string;
   description: string;
   category: CosmeticCategory;
-  emoji: string; // Emoji character or URL to png/gif
-  emojiType?: EmojiType; // "emoji" for standard emoji, "image" for png/gif URL
+  emoji?: string; // Emoji character or URL to png/gif
+  url?: string; // Emoji character or URL to png/gif
   cost: number;
   rarity: CrateRarity;
 }
+
+export const RARITY_VALUE: Record<CrateRarity, number> = {
+  common: 0, // 10-50
+  uncommon: 1, // 100-500
+  rare: 2, // 500-1000
+  "ultra-rare": 3, // 1000-5000
+  legendary: 4 // 5000-10000
+};
 
 export const RARITY_CONFIG: Record<CrateRarity, { label: string; color: string; glowColor: string; bgColor: string }> = {
   common: {
@@ -55,7 +63,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Feel the Texan spirit :p",
     category: "hat",
     emoji: "🤠",
-    cost: 25,
+    cost: 750,
     rarity: "rare",
   },
   {
@@ -64,8 +72,8 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Don't worry, you'll get this someday.",
     category: "hat",
     emoji: "🎓",
-    cost: 15,
-    rarity: "common",
+    cost: 400,
+    rarity: "uncommon",
   },
   {
     id: "hat_crown",
@@ -73,7 +81,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "MY GLORIOUS QUEEN (OR KING)",
     category: "hat",
     emoji: "👑",
-    cost: 100,
+    cost: 10000,
     rarity: "legendary",
   },
   {
@@ -82,7 +90,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Celebrateeee",
     category: "hat",
     emoji: "🎉",
-    cost: 30,
+    cost: 100,
     rarity: "uncommon",
   },
   {
@@ -91,7 +99,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Haur Haur Haur Haur Haur",
     category: "hat",
     emoji: "🎩",
-    cost: 50,
+    cost: 0,
     rarity: "ultra-rare",
   },
   {
@@ -100,8 +108,107 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Feeling quite jolly today, eh?",
     category: "hat",
     emoji: "🎅",
-    cost: 40,
+    cost: 500,
     rarity: "rare",
+  },
+  {
+    id: "hat_suprise",
+    name: "Exclamation!!",
+    description: "WHAT!!11!1!!!1",
+    category: "hat",
+    emoji: "‼",
+    cost: 650,
+    rarity: "rare",
+  },
+  {
+    id: "hat_suprised_question",
+    name: "Exclamation!?",
+    description: "WHAT!?!?!???",
+    category: "hat",
+    emoji: "⁉",
+    cost: 8000,
+    rarity: "legendary",
+  },
+  {
+    id: "hat_question",
+    name: "Huh?",
+    description: "huh?",
+    category: "hat",
+    emoji: "❓",
+    cost: 150,
+    rarity: "uncommon",
+  },
+  {
+    id: "hat_stephen",
+    name: "Stephen",
+    description: "(the rat, not the person)",
+    category: "hat",
+    emoji: "🐀",
+    cost: 0,
+    rarity: "ultra-rare",
+  },
+  {
+    id: "hat_plant",
+    name: "Sproutling",
+    description: "Maybe one day you'll grow a flower",
+    category: "hat",
+    emoji: "🌱",
+    cost: 40,
+    rarity: "common",
+  },
+  {
+    id: "hat_rain",
+    name: "Rain Cloud",
+    description: "A little wet",
+    category: "hat",
+    emoji: "🌧",
+    cost: 300,
+    rarity: "uncommon",
+  },
+  {
+    id: "hat_bow",
+    name: "Pink Bow",
+    description: "Very cute",
+    category: "hat",
+    emoji: "🎀",
+    cost: 30,
+    rarity: "common",
+  },
+  {
+    id: "hat_teddy",
+    name: "Teddy Bear",
+    description: "Mr. Roosevelt himself",
+    category: "hat",
+    emoji: "🧸",
+    cost: 850,
+    rarity: "rare",
+  },
+  {
+    id: "hat_cap",
+    name: "Baseball Cap",
+    description: "Your standard billed cap",
+    category: "hat",
+    emoji: "🧢",
+    cost: 50,
+    rarity: "common",
+  },
+  {
+    id: "hat_books",
+    name: "Books",
+    description: "For those that like wearing books on their head",
+    category: "hat",
+    emoji: "📚",
+    cost: 600,
+    rarity: "rare",
+  },
+  {
+    id: "hat_bubbles",
+    name: "Bubbles",
+    description: "How clean",
+    category: "hat",
+    emoji: "🫧",
+    cost: 2000,
+    rarity: "ultra-rare",
   },
   // --- Cosmetics ---
   {
@@ -137,7 +244,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Wowwww so... potted?",
     category: "decoration",
     emoji: "🪴",
-    cost: 20,
+    cost: 40,
     rarity: "common",
   },
   {
@@ -146,7 +253,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Wowwww so poisonous",
     category: "decoration",
     emoji: "🍄",
-    cost: 25,
+    cost: 200,
     rarity: "uncommon",
   },
   {
@@ -155,7 +262,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Wowwww so lucky",
     category: "decoration",
     emoji: "🍀",
-    cost: 35,
+    cost: 500,
     rarity: "rare",
   },
   {
@@ -164,7 +271,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "If gambling got you here, congratulations. You have our recognition.",
     category: "decoration",
     emoji: "6️⃣7️⃣",
-    cost: 1000000,
+    cost: 0,
     rarity: "legendary",
   },
   {
@@ -173,7 +280,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Double rainbow all the way across the sky.",
     category: "decoration",
     emoji: "🌈",
-    cost: 30,
+    cost: 250,
     rarity: "uncommon",
   },
   {
@@ -182,7 +289,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "You're on fire! (hopefully not literally)",
     category: "decoration",
     emoji: "🔥",
-    cost: 20,
+    cost: 500,
     rarity: "uncommon",
   },
   {
@@ -191,7 +298,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Each one is unique, just like you.",
     category: "decoration",
     emoji: "❄️",
-    cost: 15,
+    cost: 20,
     rarity: "common",
   },
   {
@@ -200,7 +307,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Shockingly good taste.",
     category: "decoration",
     emoji: "⚡",
-    cost: 25,
+    cost: 400,
     rarity: "uncommon",
   },
   {
@@ -209,7 +316,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Make a wish.",
     category: "decoration",
     emoji: "🌠",
-    cost: 40,
+    cost: 750,
     rarity: "rare",
   },
   {
@@ -218,7 +325,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Once in a lifetime. Like your scouting accuracy.",
     category: "decoration",
     emoji: "☄️",
-    cost: 45,
+    cost: 1000,
     rarity: "rare",
   },
   {
@@ -227,7 +334,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Rare find.",
     category: "decoration",
     emoji: "💎",
-    cost: 75,
+    cost: 2000,
     rarity: "ultra-rare",
   },
   {
@@ -236,7 +343,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "For those who deserve recognition.",
     category: "decoration",
     emoji: "🏆",
-    cost: 60,
+    cost: 0,
     rarity: "ultra-rare",
   },
   {
@@ -245,7 +352,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Beep boop. FRC approved.",
     category: "decoration",
     emoji: "🤖",
-    cost: 35,
+    cost: 600,
     rarity: "rare",
   },
   {
@@ -272,7 +379,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Attracting W's since day one.",
     category: "decoration",
     emoji: "🧲",
-    cost: 25,
+    cost: 150,
     rarity: "uncommon",
   },
   {
@@ -281,7 +388,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Always watching. Always scouting.",
     category: "decoration",
     emoji: "🛰️",
-    cost: 50,
+    cost: 800,
     rarity: "rare",
   },
   {
@@ -290,7 +397,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Your scouting skills are out of this world.",
     category: "decoration",
     emoji: "👽",
-    cost: 30,
+    cost: 200,
     rarity: "uncommon",
   },
   {
@@ -299,7 +406,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Invisible on defense, visible in the data.",
     category: "decoration",
     emoji: "👻",
-    cost: 25,
+    cost: 100,
     rarity: "uncommon",
   },
   {
@@ -308,7 +415,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Breathe fire on the competition.",
     category: "decoration",
     emoji: "🐉",
-    cost: 80,
+    cost: 1500,
     rarity: "ultra-rare",
   },
   {
@@ -317,7 +424,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Always moving forward.",
     category: "decoration",
     emoji: "🦈",
-    cost: 40,
+    cost: 1000,
     rarity: "rare",
   },
   {
@@ -326,7 +433,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Eyes on the field at all times.",
     category: "decoration",
     emoji: "🦅",
-    cost: 35,
+    cost: 850,
     rarity: "rare",
   },
   {
@@ -335,7 +442,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Cool under pressure.",
     category: "decoration",
     emoji: "🐧",
-    cost: 20,
+    cost: 150,
     rarity: "uncommon",
   },
   {
@@ -353,7 +460,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Sly and strategic.",
     category: "decoration",
     emoji: "🦊",
-    cost: 25,
+    cost: 100,
     rarity: "uncommon",
   },
   {
@@ -362,7 +469,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Rare, precious, and surprisingly strong.",
     category: "decoration",
     emoji: "🐼",
-    cost: 30,
+    cost: 150,
     rarity: "uncommon",
   },
   {
@@ -380,8 +487,8 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "For the late-night coding sessions.",
     category: "decoration",
     emoji: "🧋",
-    cost: 15,
-    rarity: "common",
+    cost: 700,
+    rarity: "rare",
   },
   {
     id: "decoration_soda",
@@ -413,10 +520,10 @@ export const COSMETICS: CosmeticDefinition[] = [
   {
     id: "decoration_volcano",
     name: "Volcano",
-    description: "When the match timer hits zero.",
+    description: "Big boom lmao.",
     category: "decoration",
     emoji: "🌋",
-    cost: 35,
+    cost: 750,
     rarity: "rare",
   },
   {
@@ -425,7 +532,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Predicting match outcomes since 2026.",
     category: "decoration",
     emoji: "🔮",
-    cost: 55,
+    cost: 3000,
     rarity: "ultra-rare",
   },
   {
@@ -440,11 +547,83 @@ export const COSMETICS: CosmeticDefinition[] = [
   {
     id: "decoration_joystick",
     name: "Joystick",
-    description: "Drivers only.",
+    description: "Please don't crash our robot",
     category: "decoration",
     emoji: "🕹️",
-    cost: 30,
+    cost: 900,
     rarity: "rare",
+  },
+  {
+    id: "decoration_speak",
+    name: "Yelling",
+    description: "Bros just yapping",
+    category: "decoration",
+    emoji: "🗣",
+    cost: 350,
+    rarity: "uncommon",
+  },
+  {
+    id: "decoration_you",
+    name: "Pointing",
+    description: "It's all your fault",
+    category: "decoration",
+    emoji: "🫵",
+    cost: 30,
+    rarity: "common",
+  },
+  {
+    id: "decoration_eyes",
+    name: "Eyes",
+    description: "I can see you 👁️👁️",
+    category: "decoration",
+    emoji: "👀",
+    cost: 400,
+    rarity: "uncommon",
+  },
+  {
+    id: "decoration_cursing",
+    name: "Cursing",
+    description: "Grrrrrr....",
+    category: "decoration",
+    emoji: "🤬",
+    cost: 650,
+    rarity: "rare",
+  },
+  {
+    id: "decoration_cc_rain",
+    name: "Happy Rain",
+    description: "Rain approved",
+    category: "decoration",
+    url: "/shop/decoration_cc_rain.png",
+    cost: 4000,
+    rarity: "ultra-rare",
+  },
+  {
+    id: "decoration_aura_loss",
+    name: "Aura Loss",
+    description: "All I do is win no matter what",
+    category: "decoration",
+    url: "/shop/decoration_aura_loss.gif",
+    cost: 0,
+    rarity: "legendary",
+  },
+  {
+    id: "decoration_rainbow_parrot",
+    name: "PARROT",
+    description: "A little excited to scout",
+    category: "decoration",
+    url: "/shop/decoration_rainbow_parrot.gif",
+    cost: 8000,
+    rarity: "legendary",
+  },
+  {
+    id: "decoration_rainbow_dance",
+    name: "Blob Dance",
+    description: "Just a chill guy",
+    category: "decoration",
+    url: "/shop/decoration_rainbow_dance.gif",
+    cost: 0,
+    rarity: "legendary",
   },
 ];
 

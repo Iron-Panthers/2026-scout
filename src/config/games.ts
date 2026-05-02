@@ -1,7 +1,7 @@
 import type { GameDefinition } from "@/types";
 
 // Points awarded per completed scouting submission (matches server trigger)
-export const POINTS_PER_MATCH = 5;
+export const POINTS_PER_MATCH = 20;
 
 // Static game catalog — games are iframe embeds, no DB table needed.
 // To add a game: append an entry here and provide a real iframeUrl.
