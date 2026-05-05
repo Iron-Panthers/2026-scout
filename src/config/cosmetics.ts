@@ -277,7 +277,7 @@ export const COSMETICS: CosmeticDefinition[] = [
   {
     id: "decoration_rainbow",
     name: "Rainbow",
-    description: "Double rainbow all the way across the sky.",
+    description: "Sunshine, lollipops and rainbows everything that's wonderful is what I feel when we're together",
     category: "decoration",
     emoji: "🌈",
     cost: 250,
@@ -286,7 +286,7 @@ export const COSMETICS: CosmeticDefinition[] = [
   {
     id: "decoration_fire",
     name: "Fire",
-    description: "You're on fire! (hopefully not literally)",
+    description: "Remember that robot on Hopper Division lol",
     category: "decoration",
     emoji: "🔥",
     cost: 500,
@@ -295,7 +295,7 @@ export const COSMETICS: CosmeticDefinition[] = [
   {
     id: "decoration_snowflake",
     name: "Snowflake",
-    description: "Each one is unique, just like you.",
+    description: "Brrrr",
     category: "decoration",
     emoji: "❄️",
     cost: 20,
@@ -304,7 +304,7 @@ export const COSMETICS: CosmeticDefinition[] = [
   {
     id: "decoration_lightning",
     name: "Lightning Bolt",
-    description: "Shockingly good taste.",
+    description: "Bzzzz",
     category: "decoration",
     emoji: "⚡",
     cost: 400,
@@ -313,7 +313,7 @@ export const COSMETICS: CosmeticDefinition[] = [
   {
     id: "decoration_star",
     name: "Shooting Star",
-    description: "Make a wish.",
+    description: "Beeoo",
     category: "decoration",
     emoji: "🌠",
     cost: 750,
@@ -322,7 +322,7 @@ export const COSMETICS: CosmeticDefinition[] = [
   {
     id: "decoration_comet",
     name: "Comet",
-    description: "Once in a lifetime. Like your scouting accuracy.",
+    description: "Broww",
     category: "decoration",
     emoji: "☄️",
     cost: 1000,
@@ -331,7 +331,7 @@ export const COSMETICS: CosmeticDefinition[] = [
   {
     id: "decoration_gem",
     name: "Gem",
-    description: "Rare find.",
+    description: "MINEE DIAMONDSSS",
     category: "decoration",
     emoji: "💎",
     cost: 2000,
@@ -340,7 +340,7 @@ export const COSMETICS: CosmeticDefinition[] = [
   {
     id: "decoration_trophy",
     name: "Trophy",
-    description: "For those who deserve recognition.",
+    description: "When will we get another blue banner?",
     category: "decoration",
     emoji: "🏆",
     cost: 0,
@@ -349,7 +349,7 @@ export const COSMETICS: CosmeticDefinition[] = [
   {
     id: "decoration_robot",
     name: "Robot",
-    description: "Beep boop. FRC approved.",
+    description: "I mean, this is robotics",
     category: "decoration",
     emoji: "🤖",
     cost: 600,
@@ -358,7 +358,7 @@ export const COSMETICS: CosmeticDefinition[] = [
   {
     id: "decoration_wrench",
     name: "Wrench",
-    description: "In case the robot breaks. Again.",
+    description: "RATCHET WRENCH???",
     category: "decoration",
     emoji: "🔧",
     cost: 20,
@@ -367,7 +367,7 @@ export const COSMETICS: CosmeticDefinition[] = [
   {
     id: "decoration_gear",
     name: "Gear",
-    description: "The real MVP of every robot.",
+    description: "Gang I think the gear melted",
     category: "decoration",
     emoji: "⚙️",
     cost: 20,
@@ -376,7 +376,7 @@ export const COSMETICS: CosmeticDefinition[] = [
   {
     id: "decoration_magnet",
     name: "Magnet",
-    description: "Attracting W's since day one.",
+    description: "Petition to add magnet climb on our robot",
     category: "decoration",
     emoji: "🧲",
     cost: 150,
@@ -385,7 +385,7 @@ export const COSMETICS: CosmeticDefinition[] = [
   {
     id: "decoration_satellite",
     name: "Satellite",
-    description: "Always watching. Always scouting.",
+    description: "Our wifi at worlds be like",
     category: "decoration",
     emoji: "🛰️",
     cost: 800,
@@ -394,7 +394,7 @@ export const COSMETICS: CosmeticDefinition[] = [
   {
     id: "decoration_alien",
     name: "Alien",
-    description: "Your scouting skills are out of this world.",
+    description: "Bzzorp",
     category: "decoration",
     emoji: "👽",
     cost: 200,
@@ -403,7 +403,7 @@ export const COSMETICS: CosmeticDefinition[] = [
   {
     id: "decoration_ghost",
     name: "Ghost",
-    description: "Invisible on defense, visible in the data.",
+    description: "Bruh the AI description that this replaced was so bad idk what to say for the new one",
     category: "decoration",
     emoji: "👻",
     cost: 100,
@@ -412,7 +412,7 @@ export const COSMETICS: CosmeticDefinition[] = [
   {
     id: "decoration_dragon",
     name: "Dragon",
-    description: "Breathe fire on the competition.",
+    description: "Why is this here",
     category: "decoration",
     emoji: "🐉",
     cost: 1500,
@@ -421,7 +421,7 @@ export const COSMETICS: CosmeticDefinition[] = [
   {
     id: "decoration_shark",
     name: "Shark",
-    description: "Always moving forward.",
+    description: "Why is this here v2",
     category: "decoration",
     emoji: "🦈",
     cost: 1000,
@@ -430,7 +430,7 @@ export const COSMETICS: CosmeticDefinition[] = [
   {
     id: "decoration_eagle",
     name: "Eagle",
-    description: "Eyes on the field at all times.",
+    description: "Why is this here v3",
     category: "decoration",
     emoji: "🦅",
     cost: 850,
@@ -439,7 +439,7 @@ export const COSMETICS: CosmeticDefinition[] = [
   {
     id: "decoration_penguin",
     name: "Penguin",
-    description: "Cool under pressure.",
+    description: "Hey look! It's Ethan's favorite animal (fun fact)",
     category: "decoration",
     emoji: "🐧",
     cost: 150,
@@ -448,7 +448,7 @@ export const COSMETICS: CosmeticDefinition[] = [
   {
     id: "decoration_cat",
     name: "Cat",
-    description: "Nine lives, infinite rematches.",
+    description: "Josh has 4.",
     category: "decoration",
     emoji: "🐱",
     cost: 15,
@@ -457,7 +457,7 @@ export const COSMETICS: CosmeticDefinition[] = [
   {
     id: "decoration_fox",
     name: "Fox",
-    description: "Sly and strategic.",
+    description: "Imagine we were called the iron foxes",
     category: "decoration",
     emoji: "🦊",
     cost: 100,
@@ -466,7 +466,7 @@ export const COSMETICS: CosmeticDefinition[] = [
   {
     id: "decoration_panda",
     name: "Panda",
-    description: "Rare, precious, and surprisingly strong.",
+    description: "Fat",
     category: "decoration",
     emoji: "🐼",
     cost: 150,
@@ -475,7 +475,7 @@ export const COSMETICS: CosmeticDefinition[] = [
   {
     id: "decoration_pizza",
     name: "Pizza",
-    description: "The official fuel of build season.",
+    description: "Don't worry, it's from Pizza My Heart.",
     category: "decoration",
     emoji: "🍕",
     cost: 10,
@@ -484,7 +484,7 @@ export const COSMETICS: CosmeticDefinition[] = [
   {
     id: "decoration_boba",
     name: "Bubble Tea",
-    description: "For the late-night coding sessions.",
+    description: "Ok I can't understand the people that genuinely like T-Pumps it's so bad",
     category: "decoration",
     emoji: "🧋",
     cost: 700,
@@ -493,7 +493,7 @@ export const COSMETICS: CosmeticDefinition[] = [
   {
     id: "decoration_soda",
     name: "Soda",
-    description: "Carbonated motivation.",
+    description: "Can we restock the minifridge pls",
     category: "decoration",
     emoji: "🥤",
     cost: 10,
@@ -502,7 +502,7 @@ export const COSMETICS: CosmeticDefinition[] = [
   {
     id: "decoration_moon",
     name: "Crescent Moon",
-    description: "For those midnight calibration sessions.",
+    description: "I'm the alpha I'm the leader I'm the one to trust (trust)",
     category: "decoration",
     emoji: "🌙",
     cost: 20,
@@ -511,7 +511,7 @@ export const COSMETICS: CosmeticDefinition[] = [
   {
     id: "decoration_sun",
     name: "Sun",
-    description: "Bright ideas only.",
+    description: "My only sunshine, my only sunshine",
     category: "decoration",
     emoji: "☀️",
     cost: 20,
@@ -520,7 +520,7 @@ export const COSMETICS: CosmeticDefinition[] = [
   {
     id: "decoration_volcano",
     name: "Volcano",
-    description: "Big boom lmao.",
+    description: "No one is buying this bro",
     category: "decoration",
     emoji: "🌋",
     cost: 750,
@@ -529,7 +529,7 @@ export const COSMETICS: CosmeticDefinition[] = [
   {
     id: "decoration_crystal_ball",
     name: "Crystal Ball",
-    description: "Predicting match outcomes since 2026.",
+    description: "Why is this so expensive",
     category: "decoration",
     emoji: "🔮",
     cost: 3000,
@@ -538,7 +538,7 @@ export const COSMETICS: CosmeticDefinition[] = [
   {
     id: "decoration_dice",
     name: "Dice",
-    description: "Sometimes alliances are just luck.",
+    description: "Pair of Dice Robotics Nyehehehe",
     category: "decoration",
     emoji: "🎲",
     cost: 20,
@@ -547,7 +547,7 @@ export const COSMETICS: CosmeticDefinition[] = [
   {
     id: "decoration_joystick",
     name: "Joystick",
-    description: "Please don't crash our robot",
+    description: "Kyle likes touching this",
     category: "decoration",
     emoji: "🕹️",
     cost: 900,
@@ -623,6 +623,15 @@ export const COSMETICS: CosmeticDefinition[] = [
     category: "decoration",
     url: "/shop/decoration_rainbow_dance.gif",
     cost: 0,
+    rarity: "legendary",
+  },
+  {
+    id: "decoration_norbert_pat",
+    name: "Norbert Pat",
+    description: "Pat pat pat pat pat",
+    category: "decoration",
+    url: "/shop/decoration_norbert_pat.gif",
+    cost: 8000,
     rarity: "legendary",
   },
 ];
