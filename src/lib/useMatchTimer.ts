@@ -19,22 +19,22 @@ import type { Phase } from "./ScoutingReducer";
 
 export const PHASE_START_TIMES: Record<Phase, number> = {
   "auto": 0,
-  "transition-shift": 23,
-  "phase1": 33,
-  "phase2": 58,
-  "phase3": 83,
-  "phase4": 108,
-  "endgame": 133,
+  "transition-shift": 20,
+  "phase1": 30,
+  "phase2": 55,
+  "phase3": 80,
+  "phase4": 105,
+  "endgame": 130,
 };
 
 export const PHASE_END_TIMES: Record<Phase, number> = {
   "auto": 20,
-  "transition-shift": 33,
-  "phase1": 58,
-  "phase2": 83,
-  "phase3": 108,
-  "phase4": 133,
-  "endgame": 163,
+  "transition-shift": 30,
+  "phase1": 55,
+  "phase2": 80,
+  "phase3": 105,
+  "phase4": 130,
+  "endgame": 160,
 };
 
 export const PHASE_DURATIONS: Record<Phase, number> = {
@@ -58,6 +58,8 @@ export interface MatchTimerState {
   timeRemaining: number;
   /** Whether the timer is currently running */
   isRunning: boolean;
+  /** Whether the timer is paused for the 3-second auto-to-teleop handoff */
+  isTransitionPaused: boolean;
   /** Whether the match has started */
   hasStarted: boolean;
   /** Current phase based on elapsed time */
@@ -83,11 +85,11 @@ export interface MatchTimerState {
  */
 export function getCurrentPhaseFromTime(elapsedTime: number): Phase {
   if (elapsedTime < 20) return "auto";
-  if (elapsedTime < 33) return "transition-shift";
-  if (elapsedTime < 58) return "phase1";
-  if (elapsedTime < 83) return "phase2";
-  if (elapsedTime < 108) return "phase3";
-  if (elapsedTime < 133) return "phase4";
+  if (elapsedTime < 30) return "transition-shift";
+  if (elapsedTime < 55) return "phase1";
+  if (elapsedTime < 80) return "phase2";
+  if (elapsedTime < 105) return "phase3";
+  if (elapsedTime < 130) return "phase4";
   return "endgame";
 }
 
@@ -98,6 +100,7 @@ export function getCurrentPhaseFromTime(elapsedTime: number): Phase {
 export function useMatchTimer(): MatchTimerState {
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
+  const [isTransitionPaused, setIsTransitionPaused] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
   const startTimeRef = useRef<number | null>(null);
   const animationFrameRef = useRef<number | null>(null);
@@ -132,7 +135,7 @@ export function useMatchTimer(): MatchTimerState {
 
   // Main timer loop using requestAnimationFrame for smooth updates
   useEffect(() => {
-    if (!isRunning || elapsedTime >= TOTAL_MATCH_DURATION) {
+    if (!isRunning || isTransitionPaused || elapsedTime >= TOTAL_MATCH_DURATION) {
       return;
     }
 
@@ -147,9 +150,11 @@ export function useMatchTimer(): MatchTimerState {
       if (nextElapsed >= AUTO_END_TIME && elapsedTime < AUTO_END_TIME) {
         setElapsedTime(AUTO_END_TIME);
         setIsRunning(false);
+        setIsTransitionPaused(true);
         clearTransitionPause();
         transitionPauseRef.current = window.setTimeout(() => {
           transitionPauseRef.current = null;
+          setIsTransitionPaused(false);
           setIsRunning(true);
           startTimeRef.current = Date.now() - (AUTO_END_TIME * 1000);
         }, TRANSITION_PAUSE_MS);
@@ -172,11 +177,12 @@ export function useMatchTimer(): MatchTimerState {
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [clearTransitionPause, elapsedTime, isRunning]);
+  }, [clearTransitionPause, elapsedTime, isRunning, isTransitionPaused]);
 
   const startMatch = useCallback(() => {
     setHasStarted(true);
     setIsRunning(true);
+    setIsTransitionPaused(false);
     clearTransitionPause();
     startTimeRef.current = Date.now();
     setElapsedTime(0);
@@ -186,6 +192,7 @@ export function useMatchTimer(): MatchTimerState {
     clearTransitionPause();
     setElapsedTime(0);
     setIsRunning(false);
+    setIsTransitionPaused(false);
     setHasStarted(false);
     startTimeRef.current = null;
     stopAnimation();
@@ -193,14 +200,10 @@ export function useMatchTimer(): MatchTimerState {
 
   const skipToPhase = useCallback((phase: Phase) => {
     clearTransitionPause();
+    setIsTransitionPaused(false);
     stopAnimation();
 
-    let targetTime = PHASE_START_TIMES[phase];
-    if (phase === "auto") {
-      targetTime = 0;
-    } else if (phase === "transition-shift") {
-      targetTime = AUTO_END_TIME;
-    }
+    const targetTime = PHASE_START_TIMES[phase];
 
     setElapsedTime(targetTime);
     startTimeRef.current = Date.now() - (targetTime * 1000);
@@ -222,6 +225,7 @@ export function useMatchTimer(): MatchTimerState {
     elapsedTime,
     timeRemaining,
     isRunning,
+    isTransitionPaused,
     hasStarted,
     currentPhase,
     phaseTimeRemaining,

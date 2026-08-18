@@ -36,6 +36,7 @@ export default function Scouting() {
     currentPhase,
     skipToPhase,
     timeRemaining,
+    isTransitionPaused,
   } = useMatchTimer();
   const { settings } = useSettings();
 
@@ -353,10 +354,10 @@ export default function Scouting() {
       <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{role}</span>
       <div className="ml-auto flex items-center gap-1.5">
         <span className="text-xs text-muted-foreground">Phase</span>
-        <span className={`text-xs font-semibold border px-2 py-0.5 rounded-full tabular-nums ${PHASE_TIMER_STYLES[currentPhase] ?? "bg-primary/10 text-primary border-primary/20"}`}>
+        <span className={`text-xs font-semibold border px-2 py-0.5 rounded-full tabular-nums ${isTransitionPaused ? "animate-pulse border-amber-300 bg-amber-500/20 text-amber-300 shadow-[0_0_0_2px_rgba(251,191,36,0.18)]" : PHASE_TIMER_STYLES[currentPhase] ?? "bg-primary/10 text-primary border-primary/20"}`}>
           {PHASE_LABELS[currentPhase] ?? currentPhase}
         </span>
-        <span className={`text-xs font-semibold border px-2 py-0.5 rounded-full tabular-nums ${PHASE_TIMER_STYLES[currentPhase] ?? "bg-primary/10 text-primary border-primary/20"}`}>
+        <span className={`text-xs font-semibold border px-2 py-0.5 rounded-full tabular-nums ${isTransitionPaused ? "animate-pulse border-amber-300 bg-amber-500/20 text-amber-300 shadow-[0_0_0_2px_rgba(251,191,36,0.18)]" : PHASE_TIMER_STYLES[currentPhase] ?? "bg-primary/10 text-primary border-primary/20"}`}>
           {formatCountdown(hasStarted ? timeRemaining : 160)}
         </span>
         <button
