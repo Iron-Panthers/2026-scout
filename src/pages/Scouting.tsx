@@ -19,9 +19,8 @@ export default function Scouting() {
   const team_number = parseInt(searchParams.get("team_number") || "0");
   const match_type = searchParams.get("match_type") || "qual";
   const isGuest = searchParams.get("g") ?? false;
-  const canDelete = useState(true);
 
-  const { state, set, logEvent, undo, canUndo } = useScoutingReducer(
+  const { state, set, undo, canUndo } = useScoutingReducer(
     match_id || "",
     role || "",
     event_code,
@@ -30,7 +29,14 @@ export default function Scouting() {
     match_type
   );
 
-  const { hasStarted, startMatch: startMatchTimer, resetMatch: resetMatchTimer, currentPhase, skipToPhase } = useMatchTimer();
+  const {
+    hasStarted,
+    startMatch: startMatchTimer,
+    resetMatch: resetMatchTimer,
+    currentPhase,
+    skipToPhase,
+    timeRemaining,
+  } = useMatchTimer();
   const { settings } = useSettings();
 
   const PHASE_LABELS: Record<string, string> = {
@@ -41,6 +47,23 @@ export default function Scouting() {
     phase3: "Shift 3",
     phase4: "Shift 4",
     endgame: "Endgame",
+  };
+
+  const PHASE_TIMER_STYLES: Record<string, string> = {
+    auto: "border-red-500/40 bg-red-500/10 text-red-500",
+    "transition-shift": "border-orange-500/40 bg-orange-500/10 text-orange-500",
+    phase1: "border-yellow-400/40 bg-yellow-400/10 text-yellow-400",
+    phase2: "border-green-500/40 bg-green-500/10 text-green-500",
+    phase3: "border-blue-500/40 bg-blue-500/10 text-blue-500",
+    phase4: "border-violet-500/40 bg-violet-500/10 text-violet-500",
+    endgame: "border-violet-500/40 bg-violet-500/10 text-violet-500",
+  };
+
+  const formatCountdown = (seconds: number) => {
+    const totalSeconds = Math.max(0, Math.ceil(seconds));
+    const minutes = Math.floor(totalSeconds / 60);
+    const remainingSeconds = totalSeconds % 60;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
   };
 
   const startMatch = () => {
@@ -97,8 +120,10 @@ export default function Scouting() {
     if (frame !== 2) return;
     const container = imgContainerRef.current;
     if (!container) return;
-    updateImgBounds();
-    const ro = new ResizeObserver(updateImgBounds);
+
+    const scheduleUpdate = () => updateImgBounds();
+    scheduleUpdate();
+    const ro = new ResizeObserver(scheduleUpdate);
     ro.observe(container);
     return () => ro.disconnect();
   }, [frame, updateImgBounds]);
@@ -172,12 +197,12 @@ export default function Scouting() {
   };
 
   // Keep a stable ref so the keydown handler always has the latest values
-  const keybindActionsRef = useRef({ addShots, logEvent, settings, frame });
-  useEffect(() => { keybindActionsRef.current = { addShots, logEvent, settings, frame }; });
+  const keybindActionsRef = useRef({ addShots, settings, frame });
+  useEffect(() => { keybindActionsRef.current = { addShots, settings, frame }; });
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      const { addShots, logEvent, settings, frame } = keybindActionsRef.current;
+      const { addShots, settings, frame } = keybindActionsRef.current;
       if (frame !== 1) return;
       const key = e.key.toLowerCase();
       if (key === (settings["kb-add1"] ?? "z")) { e.preventDefault(); addShots(1); }
@@ -328,8 +353,11 @@ export default function Scouting() {
       <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{role}</span>
       <div className="ml-auto flex items-center gap-1.5">
         <span className="text-xs text-muted-foreground">Phase</span>
-        <span className="text-xs font-semibold bg-primary/10 text-primary px-2 py-0.5 rounded-full tabular-nums">
+        <span className={`text-xs font-semibold border px-2 py-0.5 rounded-full tabular-nums ${PHASE_TIMER_STYLES[currentPhase] ?? "bg-primary/10 text-primary border-primary/20"}`}>
           {PHASE_LABELS[currentPhase] ?? currentPhase}
+        </span>
+        <span className={`text-xs font-semibold border px-2 py-0.5 rounded-full tabular-nums ${PHASE_TIMER_STYLES[currentPhase] ?? "bg-primary/10 text-primary border-primary/20"}`}>
+          {formatCountdown(hasStarted ? timeRemaining : 160)}
         </span>
         <button
           className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-muted active:bg-muted/80 transition-colors text-muted-foreground ml-1"
