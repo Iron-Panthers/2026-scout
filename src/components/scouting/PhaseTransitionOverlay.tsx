@@ -39,7 +39,7 @@ export default function PhaseTransitionOverlay({
           SWITCH TO
         </p>
         <p
-          className="text-4xl sm:text-5xl font-black tracking-wider text-yellow-300 mt-1 drop-shadow-lg"
+          className="text-4xl sm:text-5xl font-black tracking-wider text-orange-300 mt-1 drop-shadow-lg"
           style={{
             textShadow:
               "0 0 20px rgba(0,0,0,0.8), 0 0 40px rgba(234,179,8,0.5), 2px 2px 4px rgba(0,0,0,0.9)",
