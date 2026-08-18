@@ -72,7 +72,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Don't worry, you'll get this someday.",
     category: "hat",
     emoji: "🎓",
-    cost: 400,
+    cost: 100,
     rarity: "uncommon",
   },
   {
@@ -108,7 +108,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Feeling quite jolly today, eh?",
     category: "hat",
     emoji: "🎅",
-    cost: 500,
+    cost: 750,
     rarity: "rare",
   },
   {
@@ -117,7 +117,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "WHAT!!11!1!!!1",
     category: "hat",
     emoji: "‼",
-    cost: 650,
+    cost: 750,
     rarity: "rare",
   },
   {
@@ -126,7 +126,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "WHAT!?!?!???",
     category: "hat",
     emoji: "⁉",
-    cost: 8000,
+    cost: 10000,
     rarity: "legendary",
   },
   {
@@ -135,7 +135,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "huh?",
     category: "hat",
     emoji: "❓",
-    cost: 150,
+    cost: 100,
     rarity: "uncommon",
   },
   {
@@ -153,7 +153,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Maybe one day you'll grow a flower",
     category: "hat",
     emoji: "🌱",
-    cost: 40,
+    cost: 15,
     rarity: "common",
   },
   {
@@ -162,7 +162,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "A little wet",
     category: "hat",
     emoji: "🌧",
-    cost: 300,
+    cost: 100,
     rarity: "uncommon",
   },
   {
@@ -171,7 +171,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Very cute",
     category: "hat",
     emoji: "🎀",
-    cost: 30,
+    cost: 15,
     rarity: "common",
   },
   {
@@ -180,7 +180,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Mr. Roosevelt himself",
     category: "hat",
     emoji: "🧸",
-    cost: 850,
+    cost: 750,
     rarity: "rare",
   },
   {
@@ -189,7 +189,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Your standard billed cap",
     category: "hat",
     emoji: "🧢",
-    cost: 50,
+    cost: 15,
     rarity: "common",
   },
   {
@@ -198,7 +198,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "For those that like wearing books on their head",
     category: "hat",
     emoji: "📚",
-    cost: 600,
+    cost: 750,
     rarity: "rare",
   },
   {
@@ -217,7 +217,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Wowwww so pretty",
     category: "decoration",
     emoji: "🌸",
-    cost: 10,
+    cost: 15,
     rarity: "common",
   },
   {
@@ -235,7 +235,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Wowwww so prickly",
     category: "decoration",
     emoji: "🌵",
-    cost: 20,
+    cost: 15,
     rarity: "common",
   },
   {
@@ -244,7 +244,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Wowwww so... potted?",
     category: "decoration",
     emoji: "🪴",
-    cost: 40,
+    cost: 15,
     rarity: "common",
   },
   {
@@ -253,7 +253,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Wowwww so poisonous",
     category: "decoration",
     emoji: "🍄",
-    cost: 200,
+    cost: 100,
     rarity: "uncommon",
   },
   {
@@ -262,7 +262,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Wowwww so lucky",
     category: "decoration",
     emoji: "🍀",
-    cost: 500,
+    cost: 750,
     rarity: "rare",
   },
   {
@@ -280,7 +280,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Sunshine, lollipops and rainbows everything that's wonderful is what I feel when we're together",
     category: "decoration",
     emoji: "🌈",
-    cost: 250,
+    cost: 100,
     rarity: "uncommon",
   },
   {
@@ -289,7 +289,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Remember that robot on Hopper Division lol",
     category: "decoration",
     emoji: "🔥",
-    cost: 500,
+    cost: 100,
     rarity: "uncommon",
   },
   {
@@ -298,7 +298,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Brrrr",
     category: "decoration",
     emoji: "❄️",
-    cost: 20,
+    cost: 15,
     rarity: "common",
   },
   {
@@ -307,7 +307,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Bzzzz",
     category: "decoration",
     emoji: "⚡",
-    cost: 400,
+    cost: 100,
     rarity: "uncommon",
   },
   {
@@ -325,7 +325,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Broww",
     category: "decoration",
     emoji: "☄️",
-    cost: 1000,
+    cost: 750,
     rarity: "rare",
   },
   {
@@ -352,7 +352,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "I mean, this is robotics",
     category: "decoration",
     emoji: "🤖",
-    cost: 600,
+    cost: 750,
     rarity: "rare",
   },
   {
@@ -361,7 +361,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "RATCHET WRENCH???",
     category: "decoration",
     emoji: "🔧",
-    cost: 20,
+    cost: 15,
     rarity: "common",
   },
   {
@@ -370,7 +370,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Gang I think the gear melted",
     category: "decoration",
     emoji: "⚙️",
-    cost: 20,
+    cost: 15,
     rarity: "common",
   },
   {
@@ -379,7 +379,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Petition to add magnet climb on our robot",
     category: "decoration",
     emoji: "🧲",
-    cost: 150,
+    cost: 100,
     rarity: "uncommon",
   },
   {
@@ -388,7 +388,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Our wifi at worlds be like",
     category: "decoration",
     emoji: "🛰️",
-    cost: 800,
+    cost: 750,
     rarity: "rare",
   },
   {
@@ -397,7 +397,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Bzzorp",
     category: "decoration",
     emoji: "👽",
-    cost: 200,
+    cost: 100,
     rarity: "uncommon",
   },
   {
@@ -415,7 +415,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Why is this here",
     category: "decoration",
     emoji: "🐉",
-    cost: 1500,
+    cost: 2000,
     rarity: "ultra-rare",
   },
   {
@@ -424,7 +424,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Why is this here v2",
     category: "decoration",
     emoji: "🦈",
-    cost: 1000,
+    cost: 750,
     rarity: "rare",
   },
   {
@@ -433,7 +433,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Why is this here v3",
     category: "decoration",
     emoji: "🦅",
-    cost: 850,
+    cost: 750,
     rarity: "rare",
   },
   {
@@ -442,7 +442,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Hey look! It's Ethan's favorite animal (fun fact)",
     category: "decoration",
     emoji: "🐧",
-    cost: 150,
+    cost: 100,
     rarity: "uncommon",
   },
   {
@@ -469,7 +469,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Fat",
     category: "decoration",
     emoji: "🐼",
-    cost: 150,
+    cost: 100,
     rarity: "uncommon",
   },
   {
@@ -478,7 +478,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Don't worry, it's from Pizza My Heart.",
     category: "decoration",
     emoji: "🍕",
-    cost: 10,
+    cost: 15,
     rarity: "common",
   },
   {
@@ -487,7 +487,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Ok I can't understand the people that genuinely like T-Pumps it's so bad",
     category: "decoration",
     emoji: "🧋",
-    cost: 700,
+    cost: 750,
     rarity: "rare",
   },
   {
@@ -496,7 +496,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Can we restock the minifridge pls",
     category: "decoration",
     emoji: "🥤",
-    cost: 10,
+    cost: 15,
     rarity: "common",
   },
   {
@@ -505,7 +505,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "I'm the alpha I'm the leader I'm the one to trust (trust)",
     category: "decoration",
     emoji: "🌙",
-    cost: 20,
+    cost: 15,
     rarity: "common",
   },
   {
@@ -514,7 +514,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "My only sunshine, my only sunshine",
     category: "decoration",
     emoji: "☀️",
-    cost: 20,
+    cost: 15,
     rarity: "common",
   },
   {
@@ -532,7 +532,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Why is this so expensive",
     category: "decoration",
     emoji: "🔮",
-    cost: 3000,
+    cost: 2000,
     rarity: "ultra-rare",
   },
   {
@@ -541,7 +541,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Pair of Dice Robotics Nyehehehe",
     category: "decoration",
     emoji: "🎲",
-    cost: 20,
+    cost: 100,
     rarity: "uncommon",
   },
   {
@@ -550,7 +550,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Kyle likes touching this",
     category: "decoration",
     emoji: "🕹️",
-    cost: 900,
+    cost: 750,
     rarity: "rare",
   },
   {
@@ -559,7 +559,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Bros just yapping",
     category: "decoration",
     emoji: "🗣",
-    cost: 350,
+    cost: 100,
     rarity: "uncommon",
   },
   {
@@ -568,7 +568,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "It's all your fault",
     category: "decoration",
     emoji: "🫵",
-    cost: 30,
+    cost: 15,
     rarity: "common",
   },
   {
@@ -577,7 +577,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "I can see you 👁️👁️",
     category: "decoration",
     emoji: "👀",
-    cost: 400,
+    cost: 100,
     rarity: "uncommon",
   },
   {
@@ -586,7 +586,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Grrrrrr....",
     category: "decoration",
     emoji: "🤬",
-    cost: 650,
+    cost: 750,
     rarity: "rare",
   },
   {
@@ -595,7 +595,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Rain approved",
     category: "decoration",
     url: "/shop/decoration_cc_rain.png",
-    cost: 4000,
+    cost: 2000,
     rarity: "ultra-rare",
   },
   {
@@ -613,7 +613,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "A little excited to scout",
     category: "decoration",
     url: "/shop/decoration_rainbow_parrot.gif",
-    cost: 8000,
+    cost: 10000,
     rarity: "legendary",
   },
   {
@@ -631,7 +631,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Pat pat pat pat pat",
     category: "decoration",
     url: "/shop/decoration_norbert_pat.gif",
-    cost: 8000,
+    cost: 10000,
     rarity: "legendary",
   },
 ];
