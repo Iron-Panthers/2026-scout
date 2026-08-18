@@ -47,11 +47,15 @@ export const PHASE_DURATIONS: Record<Phase, number> = {
   "endgame": 30,
 };
 
-export const TOTAL_MATCH_DURATION = 163; // seconds
+export const TOTAL_MATCH_DURATION = 160; // seconds; display countdown starts at 2:40
+const AUTO_END_TIME = 20;
+const TRANSITION_PAUSE_MS = 3000;
 
 export interface MatchTimerState {
   /** Total elapsed time in the match (0-160 seconds) */
   elapsedTime: number;
+  /** Remaining time on the countdown clock */
+  timeRemaining: number;
   /** Whether the timer is currently running */
   isRunning: boolean;
   /** Whether the match has started */
@@ -97,26 +101,38 @@ export function useMatchTimer(): MatchTimerState {
   const [hasStarted, setHasStarted] = useState(false);
   const startTimeRef = useRef<number | null>(null);
   const animationFrameRef = useRef<number | null>(null);
+  const transitionPauseRef = useRef<number | null>(null);
+
+  const clearTransitionPause = useCallback(() => {
+    if (transitionPauseRef.current !== null) {
+      window.clearTimeout(transitionPauseRef.current);
+      transitionPauseRef.current = null;
+    }
+  }, []);
+
+  const stopAnimation = useCallback(() => {
+    if (animationFrameRef.current !== null) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+  }, []);
 
   // Calculate current phase based on elapsed time
   const currentPhase = getCurrentPhaseFromTime(elapsedTime);
 
   // Calculate phase-specific time values
   const phaseStartTime = PHASE_START_TIMES[currentPhase];
-  const phaseEndTime = PHASE_END_TIMES[currentPhase];
   const phaseDuration = PHASE_DURATIONS[currentPhase];
 
   // Time elapsed within the current phase
   const phaseElapsedTime = Math.max(0, Math.min(elapsedTime - phaseStartTime, phaseDuration));
   const phaseTimeRemaining = Math.max(0, phaseDuration - phaseElapsedTime);
   const phaseProgress = phaseDuration > 0 ? phaseElapsedTime / phaseDuration : 0;
+  const timeRemaining = Math.max(0, TOTAL_MATCH_DURATION - elapsedTime);
 
   // Main timer loop using requestAnimationFrame for smooth updates
   useEffect(() => {
     if (!isRunning || elapsedTime >= TOTAL_MATCH_DURATION) {
-      if (elapsedTime >= TOTAL_MATCH_DURATION) {
-        setIsRunning(false);
-      }
       return;
     }
 
@@ -126,13 +142,25 @@ export function useMatchTimer(): MatchTimerState {
       }
 
       const now = Date.now();
-      const elapsed = (now - startTimeRef.current) / 1000;
+      const nextElapsed = (now - startTimeRef.current) / 1000;
 
-      if (elapsed >= TOTAL_MATCH_DURATION) {
+      if (nextElapsed >= AUTO_END_TIME && elapsedTime < AUTO_END_TIME) {
+        setElapsedTime(AUTO_END_TIME);
+        setIsRunning(false);
+        clearTransitionPause();
+        transitionPauseRef.current = window.setTimeout(() => {
+          transitionPauseRef.current = null;
+          setIsRunning(true);
+          startTimeRef.current = Date.now() - (AUTO_END_TIME * 1000);
+        }, TRANSITION_PAUSE_MS);
+        return;
+      }
+
+      if (nextElapsed >= TOTAL_MATCH_DURATION) {
         setElapsedTime(TOTAL_MATCH_DURATION);
         setIsRunning(false);
       } else {
-        setElapsedTime(elapsed);
+        setElapsedTime(nextElapsed);
         animationFrameRef.current = requestAnimationFrame(updateTimer);
       }
     };
@@ -144,50 +172,55 @@ export function useMatchTimer(): MatchTimerState {
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [isRunning, elapsedTime]);
+  }, [clearTransitionPause, elapsedTime, isRunning]);
 
   const startMatch = useCallback(() => {
     setHasStarted(true);
     setIsRunning(true);
+    clearTransitionPause();
     startTimeRef.current = Date.now();
     setElapsedTime(0);
-  }, []);
+  }, [clearTransitionPause]);
 
   const resetMatch = useCallback(() => {
+    clearTransitionPause();
     setElapsedTime(0);
     setIsRunning(false);
     setHasStarted(false);
     startTimeRef.current = null;
-    if (animationFrameRef.current !== null) {
-      cancelAnimationFrame(animationFrameRef.current);
-      animationFrameRef.current = null;
-    }
-  }, []);
+    stopAnimation();
+  }, [clearTransitionPause, stopAnimation]);
 
   const skipToPhase = useCallback((phase: Phase) => {
-    const targetTime = PHASE_START_TIMES[phase];
+    clearTransitionPause();
+    stopAnimation();
 
-    // Cancel any existing animation frame
-    if (animationFrameRef.current !== null) {
-      cancelAnimationFrame(animationFrameRef.current);
-      animationFrameRef.current = null;
+    let targetTime = PHASE_START_TIMES[phase];
+    if (phase === "auto") {
+      targetTime = 0;
+    } else if (phase === "transition-shift") {
+      targetTime = AUTO_END_TIME;
     }
 
-    // Set the new time and start reference
     setElapsedTime(targetTime);
     startTimeRef.current = Date.now() - (targetTime * 1000);
 
-    // Ensure timer is running
     if (!hasStarted) {
       setHasStarted(true);
     }
-    if (!isRunning) {
-      setIsRunning(true);
-    }
-  }, [hasStarted, isRunning]);
+    setIsRunning(true);
+  }, [clearTransitionPause, hasStarted, stopAnimation]);
+
+  useEffect(() => {
+    return () => {
+      clearTransitionPause();
+      stopAnimation();
+    };
+  }, [clearTransitionPause, stopAnimation]);
 
   return {
     elapsedTime,
+    timeRemaining,
     isRunning,
     hasStarted,
     currentPhase,

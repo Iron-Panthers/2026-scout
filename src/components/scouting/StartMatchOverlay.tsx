@@ -58,8 +58,7 @@ export default function StartMatchOverlay({
             Wait for the match to begin
           </p>
           <p className="text-[10px] text-muted-foreground leading-tight">
-            Press the button below as soon as the match starts. The timer will
-            run continuously through all phases.
+            Press the button below as soon as the match starts. The countdown starts at 2:40 and pauses for 3 seconds after auto.
           </p>
         </div>
 
