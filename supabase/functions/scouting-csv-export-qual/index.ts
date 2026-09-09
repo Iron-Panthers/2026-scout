@@ -55,16 +55,10 @@ Deno.serve(async (req: Request) => {
           d.match_type || '',
           t1,
           sd.rankings ? sd.rankings.indexOf(parseInt(t1)) + 1 : '',
-          sd.teamOptions?.[t1]?.outpostFed ?? '',
-          sd.teamOptions?.[t1]?.passed ?? '',
           t2,
           sd.rankings ? sd.rankings.indexOf(parseInt(t2)) + 1 : '',
-          sd.teamOptions?.[t2]?.outpostFed ?? '',
-          sd.teamOptions?.[t2]?.passed ?? '',
           t3,
           sd.rankings ? sd.rankings.indexOf(parseInt(t3)) + 1 : '',
-          sd.teamOptions?.[t3]?.outpostFed ?? '',
-          sd.teamOptions?.[t3]?.passed ?? '',
         ];
         rows.push(row);
       } catch (err: any) {
