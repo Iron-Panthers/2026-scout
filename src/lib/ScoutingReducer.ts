@@ -47,7 +47,6 @@ export interface QualScoutingData {
   team2: number; // Second team in alliance (TBA position order)
   team3: number; // Third team in alliance (TBA position order)
   rankings: number[]; // team numbers ordered best→worst
-  teamOptions: Record<string, { outpostFed: boolean; passed: boolean, autoCenter: number }>;
   commentsTeam1: string;
   commentsTeam2: string;
   commentsTeam3: string;
@@ -146,10 +145,6 @@ export class ScoutingReducer<T extends Record<string, any> = ScoutingData> {
     match_number: number,
     teamNumbers: number[]
   ): QualScoutingData {
-    const teamOptions: Record<string, { outpostFed: boolean; passed: boolean, autoCenter: number }> = {};
-    teamNumbers.forEach((n) => {
-      teamOptions[String(n)] = { outpostFed: false, passed: false, autoCenter: -1 };
-    });
     return {
       matchId,
       role,
@@ -160,7 +155,6 @@ export class ScoutingReducer<T extends Record<string, any> = ScoutingData> {
       team2: teamNumbers[1] ?? 0,
       team3: teamNumbers[2] ?? 0,
       rankings: teamNumbers,
-      teamOptions,
       comments: "",
     };
   }
