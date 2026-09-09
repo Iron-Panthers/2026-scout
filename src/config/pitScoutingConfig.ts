@@ -70,13 +70,6 @@ export const pitScoutingQuestions: PitScoutingQuestion[] = [
     ],
   },
   {
-    id: "outpost-interaction",
-    type: "text",
-    label: "How comfortable are your drivers with pushing fuel into the outpost?",
-    required: true,
-    placeholder: "e.g., Very comfortable, Somewhat comfortable, Not comfortable",
-  },
-  {
     id: "terrain-capability",
     type: "checkbox",
     label: "Which field elements can you go through?",
@@ -84,7 +77,6 @@ export const pitScoutingQuestions: PitScoutingQuestion[] = [
     options: [
       "Can go over bump",
       "Can go under trench",
-      "Cannot do either"
     ],
   },
 
