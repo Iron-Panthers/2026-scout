@@ -32,7 +32,6 @@ export default function QualScouting() {
   const manualTeam2 = parseInt(searchParams.get("team2") || "0");
   const manualTeam3 = parseInt(searchParams.get("team3") || "0");
   const hasManualTeams = manualTeam1 > 0 || manualTeam2 > 0 || manualTeam3 > 0;
-  const centerAutoTime = useState<(number | null)[]>([null, null, null]);
 
   const alliance = role === "qualRed" ? "red" : "blue";
 
@@ -240,11 +239,6 @@ export default function QualScouting() {
                   translateY = ROW_SLOT;
                 }
               }
-              const opts = state.teamOptions[String(teamNum)] ?? {
-                outpostFed: false,
-                passed: false,
-                autoCenter: 0
-              };
 
               return (
                 <div
