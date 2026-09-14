@@ -10,7 +10,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { CalendarIcon, Save, Star, Trash2 } from "lucide-react";
+import { CalendarIcon, Save, Star, Trash2, PlusCircle } from "lucide-react";
 import { format, set } from "date-fns";
 import { updateEvent, setActiveEvent } from "@/lib/matches";
 import { supabase } from "@/lib/supabase";
@@ -216,6 +216,7 @@ export function EventInformationTab({
 
   const handleDeleteClick = async (profile) => {
     const event = events.find(e => e.id === selectedEvent);
+    if (!event) return;
     event.users = event.users.filter(u => u !== profile.id);
     setIsLoading(true);
     await updateEvent(event?.id, { users: event.users });

@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -44,6 +45,7 @@ import { ScoutAssignmentDialog } from "@/components/manager/ScoutAssignmentDialo
 import { RosterManagementTab } from "@/components/manager/RosterManagementTab";
 import { PitScoutingAssignmentsTab } from "@/components/manager/PitScoutingAssignmentsTab";
 import { ScoutingDataTab } from "@/components/manager/ScoutingDataTab";
+import CosmeticAvatar from "@/components/CosmeticAvatar";
 import { useToast } from "@/hooks/use-toast";
 import { awardPoints } from "@/lib/gameProfiles";
 import { getEquippedCosmeticsMap, getPointsMap } from "@/lib/shopService";
@@ -127,9 +129,9 @@ export default function ManagerDashboard() {
   const [refreshing, setRefreshing] = useState(false);
 
   // Award points state
-  const [awardTargetId, setAwardTargetId] = useState<string>("");
+  const [selectedPointScoutId, setSelectedPointScoutId] = useState<string>("");
+  const [pointScoutSearch, setPointScoutSearch] = useState("");
   const [awardAmount, setAwardAmount] = useState<string>("");
-  const [awardLoading, setAwardLoading] = useState(false);
   const [awardSetLoading, setAwardSetLoading] = useState(false);
 
   // Helper function to convert database match to assignment format
@@ -162,7 +164,6 @@ export default function ManagerDashboard() {
                 .toUpperCase()
                 .slice(0, 2),
               avatar: profile.avatar_url || "",
-              registered: true
             };
           }
           else if (backupProfile) {
@@ -176,7 +177,6 @@ export default function ManagerDashboard() {
                 .toUpperCase()
                 .slice(0, 2),
               avatar: backupProfile.avatar_url || "",
-              registered: false
             };
           }
         }
@@ -219,13 +219,14 @@ export default function ManagerDashboard() {
         }
 
         setSelectedEvent(temp);
-        const newScouts = eventsData.find(e => e.id === temp)?.users.map(u => profilesArray.find(scout => scout.id === u)).filter(u => u !== undefined); 
-        setAvailableScouts([...new Map(newScouts.map(u => [u.id, u])).values()]); 
+        const newScouts = (eventsData.find((event) => event.id === temp)?.users ?? [])
+          .map((userId) => profilesArray.find((scout) => scout.id === userId))
+          .filter((scout): scout is Profile => scout !== undefined);
+        setAvailableScouts([...new Map(newScouts.map((scout) => [scout.id, scout])).values()]);
         // console.log("skdfhdfhsjkdf", eventsData, profilesArray)
       }
       else if (selectedEvent !== "all") {
         // console.log("reloaded");
-        var temp = "";
         // if (eventsData.filter((a) => a.is_active).length > 0) {
         //   // setSelectedEvent(eventsData.filter((a) => a.is_active)[0].id);
         //   temp = eventsData.filter((a) => a.is_active)[0].id;
@@ -233,8 +234,10 @@ export default function ManagerDashboard() {
         //   // setSelectedEvent(eventsData[0].id);
         //   temp = eventsData[0].id;
         // }
-        const newScouts = eventsData.find(e => e.id === selectedEvent)?.users.map(u => profilesArray.find(scout => scout.id === u)).filter(u => u !== undefined); 
-        setAvailableScouts([...new Map(newScouts.map(u => [u.id, u])).values()]); 
+        const newScouts = (eventsData.find((event) => event.id === selectedEvent)?.users ?? [])
+          .map((userId) => profilesArray.find((scout) => scout.id === userId))
+          .filter((scout): scout is Profile => scout !== undefined);
+        setAvailableScouts([...new Map(newScouts.map((scout) => [scout.id, scout])).values()]);
         // setAvailableScouts(eventsData.find(e => e.id === temp)?.users.map(u => profilesArray.find(scout => scout.id === u)));
       }
     } catch (error) {
@@ -348,12 +351,13 @@ export default function ManagerDashboard() {
         .select("match_id, role, scouter_id")
         .in("match_id", matchIds);
 
-      const { data: qualSubmissions, qualError } = await supabase
+      const { data: qualSubmissions, error: qualError } = await supabase
         .from("qual_scouting_submissions")
         .select("match_id, role, scouter_id")
         .in("match_id", matchIds);
 
       if (error) throw error;
+      if (qualError) throw qualError;
 
       // Create Set of "matchId:role" strings for quick lookup
       const completedSet = new Set(
@@ -827,7 +831,7 @@ export default function ManagerDashboard() {
                     )}
                   </SelectValue>
                 </SelectTrigger>
-                <SelectContent ref={mobileTabMenuRef}>
+                <SelectContent ref={mobileTabMenuRef} position="popper" align="start">
                   <SelectItem value="assignments">
                     <div className="flex items-center gap-2">
                       <Users className="h-4 w-4" />
@@ -911,10 +915,14 @@ export default function ManagerDashboard() {
 
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">Event:</span>
-              <Select value={selectedEvent} onValueChange={(v) => { setSelectedEvent(v); 
-                  const newScouts = events.find(e => e.id === v)?.users.map(u => allScouts.find(scout => scout.id === u)).filter(u => u !== undefined); 
-                  setAvailableScouts([...new Map(newScouts.map(u => [u.id, u])).values()]); 
-                  // console.log(v, [...new Map(newScouts.map(u => [u.id, u])).values()], events, selectedEvent, allScouts); 
+              <Select value={selectedEvent} onValueChange={(v) => {
+                  setSelectedEvent(v);
+                  const eventUsers = v === "all"
+                    ? allScouts
+                    : (events.find((event) => event.id === v)?.users ?? [])
+                        .map((userId) => allScouts.find((scout) => scout.id === userId))
+                        .filter((scout): scout is Profile => scout !== undefined);
+                  setAvailableScouts([...new Map(eventUsers.map((scout) => [scout.id, scout])).values()]);
                 }}>
                 <SelectTrigger className="w-[200px]">
                   <SelectValue placeholder="Select event" />
@@ -1132,41 +1140,75 @@ export default function ManagerDashboard() {
 
           {/* Points Economy Tab */}
           <TabsContent value="points" className="mt-0">
-            <div className="max-w-md space-y-4">
+            <div className="max-w-2xl space-y-4">
               <div>
-                <h2 className="text-lg font-semibold">Add Points</h2>
+                <h2 className="text-lg font-semibold">Set Points</h2>
                 <p className="text-sm text-muted-foreground">
-                  Give or take away points from scouts.
+                  Select a scouter and set their point balance.
                 </p>
               </div>
 
               <div className="space-y-3">
-                {/* Scout selector */}
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Scout</label>
-                  <Select value={awardTargetId} onValueChange={setAwardTargetId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a scout" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableScouts.sort((a,b) => a.name?.localeCompare(b.name)).map((availableScout) => (
-                        <SelectItem key={availableScout.id} value={availableScout.id}>
-                          {availableScout.name || availableScout.id} <strong>({pointsMap[availableScout.id]}pts)</strong>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <label className="text-sm font-medium">Scouts</label>
+                <Input
+                  value={pointScoutSearch}
+                  onChange={(event) => setPointScoutSearch(event.target.value)}
+                  placeholder="Search scouts..."
+                  aria-label="Search scouts"
+                />
+                <div className="grid max-h-[45vh] grid-cols-1 gap-3 overflow-y-auto sm:grid-cols-2">
+                  {[...availableScouts]
+                    .filter((scout) => `${scout.name || ""} ${scout.role}`.toLowerCase().includes(pointScoutSearch.trim().toLowerCase()))
+                    .sort((a, b) => (a.name || "").localeCompare(b.name || ""))
+                    .map((scout) => {
+                      const initials = (scout.name || "U")
+                        .split(" ")
+                        .map((part) => part[0])
+                        .join("")
+                        .toUpperCase()
+                        .slice(0, 2);
+                      const selected = selectedPointScoutId === scout.id;
+
+                      return (
+                        <label
+                          key={scout.id}
+                          className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors ${
+                            selected ? "border-primary bg-primary/10" : "border-border hover:bg-accent/50"
+                          }`}
+                        >
+                          <Checkbox
+                            checked={selected}
+                            className="rounded-full"
+                            onCheckedChange={() => setSelectedPointScoutId(selected ? "" : scout.id)}
+                            disabled={awardSetLoading}
+                            aria-label={`Select ${scout.name || "scout"}`}
+                          />
+                          <CosmeticAvatar
+                            initials={initials}
+                            avatarUrl={scout.avatar_url}
+                            equippedCosmetics={cosmeticsMap[scout.id]}
+                          />
+                          <div className="min-w-0">
+                            <p className="truncate font-medium">{scout.name || "Unknown"}</p>
+                            <p className="text-sm capitalize text-muted-foreground">
+                              {scout.role} · {pointsMap[scout.id] ?? 0} pts
+                            </p>
+                          </div>
+                        </label>
+                      );
+                    })}
                 </div>
 
                 {/* Amount input */}
                 <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Add Points</label>
+                  <label className="text-sm font-medium">Point balance</label>
                   <div className="flex items-center gap-2">
                     <Coins className="w-4 h-4 text-yellow-500 shrink-0" />
                     <input
                       type="number"
-                      min="1"
-                      placeholder="e.g. 50, -10"
+                      min="0"
+                      step="1"
+                      placeholder="e.g. 50"
                       value={awardAmount}
                       onChange={(e) => setAwardAmount(e.target.value)}
                       className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
@@ -1175,57 +1217,36 @@ export default function ManagerDashboard() {
                 </div>
 
                 <Button
-                  className="mr-1"
-                  disabled={!awardTargetId || !awardAmount || awardLoading || awardSetLoading}
+                  disabled={!selectedPointScoutId || !awardAmount || awardSetLoading}
                   onClick={async () => {
-                    if (!awardTargetId || !awardAmount) return;
-                    setAwardLoading(true);
-                    const result = await awardPoints(awardTargetId, Number(awardAmount));
-                    setAwardLoading(false);
-                    if (result.success) {
-                      const scout = availableScouts.find((s) => s.id === awardTargetId);
-                      toast({
-                        title: "Points awarded",
-                        description: `${awardAmount} points awarded to ${scout?.name ?? "scout"}.`,
-                      });
-                      setAwardAmount("");
-                      pointsMap[awardTargetId] += Number(awardAmount);
-                      setPointsMap(pointsMap);
-                    } else {
-                      toast({
-                        title: "Failed to award points",
-                        description: result.error ?? "Unknown error.",
-                        variant: "destructive",
-                      });
-                    }
-                  }}
-                >
-                  {awardLoading ? "Modifying..." : "Modify Points"}
-                </Button>
-                <Button
-                  disabled={!awardTargetId || !awardAmount || awardLoading || awardSetLoading}
-                  onClick={async () => {
-                    if (!awardTargetId || !awardAmount) return;
+                    if (!selectedPointScoutId || !awardAmount) return;
                     setAwardSetLoading(true);
-                    const result = await awardPoints(awardTargetId, Number(awardAmount) - pointsMap[awardTargetId]);
-                    setAwardSetLoading(false);
-                    if (result.success) {
-                      const scout = availableScouts.find((s) => s.id === awardTargetId);
-                      toast({
-                        title: "Points sett",
-                        description: `Set ${scout?.name ?? "scout"}'s points to ${awardAmount}.`,
-                      });
-                      setAwardAmount("");
-                      pointsMap[awardTargetId] = Number(awardAmount);
-                      setPointsMap(pointsMap);
-                      // setAwardTargetId("");
-                    } else {
+                    const targetPoints = Number(awardAmount);
+                    const result = await awardPoints(
+                      selectedPointScoutId,
+                      targetPoints - (pointsMap[selectedPointScoutId] ?? 0)
+                    );
+                    if (!result.success) {
                       toast({
                         title: "Failed to set points",
                         description: result.error ?? "Unknown error.",
                         variant: "destructive",
                       });
+                    } else {
+                      setPointsMap((current) => {
+                        const next = { ...current };
+                        next[selectedPointScoutId] = targetPoints;
+                        return next;
+                      });
+                      const scout = availableScouts.find((item) => item.id === selectedPointScoutId);
+                      toast({
+                        title: "Points set",
+                        description: `Set ${scout?.name ?? "scout"}'s points to ${targetPoints}.`,
+                      });
+                      setAwardAmount("");
+                      setSelectedPointScoutId("");
                     }
+                    setAwardSetLoading(false);
                   }}
                 >
                   {awardSetLoading ? "Setting..." : "Set Points"}

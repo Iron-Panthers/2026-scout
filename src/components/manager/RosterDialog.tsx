@@ -72,6 +72,10 @@ export function RosterDialog({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showSaveFromMatch, setShowSaveFromMatch] = useState(false);
+  const [scoutSearches, setScoutSearches] = useState<Partial<Record<Role, string>>>({});
+
+  const getScoutName = (scoutId: string | null | undefined) =>
+    availableScouts.find((scout) => scout.id === scoutId)?.name || "";
 
   // Initialize form when roster changes
   useEffect(() => {
@@ -86,10 +90,16 @@ export function RosterDialog({
         rosterAssignments[role] = (roster[column] as string) || null;
       });
       setAssignments(rosterAssignments);
+      setScoutSearches(
+        Object.fromEntries(
+          roles.map((role) => [role, getScoutName(rosterAssignments[role])])
+        )
+      );
     } else {
       setName("");
       setDescription("");
       setAssignments({});
+      setScoutSearches({});
     }
     setError(null);
     setShowSaveFromMatch(false);
@@ -105,7 +115,20 @@ export function RosterDialog({
       newAssignments[role] = scout?.id || null;
     });
     setAssignments(newAssignments);
+    setScoutSearches(
+      Object.fromEntries(
+        roles.map((role) => [role, getScoutName(newAssignments[role])])
+      )
+    );
     setShowSaveFromMatch(false);
+  };
+
+  const handleScoutSearchChange = (role: Role, value: string) => {
+    const scout = availableScouts.find(
+      (candidate) => (candidate.name || "").toLowerCase() === value.trim().toLowerCase()
+    );
+    setScoutSearches((previous) => ({ ...previous, [role]: value }));
+    setAssignments((previous) => ({ ...previous, [role]: scout?.id || null }));
   };
 
   const handleSave = async () => {
@@ -157,8 +180,8 @@ export function RosterDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[90vh] max-w-2xl flex-col overflow-hidden">
+        <DialogHeader className="shrink-0">
           <DialogTitle>
             {mode === "create" ? "Create New Roster" : "Edit Roster"}
           </DialogTitle>
@@ -169,7 +192,7 @@ export function RosterDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto py-4">
           {error && (
             <div className="bg-destructive/15 text-destructive text-sm p-3 rounded-md">
               {error}
@@ -247,35 +270,26 @@ export function RosterDialog({
                   <Label htmlFor={`roster-${role}`} className="text-xs">
                     {roleLabels[role]}
                   </Label>
-                  <Select
-                    value={assignments[role] || "none"}
-                    onValueChange={(value) =>
-                      setAssignments((prev) => ({
-                        ...prev,
-                        [role]: value === "none" ? null : value,
-                      }))
-                    }
+                  <Input
+                    id={`roster-${role}`}
+                    list={`roster-scouts-${role}`}
+                    value={scoutSearches[role] ?? getScoutName(assignments[role])}
+                    onChange={(event) => handleScoutSearchChange(role, event.target.value)}
+                    placeholder="Search scouter..."
                     disabled={loading}
-                  >
-                    <SelectTrigger id={`roster-${role}`} className="h-9">
-                      <SelectValue placeholder="Unassigned" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Unassigned</SelectItem>
-                      {availableScouts.map((scout) => (
-                        <SelectItem key={scout.id} value={scout.id}>
-                          {scout.name || "Unknown"}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  />
+                  <datalist id={`roster-scouts-${role}`}>
+                    {availableScouts.map((scout) => (
+                      <option key={scout.id} value={scout.name || "Unknown"} />
+                    ))}
+                  </datalist>
                 </div>
               ))}
             </div>
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="shrink-0 border-t bg-background pt-4">
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
