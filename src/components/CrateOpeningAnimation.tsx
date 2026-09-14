@@ -523,9 +523,9 @@ export function CrateOpeningAnimation({ isOpen, points, ownedCosmetics, onOpen, 
               {/* Shaking phase message */}
               {phase === "shaking" && (
                 <p className="text-yellow-400 font-bold text-lg animate-pulse tracking-wide">
-                  {shakeIntensity === 1 && "Something's inside..."}
-                  {shakeIntensity === 2 && "It's getting restless!"}
-                  {shakeIntensity === 3 && "IT'S ABOUT TO BURST! 🔥"}
+                  {shakeIntensity === 1 && "You lost"}
+                  {shakeIntensity === 2 && "The"}
+                  {shakeIntensity === 3 && "Game"}
                 </p>
               )}
             </>

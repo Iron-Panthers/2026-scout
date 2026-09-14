@@ -335,7 +335,7 @@ export default function Dashboard() {
 
   const handleClockIn = async () => {
     if (!user?.id) return;
-    setClocingIn(true);
+    (true);
     await clockIn(user.id);
     await refreshProfile();
     setClocingIn(false);
@@ -844,7 +844,7 @@ export default function Dashboard() {
           </DialogContent>
         </Dialog>
 
-        <nav className="sticky bottom-4 z-30 mx-auto mt-8 flex max-w-sm items-center justify-center gap-1 rounded-xl border border-border bg-card/95 p-1 shadow-lg backdrop-blur">
+        <nav className="fixed bottom-4 z-30 mx-auto mt-8 flex max-w-sm items-center justify-center gap-1 rounded-xl border border-border bg-card/95 p-1 shadow-lg backdrop-blur">
           <Button
             variant={dashboardPage === "picklist" ? "ghost" : "secondary"}
             className="flex-1"

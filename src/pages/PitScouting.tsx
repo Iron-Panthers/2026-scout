@@ -372,7 +372,7 @@ export default function PitScouting() {
   const eventMapCard = (
     <Card>
       <CardHeader>
-        <CardTitle>{activeEvent?.name || "Event"} Map</CardTitle>
+        <CardTitle>{activeEvent?.name || "Event"} Pit Map</CardTitle>
       </CardHeader>
       <CardContent>
         {loadingEvent ? (

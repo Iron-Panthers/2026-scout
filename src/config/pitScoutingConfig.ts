@@ -104,6 +104,6 @@ export const pitScoutingQuestions: PitScoutingQuestion[] = [
     type: "textarea",
     label: "Miscellaneous notes or fun facts?",
     placeholder: "Blah blah blah blah...",
-    required: true,
+    required: false,
   },
 ];

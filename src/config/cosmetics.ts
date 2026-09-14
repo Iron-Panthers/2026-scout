@@ -78,7 +78,7 @@ export const COSMETICS: CosmeticDefinition[] = [
   {
     id: "hat_crown",
     name: "Crown",
-    description: "MY GLORIOUS QUEEN (OR KING)",
+    description: "For the best scouter",
     category: "hat",
     emoji: "👑",
     cost: 10000,
@@ -105,7 +105,7 @@ export const COSMETICS: CosmeticDefinition[] = [
   {
     id: "hat_santa",
     name: "Santa Hat",
-    description: "Feeling quite jolly today, eh?",
+    description: "Christmas is coming...",
     category: "hat",
     emoji: "🎅",
     cost: 750,
@@ -132,7 +132,7 @@ export const COSMETICS: CosmeticDefinition[] = [
   {
     id: "hat_question",
     name: "Huh?",
-    description: "huh?",
+    description: "huh",
     category: "hat",
     emoji: "❓",
     cost: 100,
@@ -511,7 +511,7 @@ export const COSMETICS: CosmeticDefinition[] = [
   {
     id: "decoration_sun",
     name: "Sun",
-    description: "My only sunshine, my only sunshine",
+    description: "You are my sunshine, my only sunshine",
     category: "decoration",
     emoji: "☀️",
     cost: 15,
