@@ -134,15 +134,11 @@ export function RosterManagementTab({
         {/* Roster Cards Grid */}
         <div className="p-4 md:p-6">
           {rosters.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-muted-foreground mb-4">
+            <div className="flex min-h-48 items-center justify-center py-12 text-center">
+              <p className="max-w-md text-muted-foreground">
                 No rosters created yet. Create your first roster to save scout
                 assignment templates.
               </p>
-              <Button onClick={handleCreateNew} variant="outline">
-                <PlusCircle className="h-4 w-4 mr-2" />
-                Create First Roster
-              </Button>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

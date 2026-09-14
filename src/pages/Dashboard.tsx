@@ -3,6 +3,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -10,11 +17,11 @@ import {
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { ClipboardList, Wrench, X, RefreshCw, LogIn, LogOut } from "lucide-react";
+import { ClipboardList, Wrench, X, RefreshCw, LogIn, LogOut, ListOrdered } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { getUserMatches, removeUserFromMatch, getEvents } from "@/lib/matches";
-import { getMatchTeam } from "@/lib/blueAlliance";
+import { getMatchTeam, getEventTeams, type TBATeamSimple } from "@/lib/blueAlliance";
 import { filterMatchesWithoutSubmissions } from "@/lib/scoutingSchema";
 import { getUserPitAssignments, type UserPitAssignment } from "@/lib/pitScoutingAssignments";
 import { clockIn, clockOut } from "@/lib/profiles";
@@ -46,6 +53,12 @@ export default function Dashboard() {
   const [pitAssignments, setPitAssignments] = useState<UserPitAssignment[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [clockingIn, setClocingIn] = useState(false);
+  const [dashboardPage, setDashboardPage] = useState<"scout" | "picklist">("scout");
+  const [picklistTeams, setPicklistTeams] = useState<TBATeamSimple[]>([]);
+  const [picklistLoading, setPicklistLoading] = useState(false);
+  const [draggedTeamNumber, setDraggedTeamNumber] = useState<number | null>(null);
+  const [picklistEvents, setPicklistEvents] = useState<Event[]>([]);
+  const [selectedPicklistEventId, setSelectedPicklistEventId] = useState("");
 
   const navigate = useNavigate();
 
@@ -149,6 +162,43 @@ export default function Dashboard() {
   useEffect(() => {
     loadPitAssignments();
   }, [loadPitAssignments]);
+
+  useEffect(() => {
+    getEvents().then((events) => {
+      setPicklistEvents(events);
+      const initialEvent = events.find((event) => event.is_active) ?? events[0];
+      if (initialEvent) setSelectedPicklistEventId(initialEvent.id);
+    });
+  }, []);
+
+  useEffect(() => {
+    const event = picklistEvents.find((item) => item.id === selectedPicklistEventId);
+    if (!event?.event_code) {
+      setPicklistTeams([]);
+      return;
+    }
+
+    const loadPicklist = async () => {
+      setPicklistLoading(true);
+      const teams = await getEventTeams(event.event_code!);
+      setPicklistTeams(teams.sort((a, b) => a.team_number - b.team_number));
+      setPicklistLoading(false);
+    };
+    loadPicklist();
+  }, [picklistEvents, selectedPicklistEventId]);
+
+  const movePicklistTeam = (targetTeamNumber: number) => {
+    if (draggedTeamNumber === null || draggedTeamNumber === targetTeamNumber) return;
+    setPicklistTeams((current) => {
+      const fromIndex = current.findIndex((team) => team.team_number === draggedTeamNumber);
+      const toIndex = current.findIndex((team) => team.team_number === targetTeamNumber);
+      if (fromIndex < 0 || toIndex < 0) return current;
+      const next = [...current];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      return next;
+    });
+  };
 
   // Re-fetch whenever the user navigates back to this tab
   useEffect(() => {
@@ -300,6 +350,7 @@ export default function Dashboard() {
   };
 
   const handleQueueScouting = async () => {
+    if (!selectedMatch) return;
     console.log("Selected match:", selectedMatch);
     console.log("Match ID:", selectedMatch.match.id);
     console.log("Match Name:", selectedMatch.match.name);
@@ -355,6 +406,10 @@ export default function Dashboard() {
     </>
   );
 
+  const selectedPicklistEvent = picklistEvents.find(
+    (event) => event.id === selectedPicklistEventId
+  );
+
   return (
     <div className="min-h-screen bg-background my-5">
       {/* Main Content */}
@@ -369,6 +424,8 @@ export default function Dashboard() {
           />
         </div>
 
+        {dashboardPage === "scout" ? (
+          <>
         {/* Clock In bar — above grid on small screens */}
         <div className="lg:hidden mb-4 space-y-2">
           {clockInBar}
@@ -589,6 +646,77 @@ export default function Dashboard() {
         <div className="mb-8">
           <OfflineMatches />
         </div>
+          </>
+        ) : (
+          <section className="my-8">
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-3">
+                <ListOrdered className="h-7 w-7 text-primary" />
+                <div>
+                  <h2 className="text-2xl font-bold">Picklist</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Drag teams to arrange your scouting priority.
+                  </p>
+                </div>
+              </div>
+              <Select value={selectedPicklistEventId} onValueChange={setSelectedPicklistEventId}>
+                <SelectTrigger className="w-full sm:w-64" aria-label="Picklist event">
+                  <SelectValue placeholder="Select event" />
+                </SelectTrigger>
+                <SelectContent>
+                  {picklistEvents.map((event) => (
+                    <SelectItem key={event.id} value={event.id}>
+                      {event.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {picklistLoading ? (
+              <p className="text-muted-foreground">Loading event teams...</p>
+            ) : picklistTeams.length === 0 ? (
+              <Card className="p-8 text-center">
+                <p className="text-muted-foreground">No teams found for the active event.</p>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 gap-2">
+                {picklistTeams.map((team, index) => (
+                  <Card
+                    key={team.team_number}
+                    draggable
+                    onDragStart={() => setDraggedTeamNumber(team.team_number)}
+                    onDragOver={(event) => {
+                      event.preventDefault();
+                      movePicklistTeam(team.team_number);
+                    }}
+                    onDrop={() => setDraggedTeamNumber(null)}
+                    onDragEnd={() => setDraggedTeamNumber(null)}
+                    className={`cursor-grab active:cursor-grabbing transition-opacity ${
+                      draggedTeamNumber === team.team_number ? "opacity-50" : ""
+                    }`}
+                  >
+                    <CardContent className="flex items-center gap-2 p-2.5">
+                      <span className="w-6 text-center text-sm font-bold text-muted-foreground">
+                        {index + 1}
+                      </span>
+                      <TeamImage
+                        teamNumber={team.team_number}
+                        eventId={selectedPicklistEvent?.id}
+                        className="h-9 w-9 rounded-md object-cover"
+                      />
+                      <div className="min-w-0">
+                        <p className="font-mono text-sm font-bold">{team.team_number}</p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {team.nickname || "Unknown team"}
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
 
         {/* Match Details Dialog */}
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -654,7 +782,7 @@ export default function Dashboard() {
                       Your Role
                     </span>
                     <span className="text-sm sm:text-base md:text-base font-semibold">
-                      {prettifyRole(selectedMatch?.role)}
+                      {selectedMatch ? prettifyRole(selectedMatch.role) : ""}
                     </span>
                   </div>
                   <div className="flex justify-between items-center p-2 landscape:p-2 md:p-3 bg-accent/50 rounded-lg">
@@ -715,6 +843,25 @@ export default function Dashboard() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <nav className="sticky bottom-4 z-30 mx-auto mt-8 flex max-w-sm items-center justify-center gap-1 rounded-xl border border-border bg-card/95 p-1 shadow-lg backdrop-blur">
+          <Button
+            variant={dashboardPage === "picklist" ? "ghost" : "secondary"}
+            className="flex-1"
+            onClick={() => setDashboardPage("scout")}
+          >
+            <ClipboardList className="mr-2 h-4 w-4" />
+            Scout
+          </Button>
+          <Button
+            variant={dashboardPage === "picklist" ? "secondary" : "ghost"}
+            className="flex-1"
+            onClick={() => setDashboardPage("picklist")}
+          >
+            <ListOrdered className="mr-2 h-4 w-4" />
+            Picklist
+          </Button>
+        </nav>
       </main>
     </div>
   );

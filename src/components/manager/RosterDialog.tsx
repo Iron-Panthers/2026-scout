@@ -8,6 +8,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -20,6 +21,7 @@ import {
 } from "@/components/ui/select";
 import { createRoster, updateRoster } from "@/lib/rosters";
 import type { Roster, Profile, Role, MatchAssignment } from "@/types";
+import CosmeticAvatar from "@/components/CosmeticAvatar";
 
 interface RosterDialogProps {
   open: boolean;
@@ -72,7 +74,8 @@ export function RosterDialog({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showSaveFromMatch, setShowSaveFromMatch] = useState(false);
-  const [scoutSearches, setScoutSearches] = useState<Partial<Record<Role, string>>>({});
+  const [scoutSearch, setScoutSearch] = useState("");
+  const [activeRole, setActiveRole] = useState<Role | null>(null);
 
   const getScoutName = (scoutId: string | null | undefined) =>
     availableScouts.find((scout) => scout.id === scoutId)?.name || "";
@@ -90,19 +93,15 @@ export function RosterDialog({
         rosterAssignments[role] = (roster[column] as string) || null;
       });
       setAssignments(rosterAssignments);
-      setScoutSearches(
-        Object.fromEntries(
-          roles.map((role) => [role, getScoutName(rosterAssignments[role])])
-        )
-      );
     } else {
       setName("");
       setDescription("");
       setAssignments({});
-      setScoutSearches({});
     }
+    setScoutSearch("");
     setError(null);
     setShowSaveFromMatch(false);
+    setActiveRole(null);
   }, [mode, roster, open]);
 
   const handleSaveFromMatch = (matchNumber: number) => {
@@ -115,21 +114,13 @@ export function RosterDialog({
       newAssignments[role] = scout?.id || null;
     });
     setAssignments(newAssignments);
-    setScoutSearches(
-      Object.fromEntries(
-        roles.map((role) => [role, getScoutName(newAssignments[role])])
-      )
-    );
     setShowSaveFromMatch(false);
+    setActiveRole(null);
   };
 
-  const handleScoutSearchChange = (role: Role, value: string) => {
-    const scout = availableScouts.find(
-      (candidate) => (candidate.name || "").toLowerCase() === value.trim().toLowerCase()
-    );
-    setScoutSearches((previous) => ({ ...previous, [role]: value }));
-    setAssignments((previous) => ({ ...previous, [role]: scout?.id || null }));
-  };
+  const filteredScouts = availableScouts.filter((scout) =>
+    `${scout.name || ""} ${scout.role}`.toLowerCase().includes(scoutSearch.trim().toLowerCase())
+  );
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -266,28 +257,84 @@ export function RosterDialog({
             <Label className="text-base font-semibold">Scout Assignments</Label>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {roles.map((role) => (
-                <div key={role} className="space-y-1.5">
-                  <Label htmlFor={`roster-${role}`} className="text-xs">
-                    {roleLabels[role]}
-                  </Label>
-                  <Input
-                    id={`roster-${role}`}
-                    list={`roster-scouts-${role}`}
-                    value={scoutSearches[role] ?? getScoutName(assignments[role])}
-                    onChange={(event) => handleScoutSearchChange(role, event.target.value)}
-                    placeholder="Search scouter..."
+                <div key={role} className="space-y-2 rounded-lg border border-border p-3">
+                  <Label className="text-xs font-semibold">{roleLabels[role]}</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className={`w-full ${!assignments[role] ? "border-muted-foreground/30 bg-muted text-muted-foreground hover:bg-muted/80" : ""}`}
+                    onClick={() => {
+                      setActiveRole(role);
+                      setScoutSearch("");
+                    }}
                     disabled={loading}
-                  />
-                  <datalist id={`roster-scouts-${role}`}>
-                    {availableScouts.map((scout) => (
-                      <option key={scout.id} value={scout.name || "Unknown"} />
-                    ))}
-                  </datalist>
+                  >
+                    {assignments[role] ? getScoutName(assignments[role]) : "Assign Role"}
+                  </Button>
                 </div>
               ))}
             </div>
           </div>
         </div>
+
+        <Dialog open={activeRole !== null} onOpenChange={(open) => !open && setActiveRole(null)}>
+          <DialogContent className="flex max-h-[85vh] max-w-2xl flex-col overflow-hidden">
+            <DialogHeader className="shrink-0">
+              <DialogTitle>Assign {activeRole ? roleLabels[activeRole] : "Role"}</DialogTitle>
+              <DialogDescription>Select a scouter for this role.</DialogDescription>
+            </DialogHeader>
+            <Input
+              value={scoutSearch}
+              onChange={(event) => setScoutSearch(event.target.value)}
+              placeholder="Search scouters..."
+              aria-label="Search scouters"
+              disabled={loading}
+            />
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <div className="grid grid-cols-1 gap-3 py-2 sm:grid-cols-2">
+                <button
+                  type="button"
+                  className="rounded-md border border-border p-3 text-left text-sm hover:bg-accent/50"
+                  onClick={() => {
+                    if (activeRole) setAssignments((previous) => ({ ...previous, [activeRole]: null }));
+                    setActiveRole(null);
+                  }}
+                  disabled={loading}
+                >
+                  Unassigned
+                </button>
+                {filteredScouts.map((scout) => {
+                  const selected = activeRole ? assignments[activeRole] === scout.id : false;
+                  const initials = (scout.name || "U")
+                    .split(" ")
+                    .map((part) => part[0])
+                    .join("")
+                    .toUpperCase()
+                    .slice(0, 2);
+                  return (
+                    <label
+                      key={scout.id}
+                      className={`flex cursor-pointer items-center gap-2 rounded-md border p-3 transition-colors ${selected ? "border-primary bg-primary/10" : "border-border hover:bg-accent/50"}`}
+                    >
+                      <Checkbox
+                        checked={selected}
+                        className="rounded-full"
+                        onCheckedChange={() => {
+                          if (activeRole) setAssignments((previous) => ({ ...previous, [activeRole]: selected ? null : scout.id }));
+                          if (!selected) setActiveRole(null);
+                        }}
+                        disabled={loading}
+                        aria-label={`Assign ${scout.name || "scouter"}`}
+                      />
+                      <CosmeticAvatar initials={initials} avatarUrl={scout.avatar_url} size="sm" />
+                      <span className="min-w-0 truncate text-sm font-medium">{scout.name || "Unknown"}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         <DialogFooter className="shrink-0 border-t bg-background pt-4">
           <Button
