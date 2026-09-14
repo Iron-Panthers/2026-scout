@@ -655,7 +655,7 @@ export default function Dashboard() {
                 <div>
                   <h2 className="text-2xl font-bold">Picklist</h2>
                   <p className="text-sm text-muted-foreground">
-                    Drag teams to arrange your scouting priority.
+                    Sort teams however you want! This list is only visible for you.
                   </p>
                 </div>
               </div>
