@@ -24,12 +24,12 @@ export function GameCard({ game, isUnlocked, userPoints, isPlayable, onBuy, onPl
   return (
     <button
       onClick={handleClick}
-      className="relative flex flex-col w-full rounded-lg border border-border bg-card overflow-hidden text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors hover:bg-accent/30 active:scale-95"
+      className="relative flex aspect-square w-full flex-col rounded-lg border border-border bg-card overflow-hidden text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors hover:bg-accent/30 active:scale-95"
       style={{ opacity: isUnlocked ? 1 : 0.45 }}
       aria-label={isUnlocked ? `Play ${game.name}` : `Buy ${game.name} for ${game.cost} points`}
     >
       {/* Thumbnail */}
-      <div className="relative w-full aspect-video bg-muted flex items-center justify-center overflow-hidden">
+      <div className="relative min-h-0 flex-1 w-full bg-muted flex items-center justify-center overflow-hidden">
         {game.thumbnailUrl && (
           <img
             src={game.thumbnailUrl}

@@ -10,7 +10,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { CalendarIcon, Save, PlusCircle, Star, MinusCircle, Trash2 } from "lucide-react";
+import { CalendarIcon, Save, Star, Trash2 } from "lucide-react";
 import { format, set } from "date-fns";
 import { updateEvent, setActiveEvent } from "@/lib/matches";
 import { supabase } from "@/lib/supabase";
@@ -45,15 +45,13 @@ export function EventInformationTab({
   const isAllEvents = selectedEvent === "all";
   const { toast } = useToast();
 
-  const [subtractMatchDialog, setSubtractMatchDialog] = useState(false);
   const [deleteEventDialog1, setDeleteEventDialog1] = useState(false);
   const [deleteEventDialog2, setDeleteEventDialog2] = useState(false);
   const [addScouterDialog, setAddScouterDialog] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [isAddingMatches, setIsAddingMatches] = useState(0);
-  const [isSubtractingMatches, setIsSubtractingMatches] = useState(false);
+  const [matchCountInput, setMatchCountInput] = useState(String(matches.length));
   const [isSettingActive, setIsSettingActive] = useState(false);
   const [editedEvent, setEditedEvent] = useState<Partial<Event>>({
     name: currentEvent?.name || "",
@@ -146,33 +144,31 @@ export function EventInformationTab({
     // }
   }
 
-  const handleAddMatches = async (numMatches) => {
+  useEffect(() => {
+    setMatchCountInput(String(matches.length));
+  }, [matches.length]);
+
+  const handleSetMatchCount = async (targetCount: number) => {
     if (!currentEvent || isAllEvents) return;
 
-    if (numMatches > 0) {
-      setIsAddingMatches(numMatches);
-    }
-    else {
-      setIsSubtractingMatches(true);
-    }
-
     try {
-      // Get the highest match number for this event
       const { data: existingMatches, error: fetchError } = await supabase
         .from("matches")
-        .select("match_number")
+        .select("id, match_number")
         .eq("event_id", currentEvent.id)
-        .order("match_number", { ascending: false })
-        .limit(1);
+        .order("match_number", { ascending: true });
 
       if (fetchError) throw fetchError;
 
-      const highestMatchNumber = existingMatches?.[0]?.match_number || 0;
+      const currentCount = existingMatches?.length || 0;
+      const difference = targetCount - currentCount;
+      if (difference === 0) return;
+
+      const highestMatchNumber = existingMatches?.[existingMatches.length - 1]?.match_number || 0;
       const eventCode = currentEvent.event_code || currentEvent.name.replace(/\s+/g, "").toLowerCase();
 
-      // Create 10 new matches
-      if (numMatches > 0) {
-        const newMatches = Array.from({ length: numMatches }, (_, i) => ({
+      if (difference > 0) {
+        const newMatches = Array.from({ length: difference }, (_, i) => ({
           name: `${eventCode}-Q${highestMatchNumber + i + 1}`,
           match_number: highestMatchNumber + i + 1,
           event_id: currentEvent.id,
@@ -184,32 +180,23 @@ export function EventInformationTab({
 
         if (insertError) throw insertError;
 
-        if (numMatches === 1) {
-          toast({
-            title: "Match Added",
-            description: `Added match ${highestMatchNumber + 1}`,
-          });
-        }
-        else {
-          toast({
-            title: "Matches Added",
-            description: `Added matches ${highestMatchNumber + 1} through ${highestMatchNumber + numMatches}`,
-          });
-        }
+        toast({
+          title: "Matches Added",
+          description: `Added ${difference} match${difference === 1 ? "" : "es"}.`,
+        });
       }
       else {
-        // Delete the match with the highest match number
+        const matchesToDelete = existingMatches.slice(targetCount).map((match) => match.id);
         const { error: deleteError } = await supabase
           .from("matches")
           .delete()
-          .eq("event_id", currentEvent.id)
-          .eq("match_number", highestMatchNumber);
+          .in("id", matchesToDelete);
 
         if (deleteError) throw deleteError;
 
         toast({
-          title: "Matche Removed",
-          description: `Removed match ${highestMatchNumber}`,
+          title: "Matches Removed",
+          description: `Removed ${Math.abs(difference)} match${Math.abs(difference) === 1 ? "" : "es"}.`,
         });
       }
 
@@ -221,9 +208,6 @@ export function EventInformationTab({
         description: error.message || "Failed to add matches",
         variant: "destructive",
       });
-    } finally {
-      setIsAddingMatches(0);
-      setIsSubtractingMatches(false);
     }
   };
 
@@ -377,53 +361,32 @@ export function EventInformationTab({
                 <Label className="text-sm font-medium text-muted-foreground">
                   Total Matches
                 </Label>
-                <div className="flex items-center gap-2 mt-1">
+                {isAllEvents ? (
                   <p className="text-lg font-semibold">{matches.length}</p>
-                  {!isAllEvents && (
-                    <>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => { handleAddMatches(10) }}
-                        disabled={isAddingMatches == 10}
-                        className="h-7"
-                      >
-                        <PlusCircle className="h-3 w-3 mr-1" />
-                        {isAddingMatches == 10 ? "Adding..." : "+10"}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => { handleAddMatches(5) }}
-                        disabled={isAddingMatches == 5}
-                        className="h-7"
-                      >
-                        <PlusCircle className="h-3 w-3 mr-1" />
-                        {isAddingMatches == 5 ? "Adding..." : "+5"}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => { handleAddMatches(1) }}
-                        disabled={isAddingMatches == 1}
-                        className="h-7"
-                      >
-                        <PlusCircle className="h-3 w-3 mr-1" />
-                        {isAddingMatches == 1 ? "Adding..." : "+1"}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 text-red-500"
-                        onClick={() => { setSubtractMatchDialog(true) }}
-                        disabled={isSubtractingMatches}
-                      >
-                        <MinusCircle className="h-3 w-3 mr-1" />
-                        {isAddingMatches ? "Subtracting..." : "-1"}
-                      </Button>
-                    </>
-                  )}
-                </div>
+                ) : (
+                  <Input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={matchCountInput}
+                    onChange={(event) => {
+                      if (/^\d*$/.test(event.target.value)) {
+                        setMatchCountInput(event.target.value);
+                      }
+                    }}
+                    onBlur={() => {
+                      const parsedCount = Number.parseInt(matchCountInput, 10);
+                      const targetCount = Number.isNaN(parsedCount) ? matches.length : parsedCount;
+                      setMatchCountInput(String(targetCount));
+                      if (targetCount !== matches.length) void handleSetMatchCount(targetCount);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") event.currentTarget.blur();
+                    }}
+                    className="mt-1 w-32"
+                    aria-label="Total matches"
+                  />
+                )}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -583,13 +546,6 @@ export function EventInformationTab({
       </Card>
       <ConfirmationDialog 
         title="Are you Sure?"
-        open={subtractMatchDialog}
-        prompt="You are about to remove the last match of the dataset. If there is any data, it could be lost to the void!"
-        onOpenChange={() => { setSubtractMatchDialog(false) }}
-        onRespond={(confirmed) => { if (confirmed) handleAddMatches(-1) }}>
-      </ConfirmationDialog>
-      <ConfirmationDialog 
-        title="Are you Sure?"
         open={deleteEventDialog1}
         prompt={`You are about to delete ${editedEvent.name} (${editedEvent.event_code}). If there is any data, it could be lost to the void!`}
         onOpenChange={() => { setDeleteEventDialog1(false) }}
@@ -607,8 +563,9 @@ export function EventInformationTab({
         onOpenChange={() => setAddScouterDialog(false)}
         availableScouts={availableScouts}
         allScouts={allScouts}
+        cosmeticsMap={cosmeticsMap}
         event={events.find(e => e.id === selectedEvent)}
-        onSave={(users) => { console.log(users); events.find(e => e.id === selectedEvent).users = users; availableScouts = users; onEventUpdate() }}
+        onSave={() => onEventUpdate?.()}
       ></AddScoutsDialog>
       <Card>
         <CardHeader>

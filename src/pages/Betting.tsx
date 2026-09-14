@@ -981,7 +981,7 @@ export default function Betting() {
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-muted-foreground">Loading markets…</div>
+        <div className="text-muted-foreground">Loading matches…</div>
       </div>
     );
   }

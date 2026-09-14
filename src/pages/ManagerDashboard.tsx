@@ -17,8 +17,6 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  ChevronLeft,
-  ChevronRight,
   Users,
   Calendar,
   PlusCircle,
@@ -115,8 +113,6 @@ export default function ManagerDashboard() {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedCell, setSelectedCell] = useState<SelectedCell | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const matchesPerPage = 25;
 
   // Roster state
   const [rosters, setRosters] = useState<Roster[]>([]);
@@ -127,6 +123,7 @@ export default function ManagerDashboard() {
 
   // Active tab state for mobile dropdown
   const [activeTab, setActiveTab] = useState<string>("assignments");
+  const mobileTabMenuRef = useRef<HTMLDivElement>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   // Award points state
@@ -336,12 +333,6 @@ export default function ManagerDashboard() {
     loadSubmissionStatus(filteredDbMatches);
   }, [selectedEvent, allDbMatches, convertMatchToAssignment]);
 
-  // Reset to page 1 only when the selected event changes, not on every data reload
-  useEffect(() => {
-    setCurrentPage(1);
-    // console.log('event changed', selectedEvent)
-  }, [selectedEvent]);
-
   // Load submission status for all match/role combinations
   const loadSubmissionStatus = async (dbMatches: Match[]) => {
     if (dbMatches.length === 0) {
@@ -388,12 +379,6 @@ export default function ManagerDashboard() {
       console.error("Error loading submission status:", error);
     }
   };
-
-  // Calculate pagination
-  const totalPages = Math.ceil(matches.length / matchesPerPage);
-  const startIndex = (currentPage - 1) * matchesPerPage;
-  const endIndex = startIndex + matchesPerPage;
-  const paginatedMatches = matches.slice(startIndex, endIndex);
 
   const handleAssignScout = useCallback(
     (profile: Profile) => {
@@ -606,20 +591,17 @@ export default function ManagerDashboard() {
 
   const handleToggleAllMatches = useCallback(() => {
     setSelectedMatches((prev) => {
-      const allMatchIds = paginatedMatches
+      const allMatchIds = matches
         .filter((m) => m.matchId)
         .map((m) => m.matchId!);
-        // console.log(paginatedMatches)
 
       if (prev.size === allMatchIds.length && allMatchIds.length > 0) {
-        // All selected, deselect all
         return new Set();
       } else {
-        // Select all on current page
         return new Set(allMatchIds);
       }
     });
-  }, [paginatedMatches]);
+  }, [matches]);
 
   const handleSendNotifications = useCallback(async () => {
     if (selectedMatches.size === 0) return;
@@ -785,8 +767,16 @@ export default function ManagerDashboard() {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full overflow-x-scroll">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
             {/* Mobile: Dropdown Menu */}
-            <div className="md:hidden w-full">
-              <Select value={activeTab} onValueChange={setActiveTab}>
+            <div className="lg:hidden w-full">
+              <Select
+                value={activeTab}
+                onValueChange={setActiveTab}
+                onOpenChange={(open) => {
+                  if (open) {
+                    setTimeout(() => mobileTabMenuRef.current?.scrollTo(0, 0), 0);
+                  }
+                }}
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue>
                     {activeTab === "assignments" && (
@@ -833,7 +823,7 @@ export default function ManagerDashboard() {
                     )}
                   </SelectValue>
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent ref={mobileTabMenuRef}>
                   <SelectItem value="assignments">
                     <div className="flex items-center gap-2">
                       <Users className="h-4 w-4" />
@@ -881,7 +871,7 @@ export default function ManagerDashboard() {
             </div>
 
             {/* Desktop: Tab Buttons */}
-            <TabsList className="hidden md:grid w-full max-w-5xl grid-cols-7 gap-1">
+            <TabsList className="hidden lg:grid w-full max-w-5xl grid-cols-7 gap-1">
               <TabsTrigger
                 value="assignments"
                 className="flex items-center justify-center gap-2"
@@ -990,8 +980,8 @@ export default function ManagerDashboard() {
                       <TableHead className="w-12 border-r border-border">
                         <Checkbox
                           checked={
-                            selectedMatches.size === paginatedMatches.filter((m) => m.matchId).length &&
-                            paginatedMatches.filter((m) => m.matchId).length > 0
+                            selectedMatches.size === matches.filter((m) => m.matchId).length &&
+                            matches.filter((m) => m.matchId).length > 0
                           }
                           onCheckedChange={handleToggleAllMatches}
                         />
@@ -1058,11 +1048,9 @@ export default function ManagerDashboard() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {paginatedMatches.map((match, index) => (
+                    {matches.map((match) => (
                       <MatchRow
-                        key={`${selectedEvent}-${match.matchNumber}-${
-                          startIndex + index
-                        }`}
+                        key={`${selectedEvent}-${match.matchNumber}`}
                         match={match}
                         roles={roles}
                         onOpenDialog={openAssignmentDialog}
@@ -1077,38 +1065,6 @@ export default function ManagerDashboard() {
                     ))}
                   </TableBody>
                 </Table>
-              </div>
-              {/* Pagination Controls */}
-              <div className="p-4 border-t border-border flex items-center justify-between">
-                <div className="text-sm text-muted-foreground">
-                  Showing {startIndex + 1}-{Math.min(endIndex, matches.length)}{" "}
-                  of {matches.length} matches
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                    disabled={currentPage === 1}
-                  >
-                    <ChevronLeft className="h-4 w-4 md:mr-1" />
-                    <span className="hidden md:inline">Previous</span>
-                  </Button>
-                  <div className="text-sm font-medium">
-                    Page {currentPage} of {totalPages}
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      setCurrentPage((p) => Math.min(totalPages, p + 1))
-                    }
-                    disabled={currentPage === totalPages}
-                  >
-                    <span className="hidden md:inline">Next</span>
-                    <ChevronRight className="h-4 w-4 md:ml-1" />
-                  </Button>
-                </div>
               </div>
             </div>
           </TabsContent>
