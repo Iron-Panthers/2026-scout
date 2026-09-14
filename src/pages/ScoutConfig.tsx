@@ -691,7 +691,7 @@ export default function ScoutConfig() {
               value="betting"
               className="w-1/4 py-2 data-[state=active]:border-t-2 data-[state=active]:border-primary bg-background hover:bg-accent hover:text-accent-foreground mx-1"
             >
-              Prediction
+              Betting
             </TabsTrigger>
           </TabsList>
         </Tabs>

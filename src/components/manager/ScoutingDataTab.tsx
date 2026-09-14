@@ -1,5 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -21,8 +29,6 @@ import {
   Loader2,
   Trash2,
   Pencil,
-  ChevronLeft,
-  ChevronRight,
   AlertTriangle,
   ChevronsUpDown,
   ChevronUp,
@@ -58,8 +64,6 @@ interface ScoutingDataTabProps {
 type SortColumn = "match" | "role" | "team" | "scout" | "submitted";
 type SortDir = "asc" | "desc";
 
-const ITEMS_PER_PAGE = 25;
-
 const ROLE_LABELS: Record<string, string> = {
   red1: "Red 1",
   red2: "Red 2",
@@ -93,7 +97,9 @@ export function ScoutingDataTab({ selectedEvent, events: _events }: ScoutingData
   const { toast } = useToast();
   const [submissions, setSubmissions] = useState<SubmissionWithDetails[]>([]);
   const [loading, setLoading] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [roleFilter, setRoleFilter] = useState("all");
+  const [scoutFilter, setScoutFilter] = useState("all");
+  const [matchFilter, setMatchFilter] = useState("");
 
   // Sorting state
   const [sortCol, setSortCol] = useState<SortColumn>("match");
@@ -174,10 +180,6 @@ export function ScoutingDataTab({ selectedEvent, events: _events }: ScoutingData
     loadSubmissions();
   }, [loadSubmissions]);
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [selectedEvent, sortCol, sortDir]);
-
   // Sorting logic
   const handleSort = (col: SortColumn) => {
     if (sortCol === col) {
@@ -210,11 +212,23 @@ export function ScoutingDataTab({ selectedEvent, events: _events }: ScoutingData
     return sortDir === "asc" ? cmp : -cmp;
   });
 
-  const totalPages = Math.max(1, Math.ceil(sorted.length / ITEMS_PER_PAGE));
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const paginatedSubmissions = sorted.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-
   const roleLabel = (role: string) => ROLE_LABELS[role] ?? role;
+  const availableRoles = [...new Set(submissions.map((submission) => submission.role))]
+    .sort((a, b) => roleLabel(a).localeCompare(roleLabel(b)));
+  const availableScouts = [...new Map(
+    submissions
+      .filter((submission) => submission.scouter_id)
+      .map((submission) => [submission.scouter_id!, submission.profiles?.name ?? "Unknown"])
+  )].sort(([, nameA], [, nameB]) => nameA.localeCompare(nameB));
+  const normalizedMatchFilter = matchFilter.trim();
+  const filteredSubmissions = sorted.filter((submission) => {
+    const matchesRole = roleFilter === "all" || submission.role === roleFilter;
+    const matchesScout = scoutFilter === "all" || submission.scouter_id === scoutFilter;
+    const matchesNumber =
+      normalizedMatchFilter === "" ||
+      String(submission.matches?.match_number ?? "") === normalizedMatchFilter;
+    return matchesRole && matchesScout && matchesNumber;
+  });
 
   // Delete handlers
   const handleDeleteClick = (submission: SubmissionWithDetails) => {
@@ -326,7 +340,8 @@ export function ScoutingDataTab({ selectedEvent, events: _events }: ScoutingData
               "Loading submissions…"
             ) : (
               <>
-                {submissions.length} submission{submissions.length !== 1 ? "s" : ""} — click a
+                {filteredSubmissions.length} submission{filteredSubmissions.length !== 1 ? "s" : ""}
+                {filteredSubmissions.length !== submissions.length ? ` of ${submissions.length}` : ""} — click a
                 column header to sort, edit data or permanently delete entries
               </>
             )}
@@ -334,6 +349,48 @@ export function ScoutingDataTab({ selectedEvent, events: _events }: ScoutingData
         </div>
         {loading && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
       </div>
+
+      {submissions.length > 0 && (
+        <div className="grid grid-cols-1 gap-3 border-b border-border p-4 sm:grid-cols-3">
+          <Select value={roleFilter} onValueChange={setRoleFilter}>
+            <SelectTrigger aria-label="Filter by role">
+              <SelectValue placeholder="All roles" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All roles</SelectItem>
+              {availableRoles.map((role) => (
+                <SelectItem key={role} value={role}>
+                  {roleLabel(role)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={scoutFilter} onValueChange={setScoutFilter}>
+            <SelectTrigger aria-label="Filter by scout">
+              <SelectValue placeholder="All scouts" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All scouts</SelectItem>
+              {availableScouts.map(([scoutId, scoutName]) => (
+                <SelectItem key={scoutId} value={scoutId}>
+                  {scoutName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Input
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            value={matchFilter}
+            onChange={(event) => {
+              if (/^\d*$/.test(event.target.value)) setMatchFilter(event.target.value);
+            }}
+            placeholder="Match number"
+            aria-label="Filter by match number"
+          />
+        </div>
+      )}
 
       {/* Empty state */}
       {!loading && submissions.length === 0 && (
@@ -345,7 +402,13 @@ export function ScoutingDataTab({ selectedEvent, events: _events }: ScoutingData
       {/* Table */}
       {submissions.length > 0 && (
         <>
-          <div className="overflow-auto max-h-[70vh]">
+          {!loading && filteredSubmissions.length === 0 && (
+            <div className="p-8 text-center text-muted-foreground">
+              No submissions match the selected filters.
+            </div>
+          )}
+          {filteredSubmissions.length > 0 && (
+            <div className="overflow-auto max-h-[70vh]">
             <Table noWrapper>
               <TableHeader className="sticky top-0 bg-card z-20 shadow-sm">
                 <TableRow>
@@ -361,7 +424,7 @@ export function ScoutingDataTab({ selectedEvent, events: _events }: ScoutingData
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginatedSubmissions.map((submission) => (
+                {filteredSubmissions.map((submission) => (
                   <TableRow key={submission.id}>
                     <TableCell className="font-mono font-semibold">
                       Q-{submission.matches?.match_number ?? "?"}
@@ -418,38 +481,8 @@ export function ScoutingDataTab({ selectedEvent, events: _events }: ScoutingData
                 ))}
               </TableBody>
             </Table>
-          </div>
-
-          {/* Pagination */}
-          <div className="p-4 border-t border-border flex items-center justify-between">
-            <div className="text-sm text-muted-foreground">
-              Showing {startIndex + 1}–{Math.min(startIndex + ITEMS_PER_PAGE, sorted.length)} of{" "}
-              {sorted.length} submissions
             </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-              >
-                <ChevronLeft className="h-4 w-4 md:mr-1" />
-                <span className="hidden md:inline">Previous</span>
-              </Button>
-              <div className="text-sm font-medium">
-                Page {currentPage} of {totalPages}
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-              >
-                <span className="hidden md:inline">Next</span>
-                <ChevronRight className="h-4 w-4 md:ml-1" />
-              </Button>
-            </div>
-          </div>
+          )}
         </>
       )}
 

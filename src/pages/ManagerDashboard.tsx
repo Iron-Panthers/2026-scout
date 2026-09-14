@@ -732,6 +732,10 @@ export default function ManagerDashboard() {
     return "bg-blue-900/30 text-blue-400";
   };
 
+  const handleEventUpdate = useCallback(() => {
+    void loadData();
+  }, [loadData]);
+
   return (
     <div className="min-h-screen bg-background my-5">
       <main className="container mx-auto p-4 md:p-6 max-w-[1600px]">
@@ -1094,9 +1098,7 @@ export default function ManagerDashboard() {
               availableScouts={availableScouts}
               allScouts={allScouts}
               cosmeticsMap={cosmeticsMap}
-              onEventUpdate={useCallback(async () => {
-                loadData();
-              }, [selectedEvent])}
+              onEventUpdate={handleEventUpdate}
             />
           </TabsContent>
 

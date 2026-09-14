@@ -22,6 +22,8 @@ import { AddScoutsDialog } from "./AddScoutsDialog";
 import CosmeticAvatar from "../CosmeticAvatar";
 import { Badge } from "../ui/badge";
 
+const MAX_MATCHES = 125;
+
 interface EventInformationTabProps {
   selectedEvent: string;
   events: Event[];
@@ -150,6 +152,7 @@ export function EventInformationTab({
 
   const handleSetMatchCount = async (targetCount: number) => {
     if (!currentEvent || isAllEvents) return;
+    targetCount = Math.min(MAX_MATCHES, Math.max(0, Math.trunc(targetCount)));
 
     try {
       const { data: existingMatches, error: fetchError } = await supabase
@@ -368,6 +371,7 @@ export function EventInformationTab({
                     type="text"
                     inputMode="numeric"
                     pattern="[0-9]*"
+                    max={MAX_MATCHES}
                     value={matchCountInput}
                     onChange={(event) => {
                       if (/^\d*$/.test(event.target.value)) {
@@ -376,7 +380,10 @@ export function EventInformationTab({
                     }}
                     onBlur={() => {
                       const parsedCount = Number.parseInt(matchCountInput, 10);
-                      const targetCount = Number.isNaN(parsedCount) ? matches.length : parsedCount;
+                      const targetCount = Math.min(
+                        MAX_MATCHES,
+                        Number.isNaN(parsedCount) ? matches.length : parsedCount
+                      );
                       setMatchCountInput(String(targetCount));
                       if (targetCount !== matches.length) void handleSetMatchCount(targetCount);
                     }}
