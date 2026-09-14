@@ -998,9 +998,8 @@ export default function Betting() {
         <div className="flex items-center justify-between mb-6 max-w-2xl mx-auto">
           <div className="flex items-center gap-3">
             {!isInIframe && (
-              <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard")}>
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Dashboard
+                <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
+                <ArrowLeft className="h-5 w-5" />
               </Button>
             )}
             <div>

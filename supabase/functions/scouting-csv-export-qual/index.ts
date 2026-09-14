@@ -20,11 +20,23 @@ Deno.serve(async (req: Request) => {
     red1: ['Red 1', 'Red'], red2: ['Red 2', 'Red'], red3: ['Red 3', 'Red'], qualRed: ['Red Qual', 'Red'],
   };
 
-  function withoutShotLocations(submission: any) {
-    const sanitized = { ...submission, scouting_data: { ...(submission.scouting_data || {}) } };
-    delete sanitized.scouting_data.primaryShotPosition;
-    delete sanitized.scouting_data.secondaryShotPosition;
-    return sanitized;
+  function withoutShotLocations(value: unknown): unknown {
+    if (Array.isArray(value)) {
+      return value.map(withoutShotLocations);
+    }
+
+    if (value && typeof value === 'object') {
+      return Object.fromEntries(
+        Object.entries(value)
+          .filter(([key]) => {
+            const normalizedKey = key.toLowerCase();
+            return normalizedKey !== 'primaryshotposition' && normalizedKey !== 'secondaryshotposition';
+          })
+          .map(([key, nestedValue]) => [key, withoutShotLocations(nestedValue)])
+      );
+    }
+
+    return value;
   }
 
   try {

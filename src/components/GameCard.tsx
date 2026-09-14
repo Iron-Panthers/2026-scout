@@ -34,9 +34,9 @@ export function GameCard({ game, isUnlocked, userPoints, isPlayable, onBuy, onPl
           <img
             src={game.thumbnailUrl}
             alt={game.name}
-            className="w-10 h-10 object-contain"
+            className="absolute inset-0 w-full h-full object-cover"
             onError={(e) => {
-              (e.currentTarget as HTMLImageElement).style.display = "none";
+              e.currentTarget.style.display = "none";
             }}
           />
         )}

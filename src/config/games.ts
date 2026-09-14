@@ -13,7 +13,7 @@ export const GAMES: GameDefinition[] = [
     cost: 0,
     // Self-hosted in public/games/2048.html — no X-Frame-Options issues
     iframeUrl: "/games/2048.html",
-    thumbnailUrl: "",
+    thumbnailUrl: "/game-thumbnails/2048.svg",
   },
   {
     id: "tetris",
@@ -22,7 +22,7 @@ export const GAMES: GameDefinition[] = [
     cost: 20,
     // open-source React Tetris on GitHub Pages — no X-Frame-Options restriction
     iframeUrl: "https://onlinetetris.org/GoodOldTetris/",
-    thumbnailUrl: "",
+    thumbnailUrl: "/game-thumbnails/tetris.png",
   },
   {
     id: "block-blast",
@@ -31,7 +31,7 @@ export const GAMES: GameDefinition[] = [
     cost: 50,
     // GitHub Pages hosted — no X-Frame-Options restriction
     iframeUrl: "https://games.engineering.com/blockblastgame/index.html",
-    thumbnailUrl: "",
+    thumbnailUrl: "/game-thumbnails/block-blast.png",
   },
   {
     id: "subway-surfers",
@@ -40,7 +40,7 @@ export const GAMES: GameDefinition[] = [
     cost: 50,
     // GitHub Pages hosted — no X-Frame-Options restriction
     iframeUrl: "https://77pen.github.io/p8/subway-surfers-newyork/",
-    thumbnailUrl: "",
+    thumbnailUrl: "/game-thumbnails/subway-surfers.avif",
   },
 ];
 

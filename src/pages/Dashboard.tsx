@@ -327,7 +327,7 @@ export default function Dashboard() {
             <div className="mx-5 h-3 w-3 rounded-full bg-red-500 animate-pulse" />
             <div>
               <p className="font-semibold text-red-400">Clocked In</p>
-              <p className="text-xs text-muted-foreground">You're available to scout</p>
+              <p className="text-xs text-muted-foreground">You're in stands!</p>
             </div>
           </div>
           <Button
