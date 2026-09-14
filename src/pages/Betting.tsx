@@ -435,7 +435,7 @@ function MarketGrid({ openMatches, oddsMap, tbaMap, sbMap, myBetByMatch, tbaLoad
     return (
       <div className="text-center text-muted-foreground py-12">
         <Target className="h-10 w-10 mx-auto mb-3 opacity-30" />
-        <p>No open markets right now.</p>
+        <p>No upcoming matches.</p>
       </div>
     );
   }
@@ -998,14 +998,15 @@ export default function Betting() {
         <div className="flex items-center justify-between mb-6 max-w-2xl mx-auto">
           <div className="flex items-center gap-3">
             {!isInIframe && (
-              <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
-                <ArrowLeft className="h-5 w-5" />
+              <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard")}>
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back to Dashboard
               </Button>
             )}
             <div>
               <h1 className="text-2xl font-bold flex items-center gap-2">
                 <TrendingUp className="h-6 w-6 text-primary" />
-                Prediction Markets
+                Betting
               </h1>
               {event && <p className="text-sm text-muted-foreground">{event.name}</p>}
             </div>
@@ -1039,7 +1040,7 @@ export default function Betting() {
             <TabsList className="w-full mb-4 max-w-2xl mx-auto">
               <TabsTrigger value="markets" className="flex-1">
                 <Target className="h-3.5 w-3.5 mr-1" />
-                Markets
+                Matches
                 {openMatches.length > 0 && (
                   <Badge className="ml-1.5 h-5 px-1.5 text-xs">{openMatches.length}</Badge>
                 )}

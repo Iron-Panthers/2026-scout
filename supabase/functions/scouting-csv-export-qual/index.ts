@@ -20,6 +20,13 @@ Deno.serve(async (req: Request) => {
     red1: ['Red 1', 'Red'], red2: ['Red 2', 'Red'], red3: ['Red 3', 'Red'], qualRed: ['Red Qual', 'Red'],
   };
 
+  function withoutShotLocations(submission: any) {
+    const sanitized = { ...submission, scouting_data: { ...(submission.scouting_data || {}) } };
+    delete sanitized.scouting_data.primaryShotPosition;
+    delete sanitized.scouting_data.secondaryShotPosition;
+    return sanitized;
+  }
+
   try {
     const [profiles, submissions] = await Promise.all([fetchTable('profiles'), fetchTable('qual_scouting_submissions')]);
     const userDict: Record<string, string> = {};
@@ -35,6 +42,7 @@ Deno.serve(async (req: Request) => {
       }
 
       try {
+        const sanitizedSubmission = withoutShotLocations(d);
         // Use team1/team2/team3 for deterministic ordering (backfilled from TBA)
         // Fall back to Object.keys(teamOptions) for any old submissions not yet backfilled
         const t1 = String(sd.team1 ?? Object.keys(sd.teamOptions || {})[0] ?? '');
@@ -45,7 +53,7 @@ Deno.serve(async (req: Request) => {
 
         const row = [
           '',
-          JSON.stringify(d),
+          JSON.stringify(sanitizedSubmission),
           d.time || '',
           version,
           userDict[d.scouter_id] || '',
@@ -62,7 +70,7 @@ Deno.serve(async (req: Request) => {
         ];
         rows.push(row);
       } catch (err: any) {
-        const row = ['Error processing: ', JSON.stringify(d), err.message];
+        const row = ['Error processing: ', JSON.stringify(withoutShotLocations(d)), err.message];
         rows.push(row);
       }
     });

@@ -3,10 +3,10 @@ import type { DashboardHeaderProps } from "@/types";
 
 const DEFAULT_SUBTITLES = [
   "Do you want candy????",
-  "Oh my god we're cooked",
+  "Is the blue alliance winning?",
   "You better scout well",
   "Norbert is watching",
-  "Scouting is life trust",
+  "Scouting is life",
   "Lemons!!!",
   "Baller",
   "Buy a decoration today",
@@ -16,6 +16,10 @@ const DEFAULT_SUBTITLES = [
   "50 26!",
   "Are you playing Mosim right now?",
   "Don't give up!!!",
+  "Vote 5026 on frcmash.com",
+  "If you've been scouting for a while, get up and stretch a bit",
+  "Tell Liam to do his damn job >:(",
+  "I'm proud of you"
 ];
 
 export default function DashboardHeader({
