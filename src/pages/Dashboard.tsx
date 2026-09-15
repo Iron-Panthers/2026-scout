@@ -1,4 +1,23 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
+import {
+  DndContext,
+  DragOverlay,
+  closestCenter,
+  useDroppable,
+  useSensor,
+  useSensors,
+  PointerSensor,
+  TouchSensor,
+  type DragStartEvent,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  arrayMove,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -64,33 +83,100 @@ interface UserMatch {
 
 type PicklistColumnKey = "bank" | "picklist" | "doNotPick";
 
+function PicklistCardContent({
+  team,
+  showRank,
+  index,
+}: {
+  team: TBATeamSimple;
+  showRank?: boolean;
+  index?: number;
+}) {
+  return (
+    <CardContent className="flex items-center gap-2.5 px-3 py-2">
+      {showRank && (
+        <span className="w-5 shrink-0 text-center text-xs font-bold text-muted-foreground">
+          {(index ?? 0) + 1}
+        </span>
+      )}
+      <TeamLogo
+        teamNumber={team.team_number}
+        className="h-11 w-11 shrink-0 rounded-md border bg-muted object-contain"
+      />
+      <div className="flex min-w-0 flex-col justify-center">
+        <p className="font-mono text-sm font-bold">{team.team_number}</p>
+        <p className="truncate text-xs text-muted-foreground">
+          {team.nickname || "Unknown team"}
+        </p>
+      </div>
+    </CardContent>
+  );
+}
+
+interface SortablePicklistCardProps {
+  team: TBATeamSimple;
+  column: PicklistColumnKey;
+  index: number;
+  showRank: boolean;
+  onCardClick: (team: TBATeamSimple) => void;
+}
+
+// A single draggable/sortable team card. Works with mouse, touch, and pen
+// input uniformly via dnd-kit's pointer sensors (native HTML5 drag-and-drop
+// doesn't fire on touch devices at all).
+function SortablePicklistCard({
+  team,
+  column,
+  index,
+  showRank,
+  onCardClick,
+}: SortablePicklistCardProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: team.team_number,
+    data: { column },
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      {...attributes}
+      {...listeners}
+      className="touch-none"
+    >
+      <Card
+        onClick={() => onCardClick(team)}
+        className={`cursor-grab gap-0 py-0 transition-opacity hover:bg-accent/50 active:cursor-grabbing ${
+          isDragging ? "opacity-50" : ""
+        }`}
+      >
+        <PicklistCardContent team={team} showRank={showRank} index={index} />
+      </Card>
+    </div>
+  );
+}
+
 interface PicklistColumnProps {
+  columnKey: PicklistColumnKey;
   title: string;
   headerAction?: React.ReactNode;
   teams: TBATeamSimple[];
   emptyMessage: string;
   showRank: boolean;
-  draggedTeamNumber: number | null;
-  onDragStart: (team: TBATeamSimple) => void;
-  onDragEnd: () => void;
-  onCardDragOver?: (teamNumber: number) => void;
-  onColumnDrop: () => void;
   onCardClick: (team: TBATeamSimple) => void;
 }
 
 function PicklistColumn({
+  columnKey,
   title,
   headerAction,
   teams,
   emptyMessage,
   showRank,
-  draggedTeamNumber,
-  onDragStart,
-  onDragEnd,
-  onCardDragOver,
-  onColumnDrop,
   onCardClick,
 }: PicklistColumnProps) {
+  const { setNodeRef } = useDroppable({ id: columnKey });
+
   return (
     <div>
       <div className="mb-1.5 flex items-center justify-between gap-2">
@@ -98,8 +184,7 @@ function PicklistColumn({
         {headerAction}
       </div>
       <div
-        onDragOver={(event) => event.preventDefault()}
-        onDrop={onColumnDrop}
+        ref={setNodeRef}
         className="flex max-h-[424px] min-h-32 flex-col gap-2 overflow-y-auto rounded-lg border border-dashed p-1.5"
       >
         {teams.length === 0 && (
@@ -107,44 +192,21 @@ function PicklistColumn({
             {emptyMessage}
           </p>
         )}
-        {teams.map((team, index) => (
-          <Card
-            key={team.team_number}
-            draggable
-            onDragStart={() => onDragStart(team)}
-            onDragOver={
-              onCardDragOver
-                ? (event) => {
-                    event.preventDefault();
-                    onCardDragOver(team.team_number);
-                  }
-                : undefined
-            }
-            onDragEnd={onDragEnd}
-            onClick={() => onCardClick(team)}
-            className={`cursor-grab gap-0 py-0 transition-opacity hover:bg-accent/50 active:cursor-grabbing ${
-              draggedTeamNumber === team.team_number ? "opacity-50" : ""
-            }`}
-          >
-            <CardContent className="flex items-center gap-2.5 px-3 py-2">
-              {showRank && (
-                <span className="w-5 shrink-0 text-center text-xs font-bold text-muted-foreground">
-                  {index + 1}
-                </span>
-              )}
-              <TeamLogo
-                teamNumber={team.team_number}
-                className="h-11 w-11 shrink-0 rounded-md border bg-muted object-contain"
-              />
-              <div className="flex min-w-0 flex-col justify-center">
-                <p className="font-mono text-sm font-bold">{team.team_number}</p>
-                <p className="truncate text-xs text-muted-foreground">
-                  {team.nickname || "Unknown team"}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+        <SortableContext
+          items={teams.map((t) => t.team_number)}
+          strategy={verticalListSortingStrategy}
+        >
+          {teams.map((team, index) => (
+            <SortablePicklistCard
+              key={team.team_number}
+              team={team}
+              column={columnKey}
+              index={index}
+              showRank={showRank}
+              onCardClick={onCardClick}
+            />
+          ))}
+        </SortableContext>
       </div>
     </div>
   );
@@ -174,13 +236,14 @@ export default function Dashboard() {
   const [scoutingAvgLoading, setScoutingAvgLoading] = useState(false);
   const [scoutingAvgLoadedEventId, setScoutingAvgLoadedEventId] = useState<string | null>(null);
   const [picklistLoading, setPicklistLoading] = useState(false);
-  const [draggedTeam, setDraggedTeam] = useState<
-    { team: TBATeamSimple; source: PicklistColumnKey } | null
-  >(null);
+  const [activeDragTeamNumber, setActiveDragTeamNumber] = useState<number | null>(null);
   const [picklistEvents, setPicklistEvents] = useState<Event[]>([]);
   const [selectedPicklistEventId, setSelectedPicklistEventId] = useState("");
   const [teamInfoOpen, setTeamInfoOpen] = useState(false);
   const [teamInfoTeam, setTeamInfoTeam] = useState<TBATeamSimple | null>(null);
+  const [mobilePicklistTab, setMobilePicklistTab] = useState<"picklist" | "doNotPick">(
+    "picklist"
+  );
 
   const navigate = useNavigate();
 
@@ -397,112 +460,101 @@ export default function Dashboard() {
     return [...bankTeams].sort((a, b) => a.team_number - b.team_number);
   }, [bankTeams, bankSortMode, teamEpaMap, teamScoutingAvgMap]);
 
-  const picklistColumnSetters: Record<
-    PicklistColumnKey,
-    React.Dispatch<React.SetStateAction<TBATeamSimple[]>>
-  > = {
-    bank: setBankTeams,
-    picklist: setPickedTeams,
-    doNotPick: setDoNotPickTeams,
+  // dnd-kit sensors: PointerSensor covers mouse/pen, TouchSensor covers touch.
+  // Both need a small activation threshold so a plain tap/click (to open the
+  // team info dialog) or a scroll gesture isn't mistaken for a drag.
+  const dndSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } })
+  );
+
+  const findColumnOfTeam = (teamNumber: number): PicklistColumnKey | null => {
+    if (pickedTeams.some((t) => t.team_number === teamNumber)) return "picklist";
+    if (doNotPickTeams.some((t) => t.team_number === teamNumber)) return "doNotPick";
+    if (bankTeams.some((t) => t.team_number === teamNumber)) return "bank";
+    return null;
   };
 
-  const removeFromPicklistColumn = (column: PicklistColumnKey, teamNumber: number) => {
-    picklistColumnSetters[column]((current) =>
-      current.filter((t) => t.team_number !== teamNumber)
-    );
+  const activeDragTeam =
+    activeDragTeamNumber != null
+      ? pickedTeams.find((t) => t.team_number === activeDragTeamNumber) ??
+        doNotPickTeams.find((t) => t.team_number === activeDragTeamNumber) ??
+        bankTeams.find((t) => t.team_number === activeDragTeamNumber) ??
+        null
+      : null;
+
+  const handleDndDragStart = (event: DragStartEvent) => {
+    setActiveDragTeamNumber(Number(event.active.id));
   };
 
-  // Reorder within an ordered column (picklist / do-not-pick), or drag a team
-  // in from another column and insert it at the hovered position.
-  const handleOrderedColumnCardDragOver = (
-    columnKey: "picklist" | "doNotPick",
-    targetTeamNumber: number
-  ) => {
-    if (!draggedTeam) return;
-    const { team, source } = draggedTeam;
-    const setColumn = picklistColumnSetters[columnKey];
-    if (source === columnKey) {
-      if (team.team_number === targetTeamNumber) return;
-      setColumn((current) => {
-        const fromIndex = current.findIndex((t) => t.team_number === team.team_number);
-        const toIndex = current.findIndex((t) => t.team_number === targetTeamNumber);
-        if (fromIndex < 0 || toIndex < 0) return current;
-        const next = [...current];
-        const [moved] = next.splice(fromIndex, 1);
-        next.splice(toIndex, 0, moved);
-        return next;
-      });
-      return;
+  const handleDndDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveDragTeamNumber(null);
+    if (!over) return;
+
+    const activeTeamNumber = Number(active.id);
+    const sourceColumn = findColumnOfTeam(activeTeamNumber);
+    if (!sourceColumn) return;
+
+    const overId = over.id;
+    const overIsColumn = overId === "bank" || overId === "picklist" || overId === "doNotPick";
+    const overColumn: PicklistColumnKey = overIsColumn
+      ? (overId as PicklistColumnKey)
+      : ((over.data.current?.column as PicklistColumnKey | undefined) ?? sourceColumn);
+
+    const arraysByColumn: Record<PicklistColumnKey, TBATeamSimple[]> = {
+      bank: bankTeams,
+      picklist: pickedTeams,
+      doNotPick: doNotPickTeams,
+    };
+
+    let nextBank = arraysByColumn.bank;
+    let nextPicked = arraysByColumn.picklist;
+    let nextDoNotPick = arraysByColumn.doNotPick;
+    const commit = (column: PicklistColumnKey, arr: TBATeamSimple[]) => {
+      if (column === "bank") nextBank = arr;
+      else if (column === "picklist") nextPicked = arr;
+      else nextDoNotPick = arr;
+    };
+
+    if (sourceColumn === overColumn) {
+      // The bank has no meaningful manual order (always re-sorted for
+      // display), and dropping on the column's own empty space is a no-op.
+      if (sourceColumn === "bank" || overIsColumn) return;
+      const arr = arraysByColumn[sourceColumn];
+      const fromIndex = arr.findIndex((t) => t.team_number === activeTeamNumber);
+      const toIndex = arr.findIndex((t) => t.team_number === Number(overId));
+      if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return;
+      commit(sourceColumn, arrayMove(arr, fromIndex, toIndex));
+    } else {
+      const sourceArr = [...arraysByColumn[sourceColumn]];
+      const fromIndex = sourceArr.findIndex((t) => t.team_number === activeTeamNumber);
+      if (fromIndex < 0) return;
+      const [movedTeam] = sourceArr.splice(fromIndex, 1);
+
+      const targetArr = [...arraysByColumn[overColumn]];
+      const overIndex = overIsColumn
+        ? targetArr.length
+        : targetArr.findIndex((t) => t.team_number === Number(overId));
+      targetArr.splice(overIndex >= 0 ? overIndex : targetArr.length, 0, movedTeam);
+
+      commit(sourceColumn, sourceArr);
+      commit(overColumn, targetArr);
     }
 
-    // Dragging in from another column: move it into this column at this position.
-    removeFromPicklistColumn(source, team.team_number);
-    setColumn((current) => {
-      if (current.some((t) => t.team_number === team.team_number)) return current;
-      const toIndex = current.findIndex((t) => t.team_number === targetTeamNumber);
-      const next = [...current];
-      next.splice(toIndex < 0 ? next.length : toIndex, 0, team);
-      return next;
-    });
-    setDraggedTeam({ team, source: columnKey });
-  };
+    setBankTeams(nextBank);
+    setPickedTeams(nextPicked);
+    setDoNotPickTeams(nextDoNotPick);
 
-  // Dropping on empty space in an ordered column appends to the end.
-  const handleOrderedColumnDrop = (columnKey: "picklist" | "doNotPick") => {
-    if (!draggedTeam || draggedTeam.source === columnKey) {
-      setDraggedTeam(null);
-      return;
+    if (user?.id && selectedPicklistEventId) {
+      upsertPicklist(
+        user.id,
+        selectedPicklistEventId,
+        nextPicked.map((t) => t.team_number),
+        nextDoNotPick.map((t) => t.team_number)
+      );
     }
-    const { team, source } = draggedTeam;
-    removeFromPicklistColumn(source, team.team_number);
-    picklistColumnSetters[columnKey]((current) =>
-      current.some((t) => t.team_number === team.team_number) ? current : [...current, team]
-    );
-    setDraggedTeam(null);
   };
-
-  // Dropping on the bank column removes the team from wherever it came from.
-  const handleBankDrop = () => {
-    if (!draggedTeam || draggedTeam.source === "bank") {
-      setDraggedTeam(null);
-      return;
-    }
-    const { team, source } = draggedTeam;
-    removeFromPicklistColumn(source, team.team_number);
-    setBankTeams((current) =>
-      current.some((t) => t.team_number === team.team_number)
-        ? current
-        : [...current, team].sort((a, b) => a.team_number - b.team_number)
-    );
-    setDraggedTeam(null);
-  };
-
-  // Fallback cleanup for gestures that end outside any valid drop target
-  // (the column onDrop handlers above already clear this in the common case).
-  const handleDragEnd = () => {
-    setDraggedTeam(null);
-  };
-
-  // Save whenever a drag gesture finishes (draggedTeam going back to null),
-  // regardless of which handler caused it. By the time this effect runs,
-  // React has already committed whatever pickedTeams/doNotPickTeams change
-  // came with that same state update, so this always reads the settled
-  // result of the gesture — unlike onDragEnd, which fires on the dragged
-  // source element and can silently never fire if that element got
-  // unmounted mid-gesture (e.g. moving a card to a different column).
-  // Deliberately keyed only on draggedTeam — the other values are read
-  // fresh from this render's closure, not tracked as retrigger conditions.
-  useEffect(() => {
-    if (draggedTeam !== null) return;
-    if (!user?.id || !selectedPicklistEventId) return;
-    upsertPicklist(
-      user.id,
-      selectedPicklistEventId,
-      pickedTeams.map((t) => t.team_number),
-      doNotPickTeams.map((t) => t.team_number)
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draggedTeam]);
 
   // Re-fetch whenever the user navigates back to this tab
   useEffect(() => {
@@ -639,7 +691,7 @@ export default function Dashboard() {
 
   const handleClockIn = async () => {
     if (!user?.id) return;
-    (true);
+    setClocingIn(true);
     await clockIn(user.id);
     await refreshProfile();
     setClocingIn(false);
@@ -692,7 +744,11 @@ export default function Dashboard() {
             className="h-16 border-red-700/40 text-red-400 hover:bg-red-900/20 hover:text-red-300"
             onClick={handleClockOut}
           >
-            <LogOut className="h-4 w-4 mr-1.5" />
+            {clockingIn ? (
+              <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+            ) : (
+              <LogOut className="h-4 w-4 mr-1.5" />
+            )}
             Clock Out
           </Button>
         </div>
@@ -703,7 +759,11 @@ export default function Dashboard() {
           className="w-full h-20 lg:h-full text-lg"
           onClick={handleClockIn}
         >
-          <LogIn className="h-6 w-6 mr-2" />
+          {clockingIn ? (
+            <Loader2 className="h-6 w-6 mr-2 animate-spin" />
+          ) : (
+            <LogIn className="h-6 w-6 mr-2" />
+          )}
           Clock In
         </Button>
       )}
@@ -976,6 +1036,32 @@ export default function Dashboard() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="mb-4 flex items-center gap-1 rounded-lg border p-1 sm:hidden">
+              <Button
+                size="sm"
+                variant={mobilePicklistTab === "picklist" ? "default" : "ghost"}
+                className={
+                  mobilePicklistTab === "picklist"
+                    ? "flex-1 text-xs font-semibold shadow-sm"
+                    : "flex-1 text-xs text-muted-foreground hover:text-foreground"
+                }
+                onClick={() => setMobilePicklistTab("picklist")}
+              >
+                Your Picklist
+              </Button>
+              <Button
+                size="sm"
+                variant={mobilePicklistTab === "doNotPick" ? "default" : "ghost"}
+                className={
+                  mobilePicklistTab === "doNotPick"
+                    ? "flex-1 text-xs font-semibold shadow-sm"
+                    : "flex-1 text-xs text-muted-foreground hover:text-foreground"
+                }
+                onClick={() => setMobilePicklistTab("doNotPick")}
+              >
+                Do Not Pick
+              </Button>
+            </div>
             {picklistLoading ? (
               <p className="text-muted-foreground">Loading event teams...</p>
             ) : pickedTeams.length === 0 && bankTeams.length === 0 ? (
@@ -983,94 +1069,98 @@ export default function Dashboard() {
                 <p className="text-muted-foreground">No teams found for the active event.</p>
               </Card>
             ) : (
-              <div className="grid grid-cols-3 gap-2 sm:gap-4">
-                <PicklistColumn
-                  title="Your Picklist"
-                  teams={pickedTeams}
-                  emptyMessage="Drag teams here to build your picklist."
-                  showRank
-                  draggedTeamNumber={draggedTeam?.team.team_number ?? null}
-                  onDragStart={(team) => setDraggedTeam({ team, source: "picklist" })}
-                  onDragEnd={handleDragEnd}
-                  onCardDragOver={(teamNumber) =>
-                    handleOrderedColumnCardDragOver("picklist", teamNumber)
-                  }
-                  onColumnDrop={() => handleOrderedColumnDrop("picklist")}
-                  onCardClick={(team) => {
-                    setTeamInfoTeam(team);
-                    setTeamInfoOpen(true);
-                  }}
-                />
+              <DndContext
+                sensors={dndSensors}
+                collisionDetection={closestCenter}
+                onDragStart={handleDndDragStart}
+                onDragEnd={handleDndDragEnd}
+              >
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-4">
+                  <div className={mobilePicklistTab === "doNotPick" ? "hidden sm:block" : ""}>
+                    <PicklistColumn
+                      columnKey="picklist"
+                      title="Your Picklist"
+                      teams={pickedTeams}
+                      emptyMessage="Picklist goes here I think"
+                      showRank
+                      onCardClick={(team) => {
+                        setTeamInfoTeam(team);
+                        setTeamInfoOpen(true);
+                      }}
+                    />
+                  </div>
 
-                <PicklistColumn
-                  title="Do Not Pick"
-                  teams={doNotPickTeams}
-                  emptyMessage="Drag teams here you don't want to pick."
-                  showRank
-                  draggedTeamNumber={draggedTeam?.team.team_number ?? null}
-                  onDragStart={(team) => setDraggedTeam({ team, source: "doNotPick" })}
-                  onDragEnd={handleDragEnd}
-                  onCardDragOver={(teamNumber) =>
-                    handleOrderedColumnCardDragOver("doNotPick", teamNumber)
-                  }
-                  onColumnDrop={() => handleOrderedColumnDrop("doNotPick")}
-                  onCardClick={(team) => {
-                    setTeamInfoTeam(team);
-                    setTeamInfoOpen(true);
-                  }}
-                />
+                  <div className={mobilePicklistTab === "picklist" ? "hidden sm:block" : ""}>
+                    <PicklistColumn
+                      columnKey="doNotPick"
+                      title="Do Not Pick"
+                      teams={doNotPickTeams}
+                      emptyMessage="Skibidi"
+                      showRank
+                      onCardClick={(team) => {
+                        setTeamInfoTeam(team);
+                        setTeamInfoOpen(true);
+                      }}
+                    />
+                  </div>
 
-                <PicklistColumn
-                  title="Available Teams"
-                  headerAction={
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 gap-1 px-1.5 text-[10px] font-semibold uppercase text-muted-foreground"
-                        >
-                          {epaLoading || scoutingAvgLoading ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                          ) : (
-                            <ArrowUpDown className="h-3 w-3" />
-                          )}
-                          Sort
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuRadioGroup
-                          value={bankSortMode}
-                          onValueChange={(value) =>
-                            setBankSortMode(value as "number" | "epa" | "scouting")
-                          }
-                        >
-                          <DropdownMenuRadioItem value="number">
-                            Team Number
-                          </DropdownMenuRadioItem>
-                          <DropdownMenuRadioItem value="epa">
-                            EPA (Statbotics)
-                          </DropdownMenuRadioItem>
-                          <DropdownMenuRadioItem value="scouting">
-                            Scouting Averages
-                          </DropdownMenuRadioItem>
-                        </DropdownMenuRadioGroup>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  }
-                  teams={sortedBankTeams}
-                  emptyMessage="All teams have been picked."
-                  showRank={false}
-                  draggedTeamNumber={draggedTeam?.team.team_number ?? null}
-                  onDragStart={(team) => setDraggedTeam({ team, source: "bank" })}
-                  onDragEnd={handleDragEnd}
-                  onColumnDrop={handleBankDrop}
-                  onCardClick={(team) => {
-                    setTeamInfoTeam(team);
-                    setTeamInfoOpen(true);
-                  }}
-                />
-              </div>
+                  <PicklistColumn
+                    columnKey="bank"
+                    title="Available Teams"
+                    headerAction={
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 gap-1 px-1.5 text-[10px] font-semibold uppercase text-muted-foreground"
+                          >
+                            {epaLoading || scoutingAvgLoading ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <ArrowUpDown className="h-3 w-3" />
+                            )}
+                            Sort
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuRadioGroup
+                            value={bankSortMode}
+                            onValueChange={(value) =>
+                              setBankSortMode(value as "number" | "epa" | "scouting")
+                            }
+                          >
+                            <DropdownMenuRadioItem value="number">
+                              Team Number
+                            </DropdownMenuRadioItem>
+                            <DropdownMenuRadioItem value="epa">
+                              EPA (Statbotics)
+                            </DropdownMenuRadioItem>
+                            <DropdownMenuRadioItem value="scouting">
+                              Scouting Averages
+                            </DropdownMenuRadioItem>
+                          </DropdownMenuRadioGroup>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    }
+                    teams={sortedBankTeams}
+                    emptyMessage="All teams have been picked."
+                    showRank={false}
+                    onCardClick={(team) => {
+                      setTeamInfoTeam(team);
+                      setTeamInfoOpen(true);
+                    }}
+                  />
+                </div>
+
+                <DragOverlay>
+                  {activeDragTeam ? (
+                    <Card className="cursor-grabbing gap-0 py-0 shadow-lg">
+                      <PicklistCardContent team={activeDragTeam} />
+                    </Card>
+                  ) : null}
+                </DragOverlay>
+              </DndContext>
             )}
 
             <TeamInfoDialog

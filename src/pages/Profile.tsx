@@ -143,12 +143,12 @@ export default function Profile() {
               </div>
               <div className="flex-1 text-center md:text-left">
                 {isEditingName ? (
-                  <div className="flex items-center gap-2 justify-center md:justify-start -mb-2">
+                  <div className="flex w-full items-center gap-2 justify-center md:w-auto md:justify-start mb-2">
                     <input
                       type="text"
                       value={editedName}
                       onChange={(e) => setEditedName(e.target.value)}
-                      className="text-2xl font-bold bg-background border border-input rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary"
+                      className="min-w-0 flex-1 text-2xl font-bold bg-background border border-input rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary md:flex-initial"
                       autoFocus
                       onKeyDown={(e) => {
                         if (e.key === "Enter") handleSaveName();
