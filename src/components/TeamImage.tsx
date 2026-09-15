@@ -10,6 +10,8 @@ interface TeamImageProps {
   eventId?: string;
   className?: string;
   fallbackClassName?: string;
+  /** Use a small, single-line placeholder instead of the large team number + "No Photo" caption. */
+  compact?: boolean;
 }
 
 /**
@@ -24,6 +26,7 @@ export function TeamImage({
   eventId,
   className = "w-full h-full object-cover",
   fallbackClassName = "w-full h-full flex items-center justify-center bg-muted",
+  compact = false,
 }: TeamImageProps) {
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -62,7 +65,7 @@ export function TeamImage({
               setPhotoUrl('/ben.png');
 
               console.log(user);
-              if (user.id === 'e692ca16-dfff-46a1-9ca2-764ffe6a7ddd') {
+              if (user?.id === 'e692ca16-dfff-46a1-9ca2-764ffe6a7ddd') {
                 setTimeout(() => {
                   updateSetting('theme', 'ben');
                   setTimeout(() => {
@@ -86,7 +89,7 @@ export function TeamImage({
           setPhotoUrl('/ben.png');
 
           console.log(user);
-          if (user.id === 'e692ca16-dfff-46a1-9ca2-764ffe6a7ddd') {
+          if (user?.id === 'e692ca16-dfff-46a1-9ca2-764ffe6a7ddd') {
             setTimeout(() => {
               updateSetting('theme', 'ben');
               setTimeout(() => {
@@ -122,12 +125,27 @@ export function TeamImage({
   if (loading) {
     return (
       <div className={fallbackClassName}>
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <Loader2
+          className={
+            compact
+              ? "h-3.5 w-3.5 animate-spin text-muted-foreground"
+              : "h-8 w-8 animate-spin text-muted-foreground"
+          }
+        />
       </div>
     );
   }
 
   if (error || !photoUrl) {
+    if (compact) {
+      return (
+        <div className={fallbackClassName}>
+          <p className="text-[10px] font-bold leading-none text-muted-foreground">
+            {teamNumber}
+          </p>
+        </div>
+      );
+    }
     return (
       <div className={fallbackClassName}>
         <div className="text-center">

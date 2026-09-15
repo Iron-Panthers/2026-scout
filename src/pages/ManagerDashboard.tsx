@@ -60,6 +60,21 @@ import type {
   Roster,
 } from "@/types";
 
+const MANAGER_SUBTITLES = [
+  "Isha and Cooper sitting in a tree",
+  "Assign 3000 matches to Aaron Cole",
+  "How's it going",
+  "Have you talked to anyone lately?",
+  "Treat yourself to some candy",
+  "Go manage or something, idk",
+  "I love scouting.",
+  "Make sure people aren't missing their matches...",
+  "6 7",
+  "Noot Noot",
+  "Hi guys",
+  "Make sure to turn off auto pulling when we're done.",
+];
+
 export default function ManagerDashboard() {
   const { user, profile: myProfile, getAvatarUrl } = useAuth();
   const { toast } = useToast();
@@ -746,10 +761,7 @@ export default function ManagerDashboard() {
         {/* Header Section */}
         <div className="flex items-start justify-between mb-8">
           <div className="flex items-center gap-3">
-            <DashboardHeader
-              userName={userName}
-              subtitle="Manage scout assignments for the competition"
-            />
+            <DashboardHeader userName={userName} subtitles={MANAGER_SUBTITLES} />
             <Button
               variant="ghost"
               size="icon"

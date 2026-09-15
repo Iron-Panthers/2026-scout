@@ -199,6 +199,42 @@ export async function getTeamPhoto(
   return null;
 }
 
+const TBA_LOGO_CACHE_PFX = "tba_logo_";
+const TBA_LOGO_CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days — avatars rarely change
+
+/**
+ * Gets a team's FIRST-issued avatar/logo for a given year (as a data URI).
+ * @param teamNumber - The team number (e.g., 1678)
+ * @param year - The year (e.g., 2024, 2025)
+ * @returns Data URI for the team's logo, or null if not found
+ */
+export async function getTeamLogo(
+  teamNumber: number,
+  year: number
+): Promise<string | null> {
+  const cKey = `${TBA_LOGO_CACHE_PFX}${teamNumber}_${year}`;
+  try {
+    const raw = localStorage.getItem(cKey);
+    if (raw) {
+      const { data, ts } = JSON.parse(raw) as { data: string | null; ts: number };
+      if (Date.now() - ts < TBA_LOGO_CACHE_TTL) return data;
+    }
+  } catch { /* ignore */ }
+
+  const teamKey = `frc${teamNumber}`;
+  const media = await tbaFetch<TBAMedia[]>(`/team/${teamKey}/media/${year}`);
+  const avatar = media?.find((m) => m.type === "avatar" && m.details?.base64Image);
+  const logo = avatar?.details?.base64Image
+    ? `data:image/png;base64,${avatar.details.base64Image}`
+    : null;
+
+  try {
+    localStorage.setItem(cKey, JSON.stringify({ data: logo, ts: Date.now() }));
+  } catch { /* ignore */ }
+
+  return logo;
+}
+
 /**
  * Gets basic team information
  * @param teamNumber - The team number (e.g., 1678)

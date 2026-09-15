@@ -14,7 +14,7 @@ const DEFAULT_SUBTITLES = [
   "50 26!",
   "Are you playing Mosim right now?",
   "Don't give up!!!",
-  "Vote 5026 on frcmash.com",
+  "Vote 5026 on frcmash.com!",
   "If you've been scouting for a while, get up and stretch a bit.",
   "Tell Liam to do his damn job >:(",
   "I'm proud of you"
@@ -23,10 +23,12 @@ const DEFAULT_SUBTITLES = [
 export default function DashboardHeader({
   userName,
   subtitle,
+  subtitles,
 }: DashboardHeaderProps) {
-  const [randomSubtitle] = useState(
-    () => DEFAULT_SUBTITLES[Math.floor(Math.random() * DEFAULT_SUBTITLES.length)],
-  );
+  const [randomSubtitle] = useState(() => {
+    const pool = subtitles && subtitles.length > 0 ? subtitles : DEFAULT_SUBTITLES;
+    return pool[Math.floor(Math.random() * pool.length)];
+  });
 
   return (
     <div>

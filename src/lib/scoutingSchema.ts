@@ -470,6 +470,56 @@ export async function hasExistingSubmission(
 }
 
 /**
+ * Get each team's average scouted activity (shots + logged events per match)
+ * for every team scouted at an event, in one pair of queries.
+ *
+ * This is a raw scouted count, not an official point value — the game's
+ * per-action point values aren't tracked anywhere in the schema.
+ *
+ * @param eventId - The event's database id
+ * @returns Map of team number -> average (shots + events) per scouted match
+ */
+export async function getEventScoutingAverages(
+  eventId: string
+): Promise<Map<number, number>> {
+  const { data: matchRows, error: matchError } = await supabase
+    .from("matches")
+    .select("id")
+    .eq("event_id", eventId);
+
+  if (matchError || !matchRows || matchRows.length === 0) return new Map();
+
+  const matchIds = matchRows.map((m) => m.id);
+  const { data: submissions, error: subError } = await supabase
+    .from("scouting_submissions")
+    .select("team_num, scouting_data")
+    .in("match_id", matchIds);
+
+  if (subError || !submissions) return new Map();
+
+  const totals = new Map<number, { sum: number; count: number }>();
+  for (const row of submissions) {
+    const teamNum = Number(row.team_num);
+    if (!Number.isFinite(teamNum)) continue;
+
+    const data = row.scouting_data as Record<string, any> | null;
+    const shots = Array.isArray(data?.shots) ? data.shots.length : 0;
+    const events = Array.isArray(data?.events) ? data.events.length : 0;
+
+    const entry = totals.get(teamNum) ?? { sum: 0, count: 0 };
+    entry.sum += shots + events;
+    entry.count += 1;
+    totals.set(teamNum, entry);
+  }
+
+  const averages = new Map<number, number>();
+  totals.forEach(({ sum, count }, teamNum) => {
+    if (count > 0) averages.set(teamNum, sum / count);
+  });
+  return averages;
+}
+
+/**
  * Filter matches to exclude those with existing submissions
  * @param matches - Array of match objects with id and role
  * @returns Filtered array excluding matches with submissions
