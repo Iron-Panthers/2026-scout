@@ -477,11 +477,23 @@ export default function Dashboard() {
     setDraggedTeam(null);
   };
 
-  // Fires once per completed drag gesture, regardless of which column it
-  // started or ended in — the natural point to persist the current
-  // picklist/do-not-pick arrangement for the selected event.
+  // Fallback cleanup for gestures that end outside any valid drop target
+  // (the column onDrop handlers above already clear this in the common case).
   const handleDragEnd = () => {
     setDraggedTeam(null);
+  };
+
+  // Save whenever a drag gesture finishes (draggedTeam going back to null),
+  // regardless of which handler caused it. By the time this effect runs,
+  // React has already committed whatever pickedTeams/doNotPickTeams change
+  // came with that same state update, so this always reads the settled
+  // result of the gesture — unlike onDragEnd, which fires on the dragged
+  // source element and can silently never fire if that element got
+  // unmounted mid-gesture (e.g. moving a card to a different column).
+  // Deliberately keyed only on draggedTeam — the other values are read
+  // fresh from this render's closure, not tracked as retrigger conditions.
+  useEffect(() => {
+    if (draggedTeam !== null) return;
     if (!user?.id || !selectedPicklistEventId) return;
     upsertPicklist(
       user.id,
@@ -489,7 +501,8 @@ export default function Dashboard() {
       pickedTeams.map((t) => t.team_number),
       doNotPickTeams.map((t) => t.team_number)
     );
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draggedTeam]);
 
   // Re-fetch whenever the user navigates back to this tab
   useEffect(() => {
