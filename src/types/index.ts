@@ -135,6 +135,7 @@ export interface SelectedCell {
 export interface DashboardHeaderProps {
   userName: string;
   subtitle?: string;
+  subtitles?: string[];
 }
 
 export interface UserProfileMenuProps {
@@ -152,6 +153,17 @@ export interface PitScoutingAssignment {
   event_id: string;
   team_number: number;
   scouter_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// Picklist Types
+export interface PicklistRow {
+  id: string;
+  user_id: string;
+  event_id: string;
+  picked_team_numbers: number[];
+  do_not_pick_team_numbers: number[];
   created_at: string;
   updated_at: string;
 }

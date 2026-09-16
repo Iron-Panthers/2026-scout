@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -17,12 +24,24 @@ import {
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { ClipboardList, Wrench, X, RefreshCw, LogIn, LogOut, ListOrdered } from "lucide-react";
+import {
+  ClipboardList,
+  Wrench,
+  X,
+  RefreshCw,
+  LogIn,
+  LogOut,
+  ListOrdered,
+  ArrowUpDown,
+  Loader2,
+} from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { getUserMatches, removeUserFromMatch, getEvents } from "@/lib/matches";
 import { getMatchTeam, getEventTeams, type TBATeamSimple } from "@/lib/blueAlliance";
-import { filterMatchesWithoutSubmissions } from "@/lib/scoutingSchema";
+import { getEventEpaMap } from "@/lib/statbotics";
+import { filterMatchesWithoutSubmissions, getEventScoutingAverages } from "@/lib/scoutingSchema";
+import { getPicklist, upsertPicklist } from "@/lib/picklists";
 import { getUserPitAssignments, type UserPitAssignment } from "@/lib/pitScoutingAssignments";
 import { clockIn, clockOut } from "@/lib/profiles";
 import { supabase } from "@/lib/supabase";
@@ -31,6 +50,8 @@ import UserProfileMenu from "@/components/UserProfileMenu";
 import OfflineMatches from "@/components/OfflineMatches";
 import AnimatedContent from "@/components/AnimatedContent";
 import { TeamImage } from "@/components/TeamImage";
+import { TeamLogo } from "@/components/TeamLogo";
+import { TeamInfoDialog } from "@/components/TeamInfoDialog";
 import type { Match, Role, Event } from "@/types";
 import { prettifyRole } from "@/lib/roleUtils";
 export { prettifyRole };
@@ -39,6 +60,94 @@ interface UserMatch {
   matchNumber: string;
   role: Role;
   match: Match;
+}
+
+type PicklistColumnKey = "bank" | "picklist" | "doNotPick";
+
+interface PicklistColumnProps {
+  title: string;
+  headerAction?: React.ReactNode;
+  teams: TBATeamSimple[];
+  emptyMessage: string;
+  showRank: boolean;
+  draggedTeamNumber: number | null;
+  onDragStart: (team: TBATeamSimple) => void;
+  onDragEnd: () => void;
+  onCardDragOver?: (teamNumber: number) => void;
+  onColumnDrop: () => void;
+  onCardClick: (team: TBATeamSimple) => void;
+}
+
+function PicklistColumn({
+  title,
+  headerAction,
+  teams,
+  emptyMessage,
+  showRank,
+  draggedTeamNumber,
+  onDragStart,
+  onDragEnd,
+  onCardDragOver,
+  onColumnDrop,
+  onCardClick,
+}: PicklistColumnProps) {
+  return (
+    <div>
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <h3 className="text-xs font-semibold uppercase text-muted-foreground">{title}</h3>
+        {headerAction}
+      </div>
+      <div
+        onDragOver={(event) => event.preventDefault()}
+        onDrop={onColumnDrop}
+        className="flex max-h-[424px] min-h-32 flex-col gap-2 overflow-y-auto rounded-lg border border-dashed p-1.5"
+      >
+        {teams.length === 0 && (
+          <p className="flex flex-1 items-center justify-center p-4 text-center text-sm text-muted-foreground">
+            {emptyMessage}
+          </p>
+        )}
+        {teams.map((team, index) => (
+          <Card
+            key={team.team_number}
+            draggable
+            onDragStart={() => onDragStart(team)}
+            onDragOver={
+              onCardDragOver
+                ? (event) => {
+                    event.preventDefault();
+                    onCardDragOver(team.team_number);
+                  }
+                : undefined
+            }
+            onDragEnd={onDragEnd}
+            onClick={() => onCardClick(team)}
+            className={`cursor-grab gap-0 py-0 transition-opacity hover:bg-accent/50 active:cursor-grabbing ${
+              draggedTeamNumber === team.team_number ? "opacity-50" : ""
+            }`}
+          >
+            <CardContent className="flex items-center gap-2.5 px-3 py-2">
+              {showRank && (
+                <span className="w-5 shrink-0 text-center text-xs font-bold text-muted-foreground">
+                  {index + 1}
+                </span>
+              )}
+              <TeamLogo
+                teamNumber={team.team_number}
+                className="h-11 w-11 shrink-0 rounded-md border bg-muted object-contain"
+              />
+              <div className="flex min-w-0 flex-col justify-center">
+                <p className="font-mono text-sm font-bold">{team.team_number}</p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {team.nickname || "Unknown team"}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export default function Dashboard() {
@@ -54,11 +163,24 @@ export default function Dashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const [clockingIn, setClocingIn] = useState(false);
   const [dashboardPage, setDashboardPage] = useState<"scout" | "picklist">("scout");
-  const [picklistTeams, setPicklistTeams] = useState<TBATeamSimple[]>([]);
+  const [pickedTeams, setPickedTeams] = useState<TBATeamSimple[]>([]);
+  const [doNotPickTeams, setDoNotPickTeams] = useState<TBATeamSimple[]>([]);
+  const [bankTeams, setBankTeams] = useState<TBATeamSimple[]>([]);
+  const [bankSortMode, setBankSortMode] = useState<"number" | "epa" | "scouting">("number");
+  const [teamEpaMap, setTeamEpaMap] = useState<Map<number, number>>(new Map());
+  const [epaLoading, setEpaLoading] = useState(false);
+  const [epaLoadedEventId, setEpaLoadedEventId] = useState<string | null>(null);
+  const [teamScoutingAvgMap, setTeamScoutingAvgMap] = useState<Map<number, number>>(new Map());
+  const [scoutingAvgLoading, setScoutingAvgLoading] = useState(false);
+  const [scoutingAvgLoadedEventId, setScoutingAvgLoadedEventId] = useState<string | null>(null);
   const [picklistLoading, setPicklistLoading] = useState(false);
-  const [draggedTeamNumber, setDraggedTeamNumber] = useState<number | null>(null);
+  const [draggedTeam, setDraggedTeam] = useState<
+    { team: TBATeamSimple; source: PicklistColumnKey } | null
+  >(null);
   const [picklistEvents, setPicklistEvents] = useState<Event[]>([]);
   const [selectedPicklistEventId, setSelectedPicklistEventId] = useState("");
+  const [teamInfoOpen, setTeamInfoOpen] = useState(false);
+  const [teamInfoTeam, setTeamInfoTeam] = useState<TBATeamSimple | null>(null);
 
   const navigate = useNavigate();
 
@@ -174,31 +296,213 @@ export default function Dashboard() {
   useEffect(() => {
     const event = picklistEvents.find((item) => item.id === selectedPicklistEventId);
     if (!event?.event_code) {
-      setPicklistTeams([]);
+      setBankTeams([]);
+      setPickedTeams([]);
+      setDoNotPickTeams([]);
       return;
     }
 
     const loadPicklist = async () => {
       setPicklistLoading(true);
       const teams = await getEventTeams(event.event_code!);
-      setPicklistTeams(teams.sort((a, b) => a.team_number - b.team_number));
+      const roster = teams.sort((a, b) => a.team_number - b.team_number);
+
+      const saved = user?.id ? await getPicklist(user.id, event.id) : null;
+
+      if (saved) {
+        const rosterByNumber = new Map(roster.map((t) => [t.team_number, t]));
+        const picked = saved.picked_team_numbers
+          .map((n) => rosterByNumber.get(n))
+          .filter((t): t is TBATeamSimple => t != null);
+        const doNotPick = saved.do_not_pick_team_numbers
+          .map((n) => rosterByNumber.get(n))
+          .filter((t): t is TBATeamSimple => t != null);
+        const used = new Set([...saved.picked_team_numbers, ...saved.do_not_pick_team_numbers]);
+        setPickedTeams(picked);
+        setDoNotPickTeams(doNotPick);
+        setBankTeams(roster.filter((t) => !used.has(t.team_number)));
+      } else {
+        setBankTeams(roster);
+        setPickedTeams([]);
+        setDoNotPickTeams([]);
+      }
       setPicklistLoading(false);
     };
     loadPicklist();
-  }, [picklistEvents, selectedPicklistEventId]);
 
-  const movePicklistTeam = (targetTeamNumber: number) => {
-    if (draggedTeamNumber === null || draggedTeamNumber === targetTeamNumber) return;
-    setPicklistTeams((current) => {
-      const fromIndex = current.findIndex((team) => team.team_number === draggedTeamNumber);
-      const toIndex = current.findIndex((team) => team.team_number === targetTeamNumber);
-      if (fromIndex < 0 || toIndex < 0) return current;
+    // EPA/scouting-average data is event-specific; drop the old event's
+    // data so we don't sort by the wrong event's numbers while the new
+    // one (re)loads.
+    setTeamEpaMap(new Map());
+    setEpaLoadedEventId(null);
+    setTeamScoutingAvgMap(new Map());
+    setScoutingAvgLoadedEventId(null);
+  }, [picklistEvents, selectedPicklistEventId, user?.id]);
+
+  // Lazily fetch Statbotics EPA ratings the first time "Sort by EPA" is used
+  // for this event.
+  useEffect(() => {
+    if (bankSortMode !== "epa") return;
+    const event = picklistEvents.find((item) => item.id === selectedPicklistEventId);
+    if (!event?.event_code || epaLoadedEventId === selectedPicklistEventId) return;
+
+    let mounted = true;
+    setEpaLoading(true);
+    getEventEpaMap(event.event_code).then((map) => {
+      if (!mounted) return;
+      setTeamEpaMap(map);
+      setEpaLoadedEventId(selectedPicklistEventId);
+      setEpaLoading(false);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [bankSortMode, picklistEvents, selectedPicklistEventId, epaLoadedEventId]);
+
+  // Lazily fetch scouted averages the first time "Sort by Scouting Averages"
+  // is used for this event.
+  useEffect(() => {
+    if (bankSortMode !== "scouting") return;
+    const event = picklistEvents.find((item) => item.id === selectedPicklistEventId);
+    if (!event || scoutingAvgLoadedEventId === selectedPicklistEventId) return;
+
+    let mounted = true;
+    setScoutingAvgLoading(true);
+    getEventScoutingAverages(event.id).then((map) => {
+      if (!mounted) return;
+      setTeamScoutingAvgMap(map);
+      setScoutingAvgLoadedEventId(selectedPicklistEventId);
+      setScoutingAvgLoading(false);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [bankSortMode, picklistEvents, selectedPicklistEventId, scoutingAvgLoadedEventId]);
+
+  const sortedBankTeams = useMemo(() => {
+    const sortByMap = (map: Map<number, number>) =>
+      [...bankTeams].sort((a, b) => {
+        const aVal = map.get(a.team_number);
+        const bVal = map.get(b.team_number);
+        if (aVal == null && bVal == null) return a.team_number - b.team_number;
+        if (aVal == null) return 1;
+        if (bVal == null) return -1;
+        return bVal - aVal;
+      });
+
+    if (bankSortMode === "epa" && teamEpaMap.size > 0) return sortByMap(teamEpaMap);
+    if (bankSortMode === "scouting" && teamScoutingAvgMap.size > 0) {
+      return sortByMap(teamScoutingAvgMap);
+    }
+    return [...bankTeams].sort((a, b) => a.team_number - b.team_number);
+  }, [bankTeams, bankSortMode, teamEpaMap, teamScoutingAvgMap]);
+
+  const picklistColumnSetters: Record<
+    PicklistColumnKey,
+    React.Dispatch<React.SetStateAction<TBATeamSimple[]>>
+  > = {
+    bank: setBankTeams,
+    picklist: setPickedTeams,
+    doNotPick: setDoNotPickTeams,
+  };
+
+  const removeFromPicklistColumn = (column: PicklistColumnKey, teamNumber: number) => {
+    picklistColumnSetters[column]((current) =>
+      current.filter((t) => t.team_number !== teamNumber)
+    );
+  };
+
+  // Reorder within an ordered column (picklist / do-not-pick), or drag a team
+  // in from another column and insert it at the hovered position.
+  const handleOrderedColumnCardDragOver = (
+    columnKey: "picklist" | "doNotPick",
+    targetTeamNumber: number
+  ) => {
+    if (!draggedTeam) return;
+    const { team, source } = draggedTeam;
+    const setColumn = picklistColumnSetters[columnKey];
+    if (source === columnKey) {
+      if (team.team_number === targetTeamNumber) return;
+      setColumn((current) => {
+        const fromIndex = current.findIndex((t) => t.team_number === team.team_number);
+        const toIndex = current.findIndex((t) => t.team_number === targetTeamNumber);
+        if (fromIndex < 0 || toIndex < 0) return current;
+        const next = [...current];
+        const [moved] = next.splice(fromIndex, 1);
+        next.splice(toIndex, 0, moved);
+        return next;
+      });
+      return;
+    }
+
+    // Dragging in from another column: move it into this column at this position.
+    removeFromPicklistColumn(source, team.team_number);
+    setColumn((current) => {
+      if (current.some((t) => t.team_number === team.team_number)) return current;
+      const toIndex = current.findIndex((t) => t.team_number === targetTeamNumber);
       const next = [...current];
-      const [moved] = next.splice(fromIndex, 1);
-      next.splice(toIndex, 0, moved);
+      next.splice(toIndex < 0 ? next.length : toIndex, 0, team);
       return next;
     });
+    setDraggedTeam({ team, source: columnKey });
   };
+
+  // Dropping on empty space in an ordered column appends to the end.
+  const handleOrderedColumnDrop = (columnKey: "picklist" | "doNotPick") => {
+    if (!draggedTeam || draggedTeam.source === columnKey) {
+      setDraggedTeam(null);
+      return;
+    }
+    const { team, source } = draggedTeam;
+    removeFromPicklistColumn(source, team.team_number);
+    picklistColumnSetters[columnKey]((current) =>
+      current.some((t) => t.team_number === team.team_number) ? current : [...current, team]
+    );
+    setDraggedTeam(null);
+  };
+
+  // Dropping on the bank column removes the team from wherever it came from.
+  const handleBankDrop = () => {
+    if (!draggedTeam || draggedTeam.source === "bank") {
+      setDraggedTeam(null);
+      return;
+    }
+    const { team, source } = draggedTeam;
+    removeFromPicklistColumn(source, team.team_number);
+    setBankTeams((current) =>
+      current.some((t) => t.team_number === team.team_number)
+        ? current
+        : [...current, team].sort((a, b) => a.team_number - b.team_number)
+    );
+    setDraggedTeam(null);
+  };
+
+  // Fallback cleanup for gestures that end outside any valid drop target
+  // (the column onDrop handlers above already clear this in the common case).
+  const handleDragEnd = () => {
+    setDraggedTeam(null);
+  };
+
+  // Save whenever a drag gesture finishes (draggedTeam going back to null),
+  // regardless of which handler caused it. By the time this effect runs,
+  // React has already committed whatever pickedTeams/doNotPickTeams change
+  // came with that same state update, so this always reads the settled
+  // result of the gesture — unlike onDragEnd, which fires on the dragged
+  // source element and can silently never fire if that element got
+  // unmounted mid-gesture (e.g. moving a card to a different column).
+  // Deliberately keyed only on draggedTeam — the other values are read
+  // fresh from this render's closure, not tracked as retrigger conditions.
+  useEffect(() => {
+    if (draggedTeam !== null) return;
+    if (!user?.id || !selectedPicklistEventId) return;
+    upsertPicklist(
+      user.id,
+      selectedPicklistEventId,
+      pickedTeams.map((t) => t.team_number),
+      doNotPickTeams.map((t) => t.team_number)
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draggedTeam]);
 
   // Re-fetch whenever the user navigates back to this tab
   useEffect(() => {
@@ -655,7 +959,7 @@ export default function Dashboard() {
                 <div>
                   <h2 className="text-2xl font-bold">Picklist</h2>
                   <p className="text-sm text-muted-foreground">
-                    Drag teams to arrange your scouting priority.
+                    Sort teams however you want! This list is only visible for you.
                   </p>
                 </div>
               </div>
@@ -674,47 +978,109 @@ export default function Dashboard() {
             </div>
             {picklistLoading ? (
               <p className="text-muted-foreground">Loading event teams...</p>
-            ) : picklistTeams.length === 0 ? (
+            ) : pickedTeams.length === 0 && bankTeams.length === 0 ? (
               <Card className="p-8 text-center">
                 <p className="text-muted-foreground">No teams found for the active event.</p>
               </Card>
             ) : (
-              <div className="grid grid-cols-1 gap-2">
-                {picklistTeams.map((team, index) => (
-                  <Card
-                    key={team.team_number}
-                    draggable
-                    onDragStart={() => setDraggedTeamNumber(team.team_number)}
-                    onDragOver={(event) => {
-                      event.preventDefault();
-                      movePicklistTeam(team.team_number);
-                    }}
-                    onDrop={() => setDraggedTeamNumber(null)}
-                    onDragEnd={() => setDraggedTeamNumber(null)}
-                    className={`cursor-grab active:cursor-grabbing transition-opacity ${
-                      draggedTeamNumber === team.team_number ? "opacity-50" : ""
-                    }`}
-                  >
-                    <CardContent className="flex items-center gap-2 p-2.5">
-                      <span className="w-6 text-center text-sm font-bold text-muted-foreground">
-                        {index + 1}
-                      </span>
-                      <TeamImage
-                        teamNumber={team.team_number}
-                        eventId={selectedPicklistEvent?.id}
-                        className="h-9 w-9 rounded-md object-cover"
-                      />
-                      <div className="min-w-0">
-                        <p className="font-mono text-sm font-bold">{team.team_number}</p>
-                        <p className="truncate text-xs text-muted-foreground">
-                          {team.nickname || "Unknown team"}
-                        </p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+              <div className="grid grid-cols-3 gap-2 sm:gap-4">
+                <PicklistColumn
+                  title="Your Picklist"
+                  teams={pickedTeams}
+                  emptyMessage="Drag teams here to build your picklist."
+                  showRank
+                  draggedTeamNumber={draggedTeam?.team.team_number ?? null}
+                  onDragStart={(team) => setDraggedTeam({ team, source: "picklist" })}
+                  onDragEnd={handleDragEnd}
+                  onCardDragOver={(teamNumber) =>
+                    handleOrderedColumnCardDragOver("picklist", teamNumber)
+                  }
+                  onColumnDrop={() => handleOrderedColumnDrop("picklist")}
+                  onCardClick={(team) => {
+                    setTeamInfoTeam(team);
+                    setTeamInfoOpen(true);
+                  }}
+                />
+
+                <PicklistColumn
+                  title="Do Not Pick"
+                  teams={doNotPickTeams}
+                  emptyMessage="Drag teams here you don't want to pick."
+                  showRank
+                  draggedTeamNumber={draggedTeam?.team.team_number ?? null}
+                  onDragStart={(team) => setDraggedTeam({ team, source: "doNotPick" })}
+                  onDragEnd={handleDragEnd}
+                  onCardDragOver={(teamNumber) =>
+                    handleOrderedColumnCardDragOver("doNotPick", teamNumber)
+                  }
+                  onColumnDrop={() => handleOrderedColumnDrop("doNotPick")}
+                  onCardClick={(team) => {
+                    setTeamInfoTeam(team);
+                    setTeamInfoOpen(true);
+                  }}
+                />
+
+                <PicklistColumn
+                  title="Available Teams"
+                  headerAction={
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 gap-1 px-1.5 text-[10px] font-semibold uppercase text-muted-foreground"
+                        >
+                          {epaLoading || scoutingAvgLoading ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <ArrowUpDown className="h-3 w-3" />
+                          )}
+                          Sort
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuRadioGroup
+                          value={bankSortMode}
+                          onValueChange={(value) =>
+                            setBankSortMode(value as "number" | "epa" | "scouting")
+                          }
+                        >
+                          <DropdownMenuRadioItem value="number">
+                            Team Number
+                          </DropdownMenuRadioItem>
+                          <DropdownMenuRadioItem value="epa">
+                            EPA (Statbotics)
+                          </DropdownMenuRadioItem>
+                          <DropdownMenuRadioItem value="scouting">
+                            Scouting Averages
+                          </DropdownMenuRadioItem>
+                        </DropdownMenuRadioGroup>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  }
+                  teams={sortedBankTeams}
+                  emptyMessage="All teams have been picked."
+                  showRank={false}
+                  draggedTeamNumber={draggedTeam?.team.team_number ?? null}
+                  onDragStart={(team) => setDraggedTeam({ team, source: "bank" })}
+                  onDragEnd={handleDragEnd}
+                  onColumnDrop={handleBankDrop}
+                  onCardClick={(team) => {
+                    setTeamInfoTeam(team);
+                    setTeamInfoOpen(true);
+                  }}
+                />
               </div>
             )}
+
+            <TeamInfoDialog
+              open={teamInfoOpen}
+              onOpenChange={setTeamInfoOpen}
+              teamNumber={teamInfoTeam?.team_number ?? null}
+              nickname={teamInfoTeam?.nickname}
+              eventId={selectedPicklistEvent?.id}
+              eventCode={selectedPicklistEvent?.event_code}
+            />
           </section>
         )}
 
@@ -844,18 +1210,26 @@ export default function Dashboard() {
           </DialogContent>
         </Dialog>
 
-        <nav className="fixed bottom-4 z-30 mx-auto mt-8 flex max-w-sm items-center justify-center gap-1 rounded-xl border border-border bg-card/95 p-1 shadow-lg backdrop-blur">
+        <nav className="fixed bottom-4 z-30 mx-auto mt-8 flex max-w-sm items-center justify-center gap-1 rounded-xl border-2 border-border bg-card p-1 shadow-xl backdrop-blur">
           <Button
-            variant={dashboardPage === "picklist" ? "ghost" : "secondary"}
-            className="flex-1"
+            variant={dashboardPage === "scout" ? "default" : "ghost"}
+            className={
+              dashboardPage === "scout"
+                ? "flex-1 font-semibold shadow-sm"
+                : "flex-1 text-muted-foreground hover:text-foreground"
+            }
             onClick={() => setDashboardPage("scout")}
           >
             <ClipboardList className="mr-2 h-4 w-4" />
             Scout
           </Button>
           <Button
-            variant={dashboardPage === "picklist" ? "secondary" : "ghost"}
-            className="flex-1"
+            variant={dashboardPage === "picklist" ? "default" : "ghost"}
+            className={
+              dashboardPage === "picklist"
+                ? "flex-1 font-semibold shadow-sm"
+                : "flex-1 text-muted-foreground hover:text-foreground"
+            }
             onClick={() => setDashboardPage("picklist")}
           >
             <ListOrdered className="mr-2 h-4 w-4" />
