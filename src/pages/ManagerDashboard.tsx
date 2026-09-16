@@ -1002,13 +1002,15 @@ export default function ManagerDashboard() {
                   <TableHeader className="sticky top-0 bg-card z-20 shadow-sm">
                     <TableRow>
                       <TableHead className="w-12 border-r border-border">
-                        <Checkbox
-                          checked={
-                            selectedMatches.size === matches.filter((m) => m.matchId).length &&
-                            matches.filter((m) => m.matchId).length > 0
-                          }
-                          onCheckedChange={handleToggleAllMatches}
-                        />
+                        <div className="flex items-center justify-center">
+                          <Checkbox
+                            checked={
+                              selectedMatches.size === matches.filter((m) => m.matchId).length &&
+                              matches.filter((m) => m.matchId).length > 0
+                            }
+                            onCheckedChange={handleToggleAllMatches}
+                          />
+                        </div>
                       </TableHead>
                       <TableHead className="w-28 md:w-32 text-xs md:text-sm font-semibold border-r border-border">
                         Match

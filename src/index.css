@@ -269,5 +269,6 @@ html[data-theme="ben"] body {
 
   body {
     @apply bg-background text-foreground;
+    padding-top: env(safe-area-inset-top);
   }
 }

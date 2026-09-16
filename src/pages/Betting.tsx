@@ -995,7 +995,7 @@ export default function Betting() {
           </div>
         )}
         {/* Header */}
-        <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3 mb-6 max-w-2xl mx-auto">
+        <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3 mb-6">
           <div className="flex items-center gap-3">
             {!isInIframe && (
               <Button variant="ghost" size="sm" className="gap-2 px-2" onClick={() => navigate("/dashboard")}>
