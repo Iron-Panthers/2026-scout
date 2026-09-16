@@ -124,7 +124,7 @@ function CosmeticCard({ item, owned, equipped, canAfford, eventName, eventCode, 
 // ---------------------------------------------------------------------------
 // Main Shop page
 // ---------------------------------------------------------------------------
-export default function Shop() {
+export default function Shop({ embedded = false }: { embedded?: boolean } = {}) {
   const navigate = useNavigate();
   const { user, profile, getAvatarUrl } = useAuth();
   const { toast } = useToast();
@@ -255,17 +255,21 @@ export default function Shop() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className={embedded ? undefined : "min-h-screen bg-background"}>
       <div className="max-w-xl mx-auto md:max-w-none px-4 py-6 space-y-5">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <Button variant="ghost" size="sm" className="gap-2 px-2" onClick={() => navigate(-1)}>
-            <ArrowLeft className="h-4 w-4" />
-            Back
-          </Button>
-          <div className="flex items-center gap-2">
-            <ShoppingBag className="h-5 w-5 text-muted-foreground" />
-            <span className="font-semibold text-lg">Shop</span>
+          <div className="flex items-center gap-3">
+            {!embedded && (
+              <Button variant="ghost" size="sm" className="gap-2 px-2" onClick={() => navigate(-1)}>
+                <ArrowLeft className="h-4 w-4" />
+                Back
+              </Button>
+            )}
+            <div className="flex items-center gap-2">
+              <ShoppingBag className="h-6 w-6 text-red-500" />
+              <span className="text-2xl font-bold">Shop</span>
+            </div>
           </div>
           <Badge
             variant="outline"

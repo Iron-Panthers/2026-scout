@@ -12,7 +12,10 @@ import CosmeticAvatar from "@/components/CosmeticAvatar";
 import { useToast } from "@/hooks/use-toast";
 import type { GameProfile } from "@/types";
 
-export default function AvatarPage() {
+export default function AvatarPage({
+  embedded = false,
+  onVisitShop,
+}: { embedded?: boolean; onVisitShop?: () => void } = {}) {
   const navigate = useNavigate();
   const { user, profile, getAvatarUrl } = useAuth();
   const { toast } = useToast();
@@ -147,25 +150,19 @@ export default function AvatarPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-xl mx-auto md:max-w-none px-4 py-6 space-y-5">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <Button variant="ghost" size="sm" className="gap-2 px-2" onClick={() => navigate(-1)}>
-            <ArrowLeft className="h-4 w-4" />
-            Back
-          </Button>
+    <div className={embedded ? undefined : "min-h-screen bg-background"}>
+      <div className="max-w-xl mx-auto md:max-w-2xl px-4 py-6 space-y-5">
+        <div className="flex items-center gap-3">
+          {!embedded && (
+            <Button variant="ghost" size="sm" className="gap-2 px-2" onClick={() => navigate(-1)}>
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </Button>
+          )}
           <div className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-muted-foreground" />
-            <span className="font-semibold text-lg">My Cosmetics</span>
+            <Sparkles className="h-6 w-6 text-red-500" />
+            <span className="text-2xl font-bold">My Cosmetics</span>
           </div>
-          <Badge
-            variant="outline"
-            className="gap-1.5 text-emerald-400 border-emerald-500/40 bg-emerald-500/10 text-sm font-semibold"
-          >
-            <Sparkles className="h-3.5 w-3.5" />
-            {loading ? "—" : owned.length} owned
-          </Badge>
         </div>
 
         {/* Main layout: stacked on mobile, sidebar+content on md+ */}
@@ -200,21 +197,14 @@ export default function AvatarPage() {
             </Card>
           </div>
 
-          {/* Content */}
-          <div className="flex-1 min-w-0">
-            {loading ? (
-              <p className="text-muted-foreground text-center">Loading...</p>
-            ) : ownedItems.length === 0 ? (
-              <div className="text-center py-10 space-y-3">
-                <p className="text-muted-foreground">You don't own any cosmetics yet.</p>
-                <Button onClick={() => navigate("/shop")}>Visit the Shop</Button>
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {renderSection("Hats", hats)}
-                {renderSection("Decorations", decorations)}
-              </div>
-            )}
+        {loading ? (
+          <p className="text-muted-foreground text-center">Loading...</p>
+        ) : ownedItems.length === 0 ? (
+          <div className="text-center py-10 space-y-3">
+            <p className="text-muted-foreground">You don't own any cosmetics yet.</p>
+            <Button onClick={() => (onVisitShop ? onVisitShop() : navigate("/shop"))}>
+              Visit the Shop
+            </Button>
           </div>
         </div>
       </div>
