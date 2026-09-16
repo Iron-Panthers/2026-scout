@@ -182,9 +182,11 @@ export interface GameProfile {
   id: string;
   user_id: string;
   points: number;
+  event_points: number; // separate currency, spent on event-exclusive cosmetics
   unlocked_games: string[];
   owned_cosmetics: string[];
   equipped_cosmetics: Record<string, string>; // slot -> cosmetic id
+  event_cosmetic_sources: Record<string, string>; // cosmetic id -> event name it was purchased from
   created_at: string;
   updated_at: string;
 }

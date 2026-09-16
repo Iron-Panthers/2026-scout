@@ -12,6 +12,8 @@ export interface CosmeticDefinition {
   url?: string; // Emoji character or URL to png/gif
   cost: number;
   rarity: CrateRarity;
+  /** Which balance `cost` is charged against. Defaults to "points". */
+  currency?: "points" | "event";
 }
 
 export const RARITY_VALUE: Record<CrateRarity, number> = {
@@ -633,6 +635,66 @@ export const COSMETICS: CosmeticDefinition[] = [
     url: "/shop/decoration_norbert_pat.gif",
     cost: 10000,
     rarity: "legendary",
+  },
+  {
+    id: "decoration_fuel",
+    name: "Fuel",
+    description: "The 2026 gamepiece.",
+    category: "decoration",
+    url: "/shop/decoration_fuel.webp",
+    cost: 15,
+    rarity: "common",
+  },
+  // --- Event Exclusives (bought with event points, only during an event) ---
+  {
+    id: "hat_cheese",
+    name: "Cheese Hat",
+    description: "Cheesy!",
+    category: "hat",
+    emoji: "🧀",
+    cost: 50,
+    rarity: "uncommon",
+    currency: "event",
+  },
+  {
+    id: "decoration_cc_trophy",
+    name: "Chezy Champs Trophy",
+    description: "The highest award.",
+    category: "decoration",
+    url: "/shop/decoration_chezy_champs_trophy.jpeg",
+    cost: 200,
+    rarity: "ultra-rare",
+    currency: "event",
+  },
+  {
+    id: "decoration_overload",
+    name: "Overload",
+    description: "254's REBUILT robot",
+    category: "decoration",
+    url: "/shop/decoration_overload.jpeg",
+    cost: 300,
+    rarity: "legendary",
+    currency: "event",
+  },
+  {
+    id: "hat_rsn",
+    name: "Robo Sports Network",
+    description: "The official caster for Chezy Champs",
+    category: "hat",
+    url: "/shop/decoration_rsn.jpeg",
+    cost: 100,
+    rarity: "rare",
+    currency: "event",
+  },
+  {
+    id: "hat_cc",
+    name: "Chezy Champs",
+    description: "The Chezy Champs Logo",
+    category: "hat",
+    url: "/shop/decoration_cc_logo.jpeg",
+    cost: 15,
+    rarity: "common",
+    currency: "event",
   },
 ];
 

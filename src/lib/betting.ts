@@ -1,6 +1,16 @@
 import { supabase } from "@/lib/supabase";
 import { getGameProfile } from "@/lib/gameProfiles";
-import type { Bet, BetAlliance, MatchOdds, OddsHistoryPoint, BetWithMatch } from "@/types/betting";
+import { getActiveEvent, isEventWithinWindow } from "@/lib/matches";
+import type { Bet, BetAlliance, BetCurrency, MatchOdds, OddsHistoryPoint, BetWithMatch } from "@/types/betting";
+
+/** Which game_profiles column a currency's balance lives in. */
+function balanceColumn(currency: BetCurrency): "points" | "event_points" {
+  return currency === "event" ? "event_points" : "points";
+}
+
+function balanceOf(profile: { points: number; event_points: number }, currency: BetCurrency): number {
+  return currency === "event" ? profile.event_points : profile.points;
+}
 
 // ---------------------------------------------------------------------------
 // Local cache (offline support)
@@ -13,18 +23,22 @@ interface CachedEntry {
   ts: number;
 }
 
-export function cacheMatchOdds(matchId: string, odds: MatchOdds): void {
+function cacheKey(matchId: string, currency: BetCurrency): string {
+  return `${CACHE_PREFIX}${currency}_${matchId}`;
+}
+
+export function cacheMatchOdds(matchId: string, odds: MatchOdds, currency: BetCurrency = "points"): void {
   try {
     localStorage.setItem(
-      CACHE_PREFIX + matchId,
+      cacheKey(matchId, currency),
       JSON.stringify({ odds, ts: Date.now() } satisfies CachedEntry)
     );
   } catch { /* ignore quota errors */ }
 }
 
-export function getCachedMatchOdds(matchId: string): MatchOdds | null {
+export function getCachedMatchOdds(matchId: string, currency: BetCurrency = "points"): MatchOdds | null {
   try {
-    const raw = localStorage.getItem(CACHE_PREFIX + matchId);
+    const raw = localStorage.getItem(cacheKey(matchId, currency));
     if (!raw) return null;
     const entry: CachedEntry = JSON.parse(raw);
     if (Date.now() - entry.ts > CACHE_TTL_MS) return null;
@@ -223,27 +237,28 @@ export function estimatePayout(
 // ---------------------------------------------------------------------------
 
 /** Fetch odds for a single match, with optional offline fallback. */
-export async function getMatchOdds(matchId: string): Promise<MatchOdds> {
+export async function getMatchOdds(matchId: string, currency: BetCurrency = "points"): Promise<MatchOdds> {
   const { data: bets, error } = await supabase
     .from("bets")
     .select("id, user_id, alliance, amount, status, created_at")
     .eq("match_id", matchId)
+    .eq("currency", currency)
     .in("status", ["pending", "won", "lost"]);
 
   if (error || !bets) {
-    return getCachedMatchOdds(matchId) ?? FLAT_ODDS;
+    return getCachedMatchOdds(matchId, currency) ?? FLAT_ODDS;
   }
 
   const odds = computeOddsFromBets(bets as Bet[]);
-  cacheMatchOdds(matchId, odds);
+  cacheMatchOdds(matchId, odds, currency);
   return odds;
 }
 
-/** Fetch raw bets for a match sorted by time. */
+/** Fetch raw bets for a match sorted by time (both currencies — filter client-side if needed). */
 export async function getMatchBets(matchId: string): Promise<Bet[]> {
   const { data, error } = await supabase
     .from("bets")
-    .select("id, user_id, alliance, amount, status, created_at, updated_at, payout, match_id")
+    .select("id, user_id, alliance, amount, status, created_at, updated_at, payout, match_id, currency")
     .eq("match_id", matchId)
     .in("status", ["pending", "won", "lost"])
     .order("created_at", { ascending: true });
@@ -252,16 +267,18 @@ export async function getMatchBets(matchId: string): Promise<Bet[]> {
   return data as Bet[];
 }
 
-/** Get the current user's non-cancelled bet on a match (null if none). */
+/** Get the current user's non-cancelled bet on a match for a given currency (null if none). */
 export async function getMatchUserBet(
   matchId: string,
-  userId: string
+  userId: string,
+  currency: BetCurrency = "points"
 ): Promise<Bet | null> {
   const { data } = await supabase
     .from("bets")
     .select("*")
     .eq("match_id", matchId)
     .eq("user_id", userId)
+    .eq("currency", currency)
     .neq("status", "cancelled")
     .limit(1)
     .maybeSingle();
@@ -269,7 +286,7 @@ export async function getMatchUserBet(
   return (data as Bet) ?? null;
 }
 
-/** All bets for a user across all matches. */
+/** All bets for a user across all matches (both currencies). */
 export async function getUserBets(userId: string): Promise<BetWithMatch[]> {
   const { data, error } = await supabase
     .from("bets")
@@ -283,9 +300,10 @@ export async function getUserBets(userId: string): Promise<BetWithMatch[]> {
   return data as BetWithMatch[];
 }
 
-/** Fetch odds for every match in a list (single DB query). */
+/** Fetch odds for every match in a list, for one currency (single DB query). */
 export async function getBulkMatchOdds(
-  matchIds: string[]
+  matchIds: string[],
+  currency: BetCurrency = "points"
 ): Promise<Map<string, MatchOdds>> {
   const map = new Map<string, MatchOdds>();
   if (matchIds.length === 0) return map;
@@ -294,10 +312,11 @@ export async function getBulkMatchOdds(
     .from("bets")
     .select("match_id, alliance, amount, status, created_at")
     .in("match_id", matchIds)
+    .eq("currency", currency)
     .in("status", ["pending", "won", "lost"]);
 
   if (error || !bets) {
-    matchIds.forEach((id) => map.set(id, getCachedMatchOdds(id) ?? FLAT_ODDS));
+    matchIds.forEach((id) => map.set(id, getCachedMatchOdds(id, currency) ?? FLAT_ODDS));
     return map;
   }
 
@@ -310,7 +329,7 @@ export async function getBulkMatchOdds(
 
   for (const matchId of matchIds) {
     const odds = computeOddsFromBets(grouped.get(matchId) ?? []);
-    cacheMatchOdds(matchId, odds);
+    cacheMatchOdds(matchId, odds, currency);
     map.set(matchId, odds);
   }
 
@@ -325,17 +344,20 @@ export async function placeBet(
   userId: string,
   matchId: string,
   alliance: BetAlliance,
-  amount: number
+  amount: number,
+  currency: BetCurrency = "points"
 ): Promise<{ success: boolean; error?: string }> {
   const profile = await getGameProfile(userId);
   if (!profile) return { success: false, error: "Could not load your game profile." };
-  if (profile.points < amount) {
-    return { success: false, error: `Not enough points — you have ${profile.points} pts.` };
+  const balance = balanceOf(profile, currency);
+  if (balance < amount) {
+    const label = currency === "event" ? "event points" : "points";
+    return { success: false, error: `Not enough ${label} — you have ${balance}.` };
   }
 
   const { data: match } = await supabase
     .from("matches")
-    .select("winning_alliance, pred_time")
+    .select("winning_alliance, pred_time, event_id")
     .eq("id", matchId)
     .maybeSingle();
 
@@ -343,34 +365,43 @@ export async function placeBet(
     return { success: false, error: "This match has already been settled." };
   }
 
+  if (currency === "event") {
+    const activeEvent = await getActiveEvent();
+    if (!activeEvent || match?.event_id !== activeEvent.id || !isEventWithinWindow(activeEvent)) {
+      return { success: false, error: "Event points can only be bet on the active event's own matches." };
+    }
+  }
+
   // if (match?.pred_time && new Date(match.pred_time) <= new Date()) {
   //   return { success: false, error: "Betting is closed — this match has already started." };
   // }
 
-  const existing = await getMatchUserBet(matchId, userId);
+  const existing = await getMatchUserBet(matchId, userId, currency);
   if (existing) {
     return { success: false, error: "You already have an active bet on this match." };
   }
 
-  const { error: pointsErr } = await supabase
+  const column = balanceColumn(currency);
+  const { error: balanceErr } = await supabase
     .from("game_profiles")
-    .update({ points: profile.points - amount })
+    .update({ [column]: balance - amount })
     .eq("user_id", userId);
 
-  if (pointsErr) return { success: false, error: "Failed to deduct points." };
+  if (balanceErr) return { success: false, error: "Failed to deduct balance." };
 
   const { error: betErr } = await supabase.from("bets").insert({
     user_id: userId,
     match_id: matchId,
     alliance,
     amount,
+    currency,
     status: "pending",
   });
 
   if (betErr) {
     await supabase
       .from("game_profiles")
-      .update({ points: profile.points })
+      .update({ [column]: balance })
       .eq("user_id", userId);
     return { success: false, error: "Failed to place bet." };
   }
@@ -402,9 +433,11 @@ export async function cancelBet(
 
   const profile = await getGameProfile(userId);
   if (profile) {
+    const currency = (bet.currency as BetCurrency) ?? "points";
+    const column = balanceColumn(currency);
     await supabase
       .from("game_profiles")
-      .update({ points: profile.points + bet.amount })
+      .update({ [column]: balanceOf(profile, currency) + bet.amount })
       .eq("user_id", userId);
   }
 
@@ -456,17 +489,8 @@ export async function settleMatchBets(
 
   if (!bets || bets.length === 0) return { success: true };
 
-  const redTotal = (bets as Bet[])
-    .filter((b) => b.alliance === "red")
-    .reduce((s, b) => s + b.amount, 0);
-  const blueTotal = (bets as Bet[])
-    .filter((b) => b.alliance === "blue")
-    .reduce((s, b) => s + b.amount, 0);
-  const totalPool = redTotal + blueTotal;
-
-  const winnerPool = effectiveWinner === "red" ? redTotal : blueTotal;
-
-  // Predicted probability for the winning side
+  // Predicted probability for the winning side (same for both pools — it's
+  // about the match outcome, not the currency).
   const p_winner =
     effectiveWinner === "tie"
       ? 0.5
@@ -474,35 +498,51 @@ export async function settleMatchBets(
       ? statboticsRedWinProb
       : 1 - statboticsRedWinProb);
 
-  for (const bet of bets as Bet[]) {
-    let payout = 0;
-    let status: "won" | "lost" = "lost";
+  // Points and event-points bets form entirely separate parimutuel pools —
+  // an event bettor's payout must only ever come from other event bettors.
+  async function settlePool(poolBets: Bet[], currency: BetCurrency) {
+    if (poolBets.length === 0) return;
+    const column = balanceColumn(currency);
 
-    if (bet.status !== 'pending') continue;
+    const redTotal = poolBets.filter((b) => b.alliance === "red").reduce((s, b) => s + b.amount, 0);
+    const blueTotal = poolBets.filter((b) => b.alliance === "blue").reduce((s, b) => s + b.amount, 0);
+    const totalPool = redTotal + blueTotal;
+    const winnerPool = effectiveWinner === "red" ? redTotal : blueTotal;
 
-    const timeDecayFactor = computeTimeDecayFactor(matchPredTime, bet.created_at);
+    for (const bet of poolBets) {
+      if (bet.status !== "pending") continue;
 
-    if (effectiveWinner === "tie") {
-      // Refund on tie (no time decay on refunds)
-      payout = bet.amount;
-      status = "won";
-    } else if (bet.alliance === effectiveWinner) {
-      status = "won";
-      payout = calcPayout(bet.amount, winnerPool, totalPool, p_winner, timeDecayFactor);
-    }
+      let payout = 0;
+      let status: "won" | "lost" = "lost";
 
-    const { data: updateData, error: updateError } = await supabase.from("bets").update({ status, payout }).eq("id", bet.id);
+      const timeDecayFactor = computeTimeDecayFactor(matchPredTime, bet.created_at);
 
-    if (payout > 0) {
-      const profile = await getGameProfile(bet.user_id);
-      if (profile) {
-        await supabase
-          .from("game_profiles")
-          .update({ points: profile.points + payout })
-          .eq("user_id", bet.user_id);
+      if (effectiveWinner === "tie") {
+        // Refund on tie (no time decay on refunds)
+        payout = bet.amount;
+        status = "won";
+      } else if (bet.alliance === effectiveWinner) {
+        status = "won";
+        payout = calcPayout(bet.amount, winnerPool, totalPool, p_winner, timeDecayFactor);
+      }
+
+      await supabase.from("bets").update({ status, payout }).eq("id", bet.id);
+
+      if (payout > 0) {
+        const profile = await getGameProfile(bet.user_id);
+        if (profile) {
+          await supabase
+            .from("game_profiles")
+            .update({ [column]: balanceOf(profile, currency) + payout })
+            .eq("user_id", bet.user_id);
+        }
       }
     }
   }
+
+  const allBets = bets as Bet[];
+  await settlePool(allBets.filter((b) => (b.currency ?? "points") === "points"), "points");
+  await settlePool(allBets.filter((b) => b.currency === "event"), "event");
 
   return { success: true };
 }

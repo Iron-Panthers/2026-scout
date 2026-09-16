@@ -995,22 +995,23 @@ export default function Betting() {
           </div>
         )}
         {/* Header */}
-        <div className="flex items-center justify-between mb-6 max-w-2xl mx-auto">
+        <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3 mb-6 max-w-2xl mx-auto">
           <div className="flex items-center gap-3">
             {!isInIframe && (
-                <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
-                <ArrowLeft className="h-5 w-5" />
+              <Button variant="ghost" size="sm" className="gap-2 px-2" onClick={() => navigate("/dashboard")}>
+                <ArrowLeft className="h-4 w-4" />
+                Back
               </Button>
             )}
-            <div>
-              <h1 className="text-2xl font-bold flex items-center gap-2">
-                <TrendingUp className="h-6 w-6 text-primary" />
-                Betting
-              </h1>
-              {event && <p className="text-sm text-muted-foreground">{event.name}</p>}
-            </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold flex items-center justify-center gap-2">
+              <TrendingUp className="h-6 w-6 text-primary" />
+              Betting
+            </h1>
+            {event && <p className="text-sm text-muted-foreground">{event.name}</p>}
+          </div>
+          <div className="flex items-center gap-2 justify-end">
             {!isOnline && (
               <Badge variant="outline" className="text-yellow-400 border-yellow-600/30 gap-1">
                 <WifiOff className="h-3 w-3" /> Offline

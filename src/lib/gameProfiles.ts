@@ -111,3 +111,26 @@ export async function awardPoints(targetUserId: string, amount: number): Promise
 
   return { success: true };
 }
+
+/**
+ * Award event points to a user (separate currency from `points`).
+ */
+export async function awardEventPoints(targetUserId: string, amount: number): Promise<{ success: boolean; error?: string }> {
+  const profile = await getGameProfile(targetUserId);
+
+  if (!profile) {
+    return { success: false, error: "Could not load target user's game profile." };
+  }
+
+  const { error } = await supabase
+    .from("game_profiles")
+    .update({ event_points: profile.event_points + amount })
+    .eq("user_id", targetUserId);
+
+  if (error) {
+    console.error("[gameProfiles] awardEventPoints error:", error);
+    return { success: false, error: "Failed to award event points." };
+  }
+
+  return { success: true };
+}

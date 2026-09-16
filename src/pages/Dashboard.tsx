@@ -53,6 +53,9 @@ import {
   ListOrdered,
   ArrowUpDown,
   Loader2,
+  ShoppingBag,
+  TrendingUp,
+  Sparkles,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -179,7 +182,7 @@ function PicklistColumn({
 
   return (
     <div>
-      <div className="mb-1.5 flex items-center justify-between gap-2">
+      <div className="mb-1.5 flex h-6 items-center justify-between gap-2">
         <h3 className="text-xs font-semibold uppercase text-muted-foreground">{title}</h3>
         {headerAction}
       </div>
@@ -764,7 +767,7 @@ export default function Dashboard() {
           ) : (
             <LogIn className="h-6 w-6 mr-2" />
           )}
-          Clock In
+          {Math.random() < 0.02 ? "Lock In" : "Clock In"}
         </Button>
       )}
     </>
@@ -1300,30 +1303,59 @@ export default function Dashboard() {
           </DialogContent>
         </Dialog>
 
-        <nav className="fixed bottom-4 z-30 mx-auto mt-8 flex max-w-sm items-center justify-center gap-1 rounded-xl border-2 border-border bg-card p-1 shadow-xl backdrop-blur">
+        <nav className="fixed inset-x-4 bottom-4 z-30 mx-auto mt-8 flex max-w-xl items-center justify-center gap-1 rounded-xl border-2 border-border bg-card p-1 shadow-xl backdrop-blur">
           <Button
+            size="sm"
             variant={dashboardPage === "scout" ? "default" : "ghost"}
             className={
               dashboardPage === "scout"
-                ? "flex-1 font-semibold shadow-sm"
-                : "flex-1 text-muted-foreground hover:text-foreground"
+                ? "flex-1 min-w-0 px-1.5 text-xs font-semibold shadow-sm sm:px-3 sm:text-sm"
+                : "flex-1 min-w-0 px-1.5 text-xs text-muted-foreground hover:text-foreground sm:px-3 sm:text-sm"
             }
             onClick={() => setDashboardPage("scout")}
           >
-            <ClipboardList className="mr-2 h-4 w-4" />
+            <ClipboardList className="mr-1 h-3.5 w-3.5 sm:mr-2 sm:h-4 sm:w-4" />
             Scout
           </Button>
           <Button
+            size="sm"
             variant={dashboardPage === "picklist" ? "default" : "ghost"}
             className={
               dashboardPage === "picklist"
-                ? "flex-1 font-semibold shadow-sm"
-                : "flex-1 text-muted-foreground hover:text-foreground"
+                ? "flex-1 min-w-0 px-1.5 text-xs font-semibold shadow-sm sm:px-3 sm:text-sm"
+                : "flex-1 min-w-0 px-1.5 text-xs text-muted-foreground hover:text-foreground sm:px-3 sm:text-sm"
             }
             onClick={() => setDashboardPage("picklist")}
           >
-            <ListOrdered className="mr-2 h-4 w-4" />
+            <ListOrdered className="mr-1 h-3.5 w-3.5 sm:mr-2 sm:h-4 sm:w-4" />
             Picklist
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="flex-1 min-w-0 px-1.5 text-xs text-muted-foreground hover:text-foreground sm:px-3 sm:text-sm"
+            onClick={() => navigate("/shop")}
+          >
+            <ShoppingBag className="mr-1 h-3.5 w-3.5 sm:mr-2 sm:h-4 sm:w-4" />
+            Shop
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="flex-1 min-w-0 px-1.5 text-xs text-muted-foreground hover:text-foreground sm:px-3 sm:text-sm"
+            onClick={() => navigate("/avatar")}
+          >
+            <Sparkles className="mr-1 h-3.5 w-3.5 sm:mr-2 sm:h-4 sm:w-4" />
+            Avatar
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="flex-1 min-w-0 px-1.5 text-xs text-muted-foreground hover:text-foreground sm:px-3 sm:text-sm"
+            onClick={() => navigate("/betting")}
+          >
+            <TrendingUp className="mr-1 h-3.5 w-3.5 sm:mr-2 sm:h-4 sm:w-4" />
+            Betting
           </Button>
         </nav>
       </main>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   ArrowLeft, Coins, WifiOff, CheckCircle2, XCircle, Loader2, Zap, Clock,
@@ -21,8 +21,10 @@ import {
   getStatboticsMatch, getCachedStatboticsMatch, getMatchLabel, wasUpset,
 } from "@/lib/statbotics";
 import { getEventMatches, getEventTeams, getMatchScores } from "@/lib/blueAlliance";
+import { isEventWithinWindow } from "@/lib/matches";
+import { getEventCurrencyLogo } from "@/config/eventCurrency";
 import type { Match, Event } from "@/types";
-import type { Bet, MatchOdds, OddsHistoryPoint } from "@/types/betting";
+import type { Bet, BetCurrency, MatchOdds, OddsHistoryPoint } from "@/types/betting";
 import type { StatboticsMatch } from "@/lib/statbotics";
 import type { TBATeamSimple } from "@/lib/blueAlliance";
 
@@ -324,9 +326,11 @@ export default function MatchBetting() {
   const [match, setMatch] = useState<Match | null>(null);
   const [event, setEvent] = useState<Event | null>(null);
   const [bets, setBets] = useState<Bet[]>([]);
-  const [odds, setOdds] = useState<MatchOdds | null>(null);
+  const [offlineOdds, setOfflineOdds] = useState<MatchOdds | null>(null);
   const [userBet, setUserBet] = useState<Bet | null>(null);
   const [points, setPoints] = useState<number>(0);
+  const [eventPoints, setEventPoints] = useState<number>(0);
+  const [betCurrency, setBetCurrency] = useState<BetCurrency>("points");
 
   const [sbMatch, setSbMatch] = useState<StatboticsMatch | null>(null);
   const [tbaMatch, setTbaMatch] = useState<TBAMatchFull | null>(null);
@@ -353,13 +357,19 @@ export default function MatchBetting() {
     if (!user?.id) return;
     const gp = await getGameProfile(user.id);
     setPoints(gp?.points ?? 0);
+    setEventPoints(gp?.event_points ?? 0);
   }, [user?.id]);
 
   const refreshUserBet = useCallback(async () => {
     if (!match_id || !user?.id) return;
-    const ub = await getMatchUserBet(match_id, user.id);
+    const ub = await getMatchUserBet(match_id, user.id, betCurrency);
     setUserBet(ub);
-  }, [match_id, user?.id]);
+  }, [match_id, user?.id, betCurrency]);
+
+  // Refetch this match's active bet whenever the selected currency changes.
+  useEffect(() => {
+    refreshUserBet();
+  }, [refreshUserBet]);
 
   useEffect(() => {
     if (!match_id || !user?.id) return;
@@ -474,29 +484,36 @@ export default function MatchBetting() {
         }
       }
 
-      // Bets — offline uses cache
+      // Bets — offline uses cache. `bets` holds every currency; odds are
+      // derived per-currency below via `currentOdds`.
       let loadedBets: Bet[] = [];
       if (isOnline) {
         loadedBets = await getMatchBets(match_id!);
-        if (!cancelled) {
-          setBets(loadedBets);
-          const computed = computeOddsFromBets(loadedBets);
-          setOdds(computed);
-          cacheMatchOdds(match_id!, computed);
-        }
+        if (!cancelled) setBets(loadedBets);
       } else {
-        const cached = getCachedMatchOdds(match_id!);
-        if (cached && !cancelled) setOdds(cached);
+        const cached = getCachedMatchOdds(match_id!, "points");
+        if (cached && !cancelled) setOfflineOdds(cached);
       }
 
-      // User bet + points
+      // User bet + balances — check both currencies so an existing event-currency
+      // bet is detected even though the toggle defaults to "points".
       if (!cancelled) {
-        const [ub, gp] = await Promise.all([
-          getMatchUserBet(match_id!, user!.id),
+        const [ubPoints, ubEvent, gp] = await Promise.all([
+          getMatchUserBet(match_id!, user!.id, "points"),
+          getMatchUserBet(match_id!, user!.id, "event"),
           getGameProfile(user!.id),
         ]);
-        setUserBet(ub);
+        if (ubPoints) {
+          setUserBet(ubPoints);
+          setBetCurrency("points");
+        } else if (ubEvent) {
+          setUserBet(ubEvent);
+          setBetCurrency("event");
+        } else {
+          setUserBet(null);
+        }
         setPoints(gp?.points ?? 0);
+        setEventPoints(gp?.event_points ?? 0);
       }
 
       setLoading(false);
@@ -545,13 +562,7 @@ export default function MatchBetting() {
         filter: `match_id=eq.${match_id}`,
       }, (payload) => {
         const newBet = payload.new as Bet;
-        setBets((prev) => {
-          const updated = [...prev, newBet];
-          const computed = computeOddsFromBets(updated);
-          setOdds(computed);
-          cacheMatchOdds(match_id, computed);
-          return updated;
-        });
+        setBets((prev) => [...prev, newBet]);
       })
       .on("postgres_changes", {
         event: "UPDATE", schema: "public", table: "matches",
@@ -587,11 +598,13 @@ export default function MatchBetting() {
     setPlacing(true);
     setFeedback(null);
 
-    const result = await placeBet(user.id, match_id, selectedAlliance, betAmount);
+    const result = await placeBet(user.id, match_id, selectedAlliance, betAmount, betCurrency);
 
     if (result.success) {
-      setFeedback({ ok: true, msg: `Bet placed! ${betAmount} pts on ${selectedAlliance.toUpperCase()}.` });
-      setPoints((p) => p - betAmount);
+      const unit = betCurrency === "event" ? "event points" : "pts";
+      setFeedback({ ok: true, msg: `Bet placed! ${betAmount} ${unit} on ${selectedAlliance.toUpperCase()}.` });
+      if (betCurrency === "event") setEventPoints((p) => p - betAmount);
+      else setPoints((p) => p - betAmount);
       await refreshUserBet();
       setSelectedAlliance(null);
     } else {
@@ -606,8 +619,10 @@ export default function MatchBetting() {
     setFeedback(null);
     const result = await cancelBet(userBet.id, user.id);
     if (result.success) {
-      setFeedback({ ok: true, msg: `Bet cancelled — ${userBet.amount} pts refunded.` });
-      setPoints((p) => p + userBet.amount);
+      const unit = userBet.currency === "event" ? "event points" : "pts";
+      setFeedback({ ok: true, msg: `Bet cancelled — ${userBet.amount} ${unit} refunded.` });
+      if (userBet.currency === "event") setEventPoints((p) => p + userBet.amount);
+      else setPoints((p) => p + userBet.amount);
       setUserBet(null);
     } else {
       setFeedback({ ok: false, msg: result.error ?? "Failed to cancel." });
@@ -636,7 +651,24 @@ export default function MatchBetting() {
   // ---------------------------------------------------------------------------
   const isSettled = !!match?.winning_alliance && userBet?.status !== "pending";
   const isManager = profile?.is_manager ?? false;
-  const currentOdds = odds ?? { redPct: 50, bluePct: 50, totalPool: 0, betCount: 0, history: [], redTotal: 0, blueTotal: 0 };
+
+  // Points and event-points bets form separate pools, so odds are derived
+  // per-currency from the raw bet list (online) or a cached snapshot (offline).
+  const currentOdds: MatchOdds = useMemo(() => {
+    if (isOnline) {
+      return computeOddsFromBets(bets.filter((b) => (b.currency ?? "points") === betCurrency));
+    }
+    return offlineOdds ?? { redPct: 50, bluePct: 50, totalPool: 0, betCount: 0, history: [], redTotal: 0, blueTotal: 0 };
+  }, [bets, betCurrency, isOnline, offlineOdds]);
+
+  useEffect(() => {
+    if (isOnline && match_id) cacheMatchOdds(match_id, currentOdds, betCurrency);
+  }, [currentOdds, isOnline, betCurrency, match_id]);
+
+  const currentBalance = betCurrency === "event" ? eventPoints : points;
+
+  // Event points can only be bet on the active event's own matches.
+  const eventBettingAvailable = !!event && event.is_active && isEventWithinWindow(event);
   const sbRedProb = sbMatch?.pred.red_win_prob;
 
   // Blended display odds: combines Statbotics prediction with bet-pool distribution.
@@ -791,6 +823,12 @@ export default function MatchBetting() {
               <Coins className="h-3.5 w-3.5 text-yellow-400" />
               <span className="font-bold text-sm">{points}</span>
             </div>
+            {eventBettingAvailable && (
+              <div className="flex items-center gap-1 rounded-full bg-sky-500/10 border border-sky-500/40 px-2.5 py-1">
+                <img src={getEventCurrencyLogo(event?.event_code)} alt="Event currency" className="h-3.5 w-3.5" />
+                <span className="font-bold text-sm text-sky-300">{eventPoints}</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -824,7 +862,7 @@ export default function MatchBetting() {
               {Math.round(blendedRedPct)}%
             </div>
             <div className="text-xs text-muted-foreground mt-1">
-              {currentOdds.redTotal} pts bet
+              {currentOdds.redTotal} {betCurrency === "event" ? "evt" : "pts"} bet
             </div>
           </div>
           <div className="bg-blue-900/20 border border-blue-700/30 rounded-xl p-4 text-center">
@@ -835,7 +873,7 @@ export default function MatchBetting() {
               {Math.round(blendedBluePct)}%
             </div>
             <div className="text-xs text-muted-foreground mt-1">
-              {currentOdds.blueTotal} pts bet
+              {currentOdds.blueTotal} {betCurrency === "event" ? "evt" : "pts"} bet
             </div>
           </div>
         </div>
@@ -848,7 +886,7 @@ export default function MatchBetting() {
                 Combined win probability (bets + Statbotics)
               </span>
               <span className="text-xs text-muted-foreground">
-                Pool: {currentOdds.totalPool} pts
+                Pool: {currentOdds.totalPool} {betCurrency === "event" ? "evt" : "pts"}
               </span>
             </div>
             <OddsChart history={blendedHistory} isLive={!matchComplete && isOnline} />
@@ -888,7 +926,7 @@ export default function MatchBetting() {
                     : "Better luck next time"}
                 </div>
                 <div className="text-sm text-muted-foreground mt-0.5">
-                  Bet {userBet.amount} pts on {userBet.alliance.toUpperCase()}
+                  Bet {userBet.amount} {userBet.currency === "event" ? "evt" : "pts"} on {userBet.alliance.toUpperCase()}
                 </div>
                 {sbRedProb !== undefined && (
                   <div className="text-xs text-muted-foreground mt-0.5">
@@ -905,7 +943,7 @@ export default function MatchBetting() {
                       +{userBet.payout - userBet.amount}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      Payout: {userBet.payout} pts
+                      Payout: {userBet.payout} {userBet.currency === "event" ? "evt" : "pts"}
                     </div>
                   </>
                 ) : (
@@ -928,14 +966,26 @@ export default function MatchBetting() {
                       userBet.alliance === "red" ? "bg-red-600/20 text-red-400" : "bg-blue-600/20 text-blue-400"}`}>
                       {userBet.alliance.toUpperCase()}
                     </span>
-                    <span className="text-sm">{userBet.amount} pts wagered</span>
+                    <span className="text-sm">
+                      {userBet.amount} {userBet.currency === "event" ? "evt" : "pts"} wagered
+                    </span>
                   </div>
                   <div className="text-xs text-muted-foreground mt-1">
                     Est. payout:{" "}
                     {estimatePayout(userBet.amount, userBet.alliance as "red" | "blue",
-                      currentOdds as MatchOdds, sbRedProb)} pts if {userBet.alliance} wins
+                      currentOdds as MatchOdds, sbRedProb)} {userBet.currency === "event" ? "evt" : "pts"} if {userBet.alliance} wins
                   </div>
                 </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-yellow-700/40 text-yellow-300 hover:bg-yellow-900/20 shrink-0"
+                  disabled={cancelling || !isOnline}
+                  onClick={handleCancelBet}
+                >
+                  {cancelling && <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />}
+                  Cancel
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -968,6 +1018,33 @@ export default function MatchBetting() {
               <CardTitle className="text-base">Place a Bet</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Currency toggle — event points only offered on the active event's own matches */}
+              {eventBettingAvailable && (
+                <div className="flex items-center gap-1 rounded-lg border p-1">
+                  <button
+                    onClick={() => setBetCurrency("points")}
+                    className={`flex-1 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
+                      betCurrency === "points"
+                        ? "bg-yellow-500/20 text-yellow-400"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Points
+                  </button>
+                  <button
+                    onClick={() => setBetCurrency("event")}
+                    className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
+                      betCurrency === "event"
+                        ? "bg-sky-500/20 text-sky-300"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <img src={getEventCurrencyLogo(event?.event_code)} alt="" className="h-3.5 w-3.5" />
+                    {event?.name ?? "Event"} Points
+                  </button>
+                </div>
+              )}
+
               {/* Time decay warning */}
               {inDecayWindow && timeUntilMatch !== null && (
                 <div className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs bg-yellow-900/20 border border-yellow-700/30 text-yellow-300">
@@ -1010,21 +1087,21 @@ export default function MatchBetting() {
 
               <div>
                 <label className="text-sm text-muted-foreground mb-2 block">
-                  Amount (you have {points} pts)
+                  Amount (you have {currentBalance} {betCurrency === "event" ? "event pts" : "pts"})
                 </label>
-                <AmountPicker value={betAmount} onChange={setBetAmount} max={points} />
+                <AmountPicker value={betAmount} onChange={setBetAmount} max={currentBalance} />
               </div>
 
               {selectedAlliance && estPayout !== null && (
                 <div className="bg-muted/30 rounded-lg px-3 py-2 text-sm space-y-1">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Est. payout if {selectedAlliance} wins</span>
-                    <span className="font-bold">{estPayout} pts</span>
+                    <span className="font-bold">{estPayout} {betCurrency === "event" ? "evt" : "pts"}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Est. profit</span>
                     <span className={`font-bold ${estPayout - betAmount >= 0 ? "text-green-400" : "text-red-400"}`}>
-                      {estPayout - betAmount >= 0 ? "+" : ""}{estPayout - betAmount} pts
+                      {estPayout - betAmount >= 0 ? "+" : ""}{estPayout - betAmount} {betCurrency === "event" ? "evt" : "pts"}
                     </span>
                   </div>
                   {sbRedProb !== undefined && (
@@ -1036,11 +1113,11 @@ export default function MatchBetting() {
               )}
 
               <Button className="w-full" size="lg"
-                disabled={!selectedAlliance || betAmount <= 0 || betAmount > points || placing}
+                disabled={!selectedAlliance || betAmount <= 0 || betAmount > currentBalance || placing}
                 onClick={handlePlaceBet}>
                 {placing && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                 {selectedAlliance
-                  ? `Bet ${betAmount} pts on ${selectedAlliance.toUpperCase()}`
+                  ? `Bet ${betAmount} ${betCurrency === "event" ? "evt" : "pts"} on ${selectedAlliance.toUpperCase()}`
                   : "Select an alliance"}
               </Button>
             </CardContent>

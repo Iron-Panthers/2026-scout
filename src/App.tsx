@@ -20,6 +20,7 @@ import PushTest from "./pages/PushTest";
 import Betting from "./pages/Betting";
 import MatchBetting from "./pages/MatchBetting";
 import Shop from "./pages/Shop";
+import AvatarPage from "./pages/Avatar";
 import { Toaster } from "./components/ui/toaster";
 import UpdateBanner from "./components/UpdateBanner";
 import NotificationNavigationListener from "./components/NotificationNavigationListener";
@@ -151,6 +152,15 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Shop />
+                </ProtectedRoute>
+              }
+            />
+            {/* Avatar / owned cosmetics */}
+            <Route
+              path="/avatar"
+              element={
+                <ProtectedRoute>
+                  <AvatarPage />
                 </ProtectedRoute>
               }
             />

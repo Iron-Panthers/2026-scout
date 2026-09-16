@@ -7,6 +7,8 @@
  */
 
 import { supabase } from "./supabase";
+import { awardPoints, awardEventPoints } from "./gameProfiles";
+import { POINTS_PER_MATCH, EVENT_POINTS_PER_MATCH } from "@/config/games";
 
 /**
  * Current schema version - increment when scouting data structure changes
@@ -265,6 +267,8 @@ export async function submitScoutingData(
   team_num: number,
   match_type: string = "qual"
 ) {
+  const alreadySubmitted = await hasExistingSubmission(matchId, role);
+
   const { data, error } = await supabase
     .from("scouting_submissions")
     .insert({
@@ -282,6 +286,15 @@ export async function submitScoutingData(
   if (error) {
     console.error("Error submitting scouting data:", error);
     throw error;
+  }
+
+  if (scouterId && !alreadySubmitted) {
+    awardPoints(scouterId, POINTS_PER_MATCH)
+      .then((r) => !r.success && console.error("Failed to award points for match submission:", r.error))
+      .catch((err) => console.error("Error awarding points for match submission:", err));
+    awardEventPoints(scouterId, EVENT_POINTS_PER_MATCH)
+      .then((r) => !r.success && console.error("Failed to award event points for match submission:", r.error))
+      .catch((err) => console.error("Error awarding event points for match submission:", err));
   }
 
   return data as ScoutingSubmission;
@@ -306,6 +319,8 @@ export async function submitQualScoutingData(
   scoutingData: Record<string, any>,
   scouterId?: string
 ): Promise<QualScoutingSubmission> {
+  const alreadySubmitted = await hasExistingQualSubmission(matchId, role);
+
   const { data, error } = await supabase
     .from("qual_scouting_submissions")
     .insert({
@@ -321,6 +336,15 @@ export async function submitQualScoutingData(
   if (error) {
     console.error("Error submitting qual scouting data:", error);
     throw error;
+  }
+
+  if (scouterId && !alreadySubmitted) {
+    awardPoints(scouterId, POINTS_PER_MATCH)
+      .then((r) => !r.success && console.error("Failed to award points for match submission:", r.error))
+      .catch((err) => console.error("Error awarding points for match submission:", err));
+    awardEventPoints(scouterId, EVENT_POINTS_PER_MATCH)
+      .then((r) => !r.success && console.error("Failed to award event points for match submission:", r.error))
+      .catch((err) => console.error("Error awarding event points for match submission:", err));
   }
 
   return data as QualScoutingSubmission;
@@ -454,15 +478,33 @@ export async function hasExistingSubmission(
   matchId: string,
   role: string
 ): Promise<boolean> {
+  return hasSubmissionForRole("scouting_submissions", matchId, role);
+}
+
+/**
+ * Check if a qual submission exists for a given match and role
+ */
+export async function hasExistingQualSubmission(
+  matchId: string,
+  role: string
+): Promise<boolean> {
+  return hasSubmissionForRole("qual_scouting_submissions", matchId, role);
+}
+
+async function hasSubmissionForRole(
+  table: "scouting_submissions" | "qual_scouting_submissions",
+  matchId: string,
+  role: string
+): Promise<boolean> {
   const { data, error } = await supabase
-    .from("scouting_submissions")
+    .from(table)
     .select("id")
     .eq("match_id", matchId)
     .eq("role", role)
     .limit(1);
 
   if (error) {
-    console.error("Error checking for existing submission:", error);
+    console.error(`Error checking for existing ${table} submission:`, error);
     return false;
   }
 

@@ -17,7 +17,7 @@ export function rollCrate(): { item: CosmeticDefinition; rarity: CrateRarity } {
   else if (rand < 0.50) selectedRarity = "uncommon";
   else selectedRarity = "common";
 
-  const pool = COSMETICS.filter((c) => c.rarity === selectedRarity);
+  const pool = COSMETICS.filter((c) => c.rarity === selectedRarity && c.currency !== "event");
   const item = pool[Math.floor(Math.random() * pool.length)];
   return { item, rarity: selectedRarity };
 }

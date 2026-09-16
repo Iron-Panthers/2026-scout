@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Coins, ShoppingBag, CheckCircle2, Sparkles, Package } from "lucide-react";
+import { ArrowLeft, Coins, ShoppingBag, CheckCircle2, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -15,16 +15,18 @@ import {
 } from "@/components/ui/dialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { getGameProfile } from "@/lib/gameProfiles";
-import { purchaseCosmetic, equipCosmetic, unequipCosmetic, openCrate, CRATE_COST } from "@/lib/shopService";
+import { purchaseCosmetic, openCrate, CRATE_COST } from "@/lib/shopService";
 import { purchaseGame } from "@/lib/gameProfiles";
+import { getActiveEvent, isEventWithinWindow } from "@/lib/matches";
 import { COSMETICS, RARITY_CONFIG, RARITY_VALUE, type CosmeticDefinition, type CrateRarity } from "@/config/cosmetics";
 import { GAMES } from "@/config/games";
+import { getEventCurrencyLogo } from "@/config/eventCurrency";
 import CosmeticAvatar from "@/components/CosmeticAvatar";
 import { GameCard } from "@/components/GameCard";
 import { GamePlayer } from "@/components/GamePlayer";
 import { CrateOpeningAnimation } from "@/components/CrateOpeningAnimation";
 import { useToast } from "@/hooks/use-toast";
-import type { GameProfile, GameDefinition } from "@/types";
+import type { GameProfile, GameDefinition, Event } from "@/types";
 
 // ---------------------------------------------------------------------------
 // Cosmetic card
@@ -34,26 +36,23 @@ interface CosmeticCardProps {
   owned: boolean;
   equipped: boolean;
   canAfford: boolean;
+  /** Name of the event this item belongs to (for event-currency items). */
+  eventName?: string;
+  /** event_code of the event this item belongs to, used to resolve its currency logo. */
+  eventCode?: string | null;
   onBuy: () => void;
-  onEquip: () => void;
-  onUnequip: () => void;
 }
 
-function CosmeticCard({ item, owned, equipped, canAfford, onBuy, onEquip, onUnequip }: CosmeticCardProps) {
+function CosmeticCard({ item, owned, equipped, canAfford, eventName, eventCode, onBuy }: CosmeticCardProps) {
   return (
     <Card
-      className={`relative overflow-hidden transition-all border ${
-        equipped
-          ? "border-yellow-500/60 bg-yellow-500/5"
-          : owned
-          ? "border-green-600/40 bg-green-900/5"
-          : canAfford
-          ? "border-border hover:border-border/80 bg-card"
-          : "border-border/40 bg-card/60 opacity-70"
+      className={`relative overflow-hidden transition-all border pt-0 ${
+        canAfford || owned ? "" : "opacity-70"
       }`}
       style={
         {
-          borderColor: item.rarity !== 'common' ? RARITY_CONFIG[item.rarity].color : '',
+          borderColor: RARITY_CONFIG[item.rarity].color,
+          backgroundColor: `${RARITY_CONFIG[item.rarity].color}0D`,
           // boxShadow: `0 0 6px 0px ${item.rarity !== 'common' && item.rarity !== 'uncommon' ? RARITY_CONFIG[item.rarity].color : 'transparent'}`
         }
       }
@@ -66,22 +65,20 @@ function CosmeticCard({ item, owned, equipped, canAfford, onBuy, onEquip, onUneq
           </Badge>
         </div>
       )}
-      {!equipped && owned && (
-        <div className="absolute top-2 right-2 flex">
-          <Badge className="bg-green-600/20 text-green-400 border-green-600/30 text-xs">
-            Owned
-          </Badge>
-        </div>
-      )}
 
-      <CardContent className="h-50 p-4 flex flex-col justify-between pb-0">
-        <div className="h-full items-center gap-3 flex-col flex">
+      <CardContent className="h-50 p-4 flex flex-col pb-0">
+        {item.currency === "event" && eventName && (
+          <div className="-mx-4 -mt-4 flex shrink-0 items-center justify-center gap-1 border-b border-sky-500/30 bg-sky-500/15 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-sky-300">
+            {eventName}
+          </div>
+        )}
+        <div className="min-h-0 flex-1 flex flex-col items-center justify-center gap-3">
           {/* Big emoji preview */}
           {item.emoji && (
-            <div className="text-5xl leading-none mt-2 select-none">{item.emoji}</div>
+            <div className="text-5xl leading-none select-none">{item.emoji}</div>
           )}
           {item.url && (
-            <img className="w-10 leading-none mt-2 select-none" src={item.url} />
+            <img className="w-10 leading-none select-none" src={item.url} />
           )}
 
           <div className="text-center space-y-0.5 w-full">
@@ -91,25 +88,14 @@ function CosmeticCard({ item, owned, equipped, canAfford, onBuy, onEquip, onUneq
         </div>
 
           {owned ? (
-            equipped ? (
-              <Button
-                size="sm"
-                variant="outline"
-                className="w-full text-xs border-yellow-500/40 text-yellow-400 hover:bg-yellow-500/10 mt-auto"
-                onClick={onUnequip}
-              >
-                Unequip
-              </Button>
-            ) : (
-              <Button
-                size="sm"
-                className="w-full text-xs bg-green-700 hover:bg-green-600 text-white mt-auto"
-                onClick={onEquip}
-              >
-                <Sparkles className="h-3 w-3 mr-1" />
-                Equip
-              </Button>
-            )
+            <Button
+              size="sm"
+              variant="outline"
+              disabled
+              className="w-full text-xs border-green-600/40 text-green-400 mt-auto disabled:opacity-100"
+            >
+              Owned
+            </Button>
           ) : (
             <Button
               size="sm"
@@ -118,8 +104,16 @@ function CosmeticCard({ item, owned, equipped, canAfford, onBuy, onEquip, onUneq
               onClick={onBuy}
               style={{ backgroundColor: RARITY_CONFIG[item.rarity].bgColor }}
             >
-              <Coins className="h-3 w-3" />
-              {item.cost === 0 ? 'Crate Exclusive' : `${item.cost} pts`}
+              {item.currency === "event" ? (
+                <img src={getEventCurrencyLogo(eventCode)} alt="ChezCoins" className="h-4 w-4" />
+              ) : (
+                <Coins className="h-3 w-3" />
+              )}
+              {item.cost === 0
+                ? "Crate Exclusive"
+                : item.currency === "event"
+                ? item.cost
+                : `${item.cost} pts`}
             </Button>
           )}
       </CardContent>
@@ -137,6 +131,7 @@ export default function Shop() {
 
   const [gameProfile, setGameProfile] = useState<GameProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activeEvent, setActiveEvent] = useState<Event | null>(null);
   const [buyTarget, setBuyTarget] = useState<CosmeticDefinition | null>(null);
   const [buying, setBuying] = useState(false);
   const [buyGameTarget, setBuyGameTarget] = useState<GameDefinition | null>(null);
@@ -155,9 +150,16 @@ export default function Shop() {
     loadProfile();
   }, [loadProfile]);
 
+  useEffect(() => {
+    getActiveEvent().then(setActiveEvent);
+  }, []);
+
   const owned = gameProfile?.owned_cosmetics ?? [];
   const equipped = gameProfile?.equipped_cosmetics ?? {};
   const points = gameProfile?.points ?? 0;
+  const eventPoints = gameProfile?.event_points ?? 0;
+  const eventCosmeticSources = gameProfile?.event_cosmetic_sources ?? {};
+  const showEventTab = !!activeEvent && isEventWithinWindow(activeEvent);
 
   const userName =
     profile?.name ||
@@ -173,37 +175,23 @@ export default function Shop() {
 
   async function handleBuy() {
     if (!buyTarget || !user?.id) return;
+    const currency = buyTarget.currency === "event" ? "event" : "points";
     setBuying(true);
-    const result = await purchaseCosmetic(user.id, buyTarget.id, buyTarget.cost);
+    const result = await purchaseCosmetic(
+      user.id,
+      buyTarget.id,
+      buyTarget.cost,
+      currency,
+      currency === "event" ? activeEvent?.name : undefined
+    );
     setBuying(false);
     if (result.success) {
-      toast({ title: `Purchased ${buyTarget.name}!`, description: `You have ${result.newPoints} pts remaining.` });
+      const unit = currency === "event" ? "ChezCoins" : "pts";
+      toast({ title: `Purchased ${buyTarget.name}!`, description: `You have ${result.newPoints} ${unit} remaining.` });
       setBuyTarget(null);
       loadProfile();
     } else {
       toast({ title: "Purchase failed", description: result.error, variant: "destructive" });
-    }
-  }
-
-  async function handleEquip(item: CosmeticDefinition) {
-    if (!user?.id) return;
-    const result = await equipCosmetic(user.id, item.category, item.id);
-    if (result.success) {
-      toast({ title: `${item.name} equipped!` });
-      loadProfile();
-    } else {
-      toast({ title: "Failed to equip", description: result.error, variant: "destructive" });
-    }
-  }
-
-  async function handleUnequip(item: CosmeticDefinition) {
-    if (!user?.id) return;
-    const result = await unequipCosmetic(user.id, item.category);
-    if (result.success) {
-      toast({ title: `${item.name} unequipped.` });
-      loadProfile();
-    } else {
-      toast({ title: "Failed to unequip", description: result.error, variant: "destructive" });
     }
   }
 
@@ -235,10 +223,15 @@ export default function Shop() {
     loadProfile();
   }
 
-  const hats = COSMETICS.filter((c) => c.category === "hat").sort((a, b) => a.rarity === b.rarity ? a.cost - b.cost : RARITY_VALUE[a.rarity] - RARITY_VALUE[b.rarity]);
-  const decorations = COSMETICS.filter((c) => c.category === "decoration").sort((a, b) => a.rarity === b.rarity ? a.cost - b.cost : RARITY_VALUE[a.rarity] - RARITY_VALUE[b.rarity]);
+  const rarityCompare = (a: CosmeticDefinition, b: CosmeticDefinition) =>
+    a.rarity === b.rarity ? a.cost - b.cost : RARITY_VALUE[a.rarity] - RARITY_VALUE[b.rarity];
 
-  function renderGrid(items: CosmeticDefinition[]) {
+  const hats = COSMETICS.filter((c) => c.category === "hat" && c.currency !== "event").sort(rarityCompare);
+  const decorations = COSMETICS.filter((c) => c.category === "decoration" && c.currency !== "event").sort(rarityCompare);
+  const eventItems = COSMETICS.filter((c) => c.currency === "event").sort(rarityCompare);
+
+  function renderGrid(items: CosmeticDefinition[], currency: "points" | "event" = "points") {
+    const balance = currency === "event" ? eventPoints : points;
     return (
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
         {items.map((item) => (
@@ -247,10 +240,14 @@ export default function Shop() {
             item={item}
             owned={owned.includes(item.id)}
             equipped={equipped[item.category] === item.id}
-            canAfford={points >= item.cost}
+            canAfford={balance >= item.cost}
+            eventName={
+              item.currency === "event"
+                ? eventCosmeticSources[item.id] ?? activeEvent?.name
+                : undefined
+            }
+            eventCode={activeEvent?.event_code}
             onBuy={() => setBuyTarget(item)}
-            onEquip={() => handleEquip(item)}
-            onUnequip={() => handleUnequip(item)}
           />
         ))}
       </div>
@@ -322,12 +319,16 @@ export default function Shop() {
                   Decorations
                 </TabsTrigger>
                 <TabsTrigger value="crates" className="flex-1 gap-1.5">
-                  <Package className="h-3.5 w-3.5" />
                   Crates
                 </TabsTrigger>
                 <TabsTrigger value="games" className="flex-1 gap-1.5">
                   Games
                 </TabsTrigger>
+                {showEventTab && (
+                  <TabsTrigger value="event" className="flex-1 gap-1.5">
+                    Event
+                  </TabsTrigger>
+                )}
               </TabsList>
               <TabsContent value="hats" className="mt-4">
                 {renderGrid(hats)}
@@ -360,6 +361,24 @@ export default function Shop() {
                   })}
                 </div>
               </TabsContent>
+              {showEventTab && activeEvent && (
+                <TabsContent value="event" className="mt-4 space-y-4">
+                  <div className="flex items-center justify-between rounded-lg border border-border/50 bg-accent/30 px-4 py-3">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Live Event</p>
+                      <p className="font-semibold">{activeEvent.name}</p>
+                    </div>
+                    <Badge
+                      variant="outline"
+                      className="gap-1.5 text-sky-400 border-sky-500/40 bg-sky-500/10 text-sm font-semibold"
+                    >
+                      <img src={getEventCurrencyLogo(activeEvent.event_code)} alt="ChezCoins" className="h-5 w-5" />
+                      {loading ? "—" : eventPoints.toLocaleString()}
+                    </Badge>
+                  </div>
+                  {renderGrid(eventItems, "event")}
+                </TabsContent>
+              )}
             </Tabs>
           </div>
         </div>
@@ -381,15 +400,28 @@ export default function Shop() {
           <div className="flex items-center justify-between rounded-lg border border-border/50 bg-muted/30 px-4 py-3 my-1">
             <span className="text-sm text-muted-foreground">Cost</span>
             <span className="flex items-center gap-1.5 font-semibold text-yellow-400">
-              <Coins className="h-4 w-4" />
-              {buyTarget?.cost} pts
+              {buyTarget?.currency === "event" ? (
+                <img src={getEventCurrencyLogo(activeEvent?.event_code)} alt="ChezCoins" className="h-6 w-6" />
+              ) : (
+                <Coins className="h-4 w-4" />
+              )}
+              {buyTarget?.cost} {buyTarget?.currency !== "event" && "pts"}
             </span>
           </div>
 
           <div className="flex items-center justify-between rounded-lg border border-border/50 bg-muted/30 px-4 py-3">
             <span className="text-sm text-muted-foreground">Your balance</span>
-            <span className={`font-semibold ${buyTarget && points >= buyTarget.cost ? "text-foreground" : "text-red-400"}`}>
-              {points} pts
+            <span
+              className={`flex items-center gap-1.5 font-semibold ${
+                buyTarget && (buyTarget.currency === "event" ? eventPoints : points) >= buyTarget.cost
+                  ? "text-foreground"
+                  : "text-red-400"
+              }`}
+            >
+              {buyTarget?.currency === "event" && (
+                <img src={getEventCurrencyLogo(activeEvent?.event_code)} alt="ChezCoins" className="h-4 w-4" />
+              )}
+              {buyTarget?.currency === "event" ? eventPoints : points} {buyTarget?.currency !== "event" && "pts"}
             </span>
           </div>
 
@@ -399,7 +431,11 @@ export default function Shop() {
             </Button>
             <Button
               className="flex-1 bg-yellow-600 hover:bg-yellow-500 text-black font-semibold"
-              disabled={buying || !buyTarget || points < buyTarget.cost}
+              disabled={
+                buying ||
+                !buyTarget ||
+                (buyTarget.currency === "event" ? eventPoints : points) < buyTarget.cost
+              }
               onClick={handleBuy}
             >
               {buying ? "Buying…" : "Buy"}
@@ -477,8 +513,8 @@ function CratesTab({ points, ownedCosmetics, onOpenCrate }: CratesTabProps) {
 
   const rarityCounts = (["common", "uncommon", "rare", "ultra-rare", "legendary"] as CrateRarity[]).map((r) => ({
     rarity: r,
-    total: COSMETICS.filter((c) => c.rarity === r).length,
-    owned: COSMETICS.filter((c) => c.rarity === r && ownedCosmetics.includes(c.id)).length,
+    total: COSMETICS.filter((c) => c.rarity === r && c.currency !== "event").length,
+    owned: COSMETICS.filter((c) => c.rarity === r && c.currency !== "event" && ownedCosmetics.includes(c.id)).length,
   }));
 
   return (
