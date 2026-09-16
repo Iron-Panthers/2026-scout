@@ -146,18 +146,13 @@ export async function getMatchTeam(
 }
 
 /**
- * Gets the preferred team photo for a given year
- * @param teamNumber - The team number (e.g., 1678)
- * @param year - The year (e.g., 2024, 2025)
- * @returns URL to the preferred team photo or null if not found
+ * Extracts a usable photo URL from a team's media list for a single year.
  */
-export async function getTeamPhoto(
+function selectPhotoFromMedia(
+  media: TBAMedia[] | null,
   teamNumber: number,
   year: number
-): Promise<string | null> {
-  const teamKey = `frc${teamNumber}`;
-  const media = await tbaFetch<TBAMedia[]>(`/team/${teamKey}/media/${year}`);
-
+): string | null {
   if (!media || media.length === 0) {
     console.log(`No media found for team ${teamNumber} in ${year}`);
     return null;
@@ -196,6 +191,47 @@ export async function getTeamPhoto(
   }
 
   console.log(`Unsupported media type: ${targetMedia.type}`);
+  return null;
+}
+
+/**
+ * Gets the preferred team photo for a given year, falling back to the
+ * team's other participated years (most recent first) if that year has
+ * no usable media - teams often only upload photos for some seasons.
+ * @param teamNumber - The team number (e.g., 1678)
+ * @param year - The year (e.g., 2024, 2025)
+ * @returns URL to the preferred team photo or null if not found
+ */
+export async function getTeamPhoto(
+  teamNumber: number,
+  year: number
+): Promise<string | null> {
+  const teamKey = `frc${teamNumber}`;
+
+  const media = await tbaFetch<TBAMedia[]>(`/team/${teamKey}/media/${year}`);
+  const photo = selectPhotoFromMedia(media, teamNumber, year);
+  if (photo) return photo;
+
+  // Fall back to other years this team has participated in, most recent first
+  const years = await tbaFetch<number[]>(
+    `/team/${teamKey}/years_participated`
+  );
+  const otherYears = (years || [])
+    .filter((y) => y !== year)
+    .sort((a, b) => b - a);
+
+  for (const fallbackYear of otherYears) {
+    const fallbackMedia = await tbaFetch<TBAMedia[]>(
+      `/team/${teamKey}/media/${fallbackYear}`
+    );
+    const fallbackPhoto = selectPhotoFromMedia(
+      fallbackMedia,
+      teamNumber,
+      fallbackYear
+    );
+    if (fallbackPhoto) return fallbackPhoto;
+  }
+
   return null;
 }
 

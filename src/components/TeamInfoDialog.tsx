@@ -82,7 +82,7 @@ function AllianceTeamList({
     <>
       {teams.map((team, i) => (
         <span key={team}>
-          {i > 0 && <span className="text-muted-foreground">, </span>}
+          {i > 0 && <span className="text-muted-foreground"> </span>}
           <span className={team === highlightTeam ? "font-bold text-green-500" : colorClass}>
             {team}
           </span>
@@ -227,7 +227,7 @@ export function TeamInfoDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-xl">
+      <DialogContent className="max-h-[85vh] max-w-[calc(100%-0.5rem)] overflow-x-hidden overflow-y-auto p-2.5 sm:max-w-xl sm:p-6">
         <DialogHeader>
           <DialogTitle className="font-mono">Team {teamNumber}</DialogTitle>
           <DialogDescription>{nickname || "Unknown team"}</DialogDescription>
@@ -282,42 +282,41 @@ export function TeamInfoDialog({
                   return (
                     <div
                       key={row.matchNumber}
-                      className="grid grid-cols-[auto_1fr_auto] items-center gap-2 rounded-md border px-2.5 py-1.5 text-sm"
+                      className="grid grid-cols-[2.5rem_1fr_3.25rem] items-center justify-items-center gap-8 rounded-md border px-1.5 py-1 text-sm sm:grid-cols-[5rem_1fr_6rem] sm:gap-14 sm:px-2.5 sm:py-1.5"
                     >
-                      <span className="shrink-0 whitespace-nowrap text-xs font-semibold text-muted-foreground">
-                        Quals {row.matchNumber}
+                      <span className="whitespace-nowrap text-[10px] font-semibold text-muted-foreground sm:text-xs">
+                        <span className="sm:hidden">Q{row.matchNumber}</span>
+                        <span className="hidden sm:inline">Quals {row.matchNumber}</span>
                       </span>
-                      <div className="flex min-w-0 items-center justify-center">
-                        <div className="flex w-56 shrink-0 overflow-hidden rounded-md border">
-                          <div
-                            className={`min-w-0 flex-1 truncate px-1 py-0.5 text-center font-mono text-[10px] ${allianceStripClass(
-                              "red",
-                              winner
-                            )}`}
-                          >
-                            <AllianceTeamList
-                              teams={row.redTeams}
-                              colorClass="text-red-400"
-                              highlightTeam={teamNumber}
-                            />
-                          </div>
-                          <div
-                            className={`min-w-0 flex-1 truncate px-1 py-0.5 text-center font-mono text-[10px] ${allianceStripClass(
-                              "blue",
-                              winner
-                            )}`}
-                          >
-                            <AllianceTeamList
-                              teams={row.blueTeams}
-                              colorClass="text-blue-400"
-                              highlightTeam={teamNumber}
-                            />
-                          </div>
+                      <div className="flex w-full min-w-0 overflow-hidden rounded-md border">
+                        <div
+                          className={`min-w-0 flex-1 truncate px-0.5 py-0.5 text-center font-mono text-[7px] sm:px-1 sm:text-[10px] ${allianceStripClass(
+                            "red",
+                            winner
+                          )}`}
+                        >
+                          <AllianceTeamList
+                            teams={row.redTeams}
+                            colorClass="text-red-400"
+                            highlightTeam={teamNumber}
+                          />
+                        </div>
+                        <div
+                          className={`min-w-0 flex-1 truncate px-0.5 py-0.5 text-center font-mono text-[7px] sm:px-1 sm:text-[10px] ${allianceStripClass(
+                            "blue",
+                            winner
+                          )}`}
+                        >
+                          <AllianceTeamList
+                            teams={row.blueTeams}
+                            colorClass="text-blue-400"
+                            highlightTeam={teamNumber}
+                          />
                         </div>
                       </div>
                       {row.played ? (
                         <span
-                          className={`shrink-0 justify-self-end text-xs font-bold ${
+                          className={`whitespace-nowrap text-[10px] font-bold sm:text-xs ${
                             outcome === "W"
                               ? "text-green-500"
                               : outcome === "L"
@@ -328,8 +327,9 @@ export function TeamInfoDialog({
                           {outcome} {ownScore}-{oppScore}
                         </span>
                       ) : (
-                        <span className="shrink-0 justify-self-end text-xs text-muted-foreground">
-                          Not yet played
+                        <span className="whitespace-nowrap text-[10px] text-muted-foreground sm:text-xs">
+                          <span className="sm:hidden">—</span>
+                          <span className="hidden sm:inline">Not yet played</span>
                         </span>
                       )}
                     </div>

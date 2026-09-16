@@ -35,6 +35,34 @@ export async function getActiveEvent(): Promise<Event | null> {
   return data;
 }
 
+/**
+ * Parses a date-only string ("2026-09-20") as local midnight.
+ * `new Date("2026-09-20")` parses per the ISO spec as UTC midnight, which
+ * shifts the effective boundary by the local UTC offset — in any timezone
+ * behind UTC (all of the US) that opens/closes the window hours early.
+ */
+function parseLocalDate(dateStr: string): Date {
+  const [y, m, d] = dateStr.split("T")[0].split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+// Whether `now` falls within an event's dates, extended by `graceDays` after
+// end_date. Events with no start/end date are treated as always "current"
+// on that side, since not every event has dates filled in.
+export function isEventWithinWindow(
+  event: Event,
+  graceDays = 7,
+  now: Date = new Date()
+): boolean {
+  if (event.start_date && now < parseLocalDate(event.start_date)) return false;
+  if (event.end_date) {
+    const graceEnd = parseLocalDate(event.end_date);
+    graceEnd.setDate(graceEnd.getDate() + graceDays);
+    if (now > graceEnd) return false;
+  }
+  return true;
+}
+
 // Fetch all matches
 export async function getMatches(): Promise<Match[]> {
   const { data, error } = await supabase

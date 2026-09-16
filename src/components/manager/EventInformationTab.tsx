@@ -24,6 +24,17 @@ import { Badge } from "../ui/badge";
 
 const MAX_MATCHES = 125;
 
+/**
+ * Parses a date-only string ("2026-09-20") as a local-midnight Date.
+ * `new Date("2026-09-20")` parses per the ISO spec as UTC midnight, which
+ * then displays as the day before in any timezone behind UTC (all of the
+ * US) once formatted with local time getters — this avoids that shift.
+ */
+function parseLocalDate(dateStr: string): Date {
+  const [y, m, d] = dateStr.split("T")[0].split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
 interface EventInformationTabProps {
   selectedEvent: string;
   events: Event[];
@@ -411,7 +422,7 @@ export function EventInformationTab({
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
                         {editedEvent.start_date
-                          ? format(new Date(editedEvent.start_date), "PPP")
+                          ? format(parseLocalDate(editedEvent.start_date), "PPP")
                           : "Pick a date"}
                       </Button>
                     </PopoverTrigger>
@@ -420,13 +431,13 @@ export function EventInformationTab({
                         mode="single"
                         selected={
                           editedEvent.start_date
-                            ? new Date(editedEvent.start_date)
+                            ? parseLocalDate(editedEvent.start_date)
                             : undefined
                         }
                         onSelect={(date) =>
                           setEditedEvent({
                             ...editedEvent,
-                            start_date: date?.toISOString() || "",
+                            start_date: date ? format(date, "yyyy-MM-dd") : "",
                           })
                         }
                         initialFocus
@@ -438,7 +449,7 @@ export function EventInformationTab({
                     {isAllEvents
                       ? "Season Long"
                       : currentEvent?.start_date
-                      ? format(new Date(currentEvent.start_date), "PPP")
+                      ? format(parseLocalDate(currentEvent.start_date), "PPP")
                       : "TBD"}
                   </p>
                 )}
@@ -456,7 +467,7 @@ export function EventInformationTab({
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
                         {editedEvent.end_date
-                          ? format(new Date(editedEvent.end_date), "PPP")
+                          ? format(parseLocalDate(editedEvent.end_date), "PPP")
                           : "Pick a date"}
                       </Button>
                     </PopoverTrigger>
@@ -465,13 +476,13 @@ export function EventInformationTab({
                         mode="single"
                         selected={
                           editedEvent.end_date
-                            ? new Date(editedEvent.end_date)
+                            ? parseLocalDate(editedEvent.end_date)
                             : undefined
                         }
                         onSelect={(date) =>
                           setEditedEvent({
                             ...editedEvent,
-                            end_date: date?.toISOString() || "",
+                            end_date: date ? format(date, "yyyy-MM-dd") : "",
                           })
                         }
                         initialFocus
@@ -483,7 +494,7 @@ export function EventInformationTab({
                     {isAllEvents
                       ? "Season Long"
                       : currentEvent?.end_date
-                      ? format(new Date(currentEvent.end_date), "PPP")
+                      ? format(parseLocalDate(currentEvent.end_date), "PPP")
                       : "TBD"}
                   </p>
                 )}

@@ -48,44 +48,63 @@ export async function getPointsMap(
 
 /**
  * Purchase a cosmetic item.
- * Deducts points and adds the cosmetic id to owned_cosmetics[].
+ * Deducts from the chosen currency balance ("points" or "event") and adds
+ * the cosmetic id to owned_cosmetics[]. `newPoints` reflects whichever
+ * balance was spent. When buying with "event" currency, `eventName` (if
+ * given) is recorded so the Shop can label which event the item came from.
  */
 export async function purchaseCosmetic(
   userId: string,
   cosmeticId: string,
-  cost: number
+  cost: number,
+  currency: "points" | "event" = "points",
+  eventName?: string
 ): Promise<{ success: boolean; newPoints: number; error?: string }> {
   const profile = await getGameProfile(userId);
   if (!profile) return { success: false, newPoints: 0, error: "Could not load your profile." };
 
+  const balance = currency === "event" ? profile.event_points : profile.points;
+  const currencyLabel = currency === "event" ? "event points" : "points";
+
   if ((profile.owned_cosmetics ?? []).includes(cosmeticId)) {
-    return { success: false, newPoints: profile.points, error: "You already own this item." };
+    return { success: false, newPoints: balance, error: "You already own this item." };
   }
 
-  if (profile.points < cost) {
+  if (balance < cost) {
     return {
       success: false,
-      newPoints: profile.points,
-      error: `Not enough points. You need ${cost} but have ${profile.points}.`,
+      newPoints: balance,
+      error: `Not enough ${currencyLabel}. You need ${cost} but have ${balance}.`,
     };
   }
 
-  const newPoints = profile.points - cost;
+  const newBalance = balance - cost;
   const newOwned = [...(profile.owned_cosmetics ?? []), cosmeticId];
+  const update =
+    currency === "event"
+      ? {
+          event_points: newBalance,
+          owned_cosmetics: newOwned,
+          ...(eventName
+            ? { event_cosmetic_sources: { ...(profile.event_cosmetic_sources ?? {}), [cosmeticId]: eventName } }
+            : {}),
+        }
+      : { points: newBalance, owned_cosmetics: newOwned };
 
   const { data, error } = await supabase
     .from("game_profiles")
-    .update({ points: newPoints, owned_cosmetics: newOwned })
+    .update(update)
     .eq("user_id", userId)
     .select()
     .single();
 
   if (error) {
     console.error("[shopService] purchaseCosmetic error:", error);
-    return { success: false, newPoints: profile.points, error: "Purchase failed. Please try again." };
+    return { success: false, newPoints: balance, error: "Purchase failed. Please try again." };
   }
 
-  return { success: true, newPoints: (data as GameProfile).points };
+  const updated = data as GameProfile;
+  return { success: true, newPoints: currency === "event" ? updated.event_points : updated.points };
 }
 
 /**

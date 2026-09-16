@@ -1,5 +1,9 @@
 export type BetAlliance = "red" | "blue";
 export type BetStatus = "pending" | "won" | "lost" | "cancelled";
+/** Which balance a bet is staked against — the normal points balance, or
+ * the separate event-points balance (only bettable on the active event's
+ * own matches). */
+export type BetCurrency = "points" | "event";
 
 export interface Bet {
   id: string;
@@ -9,6 +13,7 @@ export interface Bet {
   amount: number;
   status: BetStatus;
   payout: number | null;
+  currency: BetCurrency;
   created_at: string;
   updated_at: string;
 }
