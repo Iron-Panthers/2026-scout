@@ -69,6 +69,9 @@ import { clockIn, clockOut } from "@/lib/profiles";
 import { supabase } from "@/lib/supabase";
 import DashboardHeader from "@/components/DashboardHeader";
 import UserProfileMenu from "@/components/UserProfileMenu";
+import Shop from "@/pages/Shop";
+import AvatarPage from "@/pages/Avatar";
+import Betting from "@/pages/Betting";
 import OfflineMatches from "@/components/OfflineMatches";
 import AnimatedContent from "@/components/AnimatedContent";
 import { TeamImage } from "@/components/TeamImage";
@@ -188,7 +191,7 @@ function PicklistColumn({
       </div>
       <div
         ref={setNodeRef}
-        className="flex max-h-[424px] min-h-32 flex-col gap-2 overflow-y-auto rounded-lg border border-dashed p-1.5"
+        className="flex min-h-32 flex-col gap-2 rounded-lg border border-dashed p-1.5"
       >
         {teams.length === 0 && (
           <p className="flex flex-1 items-center justify-center p-4 text-center text-sm text-muted-foreground">
@@ -227,7 +230,9 @@ export default function Dashboard() {
   const [pitAssignments, setPitAssignments] = useState<UserPitAssignment[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [clockingIn, setClocingIn] = useState(false);
-  const [dashboardPage, setDashboardPage] = useState<"scout" | "picklist">("scout");
+  const [dashboardPage, setDashboardPage] = useState<
+    "scout" | "picklist" | "shop" | "avatar" | "betting"
+  >("scout");
   const [pickedTeams, setPickedTeams] = useState<TBATeamSimple[]>([]);
   const [doNotPickTeams, setDoNotPickTeams] = useState<TBATeamSimple[]>([]);
   const [bankTeams, setBankTeams] = useState<TBATeamSimple[]>([]);
@@ -782,8 +787,12 @@ export default function Dashboard() {
       {/* Main Content */}
       <main className="container mx-auto p-6 max-w-7xl">
         {/* Header Section */}
-        <div className="flex items-start justify-between mb-8">
-          <DashboardHeader userName={userName} />
+        <div
+          className={`flex items-start mb-8 ${
+            dashboardPage === "scout" ? "justify-between" : "justify-end"
+          }`}
+        >
+          {dashboardPage === "scout" && <DashboardHeader userName={userName} />}
           <UserProfileMenu
             userName={userName}
             userInitials={userInitials}
@@ -1014,7 +1023,7 @@ export default function Dashboard() {
           <OfflineMatches />
         </div>
           </>
-        ) : (
+        ) : dashboardPage === "picklist" ? (
           <section className="my-8">
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
@@ -1175,6 +1184,18 @@ export default function Dashboard() {
               eventCode={selectedPicklistEvent?.event_code}
             />
           </section>
+        ) : dashboardPage === "shop" ? (
+          <section className="my-8">
+            <Shop embedded />
+          </section>
+        ) : dashboardPage === "avatar" ? (
+          <section className="my-8">
+            <AvatarPage embedded onVisitShop={() => setDashboardPage("shop")} />
+          </section>
+        ) : (
+          <section className="my-8">
+            <Betting embedded />
+          </section>
         )}
 
         {/* Match Details Dialog */}
@@ -1332,27 +1353,39 @@ export default function Dashboard() {
           </Button>
           <Button
             size="sm"
-            variant="ghost"
-            className="flex-1 min-w-0 px-1.5 text-xs text-muted-foreground hover:text-foreground sm:px-3 sm:text-sm"
-            onClick={() => navigate("/shop")}
+            variant={dashboardPage === "shop" ? "default" : "ghost"}
+            className={
+              dashboardPage === "shop"
+                ? "flex-1 min-w-0 px-1.5 text-xs font-semibold shadow-sm sm:px-3 sm:text-sm"
+                : "flex-1 min-w-0 px-1.5 text-xs text-muted-foreground hover:text-foreground sm:px-3 sm:text-sm"
+            }
+            onClick={() => setDashboardPage("shop")}
           >
             <ShoppingBag className="mr-1 h-3.5 w-3.5 sm:mr-2 sm:h-4 sm:w-4" />
             Shop
           </Button>
           <Button
             size="sm"
-            variant="ghost"
-            className="flex-1 min-w-0 px-1.5 text-xs text-muted-foreground hover:text-foreground sm:px-3 sm:text-sm"
-            onClick={() => navigate("/avatar")}
+            variant={dashboardPage === "avatar" ? "default" : "ghost"}
+            className={
+              dashboardPage === "avatar"
+                ? "flex-1 min-w-0 px-1.5 text-xs font-semibold shadow-sm sm:px-3 sm:text-sm"
+                : "flex-1 min-w-0 px-1.5 text-xs text-muted-foreground hover:text-foreground sm:px-3 sm:text-sm"
+            }
+            onClick={() => setDashboardPage("avatar")}
           >
             <Sparkles className="mr-1 h-3.5 w-3.5 sm:mr-2 sm:h-4 sm:w-4" />
             Avatar
           </Button>
           <Button
             size="sm"
-            variant="ghost"
-            className="flex-1 min-w-0 px-1.5 text-xs text-muted-foreground hover:text-foreground sm:px-3 sm:text-sm"
-            onClick={() => navigate("/betting")}
+            variant={dashboardPage === "betting" ? "default" : "ghost"}
+            className={
+              dashboardPage === "betting"
+                ? "flex-1 min-w-0 px-1.5 text-xs font-semibold shadow-sm sm:px-3 sm:text-sm"
+                : "flex-1 min-w-0 px-1.5 text-xs text-muted-foreground hover:text-foreground sm:px-3 sm:text-sm"
+            }
+            onClick={() => setDashboardPage("betting")}
           >
             <TrendingUp className="mr-1 h-3.5 w-3.5 sm:mr-2 sm:h-4 sm:w-4" />
             Betting

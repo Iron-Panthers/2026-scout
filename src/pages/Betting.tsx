@@ -803,12 +803,12 @@ function Leaderboard({ userId }: { userId?: string }) {
 // ---------------------------------------------------------------------------
 // Main page
 // ---------------------------------------------------------------------------
-export default function Betting() {
+export default function Betting({ embedded = false }: { embedded?: boolean } = {}) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const isOnline = useOnlineStatus();
   const [searchParams] = useSearchParams();
-  const isInIframe = searchParams.get('isIframe') ?? false;
+  const isInIframe = (searchParams.get('isIframe') ?? false) || embedded;
 
   const [event, setEvent] = useState<Event | null>(null);
   const [matches, setMatches] = useState<Match[]>([]);
@@ -980,14 +980,14 @@ export default function Betting() {
   // ---------------------------------------------------------------------------
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className={embedded ? "flex items-center justify-center py-12" : "min-h-screen bg-background flex items-center justify-center"}>
         <div className="text-muted-foreground">Loading matches…</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background my-5">
+    <div className={embedded ? undefined : "min-h-screen bg-background my-5"}>
       <main className="container mx-auto p-4 pb-10">
         { showSBloading && (
           <div className="p-3 bg-yellow-900/20 border border-yellow-700/40 rounded-lg mb-5">
@@ -1004,8 +1004,8 @@ export default function Betting() {
               </Button>
             )}
           </div>
-          <div className="text-center">
-            <h1 className="text-2xl font-bold flex items-center justify-center gap-2">
+          <div className="text-left">
+            <h1 className="text-2xl font-bold flex items-center justify-start gap-2">
               <TrendingUp className="h-6 w-6 text-primary" />
               Betting
             </h1>
