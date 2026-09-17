@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Coins, ShoppingBag, CheckCircle2, Package } from "lucide-react";
+import { ArrowLeft, Coins, ShoppingBag, CheckCircle2, Package, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -15,10 +16,11 @@ import {
 } from "@/components/ui/dialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { getGameProfile } from "@/lib/gameProfiles";
-import { purchaseCosmetic, openCrate, CRATE_COST } from "@/lib/shopService";
+import { purchaseCosmetic, openCrate } from "@/lib/shopService";
 import { purchaseGame } from "@/lib/gameProfiles";
 import { getActiveEvent, isEventWithinWindow } from "@/lib/matches";
 import { COSMETICS, RARITY_CONFIG, RARITY_VALUE, type CosmeticDefinition, type CrateRarity } from "@/config/cosmetics";
+import { CRATE_TIERS, type CrateTier } from "@/config/crates";
 import { GAMES } from "@/config/games";
 import { getEventCurrencyLogo } from "@/config/eventCurrency";
 import CosmeticAvatar from "@/components/CosmeticAvatar";
@@ -26,6 +28,8 @@ import { GameCard } from "@/components/GameCard";
 import { GamePlayer } from "@/components/GamePlayer";
 import { CrateOpeningAnimation } from "@/components/CrateOpeningAnimation";
 import { useToast } from "@/hooks/use-toast";
+import { useRandomSubtitle } from "@/hooks/useRandomSubtitle";
+import { SHOP_SUBTITLES } from "@/config/headerSubtitles";
 import type { GameProfile, GameDefinition, Event } from "@/types";
 
 // ---------------------------------------------------------------------------
@@ -124,10 +128,14 @@ function CosmeticCard({ item, owned, equipped, canAfford, eventName, eventCode, 
 // ---------------------------------------------------------------------------
 // Main Shop page
 // ---------------------------------------------------------------------------
-export default function Shop() {
+export default function Shop({
+  embedded = false,
+  headerActions = null,
+}: { embedded?: boolean; headerActions?: HTMLElement | null } = {}) {
   const navigate = useNavigate();
   const { user, profile, getAvatarUrl } = useAuth();
   const { toast } = useToast();
+  const subtitle = useRandomSubtitle(SHOP_SUBTITLES);
 
   const [gameProfile, setGameProfile] = useState<GameProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -138,6 +146,7 @@ export default function Shop() {
   const [buyingGame, setBuyingGame] = useState(false);
   const [playingGame, setPlayingGame] = useState<GameDefinition | null>(null);
   const [crateOpen, setCrateOpen] = useState(false);
+  const [crateTierIndex, setCrateTierIndex] = useState(0);
 
   const loadProfile = useCallback(async () => {
     if (!user?.id) return;
@@ -210,8 +219,8 @@ export default function Shop() {
   }
 
   async function handleCrateOpen(itemId: string) {
-    if (!user?.id) return { success: false, newPoints: points, isDuplicate: false };
-    const result = await openCrate(user.id, itemId);
+    if (!user?.id) return { success: false, newPoints: points, isDuplicate: false, refund: 0 };
+    const result = await openCrate(user.id, itemId, CRATE_TIERS[crateTierIndex].cost);
     return result;
   }
 
@@ -226,8 +235,7 @@ export default function Shop() {
   const rarityCompare = (a: CosmeticDefinition, b: CosmeticDefinition) =>
     a.rarity === b.rarity ? a.cost - b.cost : RARITY_VALUE[a.rarity] - RARITY_VALUE[b.rarity];
 
-  const hats = COSMETICS.filter((c) => c.category === "hat" && c.currency !== "event").sort(rarityCompare);
-  const decorations = COSMETICS.filter((c) => c.category === "decoration" && c.currency !== "event").sort(rarityCompare);
+  const themes = COSMETICS.filter((c) => c.category === "theme" && c.currency !== "event").sort(rarityCompare);
   const eventItems = COSMETICS.filter((c) => c.currency === "event").sort(rarityCompare);
 
   function renderGrid(items: CosmeticDefinition[], currency: "points" | "event" = "points") {
@@ -238,7 +246,7 @@ export default function Shop() {
           <CosmeticCard
             key={item.id}
             item={item}
-            owned={owned.includes(item.id)}
+            owned={owned.includes(item.id) || !!item.default}
             equipped={equipped[item.category] === item.id}
             canAfford={balance >= item.cost}
             eventName={
@@ -255,26 +263,45 @@ export default function Shop() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className={embedded ? undefined : "min-h-screen bg-background"}>
       <div className="max-w-xl mx-auto md:max-w-none px-4 py-6 space-y-5">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <Button variant="ghost" size="sm" className="gap-2 px-2" onClick={() => navigate(-1)}>
-            <ArrowLeft className="h-4 w-4" />
-            Back
-          </Button>
-          <div className="flex items-center gap-2">
-            <ShoppingBag className="h-5 w-5 text-muted-foreground" />
-            <span className="font-semibold text-lg">Shop</span>
+        {!embedded && (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Button variant="ghost" size="sm" className="gap-2 px-2" onClick={() => navigate(-1)}>
+                <ArrowLeft className="h-4 w-4" />
+                Back
+              </Button>
+              <div className="flex items-center gap-2">
+                <ShoppingBag className="h-6 w-6 text-red-500" />
+                <div>
+                  <span className="text-2xl font-bold block">Shop</span>
+                  <p className="text-sm text-muted-foreground">{subtitle}</p>
+                </div>
+              </div>
+            </div>
+            <Badge
+              variant="outline"
+              className="gap-1.5 text-yellow-400 border-yellow-500/40 bg-yellow-500/10 text-sm font-semibold"
+            >
+              <Coins className="h-3.5 w-3.5" />
+              {loading ? "—" : points.toLocaleString()} pts
+            </Badge>
           </div>
-          <Badge
-            variant="outline"
-            className="gap-1.5 text-yellow-400 border-yellow-500/40 bg-yellow-500/10 text-sm font-semibold"
-          >
-            <Coins className="h-3.5 w-3.5" />
-            {loading ? "—" : points.toLocaleString()} pts
-          </Badge>
-        </div>
+        )}
+        {embedded &&
+          headerActions &&
+          createPortal(
+            <Badge
+              variant="outline"
+              className="gap-1.5 text-yellow-400 border-yellow-500/40 bg-yellow-500/10 text-sm font-semibold"
+            >
+              <Coins className="h-3.5 w-3.5" />
+              {loading ? "—" : points.toLocaleString()} pts
+            </Badge>,
+            headerActions
+          )}
 
         {/* Main layout: stacked on mobile, sidebar+content on md+ */}
         <div className="flex flex-col md:flex-row gap-5 justify-center">
@@ -310,13 +337,10 @@ export default function Shop() {
 
           {/* Tabs */}
           <div className="flex-1 min-w-0">
-            <Tabs defaultValue="hats">
+            <Tabs defaultValue="themes">
               <TabsList className="w-full">
-                <TabsTrigger value="hats" className="flex-1 gap-1.5">
-                  Hats
-                </TabsTrigger>
-                <TabsTrigger value="decorations" className="flex-1 gap-1.5">
-                  Decorations
+                <TabsTrigger value="themes" className="flex-1 gap-1.5">
+                  Themes
                 </TabsTrigger>
                 <TabsTrigger value="crates" className="flex-1 gap-1.5">
                   Crates
@@ -330,16 +354,16 @@ export default function Shop() {
                   </TabsTrigger>
                 )}
               </TabsList>
-              <TabsContent value="hats" className="mt-4">
-                {renderGrid(hats)}
-              </TabsContent>
-              <TabsContent value="decorations" className="mt-4">
-                {renderGrid(decorations)}
+              <TabsContent value="themes" className="mt-4">
+                {renderGrid(themes)}
               </TabsContent>
               <TabsContent value="crates" className="mt-4">
                 <CratesTab
                   points={points}
                   ownedCosmetics={owned}
+                  tier={CRATE_TIERS[crateTierIndex]}
+                  onPrevTier={() => setCrateTierIndex((i) => (i - 1 + CRATE_TIERS.length) % CRATE_TIERS.length)}
+                  onNextTier={() => setCrateTierIndex((i) => (i + 1) % CRATE_TIERS.length)}
                   onOpenCrate={() => setCrateOpen(true)}
                 />
               </TabsContent>
@@ -396,6 +420,17 @@ export default function Shop() {
               {buyTarget?.description}
             </DialogDescription>
           </DialogHeader>
+
+          {buyTarget?.category === "theme" && buyTarget.themeValue && (
+            <div data-theme={buyTarget.themeValue} className="rounded-lg border border-border overflow-hidden">
+              <div className="bg-background p-4 flex flex-col items-center gap-3">
+                <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Preview</span>
+                <span className="px-4 py-2 rounded-md text-sm font-semibold bg-primary text-primary-foreground">
+                  Sample Button
+                </span>
+              </div>
+            </div>
+          )}
 
           <div className="flex items-center justify-between rounded-lg border border-border/50 bg-muted/30 px-4 py-3 my-1">
             <span className="text-sm text-muted-foreground">Cost</span>
@@ -490,6 +525,7 @@ export default function Shop() {
       {/* Crate opening animation */}
       <CrateOpeningAnimation
         isOpen={crateOpen}
+        tier={CRATE_TIERS[crateTierIndex]}
         points={points}
         ownedCosmetics={owned}
         onOpen={handleCrateOpen}
@@ -505,20 +541,59 @@ export default function Shop() {
 interface CratesTabProps {
   points: number;
   ownedCosmetics: string[];
+  tier: CrateTier;
+  onPrevTier: () => void;
+  onNextTier: () => void;
   onOpenCrate: () => void;
 }
 
-function CratesTab({ points, ownedCosmetics, onOpenCrate }: CratesTabProps) {
-  const canAfford = points >= CRATE_COST;
+function CratesTab({ points, ownedCosmetics, tier, onPrevTier, onNextTier, onOpenCrate }: CratesTabProps) {
+  const canAfford = points >= tier.cost;
+  const tierIndex = CRATE_TIERS.findIndex((t) => t.id === tier.id);
 
   const rarityCounts = (["common", "uncommon", "rare", "ultra-rare", "legendary"] as CrateRarity[]).map((r) => ({
     rarity: r,
-    total: COSMETICS.filter((c) => c.rarity === r && c.currency !== "event").length,
-    owned: COSMETICS.filter((c) => c.rarity === r && c.currency !== "event" && ownedCosmetics.includes(c.id)).length,
+    total: COSMETICS.filter((c) => c.rarity === r && c.currency !== "event" && !c.default && c.category !== "theme").length,
+    owned: COSMETICS.filter(
+      (c) => c.rarity === r && c.currency !== "event" && !c.default && c.category !== "theme" && ownedCosmetics.includes(c.id)
+    ).length,
   }));
 
   return (
     <div className="flex flex-col items-center gap-5 max-w-sm mx-auto">
+      {/* Crate tier switcher */}
+      <div className="flex items-center justify-center gap-3 w-full">
+        <button
+          onClick={onPrevTier}
+          aria-label="Previous crate"
+          className="h-8 w-8 rounded-full flex items-center justify-center bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+
+        <div className="flex-1 flex flex-col items-center gap-1.5">
+          <span className="font-semibold text-sm">{tier.name}</span>
+          <div className="flex items-center gap-1.5">
+            {CRATE_TIERS.map((t, i) => (
+              <div
+                key={t.id}
+                className={`h-1.5 rounded-full transition-all ${
+                  i === tierIndex ? "w-5 bg-primary" : "w-1.5 bg-muted-foreground/30"
+                }`}
+              />
+            ))}
+          </div>
+        </div>
+
+        <button
+          onClick={onNextTier}
+          aria-label="Next crate"
+          className="h-8 w-8 rounded-full flex items-center justify-center bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
+
       {/* Crate card */}
       <Card className="w-full border-border/50 overflow-hidden">
         <CardContent className="p-6 flex flex-col items-center gap-4">
@@ -559,10 +634,8 @@ function CratesTab({ points, ownedCosmetics, onOpenCrate }: CratesTabProps) {
           </div>
 
           <div className="text-center space-y-1">
-            <p className="font-bold text-lg">Mystery Crate</p>
-            <p className="text-sm text-muted-foreground">
-              A chance at exclusive cosmetics across all rarities!
-            </p>
+            <p className="font-bold text-lg">{tier.name}</p>
+            <p className="text-sm text-muted-foreground">{tier.description}</p>
           </div>
 
           {/* Rarity odds */}
@@ -575,7 +648,7 @@ function CratesTab({ points, ownedCosmetics, onOpenCrate }: CratesTabProps) {
                   {ownedCount}/{total}
                 </span>
                 <span className="font-mono font-semibold" style={{ color: RARITY_CONFIG[rarity].color }}>
-                  {rarity === "legendary" ? "1%" : rarity === "ultra-rare" ? "4%" : rarity === "rare" ? "15%" : rarity === "uncommon" ? "30%" : "50%"}
+                  {Math.round(tier.odds[rarity] * 100)}%
                 </span>
               </div>
             ))}
@@ -587,7 +660,7 @@ function CratesTab({ points, ownedCosmetics, onOpenCrate }: CratesTabProps) {
               <span className="text-muted-foreground">Cost per crate</span>
               <span className="flex items-center gap-1.5 font-semibold text-yellow-400">
                 <Coins className="h-3.5 w-3.5" />
-                {CRATE_COST} pts
+                {tier.cost} pts
               </span>
             </div>
             <div className="flex items-center justify-between text-sm">
@@ -612,7 +685,7 @@ function CratesTab({ points, ownedCosmetics, onOpenCrate }: CratesTabProps) {
               onClick={onOpenCrate}
             >
               <Package className="h-4 w-4" />
-              Open Mystery Crate
+              Open {tier.name}
             </Button>
           </div>
         </CardContent>

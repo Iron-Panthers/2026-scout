@@ -42,11 +42,13 @@ export const MatchRow = memo(
     return (
       <TableRow>
         <TableCell className="border-r border-border">
-          <Checkbox
-            checked={isSelected}
-            onCheckedChange={() => onToggleSelect?.(match.matchId || "")}
-            disabled={!match.matchId}
-          />
+          <div className="flex items-center justify-center">
+            <Checkbox
+              checked={isSelected}
+              onCheckedChange={() => onToggleSelect?.(match.matchId || "")}
+              disabled={!match.matchId}
+            />
+          </div>
         </TableCell>
         <TableCell
           className={`font-mono font-semibold border-r border-border ${onToggleSelect && match.matchId ? "cursor-pointer select-none hover:bg-accent/50" : ""}`}

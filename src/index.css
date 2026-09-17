@@ -262,6 +262,294 @@ html[data-theme="ben"] body {
   background-position: center;
 }
 
+/* Shop theme: Monochrome — pure grayscale, no red */
+[data-theme="mono"] {
+  --background: hsl(0, 0%, 8%);
+  --foreground: hsl(0, 0%, 96%);
+  --card: hsl(0, 0%, 12%);
+  --card-foreground: hsl(0, 0%, 96%);
+  --popover: hsl(0, 0%, 14%);
+  --popover-foreground: hsl(0, 0%, 96%);
+  --primary: hsl(0, 0%, 60%);
+  --primary-foreground: hsl(0, 0%, 8%);
+  --secondary: hsl(0, 0%, 16%);
+  --secondary-foreground: hsl(0, 0%, 96%);
+  --muted: hsl(0, 0%, 16%);
+  --muted-foreground: hsl(0, 0%, 65%);
+  --accent: hsl(0, 0%, 18%);
+  --accent-foreground: hsl(0, 0%, 96%);
+  --destructive: hsl(0, 70%, 50%);
+  --destructive-foreground: hsl(0, 0%, 98%);
+  --border: hsl(0, 0%, 22%);
+  --input: hsl(0, 0%, 22%);
+  --ring: hsl(0, 0%, 60%);
+  --chart-1: hsl(0, 0%, 60%);
+  --chart-2: hsl(0, 0%, 45%);
+  --chart-3: hsl(0, 0%, 75%);
+  --chart-4: hsl(0, 0%, 35%);
+  --chart-5: hsl(0, 0%, 85%);
+  --sidebar: hsl(0, 0%, 10%);
+  --sidebar-foreground: hsl(0, 0%, 96%);
+  --sidebar-primary: hsl(0, 0%, 60%);
+  --sidebar-primary-foreground: hsl(0, 0%, 8%);
+  --sidebar-accent: hsl(0, 0%, 16%);
+  --sidebar-accent-foreground: hsl(0, 0%, 96%);
+  --sidebar-border: hsl(0, 0%, 22%);
+  --sidebar-ring: hsl(0, 0%, 60%);
+}
+
+/* Denham Venom — team 8044 purple and gold */
+[data-theme="denham"] {
+  --background: hsl(267, 52.6%, 29.8%);
+  --foreground: hsl(270, 25%, 96%);
+  --card: hsl(267, 48%, 34%);
+  --card-foreground: hsl(270, 25%, 96%);
+  --popover: hsl(267, 48%, 36%);
+  --popover-foreground: hsl(270, 25%, 96%);
+  --primary: hsl(46.9, 100%, 56.9%);
+  --primary-foreground: hsl(267, 45%, 14%);
+  --secondary: hsl(267, 40%, 24%);
+  --secondary-foreground: hsl(270, 25%, 96%);
+  --muted: hsl(267, 40%, 24%);
+  --muted-foreground: hsl(270, 20%, 78%);
+  --accent: hsl(267, 42%, 38%);
+  --accent-foreground: hsl(270, 25%, 96%);
+  --destructive: hsl(0, 84%, 60%);
+  --destructive-foreground: hsl(0, 0%, 98%);
+  --border: hsl(267, 32%, 38%);
+  --input: hsl(267, 32%, 38%);
+  --ring: hsl(46.9, 100%, 56.9%);
+  --chart-1: hsl(46.9, 100%, 56.9%);
+  --chart-2: hsl(267, 45%, 55%);
+  --chart-3: hsl(142, 76%, 36%);
+  --chart-4: hsl(38, 92%, 50%);
+  --chart-5: hsl(0, 84%, 60%);
+  --sidebar: hsl(267, 50%, 26%);
+  --sidebar-foreground: hsl(270, 25%, 96%);
+  --sidebar-primary: hsl(46.9, 100%, 56.9%);
+  --sidebar-primary-foreground: hsl(267, 45%, 14%);
+  --sidebar-accent: hsl(267, 40%, 24%);
+  --sidebar-accent-foreground: hsl(270, 25%, 96%);
+  --sidebar-border: hsl(267, 32%, 38%);
+  --sidebar-ring: hsl(46.9, 100%, 56.9%);
+}
+
+/* Shop theme: BREAD */
+[data-theme="bread"] {
+  --background: hsl(20, 45%, 7%);
+  --foreground: hsl(33, 100%, 92%);
+  --card: hsl(20, 42%, 11%);
+  --card-foreground: hsl(33, 100%, 92%);
+  --popover: hsl(20, 42%, 13%);
+  --popover-foreground: hsl(33, 100%, 92%);
+  --primary: hsl(33, 100%, 86.5%);
+  --primary-foreground: hsl(19.8, 70.2%, 23.7%);
+  --secondary: hsl(20, 38%, 16%);
+  --secondary-foreground: hsl(33, 100%, 92%);
+  --muted: hsl(20, 38%, 16%);
+  --muted-foreground: hsl(30, 30%, 68%);
+  --accent: hsl(19.8, 55%, 22%);
+  --accent-foreground: hsl(33, 100%, 92%);
+  --destructive: hsl(0, 84%, 60%);
+  --destructive-foreground: hsl(0, 0%, 98%);
+  --border: hsl(20, 32%, 22%);
+  --input: hsl(20, 32%, 22%);
+  --ring: hsl(33, 100%, 86.5%);
+  --chart-1: hsl(33, 100%, 86.5%);
+  --chart-2: hsl(19.8, 70.2%, 23.7%);
+  --chart-3: hsl(30, 60%, 55%);
+  --chart-4: hsl(38, 92%, 50%);
+  --chart-5: hsl(0, 84%, 60%);
+  --sidebar: hsl(20, 42%, 9%);
+  --sidebar-foreground: hsl(33, 100%, 92%);
+  --sidebar-primary: hsl(33, 100%, 86.5%);
+  --sidebar-primary-foreground: hsl(19.8, 70.2%, 23.7%);
+  --sidebar-accent: hsl(20, 38%, 16%);
+  --sidebar-accent-foreground: hsl(33, 100%, 92%);
+  --sidebar-border: hsl(20, 32%, 22%);
+  --sidebar-ring: hsl(33, 100%, 86.5%);
+}
+
+/* Citrus Circuits — bright white background, #3cd52e accent */
+[data-theme="citrus"] {
+  --background: hsl(0, 0%, 100%);
+  --foreground: hsl(0, 0%, 10%);
+  --card: hsl(0, 0%, 100%);
+  --card-foreground: hsl(0, 0%, 10%);
+  --popover: hsl(0, 0%, 100%);
+  --popover-foreground: hsl(0, 0%, 10%);
+  --primary: hsl(115, 66.5%, 50.8%);
+  --primary-foreground: hsl(120, 30%, 10%);
+  --secondary: hsl(115, 25%, 95%);
+  --secondary-foreground: hsl(0, 0%, 10%);
+  --muted: hsl(115, 25%, 95%);
+  --muted-foreground: hsl(0, 0%, 42%);
+  --accent: hsl(115, 55%, 92%);
+  --accent-foreground: hsl(0, 0%, 10%);
+  --destructive: hsl(0, 84%, 48%);
+  --destructive-foreground: hsl(0, 0%, 98%);
+  --border: hsl(115, 20%, 87%);
+  --input: hsl(115, 20%, 87%);
+  --ring: hsl(115, 66.5%, 50.8%);
+  --chart-1: hsl(115, 66.5%, 50.8%);
+  --chart-2: hsl(0, 0%, 50%);
+  --chart-3: hsl(200, 80%, 50%);
+  --chart-4: hsl(38, 92%, 50%);
+  --chart-5: hsl(0, 84%, 55%);
+  --sidebar: hsl(115, 20%, 96%);
+  --sidebar-foreground: hsl(0, 0%, 10%);
+  --sidebar-primary: hsl(115, 66.5%, 50.8%);
+  --sidebar-primary-foreground: hsl(120, 30%, 10%);
+  --sidebar-accent: hsl(115, 40%, 90%);
+  --sidebar-accent-foreground: hsl(0, 0%, 10%);
+  --sidebar-border: hsl(115, 20%, 87%);
+  --sidebar-ring: hsl(115, 66.5%, 50.8%);
+}
+
+/* High Tide — team 4414 teal wave */
+[data-theme="high_tide"] {
+  --background: hsl(190.6, 81.4%, 19%);
+  --foreground: hsl(180, 40%, 92%);
+  --card: hsl(190.6, 70%, 23%);
+  --card-foreground: hsl(180, 40%, 92%);
+  --popover: hsl(190.6, 70%, 25%);
+  --popover-foreground: hsl(180, 40%, 92%);
+  --primary: hsl(176.9, 93.6%, 36.9%);
+  --primary-foreground: hsl(190.6, 60%, 10%);
+  --secondary: hsl(190.6, 55%, 16%);
+  --secondary-foreground: hsl(180, 40%, 92%);
+  --muted: hsl(190.6, 55%, 16%);
+  --muted-foreground: hsl(185, 25%, 70%);
+  --accent: hsl(190.6, 55%, 28%);
+  --accent-foreground: hsl(180, 40%, 92%);
+  --destructive: hsl(0, 84%, 60%);
+  --destructive-foreground: hsl(0, 0%, 98%);
+  --border: hsl(190.6, 45%, 28%);
+  --input: hsl(190.6, 45%, 28%);
+  --ring: hsl(176.9, 93.6%, 36.9%);
+  --chart-1: hsl(176.9, 93.6%, 36.9%);
+  --chart-2: hsl(190.6, 40%, 55%);
+  --chart-3: hsl(142, 76%, 36%);
+  --chart-4: hsl(38, 92%, 50%);
+  --chart-5: hsl(0, 84%, 60%);
+  --sidebar: hsl(190.6, 75%, 16%);
+  --sidebar-foreground: hsl(180, 40%, 92%);
+  --sidebar-primary: hsl(176.9, 93.6%, 36.9%);
+  --sidebar-primary-foreground: hsl(190.6, 60%, 10%);
+  --sidebar-accent: hsl(190.6, 55%, 16%);
+  --sidebar-accent-foreground: hsl(180, 40%, 92%);
+  --sidebar-border: hsl(190.6, 45%, 28%);
+  --sidebar-ring: hsl(176.9, 93.6%, 36.9%);
+}
+
+/* The Cheesy Poofs — Chezy Champs 2026 event theme, white background, #0271ff accent */
+[data-theme="poofs"] {
+  --background: hsl(0, 0%, 100%);
+  --foreground: hsl(0, 0%, 10%);
+  --card: hsl(0, 0%, 100%);
+  --card-foreground: hsl(0, 0%, 10%);
+  --popover: hsl(0, 0%, 100%);
+  --popover-foreground: hsl(0, 0%, 10%);
+  --primary: hsl(213.7, 100%, 50.4%);
+  --primary-foreground: hsl(0, 0%, 98%);
+  --secondary: hsl(213.7, 25%, 95%);
+  --secondary-foreground: hsl(0, 0%, 10%);
+  --muted: hsl(213.7, 25%, 95%);
+  --muted-foreground: hsl(0, 0%, 42%);
+  --accent: hsl(213.7, 55%, 93%);
+  --accent-foreground: hsl(0, 0%, 10%);
+  --destructive: hsl(0, 84%, 48%);
+  --destructive-foreground: hsl(0, 0%, 98%);
+  --border: hsl(213.7, 20%, 87%);
+  --input: hsl(213.7, 20%, 87%);
+  --ring: hsl(213.7, 100%, 50.4%);
+  --chart-1: hsl(213.7, 100%, 50.4%);
+  --chart-2: hsl(0, 0%, 50%);
+  --chart-3: hsl(142, 76%, 36%);
+  --chart-4: hsl(38, 92%, 50%);
+  --chart-5: hsl(0, 84%, 55%);
+  --sidebar: hsl(213.7, 20%, 96%);
+  --sidebar-foreground: hsl(0, 0%, 10%);
+  --sidebar-primary: hsl(213.7, 100%, 50.4%);
+  --sidebar-primary-foreground: hsl(0, 0%, 98%);
+  --sidebar-accent: hsl(213.7, 40%, 90%);
+  --sidebar-accent-foreground: hsl(0, 0%, 10%);
+  --sidebar-border: hsl(213.7, 20%, 87%);
+  --sidebar-ring: hsl(213.7, 100%, 50.4%);
+}
+
+/* Jack in the Bot — purple base, green primary, yellow accent */
+[data-theme="jack"] {
+  --background: hsl(262.7, 30%, 12%);
+  --foreground: hsl(60, 20%, 95%);
+  --card: hsl(262.7, 28%, 18%);
+  --card-foreground: hsl(60, 20%, 95%);
+  --popover: hsl(262.7, 28%, 20%);
+  --popover-foreground: hsl(60, 20%, 95%);
+  --primary: hsl(141.7, 74.2%, 36.5%);
+  --primary-foreground: hsl(150, 40%, 10%);
+  --secondary: hsl(262.7, 25%, 22%);
+  --secondary-foreground: hsl(60, 20%, 95%);
+  --muted: hsl(262.7, 25%, 22%);
+  --muted-foreground: hsl(262.7, 15%, 70%);
+  --accent: hsl(57.8, 90%, 52.9%);
+  --accent-foreground: hsl(60, 40%, 10%);
+  --destructive: hsl(0, 84%, 60%);
+  --destructive-foreground: hsl(0, 0%, 98%);
+  --border: hsl(262.7, 25%, 30%);
+  --input: hsl(262.7, 25%, 30%);
+  --ring: hsl(141.7, 74.2%, 36.5%);
+  --chart-1: hsl(141.7, 74.2%, 36.5%);
+  --chart-2: hsl(57.8, 90%, 52.9%);
+  --chart-3: hsl(262.7, 40%, 55%);
+  --chart-4: hsl(38, 92%, 50%);
+  --chart-5: hsl(0, 84%, 60%);
+  --sidebar: hsl(262.7, 30%, 14%);
+  --sidebar-foreground: hsl(60, 20%, 95%);
+  --sidebar-primary: hsl(141.7, 74.2%, 36.5%);
+  --sidebar-primary-foreground: hsl(150, 40%, 10%);
+  --sidebar-accent: hsl(262.7, 25%, 22%);
+  --sidebar-accent-foreground: hsl(60, 20%, 95%);
+  --sidebar-border: hsl(262.7, 25%, 30%);
+  --sidebar-ring: hsl(141.7, 74.2%, 36.5%);
+}
+
+/* OP Robotics — white background, red primary, blue accent */
+[data-theme="op"] {
+  --background: hsl(0, 0%, 100%);
+  --foreground: hsl(0, 0%, 10%);
+  --card: hsl(0, 0%, 100%);
+  --card-foreground: hsl(0, 0%, 10%);
+  --popover: hsl(0, 0%, 100%);
+  --popover-foreground: hsl(0, 0%, 10%);
+  --primary: hsl(359, 82.6%, 57.1%);
+  --primary-foreground: hsl(0, 0%, 98%);
+  --secondary: hsl(216.5, 25%, 95%);
+  --secondary-foreground: hsl(0, 0%, 10%);
+  --muted: hsl(216.5, 25%, 95%);
+  --muted-foreground: hsl(0, 0%, 42%);
+  --accent: hsl(216.5, 61%, 40.2%);
+  --accent-foreground: hsl(0, 0%, 98%);
+  --destructive: hsl(0, 84%, 48%);
+  --destructive-foreground: hsl(0, 0%, 98%);
+  --border: hsl(216.5, 20%, 87%);
+  --input: hsl(216.5, 20%, 87%);
+  --ring: hsl(359, 82.6%, 57.1%);
+  --chart-1: hsl(359, 82.6%, 57.1%);
+  --chart-2: hsl(216.5, 61%, 40.2%);
+  --chart-3: hsl(142, 76%, 36%);
+  --chart-4: hsl(38, 92%, 50%);
+  --chart-5: hsl(0, 0%, 50%);
+  --sidebar: hsl(216.5, 20%, 96%);
+  --sidebar-foreground: hsl(0, 0%, 10%);
+  --sidebar-primary: hsl(359, 82.6%, 57.1%);
+  --sidebar-primary-foreground: hsl(0, 0%, 98%);
+  --sidebar-accent: hsl(216.5, 25%, 95%);
+  --sidebar-accent-foreground: hsl(0, 0%, 10%);
+  --sidebar-border: hsl(216.5, 20%, 87%);
+  --sidebar-ring: hsl(359, 82.6%, 57.1%);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -269,5 +557,6 @@ html[data-theme="ben"] body {
 
   body {
     @apply bg-background text-foreground;
+    padding-top: env(safe-area-inset-top);
   }
 }

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft, TrendingUp, Coins, Trophy, RefreshCw, WifiOff, Zap, Target,
@@ -19,6 +20,8 @@ import { supabase } from "@/lib/supabase";
 import type { Match, Event } from "@/types";
 import type { MatchOdds, BetWithMatch } from "@/types/betting";
 import type { StatboticsMatch } from "@/lib/statbotics";
+import { useRandomSubtitle } from "@/hooks/useRandomSubtitle";
+import { BETTING_SUBTITLES } from "@/config/headerSubtitles";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -803,12 +806,16 @@ function Leaderboard({ userId }: { userId?: string }) {
 // ---------------------------------------------------------------------------
 // Main page
 // ---------------------------------------------------------------------------
-export default function Betting() {
+export default function Betting({
+  embedded = false,
+  headerActions = null,
+}: { embedded?: boolean; headerActions?: HTMLElement | null } = {}) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const isOnline = useOnlineStatus();
   const [searchParams] = useSearchParams();
-  const isInIframe = searchParams.get('isIframe') ?? false;
+  const isInIframe = (searchParams.get('isIframe') ?? false) || embedded;
+  const subtitle = useRandomSubtitle(BETTING_SUBTITLES);
 
   const [event, setEvent] = useState<Event | null>(null);
   const [matches, setMatches] = useState<Match[]>([]);
@@ -980,14 +987,14 @@ export default function Betting() {
   // ---------------------------------------------------------------------------
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className={embedded ? "flex items-center justify-center py-12" : "min-h-screen bg-background flex items-center justify-center"}>
         <div className="text-muted-foreground">Loading matches…</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background my-5">
+    <div className={embedded ? undefined : "min-h-screen bg-background my-5"}>
       <main className="container mx-auto p-4 pb-10">
         { showSBloading && (
           <div className="p-3 bg-yellow-900/20 border border-yellow-700/40 rounded-lg mb-5">
@@ -995,37 +1002,60 @@ export default function Betting() {
           </div>
         )}
         {/* Header */}
-        <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3 mb-6 max-w-2xl mx-auto">
-          <div className="flex items-center gap-3">
-            {!isInIframe && (
-              <Button variant="ghost" size="sm" className="gap-2 px-2" onClick={() => navigate("/dashboard")}>
-                <ArrowLeft className="h-4 w-4" />
-                Back
+        {!embedded && (
+          <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3 mb-6">
+            <div className="flex items-center gap-3">
+              {!isInIframe && (
+                <Button variant="ghost" size="sm" className="gap-2 px-2" onClick={() => navigate("/dashboard")}>
+                  <ArrowLeft className="h-4 w-4" />
+                  Back
+                </Button>
+              )}
+            </div>
+            <div className="text-left">
+              <h1 className="text-2xl font-bold flex items-center justify-start gap-2">
+                <TrendingUp className="h-6 w-6 text-primary" />
+                Betting
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                {event ? `${event.name} · ${subtitle}` : subtitle}
+              </p>
+            </div>
+            <div className="flex items-center gap-2 justify-end">
+              {!isOnline && (
+                <Badge variant="outline" className="text-yellow-400 border-yellow-600/30 gap-1">
+                  <WifiOff className="h-3 w-3" /> Offline
+                </Badge>
+              )}
+              <Button variant="ghost" size="icon" onClick={refresh} disabled={refreshing || !isOnline}>
+                <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
               </Button>
-            )}
-          </div>
-          <div className="text-center">
-            <h1 className="text-2xl font-bold flex items-center justify-center gap-2">
-              <TrendingUp className="h-6 w-6 text-primary" />
-              Betting
-            </h1>
-            {event && <p className="text-sm text-muted-foreground">{event.name}</p>}
-          </div>
-          <div className="flex items-center gap-2 justify-end">
-            {!isOnline && (
-              <Badge variant="outline" className="text-yellow-400 border-yellow-600/30 gap-1">
-                <WifiOff className="h-3 w-3" /> Offline
-              </Badge>
-            )}
-            <Button variant="ghost" size="icon" onClick={refresh} disabled={refreshing || !isOnline}>
-              <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-            </Button>
-            <div className="flex items-center gap-1.5 bg-muted rounded-full px-3 py-1.5">
-              <Coins className="h-4 w-4 text-yellow-400" />
-              <span className="font-bold text-sm">{points ?? "—"}</span>
+              <div className="flex items-center gap-1.5 bg-muted rounded-full px-3 py-1.5">
+                <Coins className="h-4 w-4 text-yellow-400" />
+                <span className="font-bold text-sm">{points ?? "—"}</span>
+              </div>
             </div>
           </div>
-        </div>
+        )}
+        {embedded &&
+          headerActions &&
+          createPortal(
+            <>
+              {!isOnline && (
+                <Badge variant="outline" className="text-yellow-400 border-yellow-600/30 gap-1">
+                  <WifiOff className="h-3 w-3" /> Offline
+                </Badge>
+              )}
+              <Button variant="ghost" size="icon" onClick={refresh} disabled={refreshing || !isOnline}>
+                <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+              </Button>
+              <div className="flex items-center gap-1.5 bg-muted rounded-full px-3 py-1.5">
+                <Coins className="h-4 w-4 text-yellow-400" />
+                <span className="font-bold text-sm">{points ?? "—"}</span>
+              </div>
+            </>,
+            headerActions
+          )}
 
         {!event ? (
           <div className="max-w-2xl mx-auto">
@@ -1037,7 +1067,7 @@ export default function Betting() {
           </div>
         ) : (
           <Tabs defaultValue="markets">
-            <TabsList className="w-full mb-4 max-w-2xl mx-auto">
+            <TabsList className="w-full mb-4">
               <TabsTrigger value="markets" className="flex-1">
                 <Target className="h-3.5 w-3.5 mr-1" />
                 Matches
