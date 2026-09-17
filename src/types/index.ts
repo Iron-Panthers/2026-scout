@@ -168,6 +168,16 @@ export interface PicklistRow {
   updated_at: string;
 }
 
+export interface PicklistTeamNote {
+  id: string;
+  user_id: string;
+  event_id: string;
+  team_number: number;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+}
+
 // Game Shop Types
 export interface GameDefinition {
   id: string;
