@@ -3,21 +3,38 @@ import { gsap } from "gsap";
 import { Coins } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { COSMETICS, RARITY_CONFIG, type CosmeticDefinition, type CrateRarity } from "@/config/cosmetics";
-import { CRATE_COST } from "@/lib/shopService";
+import type { CrateTier } from "@/config/crates";
 
 // ---------------------------------------------------------------------------
 // Roll logic (client-side)
 // ---------------------------------------------------------------------------
-export function rollCrate(): { item: CosmeticDefinition; rarity: CrateRarity } {
-  const rand = Math.random();
-  let selectedRarity: CrateRarity;
-  if (rand < 0.01) selectedRarity = "legendary";
-  else if (rand < 0.05) selectedRarity = "ultra-rare";
-  else if (rand < 0.20) selectedRarity = "rare";
-  else if (rand < 0.50) selectedRarity = "uncommon";
-  else selectedRarity = "common";
+const RARITY_ORDER: CrateRarity[] = ["legendary", "ultra-rare", "rare", "uncommon", "common"];
 
-  const pool = COSMETICS.filter((c) => c.rarity === selectedRarity && c.currency !== "event");
+export function rollCrate(
+  odds: Record<CrateRarity, number>,
+  ownedCosmetics: string[] = []
+): { item: CosmeticDefinition; rarity: CrateRarity } {
+  const rand = Math.random();
+  let cumulative = 0;
+  let selectedRarity: CrateRarity = "common";
+  for (const rarity of RARITY_ORDER) {
+    cumulative += odds[rarity];
+    if (rand < cumulative) {
+      selectedRarity = rarity;
+      break;
+    }
+  }
+
+  let pool = COSMETICS.filter(
+    (c) => c.rarity === selectedRarity && c.currency !== "event" && !c.default && c.category !== "theme"
+  );
+
+  // Legendaries never duplicate unless the player already owns every legendary.
+  if (selectedRarity === "legendary") {
+    const unowned = pool.filter((c) => !ownedCosmetics.includes(c.id));
+    if (unowned.length > 0) pool = unowned;
+  }
+
   const item = pool[Math.floor(Math.random() * pool.length)];
   return { item, rarity: selectedRarity };
 }
@@ -155,21 +172,23 @@ type Phase = "idle" | "shaking" | "flash" | "rarity" | "item";
 
 interface Props {
   isOpen: boolean;
+  tier: CrateTier;
   points: number;
   ownedCosmetics: string[];
   onOpen: (
     itemId: string
-  ) => Promise<{ success: boolean; newPoints: number; isDuplicate: boolean }>;
+  ) => Promise<{ success: boolean; newPoints: number; isDuplicate: boolean; refund: number }>;
   onClose: (newPoints?: number) => void;
 }
 
-export function CrateOpeningAnimation({ isOpen, points, ownedCosmetics, onOpen, onClose }: Props) {
+export function CrateOpeningAnimation({ isOpen, tier, points, ownedCosmetics, onOpen, onClose }: Props) {
   const [phase, setPhase] = useState<Phase>("idle");
   const [isOpening, setIsOpening] = useState(false);
   const [canClose, setCanClose] = useState(false);
   const [wonItem, setWonItem] = useState<CosmeticDefinition | null>(null);
   const [wonRarity, setWonRarity] = useState<CrateRarity>("common");
   const [isDuplicate, setIsDuplicate] = useState(false);
+  const [refund, setRefund] = useState(0);
   const [finalPoints, setFinalPoints] = useState<number | null>(null);
   const [shakeIntensity, setShakeIntensity] = useState(0);
 
@@ -203,6 +222,7 @@ export function CrateOpeningAnimation({ isOpen, points, ownedCosmetics, onOpen, 
     setWonItem(null);
     setWonRarity("common");
     setIsDuplicate(false);
+    setRefund(0);
     setFinalPoints(null);
     setShakeIntensity(0);
   }, [isOpen]);
@@ -245,9 +265,9 @@ export function CrateOpeningAnimation({ isOpen, points, ownedCosmetics, onOpen, 
   }
 
   async function handleOpen() {
-    if (isOpening || points < CRATE_COST) return;
+    if (isOpening || points < tier.cost) return;
 
-    const { item, rarity } = rollCrate();
+    const { item, rarity } = rollCrate(tier.odds, ownedCosmetics);
     setWonItem(item);
     setWonRarity(rarity);
 
@@ -339,6 +359,7 @@ export function CrateOpeningAnimation({ isOpen, points, ownedCosmetics, onOpen, 
     if (dbResult.success) {
       setFinalPoints(dbResult.newPoints);
       setIsDuplicate(dbResult.isDuplicate);
+      setRefund(dbResult.refund);
     }
 
     await new Promise<void>((r) => setTimeout(r, 1850));
@@ -361,7 +382,7 @@ export function CrateOpeningAnimation({ isOpen, points, ownedCosmetics, onOpen, 
   if (!isOpen) return null;
 
   const config = RARITY_CONFIG[wonRarity];
-  const canAfford = points >= CRATE_COST;
+  const canAfford = points >= tier.cost;
 
   return (
     <>
@@ -440,8 +461,8 @@ export function CrateOpeningAnimation({ isOpen, points, ownedCosmetics, onOpen, 
           {(phase === "idle" || phase === "shaking" || phase === "flash") && (
             <>
               <div className="space-y-1">
-                <h2 className="text-2xl font-bold text-white tracking-tight">Mystery Crate</h2>
-                <p className="text-sm text-gray-400">Open to receive a random cosmetic!</p>
+                <h2 className="text-2xl font-bold text-white tracking-tight">{tier.name}</h2>
+                <p className="text-sm text-gray-400">{tier.description}</p>
               </div>
 
               <div ref={crateRef}>
@@ -455,15 +476,7 @@ export function CrateOpeningAnimation({ isOpen, points, ownedCosmetics, onOpen, 
                     <p className="text-gray-500 text-[10px] uppercase tracking-widest mb-2">
                       Rarity Chances
                     </p>
-                    {(
-                      [
-                        ["common", "50%"],
-                        ["uncommon", "30%"],
-                        ["rare", "15%"],
-                        ["ultra-rare", "4%"],
-                        ["legendary", "1%"],
-                      ] as [CrateRarity, string][]
-                    ).map(([r, pct]) => (
+                    {(["common", "uncommon", "rare", "ultra-rare", "legendary"] as CrateRarity[]).map((r) => (
                       <div key={r} className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <div
@@ -472,7 +485,7 @@ export function CrateOpeningAnimation({ isOpen, points, ownedCosmetics, onOpen, 
                           />
                           <span className="text-gray-300">{RARITY_CONFIG[r].label}</span>
                         </div>
-                        <span className="font-mono text-gray-400">{pct}</span>
+                        <span className="font-mono text-gray-400">{Math.round(tier.odds[r] * 100)}%</span>
                       </div>
                     ))}
                   </div>
@@ -506,7 +519,7 @@ export function CrateOpeningAnimation({ isOpen, points, ownedCosmetics, onOpen, 
                       onClick={handleOpen}
                     >
                       <Coins className="h-5 w-5" />
-                      Open Crate — {CRATE_COST} pts
+                      Open Crate — {tier.cost} pts
                     </Button>
 
                     <Button
@@ -518,15 +531,6 @@ export function CrateOpeningAnimation({ isOpen, points, ownedCosmetics, onOpen, 
                     </Button>
                   </div>
                 </>
-              )}
-
-              {/* Shaking phase message */}
-              {phase === "shaking" && (
-                <p className="text-yellow-400 font-bold text-lg animate-pulse tracking-wide">
-                  {shakeIntensity === 1 && "You lost"}
-                  {shakeIntensity === 2 && "The"}
-                  {shakeIntensity === 3 && "Game"}
-                </p>
               )}
             </>
           )}
@@ -576,13 +580,13 @@ export function CrateOpeningAnimation({ isOpen, points, ownedCosmetics, onOpen, 
                   </p>
                   <p className="text-gray-400 text-base min-h-[1.5rem]">
                     {wonRarity === "legendary"
-                      ? "😱 UNBELIEVABLE!!"
+                      ? "UNBELIEVABLE!!"
                       : wonRarity === "ultra-rare"
-                      ? "🤩 Amazing pull!"
+                      ? "Amazing pull!"
                       : wonRarity === "rare"
-                      ? "✨ Nice one!"
+                      ? "Nice one!"
                       : wonRarity === "uncommon"
-                      ? "😊 Pretty good!"
+                      ? "Pretty good!"
                       : ""}
                   </p>
                 </div>
@@ -626,7 +630,12 @@ export function CrateOpeningAnimation({ isOpen, points, ownedCosmetics, onOpen, 
                         }
                   }
                 >
-                  <span style={{ fontSize: 80, lineHeight: 1 }}>{wonItem.emoji}</span>
+                  {wonItem.emoji && (
+                    <span style={{ fontSize: 80, lineHeight: 1 }}>{wonItem.emoji}</span>
+                  )}
+                  {wonItem.url && (
+                    <img src={wonItem.url} alt={wonItem.name} style={{ width: 80, height: 80, objectFit: "contain" }} />
+                  )}
                 </div>
 
                 <div className="space-y-1.5 text-center">
@@ -643,7 +652,7 @@ export function CrateOpeningAnimation({ isOpen, points, ownedCosmetics, onOpen, 
                       border: "1px solid rgba(156,163,175,0.3)",
                     }}
                   >
-                    Already Owned
+                    Already Owned{refund > 0 ? ` — refunded ${refund} pts` : ""}
                   </div>
                 )}
               </div>

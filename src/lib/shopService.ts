@@ -1,8 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { getGameProfile } from "@/lib/gameProfiles";
+import { COSMETICS } from "@/config/cosmetics";
 import type { GameProfile } from "@/types";
-
-export const CRATE_COST = 25;
 
 export type { GameProfile };
 
@@ -119,7 +118,8 @@ export async function equipCosmetic(
   const profile = await getGameProfile(userId);
   if (!profile) return { success: false, error: "Could not load your profile." };
 
-  if (!(profile.owned_cosmetics ?? []).includes(cosmeticId)) {
+  const isDefault = COSMETICS.find((c) => c.id === cosmeticId)?.default === true;
+  if (!isDefault && !(profile.owned_cosmetics ?? []).includes(cosmeticId)) {
     return { success: false, error: "You don't own this item." };
   }
 
@@ -139,29 +139,33 @@ export async function equipCosmetic(
 }
 
 /**
- * Open a mystery crate: deduct CRATE_COST points and record the won item.
+ * Open a mystery crate: deduct `cost` points and record the won item.
  * The client-side rolls the item; this function just records the transaction.
  */
 export async function openCrate(
   userId: string,
   itemId: string,
-): Promise<{ success: boolean; newPoints: number; isDuplicate: boolean; error?: string }> {
+  cost: number,
+): Promise<{ success: boolean; newPoints: number; isDuplicate: boolean; refund: number; error?: string }> {
   const profile = await getGameProfile(userId);
   if (!profile) {
-    return { success: false, newPoints: 0, isDuplicate: false, error: "Could not load your profile." };
+    return { success: false, newPoints: 0, isDuplicate: false, refund: 0, error: "Could not load your profile." };
   }
 
-  if (profile.points < CRATE_COST) {
+  if (profile.points < cost) {
     return {
       success: false,
       newPoints: profile.points,
       isDuplicate: false,
-      error: `Not enough points. You need ${CRATE_COST} but have ${profile.points}.`,
+      refund: 0,
+      error: `Not enough points. You need ${cost} but have ${profile.points}.`,
     };
   }
 
   const isDuplicate = (profile.owned_cosmetics ?? []).includes(itemId);
-  const newPoints = profile.points - CRATE_COST;
+  // Duplicates refund half the crate cost since no new cosmetic was gained.
+  const refund = isDuplicate ? Math.floor(cost / 2) : 0;
+  const newPoints = profile.points - cost + refund;
   const newOwned = isDuplicate
     ? (profile.owned_cosmetics ?? [])
     : [...(profile.owned_cosmetics ?? []), itemId];
@@ -175,10 +179,10 @@ export async function openCrate(
 
   if (error) {
     console.error("[shopService] openCrate error:", error);
-    return { success: false, newPoints: profile.points, isDuplicate: false, error: "Failed to open crate." };
+    return { success: false, newPoints: profile.points, isDuplicate: false, refund: 0, error: "Failed to open crate." };
   }
 
-  return { success: true, newPoints: (data as GameProfile).points, isDuplicate };
+  return { success: true, newPoints: (data as GameProfile).points, isDuplicate, refund };
 }
 
 /**

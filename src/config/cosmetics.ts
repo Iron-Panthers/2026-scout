@@ -1,4 +1,4 @@
-export type CosmeticCategory = "hat" | "decoration";
+export type CosmeticCategory = "hat" | "decoration" | "theme";
 export type CrateRarity = "common" | "uncommon" | "rare" | "ultra-rare" | "legendary";
 
 export type EmojiType = "emoji" | "image";
@@ -14,6 +14,12 @@ export interface CosmeticDefinition {
   rarity: CrateRarity;
   /** Which balance `cost` is charged against. Defaults to "points". */
   currency?: "points" | "event";
+  /** For category "theme": the `data-theme` value applied to the app when equipped. */
+  themeValue?: string;
+  /** True for items every user owns automatically — not purchasable or won from crates. */
+  default?: boolean;
+  /** For category "theme": true if the theme has a light background (skips the global `.dark` class). */
+  isLight?: boolean;
 }
 
 export const RARITY_VALUE: Record<CrateRarity, number> = {
@@ -65,7 +71,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Feel the Texan spirit :p",
     category: "hat",
     emoji: "🤠",
-    cost: 750,
+    cost: 250,
     rarity: "rare",
   },
   {
@@ -83,7 +89,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "For the best scouter",
     category: "hat",
     emoji: "👑",
-    cost: 10000,
+    cost: 1000,
     rarity: "legendary",
   },
   {
@@ -110,7 +116,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Christmas is coming...",
     category: "hat",
     emoji: "🎅",
-    cost: 750,
+    cost: 250,
     rarity: "rare",
   },
   {
@@ -119,7 +125,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "WHAT!!11!1!!!1",
     category: "hat",
     emoji: "‼",
-    cost: 750,
+    cost: 250,
     rarity: "rare",
   },
   {
@@ -128,7 +134,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "WHAT!?!?!???",
     category: "hat",
     emoji: "⁉",
-    cost: 10000,
+    cost: 1000,
     rarity: "legendary",
   },
   {
@@ -182,7 +188,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Mr. Roosevelt himself",
     category: "hat",
     emoji: "🧸",
-    cost: 750,
+    cost: 250,
     rarity: "rare",
   },
   {
@@ -200,7 +206,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "For those that like wearing books on their head",
     category: "hat",
     emoji: "📚",
-    cost: 750,
+    cost: 250,
     rarity: "rare",
   },
   {
@@ -209,7 +215,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "How clean",
     category: "hat",
     emoji: "🫧",
-    cost: 2000,
+    cost: 500,
     rarity: "ultra-rare",
   },
   // --- Cosmetics ---
@@ -264,7 +270,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Wowwww so lucky",
     category: "decoration",
     emoji: "🍀",
-    cost: 750,
+    cost: 250,
     rarity: "rare",
   },
   {
@@ -318,7 +324,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Beeoo",
     category: "decoration",
     emoji: "🌠",
-    cost: 750,
+    cost: 250,
     rarity: "rare",
   },
   {
@@ -327,7 +333,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Broww",
     category: "decoration",
     emoji: "☄️",
-    cost: 750,
+    cost: 250,
     rarity: "rare",
   },
   {
@@ -336,7 +342,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "MINEE DIAMONDSSS",
     category: "decoration",
     emoji: "💎",
-    cost: 2000,
+    cost: 500,
     rarity: "ultra-rare",
   },
   {
@@ -354,7 +360,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "I mean, this is robotics",
     category: "decoration",
     emoji: "🤖",
-    cost: 750,
+    cost: 250,
     rarity: "rare",
   },
   {
@@ -390,7 +396,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Our wifi at worlds be like",
     category: "decoration",
     emoji: "🛰️",
-    cost: 750,
+    cost: 250,
     rarity: "rare",
   },
   {
@@ -417,7 +423,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Why is this here",
     category: "decoration",
     emoji: "🐉",
-    cost: 2000,
+    cost: 500,
     rarity: "ultra-rare",
   },
   {
@@ -426,7 +432,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Why is this here v2",
     category: "decoration",
     emoji: "🦈",
-    cost: 750,
+    cost: 250,
     rarity: "rare",
   },
   {
@@ -435,7 +441,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Why is this here v3",
     category: "decoration",
     emoji: "🦅",
-    cost: 750,
+    cost: 250,
     rarity: "rare",
   },
   {
@@ -489,7 +495,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Ok I can't understand the people that genuinely like T-Pumps it's so bad",
     category: "decoration",
     emoji: "🧋",
-    cost: 750,
+    cost: 250,
     rarity: "rare",
   },
   {
@@ -525,7 +531,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "No one is buying this bro",
     category: "decoration",
     emoji: "🌋",
-    cost: 750,
+    cost: 250,
     rarity: "rare",
   },
   {
@@ -534,7 +540,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Why is this so expensive",
     category: "decoration",
     emoji: "🔮",
-    cost: 2000,
+    cost: 500,
     rarity: "ultra-rare",
   },
   {
@@ -552,7 +558,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Kyle likes touching this",
     category: "decoration",
     emoji: "🕹️",
-    cost: 750,
+    cost: 250,
     rarity: "rare",
   },
   {
@@ -588,7 +594,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Grrrrrr....",
     category: "decoration",
     emoji: "🤬",
-    cost: 750,
+    cost: 250,
     rarity: "rare",
   },
   {
@@ -597,7 +603,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Rain approved",
     category: "decoration",
     url: "/shop/decoration_cc_rain.png",
-    cost: 2000,
+    cost: 500,
     rarity: "ultra-rare",
   },
   {
@@ -615,7 +621,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "A little excited to scout",
     category: "decoration",
     url: "/shop/decoration_rainbow_parrot.gif",
-    cost: 10000,
+    cost: 1000,
     rarity: "legendary",
   },
   {
@@ -633,7 +639,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     description: "Pat pat pat pat pat",
     category: "decoration",
     url: "/shop/decoration_norbert_pat.gif",
-    cost: 10000,
+    cost: 1000,
     rarity: "legendary",
   },
   {
@@ -695,6 +701,125 @@ export const COSMETICS: CosmeticDefinition[] = [
     cost: 15,
     rarity: "common",
     currency: "event",
+  },
+  {
+    id: "theme_poofs",
+    name: "The Cheesy Poofs",
+    description: "Why are they called the Cheesy Poofs?",
+    category: "theme",
+    url: "/shop/theme_poofs.jpg",
+    cost: 300,
+    rarity: "legendary",
+    currency: "event",
+    themeValue: "poofs",
+    isLight: true,
+  },
+
+  // --- Themes ---
+  {
+    id: "theme_dark",
+    name: "Dark Mode",
+    description: "The better option",
+    category: "theme",
+    emoji: "🌑",
+    cost: 0,
+    rarity: "common",
+    themeValue: "dark",
+    default: true,
+  },
+  {
+    id: "theme_light",
+    name: "Light Mode",
+    description: "The worse option",
+    category: "theme",
+    emoji: "☀️",
+    cost: 0,
+    rarity: "common",
+    themeValue: "light",
+    default: true,
+    isLight: true,
+  },
+  {
+    id: "theme_mono",
+    name: "Monochrome",
+    description: "The... Bland option?",
+    category: "theme",
+    emoji: "⚫",
+    cost: 15,
+    rarity: "common",
+    themeValue: "mono",
+  },
+  {
+    id: "theme_denham",
+    name: "Denham Venom",
+    description: "Ouch! My eyes!",
+    category: "theme",
+    url: "/shop/theme_denham.jpeg",
+    cost: 100,
+    rarity: "uncommon",
+    themeValue: "denham",
+  },
+  {
+    id: "theme_bread",
+    name: "BREAD",
+    description: "Nom nom nom",
+    category: "theme",
+    url: "/shop/theme_bread.jpg",
+    cost: 250,
+    rarity: "rare",
+    themeValue: "bread",
+  },
+  {
+    id: "theme_citrus",
+    name: "Citrus Circuits",
+    description: "Sour!",
+    category: "theme",
+    url: "/shop/theme_citrus.png",
+    cost: 500,
+    rarity: "ultra-rare",
+    themeValue: "citrus",
+    isLight: true,
+  },
+  {
+    id: "theme_high_tide",
+    name: "High Tide",
+    description: "The tide's coming in! Awhawhawhawhaw!",
+    category: "theme",
+    url: "/shop/theme_high_tide.png",
+    cost: 1000,
+    rarity: "legendary",
+    themeValue: "high_tide",
+  },
+  {
+    id: "theme_jack",
+    name: "Jack in the Bot",
+    description: "THE GOATS",
+    category: "theme",
+    url: "/shop/theme_jitb.jpg",
+    cost: 500,
+    rarity: "ultra-rare",
+    themeValue: "jack",
+  },
+  {
+    id: "theme_op",
+    name: "OP Robotics",
+    description: "It actually stands for Orchard Park.",
+    category: "theme",
+    url: "/shop/theme_op.png",
+    cost: 1000,
+    rarity: "legendary",
+    themeValue: "op",
+    isLight: true,
+  },
+  {
+    id: "theme_ben",
+    name: "Ben Mode",
+    description: "Err... That's not Ben...",
+    category: "theme",
+    url: "ben.png",
+    cost: 1000,
+    rarity: "legendary",
+    themeValue: "ben",
   },
 ];
 

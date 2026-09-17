@@ -19,25 +19,6 @@
       }
     ]
   },
-  "appearance": {
-    "title": "Appearance",
-    "description": "Customize how the app looks and feels",
-    "fields": [
-      {
-        "id": "theme",
-        "label": "Theme",
-        "description": "Choose your preferred color theme",
-        "type": "select",
-        "options": [
-          { "value": "dark", "label": "Dark" },
-          { "value": "light", "label": "Light" },
-          { "value": "ben", "label": "Ben Mode" }
-        ],
-        "defaultValue": "dark",
-        "editable": true
-      }
-    ]
-  },
   "event": {
     "title": "Event",
     "description": "Current competition event settings",

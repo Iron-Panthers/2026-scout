@@ -54,8 +54,8 @@ import {
   ArrowUpDown,
   Loader2,
   ShoppingBag,
-  TrendingUp,
   Sparkles,
+  TrendingUp,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -79,6 +79,8 @@ import { TeamLogo } from "@/components/TeamLogo";
 import { TeamInfoDialog } from "@/components/TeamInfoDialog";
 import type { Match, Role, Event } from "@/types";
 import { prettifyRole } from "@/lib/roleUtils";
+import { useRandomSubtitle } from "@/hooks/useRandomSubtitle";
+import { SHOP_SUBTITLES, AVATAR_SUBTITLES, BETTING_SUBTITLES } from "@/config/headerSubtitles";
 export { prettifyRole };
 
 interface UserMatch {
@@ -252,6 +254,10 @@ export default function Dashboard() {
   const [mobilePicklistTab, setMobilePicklistTab] = useState<"picklist" | "doNotPick">(
     "picklist"
   );
+  const [headerActionsEl, setHeaderActionsEl] = useState<HTMLDivElement | null>(null);
+  const shopSubtitle = useRandomSubtitle(SHOP_SUBTITLES, [dashboardPage === "shop"]);
+  const avatarSubtitle = useRandomSubtitle(AVATAR_SUBTITLES, [dashboardPage === "avatar"]);
+  const bettingSubtitle = useRandomSubtitle(BETTING_SUBTITLES, [dashboardPage === "betting"]);
 
   const navigate = useNavigate();
 
@@ -787,17 +793,54 @@ export default function Dashboard() {
       {/* Main Content */}
       <main className="container mx-auto p-6 max-w-7xl">
         {/* Header Section */}
-        <div
-          className={`flex items-start mb-8 ${
-            dashboardPage === "scout" ? "justify-between" : "justify-end"
-          }`}
-        >
+        <div className="flex items-start justify-between mb-8">
           {dashboardPage === "scout" && <DashboardHeader userName={userName} />}
-          <UserProfileMenu
-            userName={userName}
-            userInitials={userInitials}
-            avatarUrl={avatarUrl}
-          />
+          {dashboardPage === "picklist" && (
+            <div className="flex items-center gap-3">
+              <ListOrdered className="h-7 w-7 text-primary" />
+              <div>
+                <h1 className="text-2xl font-bold">Picklist</h1>
+                <p className="text-sm text-muted-foreground">
+                  Sort teams however you want! This list is only visible for you.
+                </p>
+              </div>
+            </div>
+          )}
+          {dashboardPage === "shop" && (
+            <div className="flex items-center gap-2">
+              <ShoppingBag className="h-6 w-6 text-red-500" />
+              <div>
+                <span className="text-2xl font-bold block">Shop</span>
+                <p className="text-sm text-muted-foreground">{shopSubtitle}</p>
+              </div>
+            </div>
+          )}
+          {dashboardPage === "avatar" && (
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-6 w-6 text-red-500" />
+              <div>
+                <span className="text-2xl font-bold block">My Cosmetics</span>
+                <p className="text-sm text-muted-foreground">{avatarSubtitle}</p>
+              </div>
+            </div>
+          )}
+          {dashboardPage === "betting" && (
+            <div className="flex items-center gap-2">
+              <TrendingUp className="h-6 w-6 text-primary" />
+              <div>
+                <span className="text-2xl font-bold block">Betting</span>
+                <p className="text-sm text-muted-foreground">{bettingSubtitle}</p>
+              </div>
+            </div>
+          )}
+          <div className="flex items-center gap-3">
+            <div ref={setHeaderActionsEl} className="flex items-center gap-2" />
+            <UserProfileMenu
+              userName={userName}
+              userInitials={userInitials}
+              avatarUrl={avatarUrl}
+            />
+          </div>
         </div>
 
         {dashboardPage === "scout" ? (
@@ -1025,16 +1068,7 @@ export default function Dashboard() {
           </>
         ) : dashboardPage === "picklist" ? (
           <section className="my-8">
-            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-3">
-                <ListOrdered className="h-7 w-7 text-primary" />
-                <div>
-                  <h2 className="text-2xl font-bold">Picklist</h2>
-                  <p className="text-sm text-muted-foreground">
-                    Sort teams however you want! This list is only visible for you.
-                  </p>
-                </div>
-              </div>
+            <div className="mb-4 flex justify-end">
               <Select value={selectedPicklistEventId} onValueChange={setSelectedPicklistEventId}>
                 <SelectTrigger className="w-full sm:w-64" aria-label="Picklist event">
                   <SelectValue placeholder="Select event" />
@@ -1186,7 +1220,7 @@ export default function Dashboard() {
           </section>
         ) : dashboardPage === "shop" ? (
           <section className="my-8">
-            <Shop embedded />
+            <Shop embedded headerActions={headerActionsEl} />
           </section>
         ) : dashboardPage === "avatar" ? (
           <section className="my-8">
@@ -1194,7 +1228,7 @@ export default function Dashboard() {
           </section>
         ) : (
           <section className="my-8">
-            <Betting embedded />
+            <Betting embedded headerActions={headerActionsEl} />
           </section>
         )}
 
@@ -1335,7 +1369,6 @@ export default function Dashboard() {
             }
             onClick={() => setDashboardPage("scout")}
           >
-            <ClipboardList className="mr-1 h-3.5 w-3.5 sm:mr-2 sm:h-4 sm:w-4" />
             Scout
           </Button>
           <Button
@@ -1348,7 +1381,6 @@ export default function Dashboard() {
             }
             onClick={() => setDashboardPage("picklist")}
           >
-            <ListOrdered className="mr-1 h-3.5 w-3.5 sm:mr-2 sm:h-4 sm:w-4" />
             Picklist
           </Button>
           <Button
@@ -1361,7 +1393,6 @@ export default function Dashboard() {
             }
             onClick={() => setDashboardPage("shop")}
           >
-            <ShoppingBag className="mr-1 h-3.5 w-3.5 sm:mr-2 sm:h-4 sm:w-4" />
             Shop
           </Button>
           <Button
@@ -1374,7 +1405,6 @@ export default function Dashboard() {
             }
             onClick={() => setDashboardPage("avatar")}
           >
-            <Sparkles className="mr-1 h-3.5 w-3.5 sm:mr-2 sm:h-4 sm:w-4" />
             Avatar
           </Button>
           <Button
@@ -1387,7 +1417,6 @@ export default function Dashboard() {
             }
             onClick={() => setDashboardPage("betting")}
           >
-            <TrendingUp className="mr-1 h-3.5 w-3.5 sm:mr-2 sm:h-4 sm:w-4" />
             Betting
           </Button>
         </nav>

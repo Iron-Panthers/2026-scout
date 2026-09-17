@@ -5,11 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSettings } from "@/contexts/SettingsContext";
 import { getGameProfile } from "@/lib/gameProfiles";
 import { equipCosmetic, unequipCosmetic } from "@/lib/shopService";
 import { COSMETICS, RARITY_CONFIG, RARITY_VALUE, type CosmeticDefinition } from "@/config/cosmetics";
 import CosmeticAvatar from "@/components/CosmeticAvatar";
 import { useToast } from "@/hooks/use-toast";
+import { useRandomSubtitle } from "@/hooks/useRandomSubtitle";
+import { AVATAR_SUBTITLES } from "@/config/headerSubtitles";
 import type { GameProfile } from "@/types";
 
 export default function AvatarPage({
@@ -19,6 +22,8 @@ export default function AvatarPage({
   const navigate = useNavigate();
   const { user, profile, getAvatarUrl } = useAuth();
   const { toast } = useToast();
+  const { updateSetting } = useSettings();
+  const subtitle = useRandomSubtitle(AVATAR_SUBTITLES);
 
   const [gameProfile, setGameProfile] = useState<GameProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -54,6 +59,9 @@ export default function AvatarPage({
     if (!user?.id) return;
     const result = await equipCosmetic(user.id, item.category, item.id);
     if (result.success) {
+      if (item.category === "theme" && item.themeValue) {
+        updateSetting("theme", item.themeValue);
+      }
       toast({ title: `${item.name} equipped!` });
       loadProfile();
     } else {
@@ -65,6 +73,9 @@ export default function AvatarPage({
     if (!user?.id) return;
     const result = await unequipCosmetic(user.id, item.category);
     if (result.success) {
+      if (item.category === "theme") {
+        updateSetting("theme", "dark");
+      }
       toast({ title: `${item.name} unequipped.` });
       loadProfile();
     } else {
@@ -75,9 +86,10 @@ export default function AvatarPage({
   const rarityCompare = (a: CosmeticDefinition, b: CosmeticDefinition) =>
     a.rarity === b.rarity ? a.cost - b.cost : RARITY_VALUE[a.rarity] - RARITY_VALUE[b.rarity];
 
-  const ownedItems = COSMETICS.filter((c) => owned.includes(c.id));
+  const ownedItems = COSMETICS.filter((c) => owned.includes(c.id) || c.default);
   const hats = ownedItems.filter((c) => c.category === "hat").sort(rarityCompare);
   const decorations = ownedItems.filter((c) => c.category === "decoration").sort(rarityCompare);
+  const themes = ownedItems.filter((c) => c.category === "theme").sort(rarityCompare);
 
   function renderSection(title: string, items: CosmeticDefinition[]) {
     if (items.length === 0) return null;
@@ -151,19 +163,22 @@ export default function AvatarPage({
 
   return (
     <div className={embedded ? undefined : "min-h-screen bg-background"}>
-      <div className="max-w-xl mx-auto md:max-w-2xl px-4 py-6 space-y-5">
-        <div className="flex items-center gap-3">
-          {!embedded && (
+      <div className="max-w-xl mx-auto md:max-w-none px-4 py-6 space-y-5">
+        {!embedded && (
+          <div className="flex items-center gap-3">
             <Button variant="ghost" size="sm" className="gap-2 px-2" onClick={() => navigate(-1)}>
               <ArrowLeft className="h-4 w-4" />
               Back
             </Button>
-          )}
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-6 w-6 text-red-500" />
-            <span className="text-2xl font-bold">My Cosmetics</span>
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-6 w-6 text-red-500" />
+              <div>
+                <span className="text-2xl font-bold block">My Cosmetics</span>
+                <p className="text-sm text-muted-foreground">{subtitle}</p>
+              </div>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Main layout: stacked on mobile, sidebar+content on md+ */}
         <div className="flex flex-col md:flex-row gap-5 justify-center">
@@ -197,14 +212,24 @@ export default function AvatarPage({
             </Card>
           </div>
 
-        {loading ? (
-          <p className="text-muted-foreground text-center">Loading...</p>
-        ) : ownedItems.length === 0 ? (
-          <div className="text-center py-10 space-y-3">
-            <p className="text-muted-foreground">You don't own any cosmetics yet.</p>
-            <Button onClick={() => (onVisitShop ? onVisitShop() : navigate("/shop"))}>
-              Visit the Shop
-            </Button>
+          {/* Owned cosmetics */}
+          <div className="flex-1 min-w-0">
+            {loading ? (
+              <p className="text-muted-foreground text-center">Loading...</p>
+            ) : ownedItems.length === 0 ? (
+              <div className="text-center py-10 space-y-3">
+                <p className="text-muted-foreground">You don't own any cosmetics yet.</p>
+                <Button onClick={() => (onVisitShop ? onVisitShop() : navigate("/shop"))}>
+                  Visit the Shop
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {renderSection("Hats", hats)}
+                {renderSection("Decorations", decorations)}
+                {renderSection("Themes", themes)}
+              </div>
+            )}
           </div>
         </div>
       </div>
