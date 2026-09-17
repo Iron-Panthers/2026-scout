@@ -6,12 +6,17 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Loader2 } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { ChevronDown, Loader2, NotebookPen } from "lucide-react";
 import { TeamImage } from "@/components/TeamImage";
 import { getEventMatches } from "@/lib/blueAlliance";
 import { getPitScoutingForTeamAtEvent } from "@/lib/pitScouting";
 import { pitScoutingQuestions } from "@/config/pitScoutingConfig";
+import { getTeamNote, upsertTeamNote } from "@/lib/picklistNotes";
 import { supabase } from "@/lib/supabase";
+import { useToast } from "@/hooks/use-toast";
 import type { PitScoutingSubmission } from "@/types/pitScouting";
 
 interface TeamInfoDialogProps {
@@ -21,6 +26,7 @@ interface TeamInfoDialogProps {
   nickname?: string | null;
   eventId?: string | null;
   eventCode?: string | null;
+  userId?: string | null;
 }
 
 interface TeamMatchRow {
@@ -99,7 +105,9 @@ export function TeamInfoDialog({
   nickname,
   eventId,
   eventCode,
+  userId,
 }: TeamInfoDialogProps) {
+  const { toast } = useToast();
   const [matchesLoading, setMatchesLoading] = useState(true);
   const [teamMatches, setTeamMatches] = useState<TeamMatchRow[] | null>(null);
 
@@ -108,6 +116,12 @@ export function TeamInfoDialog({
 
   const [pitLoading, setPitLoading] = useState(true);
   const [pitSubmission, setPitSubmission] = useState<PitScoutingSubmission | null>(null);
+
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [notesLoading, setNotesLoading] = useState(false);
+  const [notesLoaded, setNotesLoaded] = useState(false);
+  const [notes, setNotes] = useState("");
+  const [notesSaving, setNotesSaving] = useState(false);
 
   useEffect(() => {
     if (!open || !teamNumber) return;
@@ -213,6 +227,37 @@ export function TeamInfoDialog({
     };
   }, [open, teamNumber, eventId, eventCode]);
 
+  // Reset the notes editor whenever a different team/dialog session opens,
+  // so stale text from the previous team never briefly shows.
+  useEffect(() => {
+    setNotesOpen(false);
+    setNotesLoaded(false);
+    setNotes("");
+  }, [open, teamNumber]);
+
+  async function handleOpenNotes(nextOpen: boolean) {
+    setNotesOpen(nextOpen);
+    if (nextOpen && !notesLoaded && userId && eventId && teamNumber) {
+      setNotesLoading(true);
+      const existing = await getTeamNote(userId, eventId, teamNumber);
+      setNotes(existing);
+      setNotesLoaded(true);
+      setNotesLoading(false);
+    }
+  }
+
+  async function handleSaveNotes() {
+    if (!userId || !eventId || !teamNumber) return;
+    setNotesSaving(true);
+    const success = await upsertTeamNote(userId, eventId, teamNumber, notes);
+    setNotesSaving(false);
+    if (success) {
+      toast({ title: "Notes saved" });
+    } else {
+      toast({ title: "Failed to save notes", variant: "destructive" });
+    }
+  }
+
   if (!teamNumber) return null;
 
   const pitAnswers = pitSubmission
@@ -234,6 +279,47 @@ export function TeamInfoDialog({
         </DialogHeader>
 
         <div className="space-y-5">
+          {/* My Notes */}
+          <Collapsible open={notesOpen} onOpenChange={handleOpenNotes}>
+            <CollapsibleTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full justify-between gap-1.5"
+                disabled={!userId || !eventId}
+              >
+                <span className="flex items-center gap-1.5">
+                  <NotebookPen className="h-3.5 w-3.5" />
+                  My Notes
+                </span>
+                <ChevronDown
+                  className={`h-3.5 w-3.5 transition-transform ${notesOpen ? "rotate-180" : ""}`}
+                />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-2 space-y-2">
+              {notesLoading ? (
+                <div className="flex items-center justify-center p-4">
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : (
+                <>
+                  <Textarea
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Write anything you want to remember about this team..."
+                    className="min-h-24"
+                  />
+                  <div className="flex justify-end">
+                    <Button size="sm" onClick={handleSaveNotes} disabled={notesSaving}>
+                      {notesSaving ? "Saving…" : "Save"}
+                    </Button>
+                  </div>
+                </>
+              )}
+            </CollapsibleContent>
+          </Collapsible>
+
           {/* Photo */}
           <div>
             <SectionHeading>Robot Photo</SectionHeading>

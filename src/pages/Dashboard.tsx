@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -127,6 +127,11 @@ interface SortablePicklistCardProps {
   index: number;
   showRank: boolean;
   onCardClick: (team: TBATeamSimple) => void;
+  /** Screen position (viewport coords) this card was dropped at, if it just
+   * landed in this column from a different one — used to animate it flying
+   * from the drop point to its sorted resting position. */
+  flyFrom?: { top: number; left: number } | null;
+  onFlyDone?: () => void;
 }
 
 // A single draggable/sortable team card. Works with mouse, touch, and pen
@@ -138,15 +143,49 @@ function SortablePicklistCard({
   index,
   showRank,
   onCardClick,
+  flyFrom,
+  onFlyDone,
 }: SortablePicklistCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: team.team_number,
     data: { column },
   });
+  const nodeRef = useRef<HTMLDivElement | null>(null);
+
+  // When this card just moved into a new column (a sorted position dnd-kit
+  // has no prior rect for), fly it in from where it was dropped instead of
+  // letting it pop straight into place. Driven via the Web Animations API
+  // (rather than a two-step style write) since that's a single atomic call
+  // the browser is guaranteed to animate — writing an inline "from" transform
+  // and then a "to" transform across two renders is prone to both landing in
+  // the same paint with no visible transition in between.
+  useLayoutEffect(() => {
+    if (!flyFrom || !nodeRef.current) return;
+    const el = nodeRef.current;
+    const toRect = el.getBoundingClientRect();
+    const dx = flyFrom.left - toRect.left;
+    const dy = flyFrom.top - toRect.top;
+
+    const animation = el.animate(
+      [{ transform: `translate3d(${dx}px, ${dy}px, 0)` }, { transform: "translate3d(0, 0, 0)" }],
+      { duration: 250, easing: "ease", fill: "both" }
+    );
+    animation.finished
+      .then(() => {
+        animation.cancel();
+        onFlyDone?.();
+      })
+      .catch(() => {});
+    return () => animation.cancel();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flyFrom]);
 
   return (
     <div
-      ref={setNodeRef}
+      ref={(node) => {
+        setNodeRef(node);
+        nodeRef.current = node;
+      }}
       style={{ transform: CSS.Transform.toString(transform), transition }}
       {...attributes}
       {...listeners}
@@ -172,6 +211,8 @@ interface PicklistColumnProps {
   emptyMessage: string;
   showRank: boolean;
   onCardClick: (team: TBATeamSimple) => void;
+  flyingTeam?: { teamNumber: number; rect: { top: number; left: number } } | null;
+  onFlyDone?: () => void;
 }
 
 function PicklistColumn({
@@ -182,6 +223,8 @@ function PicklistColumn({
   emptyMessage,
   showRank,
   onCardClick,
+  flyingTeam,
+  onFlyDone,
 }: PicklistColumnProps) {
   const { setNodeRef } = useDroppable({ id: columnKey });
 
@@ -212,6 +255,8 @@ function PicklistColumn({
               index={index}
               showRank={showRank}
               onCardClick={onCardClick}
+              flyFrom={flyingTeam?.teamNumber === team.team_number ? flyingTeam.rect : null}
+              onFlyDone={flyingTeam?.teamNumber === team.team_number ? onFlyDone : undefined}
             />
           ))}
         </SortableContext>
@@ -247,6 +292,10 @@ export default function Dashboard() {
   const [scoutingAvgLoadedEventId, setScoutingAvgLoadedEventId] = useState<string | null>(null);
   const [picklistLoading, setPicklistLoading] = useState(false);
   const [activeDragTeamNumber, setActiveDragTeamNumber] = useState<number | null>(null);
+  const [flyingTeam, setFlyingTeam] = useState<{
+    teamNumber: number;
+    rect: { top: number; left: number };
+  } | null>(null);
   const [picklistEvents, setPicklistEvents] = useState<Event[]>([]);
   const [selectedPicklistEventId, setSelectedPicklistEventId] = useState("");
   const [teamInfoOpen, setTeamInfoOpen] = useState(false);
@@ -554,6 +603,17 @@ export default function Dashboard() {
 
       commit(sourceColumn, sourceArr);
       commit(overColumn, targetArr);
+
+      // The destination column (especially "bank", which is always re-sorted
+      // for display) may place this card far from where it was dropped, with
+      // no prior rect for dnd-kit's own sortable animation to interpolate
+      // from. Fly it in manually from the drop point instead of letting it
+      // just appear — using our own transform animation (not DragOverlay's
+      // built-in drop animation) so nothing forces the page to scroll to it.
+      const dropRect = active.rect.current.translated ?? active.rect.current.initial;
+      if (dropRect) {
+        setFlyingTeam({ teamNumber: activeTeamNumber, rect: dropRect });
+      }
     }
 
     setBankTeams(nextBank);
@@ -1133,6 +1193,8 @@ export default function Dashboard() {
                         setTeamInfoTeam(team);
                         setTeamInfoOpen(true);
                       }}
+                      flyingTeam={flyingTeam}
+                      onFlyDone={() => setFlyingTeam(null)}
                     />
                   </div>
 
@@ -1147,6 +1209,8 @@ export default function Dashboard() {
                         setTeamInfoTeam(team);
                         setTeamInfoOpen(true);
                       }}
+                      flyingTeam={flyingTeam}
+                      onFlyDone={() => setFlyingTeam(null)}
                     />
                   </div>
 
@@ -1196,10 +1260,12 @@ export default function Dashboard() {
                       setTeamInfoTeam(team);
                       setTeamInfoOpen(true);
                     }}
+                    flyingTeam={flyingTeam}
+                    onFlyDone={() => setFlyingTeam(null)}
                   />
                 </div>
 
-                <DragOverlay>
+                <DragOverlay dropAnimation={null}>
                   {activeDragTeam ? (
                     <Card className="cursor-grabbing gap-0 py-0 shadow-lg">
                       <PicklistCardContent team={activeDragTeam} />
@@ -1216,6 +1282,7 @@ export default function Dashboard() {
               nickname={teamInfoTeam?.nickname}
               eventId={selectedPicklistEvent?.id}
               eventCode={selectedPicklistEvent?.event_code}
+              userId={user?.id}
             />
           </section>
         ) : dashboardPage === "shop" ? (
