@@ -3,7 +3,6 @@ export const SHOP_SUBTITLES = [
   "Ooh goodies!!!",
   "Caps for sale! 50 cents a cap!",
   "What decorations should we add?",
-  "Retail therapy for scouts.",
   "Baller",
   "Gotta catch em' all...",
   "Buy the event stuff before it's gone.",
@@ -14,6 +13,7 @@ export const AVATAR_SUBTITLES = [
   "*Insert shameless plugin here*",
   "Did you get them all?",
   "Will we ever add verity?",
+  "Don't tell anyone but we think you're the best scouter"
 ];
 
 export const BETTING_SUBTITLES = [
@@ -22,6 +22,7 @@ export const BETTING_SUBTITLES = [
   "GAMBLING???",
   "All in on red!",
   "Don't be like Isha",
+  "99% of gamblers quit before their first big win",
   "Are you *really* gonna bet event currency?",
   "Hi",
 ];

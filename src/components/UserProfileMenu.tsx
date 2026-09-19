@@ -8,7 +8,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Settings, User, LogOut, Users, LayoutDashboard } from "lucide-react";
+import { Settings, User, LogOut, Users, LayoutDashboard, ListOrdered } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { getGameProfile } from "@/lib/gameProfiles";
@@ -25,6 +25,8 @@ export default function UserProfileMenu({
   const { profile, signOut, user } = useAuth();
   const isManager = profile?.is_manager || false;
   const isOnManagerDashboard = location.pathname === "/manager";
+  const isOnStrategyDashboard = location.pathname === "/strategy";
+  const isOnScoutDashboard = location.pathname === "/dashboard";
 
   const [equippedCosmetics, setEquippedCosmetics] = useState<Record<string, string>>({});
 
@@ -66,20 +68,23 @@ export default function UserProfileMenu({
           <Settings className="mr-2 h-4 w-4" />
           <span>Settings</span>
         </DropdownMenuItem>
-        {isManager && (
-          <>
-            {isOnManagerDashboard ? (
-              <DropdownMenuItem onClick={() => navigate("/dashboard")}>
-                <LayoutDashboard className="mr-2 h-4 w-4" />
-                <span>Scout Dashboard</span>
-              </DropdownMenuItem>
-            ) : (
-              <DropdownMenuItem onClick={() => navigate("/manager")}>
-                <Users className="mr-2 h-4 w-4" />
-                <span>Manager Dashboard</span>
-              </DropdownMenuItem>
-            )}
-          </>
+        {!isOnScoutDashboard && (
+          <DropdownMenuItem onClick={() => navigate("/dashboard")}>
+            <LayoutDashboard className="mr-2 h-4 w-4" />
+            <span>Scout Dashboard</span>
+          </DropdownMenuItem>
+        )}
+        {!isOnStrategyDashboard && (
+          <DropdownMenuItem onClick={() => navigate("/strategy")}>
+            <ListOrdered className="mr-2 h-4 w-4" />
+            <span>Strategy Dashboard</span>
+          </DropdownMenuItem>
+        )}
+        {isManager && !isOnManagerDashboard && (
+          <DropdownMenuItem onClick={() => navigate("/manager")}>
+            <Users className="mr-2 h-4 w-4" />
+            <span>Manager Dashboard</span>
+          </DropdownMenuItem>
         )}
         <DropdownMenuSeparator />
         <DropdownMenuItem className="text-destructive" onClick={handleSignOut}>

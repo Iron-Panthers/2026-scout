@@ -274,7 +274,7 @@ export default function Shop({
                 Back
               </Button>
               <div className="flex items-center gap-2">
-                <ShoppingBag className="h-6 w-6 text-red-500" />
+                <ShoppingBag className="h-6 w-6 text-primary" />
                 <div>
                   <span className="text-2xl font-bold block">Shop</span>
                   <p className="text-sm text-muted-foreground">{subtitle}</p>

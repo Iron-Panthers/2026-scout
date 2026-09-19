@@ -11,6 +11,9 @@ interface AuthContextType {
   loading: boolean;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  /** Patch the cached profile locally, ahead of a server round-trip, so UI
+   * driven by `profile` can update instantly instead of waiting on a fetch. */
+  patchProfile: (updates: Partial<Profile>) => void;
   getAvatarUrl: () => string;
 }
 
@@ -45,6 +48,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (user) {
       await loadProfile(user.id);
     }
+  };
+
+  const patchProfile = (updates: Partial<Profile>) => {
+    setProfile((prev) => (prev ? { ...prev, ...updates } : prev));
   };
 
   useEffect(() => {
@@ -109,7 +116,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, session, profile, loading, signOut, refreshProfile, getAvatarUrl }}
+      value={{ user, session, profile, loading, signOut, refreshProfile, patchProfile, getAvatarUrl }}
     >
       {children}
     </AuthContext.Provider>
