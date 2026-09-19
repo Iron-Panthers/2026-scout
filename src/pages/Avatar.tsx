@@ -57,30 +57,44 @@ export default function AvatarPage({
 
   async function handleEquip(item: CosmeticDefinition) {
     if (!user?.id) return;
+    // Reflect the equip immediately — the button/badge/avatar preview
+    // shouldn't wait on the round-trip to feel responsive. loadProfile()
+    // below reconciles with the server once it resolves either way.
+    setGameProfile((prev) =>
+      prev
+        ? { ...prev, equipped_cosmetics: { ...(prev.equipped_cosmetics ?? {}), [item.category]: item.id } }
+        : prev
+    );
+    if (item.category === "theme" && item.themeValue) {
+      updateSetting("theme", item.themeValue);
+    }
     const result = await equipCosmetic(user.id, item.category, item.id);
     if (result.success) {
-      if (item.category === "theme" && item.themeValue) {
-        updateSetting("theme", item.themeValue);
-      }
       toast({ title: `${item.name} equipped!` });
-      loadProfile();
     } else {
       toast({ title: "Failed to equip", description: result.error, variant: "destructive" });
     }
+    loadProfile();
   }
 
   async function handleUnequip(item: CosmeticDefinition) {
     if (!user?.id) return;
+    setGameProfile((prev) => {
+      if (!prev) return prev;
+      const nextEquipped = { ...(prev.equipped_cosmetics ?? {}) };
+      delete nextEquipped[item.category];
+      return { ...prev, equipped_cosmetics: nextEquipped };
+    });
+    if (item.category === "theme") {
+      updateSetting("theme", "dark");
+    }
     const result = await unequipCosmetic(user.id, item.category);
     if (result.success) {
-      if (item.category === "theme") {
-        updateSetting("theme", "dark");
-      }
       toast({ title: `${item.name} unequipped.` });
-      loadProfile();
     } else {
       toast({ title: "Failed to unequip", description: result.error, variant: "destructive" });
     }
+    loadProfile();
   }
 
   const rarityCompare = (a: CosmeticDefinition, b: CosmeticDefinition) =>
@@ -171,7 +185,7 @@ export default function AvatarPage({
               Back
             </Button>
             <div className="flex items-center gap-2">
-              <Sparkles className="h-6 w-6 text-red-500" />
+              <Sparkles className="h-6 w-6 text-primary" />
               <div>
                 <span className="text-2xl font-bold block">My Cosmetics</span>
                 <p className="text-sm text-muted-foreground">{subtitle}</p>

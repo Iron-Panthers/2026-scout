@@ -10,9 +10,10 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { CalendarIcon, Save, Star, Trash2, PlusCircle } from "lucide-react";
+import { CalendarIcon, Save, Star, Trash2, PlusCircle, Upload } from "lucide-react";
 import { format, set } from "date-fns";
 import { updateEvent, setActiveEvent } from "@/lib/matches";
+import { uploadEventMap } from "@/lib/photoUpload";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import type { Event, Profile, MatchAssignment } from "@/types";
@@ -66,6 +67,7 @@ export function EventInformationTab({
   const [isSaving, setIsSaving] = useState(false);
   const [matchCountInput, setMatchCountInput] = useState(String(matches.length));
   const [isSettingActive, setIsSettingActive] = useState(false);
+  const [uploadingMap, setUploadingMap] = useState(false);
   const [editedEvent, setEditedEvent] = useState<Partial<Event>>({
     name: currentEvent?.name || "",
     event_code: currentEvent?.event_code || "",
@@ -93,6 +95,30 @@ export function EventInformationTab({
       onEventUpdate?.();
     }
     setIsSaving(false);
+  };
+
+  const handleMapFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-selecting the same file
+    if (!file || !currentEvent) return;
+
+    setUploadingMap(true);
+    try {
+      const { publicUrl } = await uploadEventMap(file, currentEvent.id);
+      setEditedEvent((prev) => ({ ...prev, scouting_map_url: publicUrl }));
+      toast({
+        title: "Map uploaded",
+        description: "Don't forget to save your changes.",
+      });
+    } catch (error) {
+      toast({
+        title: "Upload failed",
+        description: error instanceof Error ? error.message : "Could not upload the map image.",
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingMap(false);
+    }
   };
 
   const handleSetActive = async () => {
@@ -504,20 +530,53 @@ export function EventInformationTab({
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label className="text-sm font-medium text-muted-foreground">
-                  Scouting Map URL
+                  Scouting Map
                 </Label>
                 {isEditing ? (
-                  <Input
-                    value={editedEvent.scouting_map_url || ""}
-                    onChange={(e) =>
-                      setEditedEvent({
-                        ...editedEvent,
-                        scouting_map_url: e.target.value,
-                      })
-                    }
-                    placeholder="https://example.com/map.png"
-                    className="mt-1"
-                  />
+                  <div className="mt-1 space-y-2">
+                    <Input
+                      value={editedEvent.scouting_map_url || ""}
+                      onChange={(e) =>
+                        setEditedEvent({
+                          ...editedEvent,
+                          scouting_map_url: e.target.value,
+                        })
+                      }
+                      placeholder="https://example.com/map.png"
+                    />
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        id="scouting-map-upload"
+                        className="hidden"
+                        onChange={handleMapFileChange}
+                        disabled={uploadingMap}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={uploadingMap}
+                        onClick={() =>
+                          document.getElementById("scouting-map-upload")?.click()
+                        }
+                      >
+                        <Upload className="h-4 w-4 mr-2" />
+                        {uploadingMap ? "Uploading..." : "Upload Image"}
+                      </Button>
+                      {editedEvent.scouting_map_url && (
+                        <a
+                          href={editedEvent.scouting_map_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-blue-500 hover:underline"
+                        >
+                          Preview
+                        </a>
+                      )}
+                    </div>
+                  </div>
                 ) : (
                   <p className="text-lg">
                     {currentEvent?.scouting_map_url ? (

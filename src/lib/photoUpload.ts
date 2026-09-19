@@ -149,6 +149,61 @@ export async function deletePitPhoto(path: string): Promise<void> {
 }
 
 /**
+ * Upload an event's scouting map image to Supabase Storage
+ * @param file - The image file to upload
+ * @param eventId - The event's ID (for path organization)
+ * @returns Object with storage path and public URL
+ */
+export async function uploadEventMap(
+  file: File,
+  eventId: string
+): Promise<{ path: string; publicUrl: string }> {
+  // Validate file
+  if (!file.type.startsWith("image/")) {
+    throw new Error("File must be an image");
+  }
+
+  const maxSize = 5 * 1024 * 1024; // 5MB
+  if (file.size > maxSize) {
+    throw new Error("File size must be less than 5MB");
+  }
+
+  // Compress if larger than 1MB
+  let uploadFile = file;
+  if (file.size > 1024 * 1024) {
+    try {
+      uploadFile = await compressImage(file);
+    } catch (error) {
+      console.warn("Failed to compress image, uploading original:", error);
+      uploadFile = file;
+    }
+  }
+
+  // Create storage path: eventId/map_timestamp.jpg
+  const timestamp = Date.now();
+  const path = `${eventId}/map_${timestamp}.jpg`;
+
+  // Upload to Supabase Storage
+  const { data, error } = await supabase.storage
+    .from("event-maps")
+    .upload(path, uploadFile, {
+      contentType: "image/jpeg",
+      upsert: false,
+    });
+
+  if (error) {
+    throw new Error(`Failed to upload map: ${error.message}`);
+  }
+
+  // Get public URL
+  const {
+    data: { publicUrl },
+  } = supabase.storage.from("event-maps").getPublicUrl(data.path);
+
+  return { path: data.path, publicUrl };
+}
+
+/**
  * Convert a File to a data URL (base64) for offline storage
  * @param file - The file to convert
  * @returns Data URL string
