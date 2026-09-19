@@ -225,6 +225,19 @@ function PicklistColumn({
 export default function StrategyDashboard() {
   const { user, profile, getAvatarUrl } = useAuth();
   const [strategyPage, setStrategyPage] = useState<"picklist" | "event">("picklist");
+  // Per-event snapshot of the picklist columns, kept for the life of this
+  // page. Switching events re-reads from here instead of the server when
+  // we've already loaded (and possibly locally edited) that event this
+  // session — a background save from a recent edit may not have landed yet,
+  // so re-fetching on switch-back could show the stale pre-edit state.
+  const picklistCacheRef = useRef<
+    Record<string, { picked: TBATeamSimple[]; doNotPick: TBATeamSimple[]; bank: TBATeamSimple[] }>
+  >({});
+  // Chains picklist saves so they always land in the order they were
+  // triggered — without this, two saves fired in quick succession (e.g.
+  // rapid reordering) could resolve out of order and leave the DB reflecting
+  // an earlier state than what's actually on screen.
+  const pendingSaveRef = useRef<Promise<unknown>>(Promise.resolve());
   const [pickedTeams, setPickedTeams] = useState<TBATeamSimple[]>([]);
   const [doNotPickTeams, setDoNotPickTeams] = useState<TBATeamSimple[]>([]);
   const [bankTeams, setBankTeams] = useState<TBATeamSimple[]>([]);
@@ -276,33 +289,47 @@ export default function StrategyDashboard() {
       return;
     }
 
-    const loadPicklist = async () => {
-      setPicklistLoading(true);
-      const teams = await getEventTeams(event.event_code!);
-      const roster = teams.sort((a, b) => a.team_number - b.team_number);
+    const cached = picklistCacheRef.current[event.id];
+    if (cached) {
+      setPickedTeams(cached.picked);
+      setDoNotPickTeams(cached.doNotPick);
+      setBankTeams(cached.bank);
+      setPicklistLoading(false);
+    } else {
+      const loadPicklist = async () => {
+        setPicklistLoading(true);
+        const teams = await getEventTeams(event.event_code!);
+        const roster = teams.sort((a, b) => a.team_number - b.team_number);
 
-      const saved = user?.id ? await getPicklist(user.id, event.id) : null;
+        const saved = user?.id ? await getPicklist(user.id, event.id) : null;
 
-      if (saved) {
-        const rosterByNumber = new Map(roster.map((t) => [t.team_number, t]));
-        const picked = saved.picked_team_numbers
-          .map((n) => rosterByNumber.get(n))
-          .filter((t): t is TBATeamSimple => t != null);
-        const doNotPick = saved.do_not_pick_team_numbers
-          .map((n) => rosterByNumber.get(n))
-          .filter((t): t is TBATeamSimple => t != null);
-        const used = new Set([...saved.picked_team_numbers, ...saved.do_not_pick_team_numbers]);
+        let picked: TBATeamSimple[];
+        let doNotPick: TBATeamSimple[];
+        let bank: TBATeamSimple[];
+        if (saved) {
+          const rosterByNumber = new Map(roster.map((t) => [t.team_number, t]));
+          picked = saved.picked_team_numbers
+            .map((n) => rosterByNumber.get(n))
+            .filter((t): t is TBATeamSimple => t != null);
+          doNotPick = saved.do_not_pick_team_numbers
+            .map((n) => rosterByNumber.get(n))
+            .filter((t): t is TBATeamSimple => t != null);
+          const used = new Set([...saved.picked_team_numbers, ...saved.do_not_pick_team_numbers]);
+          bank = roster.filter((t) => !used.has(t.team_number));
+        } else {
+          bank = roster;
+          picked = [];
+          doNotPick = [];
+        }
+
+        picklistCacheRef.current[event.id] = { picked, doNotPick, bank };
         setPickedTeams(picked);
         setDoNotPickTeams(doNotPick);
-        setBankTeams(roster.filter((t) => !used.has(t.team_number)));
-      } else {
-        setBankTeams(roster);
-        setPickedTeams([]);
-        setDoNotPickTeams([]);
-      }
-      setPicklistLoading(false);
-    };
-    loadPicklist();
+        setBankTeams(bank);
+        setPicklistLoading(false);
+      };
+      loadPicklist();
+    }
 
     // EPA/scouting-average data is event-specific; drop the old event's
     // data so we don't sort by the wrong event's numbers while the new
@@ -479,12 +506,26 @@ export default function StrategyDashboard() {
     setPickedTeams(nextPicked);
     setDoNotPickTeams(nextDoNotPick);
 
+    // Keep the session cache in sync so switching away to another event and
+    // back re-reads this edit immediately, without waiting on (or racing) a
+    // save that may still be in flight.
+    if (selectedPicklistEventId) {
+      picklistCacheRef.current[selectedPicklistEventId] = {
+        picked: nextPicked,
+        doNotPick: nextDoNotPick,
+        bank: nextBank,
+      };
+    }
+
     if (user?.id && selectedPicklistEventId) {
-      upsertPicklist(
-        user.id,
-        selectedPicklistEventId,
-        nextPicked.map((t) => t.team_number),
-        nextDoNotPick.map((t) => t.team_number)
+      const eventId = selectedPicklistEventId;
+      const pickedNumbers = nextPicked.map((t) => t.team_number);
+      const doNotPickNumbers = nextDoNotPick.map((t) => t.team_number);
+      // Chain onto any still-pending save so writes always land in the
+      // order they were triggered, even if an earlier request happens to
+      // resolve slower than this one.
+      pendingSaveRef.current = pendingSaveRef.current.then(() =>
+        upsertPicklist(user.id, eventId, pickedNumbers, doNotPickNumbers)
       );
     }
   };
