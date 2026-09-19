@@ -1,17 +1,6 @@
 import { supabase } from "./supabase";
 import type { Roster, Role } from "@/types";
-
-// Role to database column mapping (same as in matches.ts)
-const roleToColumn: Record<Role, string> = {
-  red1: "red1_scouter_id",
-  red2: "red2_scouter_id",
-  red3: "red3_scouter_id",
-  qualRed: "qual_red_scouter_id",
-  blue1: "blue1_scouter_id",
-  blue2: "blue2_scouter_id",
-  blue3: "blue3_scouter_id",
-  qualBlue: "qual_blue_scouter_id",
-};
+import { ROLE_TO_COLUMN, ROLE_TO_COLUMN_2 } from "./roleUtils";
 
 /**
  * Fetch all rosters for a specific event
@@ -43,7 +32,8 @@ export async function createRoster(
   name: string,
   eventId: string,
   description: string,
-  assignments: Partial<Record<Role, string | null>>
+  assignments: Partial<Record<Role, string | null>>,
+  assignments2: Partial<Record<Role, string | null>> = {}
 ): Promise<{ success: boolean; roster?: Roster; error?: string }> {
   try {
     const { data: userData } = await supabase.auth.getUser();
@@ -61,7 +51,13 @@ export async function createRoster(
 
     // Add scout assignments using role-to-column mapping
     Object.entries(assignments).forEach(([role, scouterId]) => {
-      const column = roleToColumn[role as Role];
+      const column = ROLE_TO_COLUMN[role as Role];
+      if (column) {
+        rosterData[column] = scouterId;
+      }
+    });
+    Object.entries(assignments2).forEach(([role, scouterId]) => {
+      const column = ROLE_TO_COLUMN_2[role as Role];
       if (column) {
         rosterData[column] = scouterId;
       }
@@ -101,6 +97,7 @@ export async function updateRoster(
     name?: string;
     description?: string;
     assignments?: Partial<Record<Role, string | null>>;
+    assignments2?: Partial<Record<Role, string | null>>;
   }
 ): Promise<{ success: boolean; error?: string }> {
   try {
@@ -113,7 +110,15 @@ export async function updateRoster(
     // Add scout assignment updates
     if (updates.assignments) {
       Object.entries(updates.assignments).forEach(([role, scouterId]) => {
-        const column = roleToColumn[role as Role];
+        const column = ROLE_TO_COLUMN[role as Role];
+        if (column) {
+          updateData[column] = scouterId;
+        }
+      });
+    }
+    if (updates.assignments2) {
+      Object.entries(updates.assignments2).forEach(([role, scouterId]) => {
+        const column = ROLE_TO_COLUMN_2[role as Role];
         if (column) {
           updateData[column] = scouterId;
         }
@@ -198,7 +203,7 @@ export async function applyRosterToMatches(
       return { success: false, updated: 0, error: "Roster not found" };
     }
 
-    // Build update object with scout assignments
+    // Build update object with scout assignments (both co-scout slots)
     const updateData: any = {
       red1_scouter_id: roster.red1_scouter_id,
       red2_scouter_id: roster.red2_scouter_id,
@@ -208,6 +213,14 @@ export async function applyRosterToMatches(
       blue2_scouter_id: roster.blue2_scouter_id,
       blue3_scouter_id: roster.blue3_scouter_id,
       qual_blue_scouter_id: roster.qual_blue_scouter_id,
+      red1_scouter_id_2: roster.red1_scouter_id_2,
+      red2_scouter_id_2: roster.red2_scouter_id_2,
+      red3_scouter_id_2: roster.red3_scouter_id_2,
+      qual_red_scouter_id_2: roster.qual_red_scouter_id_2,
+      blue1_scouter_id_2: roster.blue1_scouter_id_2,
+      blue2_scouter_id_2: roster.blue2_scouter_id_2,
+      blue3_scouter_id_2: roster.blue3_scouter_id_2,
+      qual_blue_scouter_id_2: roster.qual_blue_scouter_id_2,
     };
 
     // Update all matches at once using IN clause

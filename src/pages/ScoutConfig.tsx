@@ -145,6 +145,15 @@ export default function ScoutConfig() {
           { id: match.red2_scouter_id, role: "red2" },
           { id: match.red3_scouter_id, role: "red3" },
           { id: match.qual_red_scouter_id, role: "qualRed" },
+          // Co-scout (slot 2) columns — same roles as above
+          { id: match.blue1_scouter_id_2, role: "blue1" },
+          { id: match.blue2_scouter_id_2, role: "blue2" },
+          { id: match.blue3_scouter_id_2, role: "blue3" },
+          { id: match.qual_blue_scouter_id_2, role: "qualBlue" },
+          { id: match.red1_scouter_id_2, role: "red1" },
+          { id: match.red2_scouter_id_2, role: "red2" },
+          { id: match.red3_scouter_id_2, role: "red3" },
+          { id: match.qual_red_scouter_id_2, role: "qualRed" },
         ];
 
         const assignedRole = roleChecks.find((r) => r.id === user.id);

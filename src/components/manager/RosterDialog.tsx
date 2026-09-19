@@ -71,11 +71,15 @@ export function RosterDialog({
   const [assignments, setAssignments] = useState<
     Partial<Record<Role, string | null>>
   >({});
+  const [assignments2, setAssignments2] = useState<
+    Partial<Record<Role, string | null>>
+  >({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showSaveFromMatch, setShowSaveFromMatch] = useState(false);
   const [scoutSearch, setScoutSearch] = useState("");
   const [activeRole, setActiveRole] = useState<Role | null>(null);
+  const [activeSlot, setActiveSlot] = useState<1 | 2>(1);
 
   const getScoutName = (scoutId: string | null | undefined) =>
     availableScouts.find((scout) => scout.id === scoutId)?.name || "";
@@ -88,20 +92,27 @@ export function RosterDialog({
 
       // Map roster scout IDs to assignments
       const rosterAssignments: Partial<Record<Role, string | null>> = {};
+      const rosterAssignments2: Partial<Record<Role, string | null>> = {};
       roles.forEach((role) => {
-        const column = `${role === "qualRed" ? "qual_red" : role === "qualBlue" ? "qual_blue" : role}_scouter_id` as keyof Roster;
+        const base = role === "qualRed" ? "qual_red" : role === "qualBlue" ? "qual_blue" : role;
+        const column = `${base}_scouter_id` as keyof Roster;
+        const column2 = `${base}_scouter_id_2` as keyof Roster;
         rosterAssignments[role] = (roster[column] as string) || null;
+        rosterAssignments2[role] = (roster[column2] as string) || null;
       });
       setAssignments(rosterAssignments);
+      setAssignments2(rosterAssignments2);
     } else {
       setName("");
       setDescription("");
       setAssignments({});
+      setAssignments2({});
     }
     setScoutSearch("");
     setError(null);
     setShowSaveFromMatch(false);
     setActiveRole(null);
+    setActiveSlot(1);
   }, [mode, roster, open]);
 
   const handleSaveFromMatch = (matchNumber: number) => {
@@ -109,11 +120,15 @@ export function RosterDialog({
     if (!match) return;
 
     const newAssignments: Partial<Record<Role, string | null>> = {};
+    const newAssignments2: Partial<Record<Role, string | null>> = {};
     roles.forEach((role) => {
       const scout = match.assignments[role];
       newAssignments[role] = scout?.id || null;
+      const scout2 = match.assignments2?.[role];
+      newAssignments2[role] = scout2?.id || null;
     });
     setAssignments(newAssignments);
+    setAssignments2(newAssignments2);
     setShowSaveFromMatch(false);
     setActiveRole(null);
   };
@@ -137,7 +152,8 @@ export function RosterDialog({
           name.trim(),
           eventId,
           description.trim(),
-          assignments
+          assignments,
+          assignments2
         );
 
         if (!result.success) {
@@ -150,6 +166,7 @@ export function RosterDialog({
           name: name.trim(),
           description: description.trim(),
           assignments,
+          assignments2,
         });
 
         if (!result.success) {
@@ -265,11 +282,26 @@ export function RosterDialog({
                     className={`w-full ${!assignments[role] ? "border-muted-foreground/30 bg-muted text-muted-foreground hover:bg-muted/80" : ""}`}
                     onClick={() => {
                       setActiveRole(role);
+                      setActiveSlot(1);
                       setScoutSearch("");
                     }}
                     disabled={loading}
                   >
                     {assignments[role] ? getScoutName(assignments[role]) : "Assign Role"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className={`w-full text-xs ${!assignments2[role] ? "border-muted-foreground/30 bg-muted text-muted-foreground hover:bg-muted/80" : ""}`}
+                    onClick={() => {
+                      setActiveRole(role);
+                      setActiveSlot(2);
+                      setScoutSearch("");
+                    }}
+                    disabled={loading}
+                  >
+                    {assignments2[role] ? getScoutName(assignments2[role]) : "Assign Co-Scout"}
                   </Button>
                 </div>
               ))}
@@ -280,8 +312,15 @@ export function RosterDialog({
         <Dialog open={activeRole !== null} onOpenChange={(open) => !open && setActiveRole(null)}>
           <DialogContent className="flex max-h-[85vh] max-w-2xl flex-col overflow-hidden">
             <DialogHeader className="shrink-0">
-              <DialogTitle>Assign {activeRole ? roleLabels[activeRole] : "Role"}</DialogTitle>
-              <DialogDescription>Select a scouter for this role.</DialogDescription>
+              <DialogTitle>
+                Assign {activeRole ? roleLabels[activeRole] : "Role"}
+                {activeSlot === 2 ? " (Co-Scout)" : ""}
+              </DialogTitle>
+              <DialogDescription>
+                {activeSlot === 2
+                  ? "Select a second scouter to co-scout this role alongside the primary."
+                  : "Select a scouter for this role."}
+              </DialogDescription>
             </DialogHeader>
             <Input
               value={scoutSearch}
@@ -296,7 +335,10 @@ export function RosterDialog({
                   type="button"
                   className="rounded-md border border-border p-3 text-left text-sm hover:bg-accent/50"
                   onClick={() => {
-                    if (activeRole) setAssignments((previous) => ({ ...previous, [activeRole]: null }));
+                    if (activeRole) {
+                      const setter = activeSlot === 2 ? setAssignments2 : setAssignments;
+                      setter((previous) => ({ ...previous, [activeRole]: null }));
+                    }
                     setActiveRole(null);
                   }}
                   disabled={loading}
@@ -304,7 +346,8 @@ export function RosterDialog({
                   Unassigned
                 </button>
                 {filteredScouts.map((scout) => {
-                  const selected = activeRole ? assignments[activeRole] === scout.id : false;
+                  const currentAssignments = activeSlot === 2 ? assignments2 : assignments;
+                  const selected = activeRole ? currentAssignments[activeRole] === scout.id : false;
                   const initials = (scout.name || "U")
                     .split(" ")
                     .map((part) => part[0])
@@ -320,7 +363,10 @@ export function RosterDialog({
                         checked={selected}
                         className="rounded-full"
                         onCheckedChange={() => {
-                          if (activeRole) setAssignments((previous) => ({ ...previous, [activeRole]: selected ? null : scout.id }));
+                          if (activeRole) {
+                            const setter = activeSlot === 2 ? setAssignments2 : setAssignments;
+                            setter((previous) => ({ ...previous, [activeRole]: selected ? null : scout.id }));
+                          }
                           if (!selected) setActiveRole(null);
                         }}
                         disabled={loading}

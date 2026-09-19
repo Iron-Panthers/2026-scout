@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Coins, ShoppingBag, CheckCircle2, Package, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, Coins, ShoppingBag, CheckCircle2, Package, ChevronLeft, ChevronRight, List } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -19,7 +19,7 @@ import { getGameProfile } from "@/lib/gameProfiles";
 import { purchaseCosmetic, openCrate } from "@/lib/shopService";
 import { purchaseGame } from "@/lib/gameProfiles";
 import { getActiveEvent, isEventWithinWindow } from "@/lib/matches";
-import { COSMETICS, RARITY_CONFIG, RARITY_VALUE, type CosmeticDefinition, type CrateRarity } from "@/config/cosmetics";
+import { COSMETICS, RARITY_CONFIG, RARITY_VALUE, type CosmeticDefinition, type CosmeticCategory, type CrateRarity } from "@/config/cosmetics";
 import { CRATE_TIERS, type CrateTier } from "@/config/crates";
 import { GAMES } from "@/config/games";
 import { getEventCurrencyLogo } from "@/config/eventCurrency";
@@ -550,6 +550,12 @@ interface CratesTabProps {
 function CratesTab({ points, ownedCosmetics, tier, onPrevTier, onNextTier, onOpenCrate }: CratesTabProps) {
   const canAfford = points >= tier.cost;
   const tierIndex = CRATE_TIERS.findIndex((t) => t.id === tier.id);
+  const [catalogOpen, setCatalogOpen] = useState(false);
+
+  const crateCategoryOrder: CosmeticCategory[] = ["hat", "decoration"];
+  const cratePool = COSMETICS.filter(
+    (c) => c.currency !== "event" && !c.default && c.category !== "theme"
+  );
 
   const rarityCounts = (["common", "uncommon", "rare", "ultra-rare", "legendary"] as CrateRarity[]).map((r) => ({
     rarity: r,
@@ -691,9 +697,70 @@ function CratesTab({ points, ownedCosmetics, tier, onPrevTier, onNextTier, onOpe
         </CardContent>
       </Card>
 
+      <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setCatalogOpen(true)}>
+        <List className="h-3.5 w-3.5" />
+        View All Cosmetics
+      </Button>
+
       <p className="text-xs text-muted-foreground text-center px-4">
         Crates give random cosmetics from any rarity. Already-owned items are marked as such.
       </p>
+
+      {/* Full crate cosmetic catalog */}
+      <Dialog open={catalogOpen} onOpenChange={setCatalogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>All Crate Cosmetics</DialogTitle>
+            <DialogDescription>
+              Every cosmetic obtainable from crates — hats and decorations, unowned items first.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="max-h-[60vh] space-y-4 overflow-y-auto pr-1">
+            {crateCategoryOrder.map((category) => {
+              const items = cratePool
+                .filter((c) => c.category === category)
+                .sort((a, b) => {
+                  const aOwned = ownedCosmetics.includes(a.id);
+                  const bOwned = ownedCosmetics.includes(b.id);
+                  return aOwned === bOwned ? 0 : aOwned ? 1 : -1;
+                });
+              if (items.length === 0) return null;
+              return (
+                <div key={category} className="space-y-1.5">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    {category === "hat" ? "Hats" : "Decorations"}
+                  </span>
+                  <div className="space-y-1">
+                    {items.map((item) => {
+                      const isOwned = ownedCosmetics.includes(item.id);
+                      return (
+                        <div
+                          key={item.id}
+                          className="flex items-center gap-2.5 rounded-md border border-border/50 bg-muted/20 px-2.5 py-1.5"
+                        >
+                          {item.emoji && <span className="text-lg leading-none">{item.emoji}</span>}
+                          {item.url && <img src={item.url} alt={item.name} className="h-5 w-5 object-contain" />}
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium">{item.name}</p>
+                          </div>
+                          <span
+                            className="text-[10px] font-semibold uppercase tracking-wide"
+                            style={{ color: RARITY_CONFIG[item.rarity].color }}
+                          >
+                            {RARITY_CONFIG[item.rarity].label}
+                          </span>
+                          {isOwned && <CheckCircle2 className="h-3.5 w-3.5 flex-shrink-0 text-green-500" />}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -121,6 +121,11 @@ export function TeamInfoDialog({
   const [notesLoading, setNotesLoading] = useState(false);
   const [notes, setNotes] = useState("");
   const [notesSaving, setNotesSaving] = useState(false);
+  // Caches the last known-good note per event+team so reopening the dialog
+  // right after a save doesn't have to race a fresh fetch against that same
+  // write — a save that just landed is already known to be correct, so
+  // trust it instead of re-querying and risking a stale read winning the race.
+  const notesCacheRef = useRef<Record<string, string>>({});
 
   useEffect(() => {
     if (!open || !teamNumber) return;
@@ -237,10 +242,18 @@ export function TeamInfoDialog({
     setNotesOpen(false);
     setNotes("");
     if (!open || !teamNumber || !userId || !eventId) return;
+    const cacheKey = `${eventId}:${teamNumber}`;
+    const cached = notesCacheRef.current[cacheKey];
+    if (cached !== undefined) {
+      setNotes(cached);
+      setNotesLoading(false);
+      return;
+    }
     let mounted = true;
     setNotesLoading(true);
     getTeamNote(userId, eventId, teamNumber).then((existing) => {
       if (!mounted) return;
+      notesCacheRef.current[cacheKey] = existing;
       setNotes(existing);
       setNotesLoading(false);
     });
@@ -259,6 +272,7 @@ export function TeamInfoDialog({
     const success = await upsertTeamNote(userId, eventId, teamNumber, notes);
     setNotesSaving(false);
     if (success) {
+      notesCacheRef.current[`${eventId}:${teamNumber}`] = notes;
       toast({ title: "Notes saved" });
     } else {
       toast({ title: "Failed to save notes", variant: "destructive" });

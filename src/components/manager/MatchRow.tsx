@@ -16,8 +16,8 @@ const getRoleCellColor = (role: Role) => {
 interface MatchRowProps {
   match: MatchAssignment;
   roles: Role[];
-  onOpenDialog: (matchNumber: number, role: Role) => void;
-  onClearAssignment: (matchNumber: number, role: Role) => void;
+  onOpenDialog: (matchNumber: number, role: Role, slot?: 1 | 2) => void;
+  onClearAssignment: (matchNumber: number, role: Role, slot?: 1 | 2) => void;
   completedSubmissions: Set<string>;
   actualScouters: Map<string, string>; // Map of "matchId:role" -> scouter_id
   availableScouts: Profile[]; // All profiles to look up names
@@ -57,8 +57,6 @@ export const MatchRow = memo(
           Q-{match.matchNumber}
         </TableCell>
         {roles.map((role) => {
-          const assignment = match.assignments[role];
-          // console.log(match.assignments, role)
           const isCompleted =
             match.matchId &&
             completedSubmissions.has(`${match.matchId}:${role}`);
@@ -71,69 +69,78 @@ export const MatchRow = memo(
             ? availableScouts.find((s) => s.id === actualScouterId)
             : null;
 
-          // Check if actual scouter is different from assigned
-          const isDifferentScouter = actualScouter && assignment && actualScouter.id !== assignment.id;
-          // console.log(actualScouter?.name, assignment, actualScouter?.id, assignment?.id)
-
           const cellColorClass = isCompleted
             ? "bg-green-900/30"
             : getRoleCellColor(role);
 
+          const renderSlot = (slot: 1 | 2) => {
+            const assignment =
+              slot === 2 ? match.assignments2?.[role] : match.assignments[role];
+            const isDifferentScouter =
+              slot === 1 && actualScouter && assignment && actualScouter.id !== assignment.id;
+
+            return assignment ? (
+              <div className="relative group flex-1 min-w-0">
+                <button
+                  onClick={() => onOpenDialog(match.matchNumber, role, slot)}
+                  className="flex flex-col items-center gap-0.5 md:gap-1 hover:bg-accent/50 rounded-md p-1 md:p-1.5 transition-colors w-full"
+                >
+                  <CosmeticAvatar
+                    avatarUrl={assignment.avatar}
+                    initials={assignment.initials}
+                    equippedCosmetics={cosmeticsMap[assignment.id] ?? {}}
+                    size="sm"
+                    className="h-7 w-7 md:h-9 md:w-9"
+                  />
+                  <span className="text-[9px] leading-tight md:text-[11px] font-medium text-center truncate w-full">
+                    {assignment.name}
+                  </span>
+                  {slot === 1 && isCompleted && !isDifferentScouter && (
+                    <Check className="h-3 w-3 text-green-400" />
+                  )}
+                  {isDifferentScouter && actualScouter && (
+                    <span className="text-[9px] text-orange-400 font-semibold">
+                      ✓ by {actualScouter.name?.split(' ')[0] || 'Other'}
+                    </span>
+                  )}
+                  {!assignment.registered && (
+                    <span className="text-[9px] text-gray-400 font-semibold">
+                      Not registered for Event
+                    </span>
+                  )}
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onClearAssignment(match.matchNumber, role, slot);
+                  }}
+                  className="absolute top-0 right-0 h-5 w-5 rounded-full bg-destructive/90 hover:bg-destructive text-destructive-foreground opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                  title="Clear assignment"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-1 items-center justify-center min-w-0">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => onOpenDialog(match.matchNumber, role, slot)}
+                  className="h-7 w-7 md:h-9 md:w-9"
+                  title={slot === 2 ? "Assign co-scout" : "Assign scout"}
+                >
+                  <Plus className="h-4 w-4 text-muted-foreground" />
+                </Button>
+              </div>
+            );
+          };
+
           return (
             <TableCell key={role} className={`p-1.5 md:p-2 ${cellColorClass}`}>
-              {assignment ? (
-                <div className="relative group">
-                  <button
-                    onClick={() => onOpenDialog(match.matchNumber, role)}
-                    className="flex flex-col items-center gap-0.5 md:gap-1 hover:bg-accent/50 rounded-md p-1.5 md:p-2 transition-colors w-full"
-                  >
-                    <CosmeticAvatar
-                      avatarUrl={assignment.avatar}
-                      initials={assignment.initials}
-                      equippedCosmetics={cosmeticsMap[assignment.id] ?? {}}
-                      size="sm"
-                      className="h-8 w-8 md:h-10 md:w-10"
-                    />
-                    <span className="text-[10px] leading-tight md:text-xs font-medium text-center">
-                      {assignment.name}
-                    </span>
-                    {isCompleted && !isDifferentScouter && (
-                      <Check className="h-3 w-3 text-green-400" />
-                    )}
-                    {isDifferentScouter && actualScouter && (
-                      <span className="text-[9px] text-orange-400 font-semibold">
-                        ✓ by {actualScouter.name?.split(' ')[0] || 'Other'}
-                      </span>
-                    )}
-                    {!assignment.registered && (
-                      <span className="text-[9px] text-gray-400 font-semibold">
-                        Not registered for Event
-                      </span>
-                    )}
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onClearAssignment(match.matchNumber, role);
-                    }}
-                    className="absolute top-0 right-0 h-5 w-5 rounded-full bg-destructive/90 hover:bg-destructive text-destructive-foreground opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-                    title="Clear assignment"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-              ) : (
-                <div className="flex items-center justify-center w-full">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => onOpenDialog(match.matchNumber, role)}
-                    className="h-8 w-8 md:h-10 md:w-10"
-                  >
-                    <Plus className="h-4 w-4 md:h-5 md:w-5 text-muted-foreground" />
-                  </Button>
-                </div>
-              )}
+              <div className="flex items-start gap-0.5">
+                {renderSlot(1)}
+                {renderSlot(2)}
+              </div>
             </TableCell>
           );
         })}

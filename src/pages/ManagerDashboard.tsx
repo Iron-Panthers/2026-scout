@@ -149,20 +149,33 @@ export default function ManagerDashboard() {
   const [awardAmount, setAwardAmount] = useState<string>("");
   const [awardSetLoading, setAwardSetLoading] = useState(false);
 
-  // Helper function to convert database match to assignment format
+  // Helper function to convert database match to assignment format. `slot` 2
+  // reads the co-scout columns instead of the primary ones.
   const convertMatchToAssignment = useCallback(
-    (match: Match): Partial<Record<Role, Scout>> => {
+    (match: Match, slot: 1 | 2 = 1): Partial<Record<Role, Scout>> => {
       const assignments: Partial<Record<Role, Scout>> = {};
-      const roleMapping: Array<{ role: Role; scouterId: string | null }> = [
-        { role: "red1", scouterId: match.red1_scouter_id },
-        { role: "red2", scouterId: match.red2_scouter_id },
-        { role: "red3", scouterId: match.red3_scouter_id },
-        { role: "qualRed", scouterId: match.qual_red_scouter_id },
-        { role: "blue1", scouterId: match.blue1_scouter_id },
-        { role: "blue2", scouterId: match.blue2_scouter_id },
-        { role: "blue3", scouterId: match.blue3_scouter_id },
-        { role: "qualBlue", scouterId: match.qual_blue_scouter_id },
-      ];
+      const roleMapping: Array<{ role: Role; scouterId: string | null }> =
+        slot === 2
+          ? [
+              { role: "red1", scouterId: match.red1_scouter_id_2 },
+              { role: "red2", scouterId: match.red2_scouter_id_2 },
+              { role: "red3", scouterId: match.red3_scouter_id_2 },
+              { role: "qualRed", scouterId: match.qual_red_scouter_id_2 },
+              { role: "blue1", scouterId: match.blue1_scouter_id_2 },
+              { role: "blue2", scouterId: match.blue2_scouter_id_2 },
+              { role: "blue3", scouterId: match.blue3_scouter_id_2 },
+              { role: "qualBlue", scouterId: match.qual_blue_scouter_id_2 },
+            ]
+          : [
+              { role: "red1", scouterId: match.red1_scouter_id },
+              { role: "red2", scouterId: match.red2_scouter_id },
+              { role: "red3", scouterId: match.red3_scouter_id },
+              { role: "qualRed", scouterId: match.qual_red_scouter_id },
+              { role: "blue1", scouterId: match.blue1_scouter_id },
+              { role: "blue2", scouterId: match.blue2_scouter_id },
+              { role: "blue3", scouterId: match.blue3_scouter_id },
+              { role: "qualBlue", scouterId: match.qual_blue_scouter_id },
+            ];
 
       roleMapping.forEach(({ role, scouterId }) => {
         if (scouterId) {
@@ -343,7 +356,8 @@ export default function ManagerDashboard() {
       filteredDbMatches.map((match) => ({
         matchNumber: match.match_number,
         matchId: match.id,
-        assignments: convertMatchToAssignment(match),
+        assignments: convertMatchToAssignment(match, 1),
+        assignments2: convertMatchToAssignment(match, 2),
       }))
     );
 
@@ -402,6 +416,8 @@ export default function ManagerDashboard() {
   const handleAssignScout = useCallback(
     (profile: Profile) => {
       if (!selectedCell) return;
+      const slot = selectedCell.slot ?? 1;
+      const assignmentsKey = slot === 2 ? "assignments2" : "assignments";
 
       // Find current match for rollback
       const currentMatch = matches.find(
@@ -417,13 +433,14 @@ export default function ManagerDashboard() {
       }
 
       // Capture previous state for rollback
-      const previousAssignment = currentMatch.assignments[selectedCell.role];
+      const previousAssignment = currentMatch[assignmentsKey]?.[selectedCell.role];
 
       // 3. Fire database operation in background
       updateMatchAssignment(
         currentMatch.matchId,
         selectedCell.role,
-        profile.id
+        profile.id,
+        slot
       )
         .then((success) => {
           if (!success) {
@@ -433,8 +450,8 @@ export default function ManagerDashboard() {
                 match.matchNumber === selectedCell.matchNumber
                   ? {
                       ...match,
-                      assignments: {
-                        ...match.assignments,
+                      [assignmentsKey]: {
+                        ...match[assignmentsKey],
                         [selectedCell.role]: previousAssignment,
                       },
                     }
@@ -455,8 +472,8 @@ export default function ManagerDashboard() {
               match.matchNumber === selectedCell.matchNumber
                 ? {
                     ...match,
-                    assignments: {
-                      ...match.assignments,
+                    [assignmentsKey]: {
+                      ...match[assignmentsKey],
                       [selectedCell.role]: previousAssignment,
                     },
                   }
@@ -480,8 +497,8 @@ export default function ManagerDashboard() {
           match.matchNumber === selectedCell.matchNumber
             ? {
                 ...match,
-                assignments: {
-                  ...match.assignments,
+                [assignmentsKey]: {
+                  ...match[assignmentsKey],
                   [selectedCell.role]: {
                     id: profile.id,
                     name: profile.name || "Unknown",
@@ -503,15 +520,17 @@ export default function ManagerDashboard() {
   );
 
   const openAssignmentDialog = useCallback(
-    (matchNumber: number, role: Role) => {
-      setSelectedCell({ matchNumber, role });
+    (matchNumber: number, role: Role, slot: 1 | 2 = 1) => {
+      setSelectedCell({ matchNumber, role, slot });
       setDialogOpen(true);
     },
     []
   );
 
   const handleClearAssignment = useCallback(
-    (matchNumber: number, role: Role) => {
+    (matchNumber: number, role: Role, slot: 1 | 2 = 1) => {
+      const assignmentsKey = slot === 2 ? "assignments2" : "assignments";
+
       // Find current match for rollback
       const currentMatch = matches.find((m) => m.matchNumber === matchNumber);
       if (!currentMatch?.matchId) {
@@ -524,7 +543,7 @@ export default function ManagerDashboard() {
       }
 
       // Capture previous state for rollback
-      const previousAssignment = currentMatch.assignments[role];
+      const previousAssignment = currentMatch[assignmentsKey]?.[role];
 
       // 1. Update UI immediately (optimistic)
       setMatches((prevMatches) =>
@@ -532,8 +551,8 @@ export default function ManagerDashboard() {
           match.matchNumber === matchNumber
             ? {
                 ...match,
-                assignments: {
-                  ...match.assignments,
+                [assignmentsKey]: {
+                  ...match[assignmentsKey],
                   [role]: null,
                 },
               }
@@ -545,7 +564,8 @@ export default function ManagerDashboard() {
       updateMatchAssignment(
         currentMatch.matchId,
         role,
-        null
+        null,
+        slot
       )
         .then((success) => {
           if (!success) {
@@ -555,8 +575,8 @@ export default function ManagerDashboard() {
                 match.matchNumber === matchNumber
                   ? {
                       ...match,
-                      assignments: {
-                        ...match.assignments,
+                      [assignmentsKey]: {
+                        ...match[assignmentsKey],
                         [role]: previousAssignment,
                       },
                     }
@@ -577,8 +597,8 @@ export default function ManagerDashboard() {
               match.matchNumber === matchNumber
                 ? {
                     ...match,
-                    assignments: {
-                      ...match.assignments,
+                    [assignmentsKey]: {
+                      ...match[assignmentsKey],
                       [role]: previousAssignment,
                     },
                   }
@@ -688,43 +708,64 @@ export default function ManagerDashboard() {
           number,
           Partial<Record<Role, Scout>>
         >();
+        const matchAssignments2Map = new Map<
+          number,
+          Partial<Record<Role, Scout>>
+        >();
         dbMatches.forEach((match) => {
-          const assignments: Partial<Record<Role, Scout>> = {};
-          const roleMapping: Array<{ role: Role; scouterId: string | null }> = [
-            { role: "red1", scouterId: match.red1_scouter_id },
-            { role: "red2", scouterId: match.red2_scouter_id },
-            { role: "red3", scouterId: match.red3_scouter_id },
-            { role: "qualRed", scouterId: match.qual_red_scouter_id },
-            { role: "blue1", scouterId: match.blue1_scouter_id },
-            { role: "blue2", scouterId: match.blue2_scouter_id },
-            { role: "blue3", scouterId: match.blue3_scouter_id },
-            { role: "qualBlue", scouterId: match.qual_blue_scouter_id },
-          ];
+          const buildAssignments = (slot: 1 | 2) => {
+            const assignments: Partial<Record<Role, Scout>> = {};
+            const roleMapping: Array<{ role: Role; scouterId: string | null }> =
+              slot === 2
+                ? [
+                    { role: "red1", scouterId: match.red1_scouter_id_2 },
+                    { role: "red2", scouterId: match.red2_scouter_id_2 },
+                    { role: "red3", scouterId: match.red3_scouter_id_2 },
+                    { role: "qualRed", scouterId: match.qual_red_scouter_id_2 },
+                    { role: "blue1", scouterId: match.blue1_scouter_id_2 },
+                    { role: "blue2", scouterId: match.blue2_scouter_id_2 },
+                    { role: "blue3", scouterId: match.blue3_scouter_id_2 },
+                    { role: "qualBlue", scouterId: match.qual_blue_scouter_id_2 },
+                  ]
+                : [
+                    { role: "red1", scouterId: match.red1_scouter_id },
+                    { role: "red2", scouterId: match.red2_scouter_id },
+                    { role: "red3", scouterId: match.red3_scouter_id },
+                    { role: "qualRed", scouterId: match.qual_red_scouter_id },
+                    { role: "blue1", scouterId: match.blue1_scouter_id },
+                    { role: "blue2", scouterId: match.blue2_scouter_id },
+                    { role: "blue3", scouterId: match.blue3_scouter_id },
+                    { role: "qualBlue", scouterId: match.qual_blue_scouter_id },
+                  ];
 
-          roleMapping.forEach(({ role, scouterId }) => {
-            if (scouterId && profiles.has(scouterId)) {
-              const profile = profiles.get(scouterId)!;
-              assignments[role] = {
-                id: profile.id,
-                name: profile.name || "Unknown",
-                initials: (profile.name || "U")
-                  .split(" ")
-                  .map((n) => n[0])
-                  .join("")
-                  .toUpperCase()
-                  .slice(0, 2),
-                avatar: profile.avatar_url || "",
-              };
-            }
-          });
+            roleMapping.forEach(({ role, scouterId }) => {
+              if (scouterId && profiles.has(scouterId)) {
+                const profile = profiles.get(scouterId)!;
+                assignments[role] = {
+                  id: profile.id,
+                  name: profile.name || "Unknown",
+                  initials: (profile.name || "U")
+                    .split(" ")
+                    .map((n) => n[0])
+                    .join("")
+                    .toUpperCase()
+                    .slice(0, 2),
+                  avatar: profile.avatar_url || "",
+                };
+              }
+            });
+            return assignments;
+          };
 
-          matchAssignmentsMap.set(match.match_number, assignments);
+          matchAssignmentsMap.set(match.match_number, buildAssignments(1));
+          matchAssignments2Map.set(match.match_number, buildAssignments(2));
         });
 
         setMatches((prevMatches) =>
           prevMatches.map((match) => ({
             ...match,
             assignments: matchAssignmentsMap.get(match.matchNumber) || {},
+            assignments2: matchAssignments2Map.get(match.matchNumber) || {},
           }))
         );
 
@@ -1016,56 +1057,56 @@ export default function ManagerDashboard() {
                         Match
                       </TableHead>
                       <TableHead
-                        className={`w-28 md:w-32 text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
+                        className={`w-40 md:w-48 text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
                           "red1"
                         )}`}
                       >
                         Red 1
                       </TableHead>
                       <TableHead
-                        className={`w-28 md:w-32 text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
+                        className={`w-40 md:w-48 text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
                           "red2"
                         )}`}
                       >
                         Red 2
                       </TableHead>
                       <TableHead
-                        className={`w-28 md:w-32 text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
+                        className={`w-40 md:w-48 text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
                           "red3"
                         )}`}
                       >
                         Red 3
                       </TableHead>
                       <TableHead
-                        className={`w-28 md:w-32 text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
+                        className={`w-40 md:w-48 text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
                           "qualRed"
                         )}`}
                       >
                         Qual Red
                       </TableHead>
                       <TableHead
-                        className={`w-28 md:w-32 text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
+                        className={`w-40 md:w-48 text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
                           "blue1"
                         )}`}
                       >
                         Blue 1
                       </TableHead>
                       <TableHead
-                        className={`w-28 md:w-32 text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
+                        className={`w-40 md:w-48 text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
                           "blue2"
                         )}`}
                       >
                         Blue 2
                       </TableHead>
                       <TableHead
-                        className={`w-28 md:w-32 text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
+                        className={`w-40 md:w-48 text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
                           "blue3"
                         )}`}
                       >
                         Blue 3
                       </TableHead>
                       <TableHead
-                        className={`w-28 md:w-32 text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
+                        className={`w-40 md:w-48 text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
                           "qualBlue"
                         )}`}
                       >

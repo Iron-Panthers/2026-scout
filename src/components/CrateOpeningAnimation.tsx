@@ -2,8 +2,14 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { gsap } from "gsap";
 import { Coins } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { COSMETICS, RARITY_CONFIG, type CosmeticDefinition, type CrateRarity } from "@/config/cosmetics";
+import { COSMETICS, RARITY_CONFIG, type CosmeticDefinition, type CosmeticCategory, type CrateRarity } from "@/config/cosmetics";
 import type { CrateTier } from "@/config/crates";
+
+const CATEGORY_LABEL: Record<CosmeticCategory, string> = {
+  hat: "Hat",
+  decoration: "Decoration",
+  theme: "Theme",
+};
 
 // ---------------------------------------------------------------------------
 // Roll logic (client-side)
@@ -609,7 +615,7 @@ export function CrateOpeningAnimation({ isOpen, tier, points, ownedCosmetics, on
               </p>
 
               <div
-                className="flex flex-col items-center gap-4 p-7 rounded-2xl border-2 w-full"
+                className="relative flex flex-col items-center gap-4 p-7 rounded-2xl border-2 w-full"
                 style={{
                   borderColor: `${config.color}55`,
                   background: `radial-gradient(ellipse at center, ${config.bgColor} 0%, rgba(0,0,0,0.6) 100%)`,
@@ -620,6 +626,17 @@ export function CrateOpeningAnimation({ isOpen, tier, points, ownedCosmetics, on
                   animation: "itemGlow 2s ease-in-out infinite",
                 }}
               >
+                <span
+                  className="absolute top-3 right-3 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                  style={{
+                    background: `${config.color}22`,
+                    color: config.color,
+                    border: `1px solid ${config.color}55`,
+                  }}
+                >
+                  {CATEGORY_LABEL[wonItem.category]}
+                </span>
+
                 {/* Legendary gets rainbow spin */}
                 <div
                   style={

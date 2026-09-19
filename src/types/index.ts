@@ -61,6 +61,15 @@ export interface Match {
   blue2_scouter_id: string | null;
   blue3_scouter_id: string | null;
   qual_blue_scouter_id: string | null;
+  // Second ("co-scout") slot per role — see ROLE_TO_COLUMN_2 in roleUtils.ts.
+  red1_scouter_id_2: string | null;
+  red2_scouter_id_2: string | null;
+  red3_scouter_id_2: string | null;
+  qual_red_scouter_id_2: string | null;
+  blue1_scouter_id_2: string | null;
+  blue2_scouter_id_2: string | null;
+  blue3_scouter_id_2: string | null;
+  qual_blue_scouter_id_2: string | null;
   winning_alliance: "red" | "blue" | "tie" | null;
   statbotics_red_win_prob: number | null;
   pred_time: string | null;
@@ -85,6 +94,15 @@ export interface Roster {
   blue2_scouter_id: string | null;
   blue3_scouter_id: string | null;
   qual_blue_scouter_id: string | null;
+  // Second ("co-scout") slot per role — see ROLE_TO_COLUMN_2 in roleUtils.ts.
+  red1_scouter_id_2: string | null;
+  red2_scouter_id_2: string | null;
+  red3_scouter_id_2: string | null;
+  qual_red_scouter_id_2: string | null;
+  blue1_scouter_id_2: string | null;
+  blue2_scouter_id_2: string | null;
+  blue3_scouter_id_2: string | null;
+  qual_blue_scouter_id_2: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -124,11 +142,14 @@ export interface MatchAssignment {
   matchNumber: number;
   matchId?: string;
   assignments: Partial<Record<Role, Scout | null>>;
+  // Second ("co-scout") slot per role, shown/edited alongside `assignments`.
+  assignments2?: Partial<Record<Role, Scout | null>>;
 }
 
 export interface SelectedCell {
   matchNumber: number;
   role: Role;
+  slot?: 1 | 2;
 }
 
 // Component Props Types

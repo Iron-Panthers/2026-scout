@@ -1,5 +1,6 @@
 import { supabase } from "./supabase";
-import type { Match, Profile, Event } from "@/types";
+import type { Match, Profile, Event, Role } from "@/types";
+import { ALL_ROLE_COLUMNS, roleColumn } from "./roleUtils";
 
 // Fetch all events
 export async function getEvents(): Promise<Event[]> {
@@ -196,27 +197,17 @@ export async function createEventWithMatches(
   }
 }
 
-// Update a specific scouter assignment
+// Update a specific scouter assignment. `slot` 2 targets the co-scout column
+// for that role (see ROLE_TO_COLUMN_2 in roleUtils.ts) instead of the primary.
 export async function updateMatchAssignment(
   matchId: string,
   role: string,
-  scouterId: string | null
+  scouterId: string | null,
+  slot: 1 | 2 = 1
 ): Promise<boolean> {
-  // Map camelCase role names to snake_case database columns
-  const roleToColumn: Record<string, string> = {
-    red1: "red1_scouter_id",
-    red2: "red2_scouter_id",
-    red3: "red3_scouter_id",
-    qualRed: "qual_red_scouter_id",
-    blue1: "blue1_scouter_id",
-    blue2: "blue2_scouter_id",
-    blue3: "blue3_scouter_id",
-    qualBlue: "qual_blue_scouter_id",
-  };
+  const column = roleColumn(role as Role, slot);
 
-  const roleColumn = roleToColumn[role];
-
-  if (!roleColumn) {
+  if (!column) {
     console.error(`Invalid role: ${role}`);
     return false;
   }
@@ -224,13 +215,14 @@ export async function updateMatchAssignment(
   console.log("Updating assignment:", {
     matchId,
     role,
-    roleColumn,
+    slot,
+    column,
     scouterId,
   });
 
   const { error } = await supabase
     .from("matches")
-    .update({ [roleColumn]: scouterId })
+    .update({ [column]: scouterId })
     .eq("id", matchId);
 
   if (error) {
@@ -250,17 +242,8 @@ export async function getUserMatches(
   matches: Match[];
   profile: Profile | null;
 }> {
-  const roleFilter = [
-    "red1_scouter_id",
-    "red2_scouter_id",
-    "red3_scouter_id",
-    "qual_red_scouter_id",
-    "blue1_scouter_id",
-    "blue2_scouter_id",
-    "blue3_scouter_id",
-    "qual_blue_scouter_id",
-  ]
-    .map((col) => `${col}.eq.${userId}`)
+  const roleFilter = ALL_ROLE_COLUMNS
+    .map(({ column }) => `${column}.eq.${userId}`)
     .join(",");
 
   const selectClause = activeEventOnly
@@ -296,32 +279,21 @@ export async function getUserMatches(
 export async function removeUserFromMatch(
   matchId: string,
   userId: string,
-  role: string
+  role: string,
+  slot: 1 | 2 = 1
 ): Promise<boolean> {
-  // Map camelCase role names to snake_case database columns
-  const roleToColumn: Record<string, string> = {
-    red1: "red1_scouter_id",
-    red2: "red2_scouter_id",
-    red3: "red3_scouter_id",
-    qualRed: "qual_red_scouter_id",
-    blue1: "blue1_scouter_id",
-    blue2: "blue2_scouter_id",
-    blue3: "blue3_scouter_id",
-    qualBlue: "qual_blue_scouter_id",
-  };
+  const column = roleColumn(role as Role, slot);
 
-  const roleColumn = roleToColumn[role];
-
-  if (!roleColumn) {
+  if (!column) {
     console.error(`Invalid role: ${role}`);
     return false;
   }
 
   const { error } = await supabase
     .from("matches")
-    .update({ [roleColumn]: null })
+    .update({ [column]: null })
     .eq("id", matchId)
-    .eq(roleColumn, userId);
+    .eq(column, userId);
 
   if (error) {
     console.error("Error removing user from match:", error);

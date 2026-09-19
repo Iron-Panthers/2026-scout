@@ -153,79 +153,46 @@ export function RosterManagementTab({
                     )}
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {/* Scout Avatars Preview */}
+                    {/* Scout Avatars Preview — primary + co-scout per role */}
                     <div className="space-y-2">
                       <div className="text-xs font-medium text-muted-foreground">
                         Assignments:
                       </div>
                       <div className="grid grid-cols-4 gap-2">
-                        {/* Red Team */}
-                        <div className="space-y-1">
-                          <Avatar className="h-6 w-6 bg-red-900/30">
-                            <AvatarFallback className="text-[9px] text-red-400">
-                              {getScoutInitials(roster.red1_scouter_id)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="text-[9px] text-muted-foreground">R1</div>
-                        </div>
-                        <div className="space-y-1">
-                          <Avatar className="h-6 w-6 bg-red-900/30">
-                            <AvatarFallback className="text-[9px] text-red-400">
-                              {getScoutInitials(roster.red2_scouter_id)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="text-[9px] text-muted-foreground">R2</div>
-                        </div>
-                        <div className="space-y-1">
-                          <Avatar className="h-6 w-6 bg-red-900/30">
-                            <AvatarFallback className="text-[9px] text-red-400">
-                              {getScoutInitials(roster.red3_scouter_id)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="text-[9px] text-muted-foreground">R3</div>
-                        </div>
-                        <div className="space-y-1">
-                          <Avatar className="h-6 w-6 bg-red-900/30">
-                            <AvatarFallback className="text-[9px] text-red-400">
-                              {getScoutInitials(roster.qual_red_scouter_id)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="text-[9px] text-muted-foreground">QR</div>
-                        </div>
-
-                        {/* Blue Team */}
-                        <div className="space-y-1">
-                          <Avatar className="h-6 w-6 bg-blue-900/30">
-                            <AvatarFallback className="text-[9px] text-blue-400">
-                              {getScoutInitials(roster.blue1_scouter_id)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="text-[9px] text-muted-foreground">B1</div>
-                        </div>
-                        <div className="space-y-1">
-                          <Avatar className="h-6 w-6 bg-blue-900/30">
-                            <AvatarFallback className="text-[9px] text-blue-400">
-                              {getScoutInitials(roster.blue2_scouter_id)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="text-[9px] text-muted-foreground">B2</div>
-                        </div>
-                        <div className="space-y-1">
-                          <Avatar className="h-6 w-6 bg-blue-900/30">
-                            <AvatarFallback className="text-[9px] text-blue-400">
-                              {getScoutInitials(roster.blue3_scouter_id)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="text-[9px] text-muted-foreground">B3</div>
-                        </div>
-                        <div className="space-y-1">
-                          <Avatar className="h-6 w-6 bg-blue-900/30">
-                            <AvatarFallback className="text-[9px] text-blue-400">
-                              {getScoutInitials(roster.qual_blue_scouter_id)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="text-[9px] text-muted-foreground">QB</div>
-                        </div>
+                        {(
+                          [
+                            { label: "R1", color: "red", primary: roster.red1_scouter_id, secondary: roster.red1_scouter_id_2 },
+                            { label: "R2", color: "red", primary: roster.red2_scouter_id, secondary: roster.red2_scouter_id_2 },
+                            { label: "R3", color: "red", primary: roster.red3_scouter_id, secondary: roster.red3_scouter_id_2 },
+                            { label: "QR", color: "red", primary: roster.qual_red_scouter_id, secondary: roster.qual_red_scouter_id_2 },
+                            { label: "B1", color: "blue", primary: roster.blue1_scouter_id, secondary: roster.blue1_scouter_id_2 },
+                            { label: "B2", color: "blue", primary: roster.blue2_scouter_id, secondary: roster.blue2_scouter_id_2 },
+                            { label: "B3", color: "blue", primary: roster.blue3_scouter_id, secondary: roster.blue3_scouter_id_2 },
+                            { label: "QB", color: "blue", primary: roster.qual_blue_scouter_id, secondary: roster.qual_blue_scouter_id_2 },
+                          ] as const
+                        ).map(({ label, color, primary, secondary }) => (
+                          <div key={label} className="space-y-1">
+                            <div className="flex -space-x-1.5">
+                              <Avatar
+                                className={`h-6 w-6 border border-background ${color === "red" ? "bg-red-900/30" : "bg-blue-900/30"}`}
+                              >
+                                <AvatarFallback className={`text-[9px] ${color === "red" ? "text-red-400" : "text-blue-400"}`}>
+                                  {getScoutInitials(primary)}
+                                </AvatarFallback>
+                              </Avatar>
+                              {secondary && (
+                                <Avatar
+                                  className={`h-6 w-6 border border-background ${color === "red" ? "bg-red-900/30" : "bg-blue-900/30"}`}
+                                >
+                                  <AvatarFallback className={`text-[9px] ${color === "red" ? "text-red-400" : "text-blue-400"}`}>
+                                    {getScoutInitials(secondary)}
+                                  </AvatarFallback>
+                                </Avatar>
+                              )}
+                            </div>
+                            <div className="text-[9px] text-muted-foreground">{label}</div>
+                          </div>
+                        ))}
                       </div>
                     </div>
 

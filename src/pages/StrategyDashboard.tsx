@@ -589,7 +589,7 @@ export default function StrategyDashboard() {
 
           {strategyPage === "picklist" ? (
             <>
-              <div className="mb-4 flex items-center gap-1 rounded-lg border p-1 sm:hidden">
+              <div className="mb-4 flex items-center gap-1 rounded-lg border p-1">
                 <Button
                   size="sm"
                   variant={mobilePicklistTab === "picklist" ? "default" : "ghost"}
@@ -628,8 +628,8 @@ export default function StrategyDashboard() {
                   onDragStart={handleDndDragStart}
                   onDragEnd={handleDndDragEnd}
                 >
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-4 items-stretch">
-                    <div className={mobilePicklistTab === "doNotPick" ? "hidden h-full sm:block" : "h-full"}>
+                  <div className="grid grid-cols-2 gap-2 sm:gap-4 items-stretch">
+                    <div className={mobilePicklistTab === "doNotPick" ? "hidden" : "h-full"}>
                       <PicklistColumn
                         columnKey="picklist"
                         title="Your Picklist"
@@ -645,7 +645,7 @@ export default function StrategyDashboard() {
                       />
                     </div>
 
-                    <div className={mobilePicklistTab === "picklist" ? "hidden h-full sm:block" : "h-full"}>
+                    <div className={mobilePicklistTab === "picklist" ? "hidden" : "h-full"}>
                       <PicklistColumn
                         columnKey="doNotPick"
                         title="Do Not Pick"

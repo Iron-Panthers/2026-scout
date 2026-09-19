@@ -73,8 +73,12 @@ Deno.serve(async (req) => {
       if (event) eventName = event.name;
     }
 
-    const roleDisplay = ROLE_DISPLAY[role] ?? role.replace("_scouter_id", "");
-    const roleName = role.replace("_scouter_id", "");
+    // Slot-2 (co-scout) columns are named "<role>_scouter_id_2" — normalize
+    // back to the base column so both slots share the same display name and
+    // link to the same scouting role (they're covering the same position).
+    const baseColumn: string = role.endsWith("_2") ? role.slice(0, -2) : role;
+    const roleDisplay = ROLE_DISPLAY[baseColumn] ?? baseColumn.replace("_scouter_id", "");
+    const roleName = baseColumn.replace("_scouter_id", "");
 
     let title: string;
     let body: string;

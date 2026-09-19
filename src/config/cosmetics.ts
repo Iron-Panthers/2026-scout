@@ -447,7 +447,7 @@ export const COSMETICS: CosmeticDefinition[] = [
   {
     id: "decoration_penguin",
     name: "Penguin",
-    description: "Hey look! It's Ethan's favorite animal (fun fact)",
+    description: "Hey look! It's Alex!",
     category: "decoration",
     emoji: "🐧",
     cost: 100,

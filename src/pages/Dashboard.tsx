@@ -47,6 +47,7 @@ export { prettifyRole };
 interface UserMatch {
   matchNumber: string;
   role: Role;
+  slot: 1 | 2;
   match: Match;
 }
 
@@ -93,23 +94,32 @@ export default function Dashboard() {
       const formattedMatches: UserMatch[] = [];
 
       userMatches.forEach((match) => {
-        // Check each role to find where the user is assigned
-        const roleChecks: Array<{ column: string | null; role: Role }> = [
-          { column: match.red1_scouter_id, role: "red1" },
-          { column: match.red2_scouter_id, role: "red2" },
-          { column: match.red3_scouter_id, role: "red3" },
-          { column: match.qual_red_scouter_id, role: "qualRed" },
-          { column: match.blue1_scouter_id, role: "blue1" },
-          { column: match.blue2_scouter_id, role: "blue2" },
-          { column: match.blue3_scouter_id, role: "blue3" },
-          { column: match.qual_blue_scouter_id, role: "qualBlue" },
+        // Check each role/slot to find where the user is assigned
+        const roleChecks: Array<{ column: string | null; role: Role; slot: 1 | 2 }> = [
+          { column: match.red1_scouter_id, role: "red1", slot: 1 },
+          { column: match.red2_scouter_id, role: "red2", slot: 1 },
+          { column: match.red3_scouter_id, role: "red3", slot: 1 },
+          { column: match.qual_red_scouter_id, role: "qualRed", slot: 1 },
+          { column: match.blue1_scouter_id, role: "blue1", slot: 1 },
+          { column: match.blue2_scouter_id, role: "blue2", slot: 1 },
+          { column: match.blue3_scouter_id, role: "blue3", slot: 1 },
+          { column: match.qual_blue_scouter_id, role: "qualBlue", slot: 1 },
+          { column: match.red1_scouter_id_2, role: "red1", slot: 2 },
+          { column: match.red2_scouter_id_2, role: "red2", slot: 2 },
+          { column: match.red3_scouter_id_2, role: "red3", slot: 2 },
+          { column: match.qual_red_scouter_id_2, role: "qualRed", slot: 2 },
+          { column: match.blue1_scouter_id_2, role: "blue1", slot: 2 },
+          { column: match.blue2_scouter_id_2, role: "blue2", slot: 2 },
+          { column: match.blue3_scouter_id_2, role: "blue3", slot: 2 },
+          { column: match.qual_blue_scouter_id_2, role: "qualBlue", slot: 2 },
         ];
 
-        roleChecks.forEach(({ column, role }) => {
+        roleChecks.forEach(({ column, role, slot }) => {
           if (column === user.id) {
             formattedMatches.push({
               matchNumber: match.name,
               role,
+              slot,
               match,
             });
           }
@@ -286,7 +296,8 @@ export default function Dashboard() {
     const success = await removeUserFromMatch(
       selectedMatch.match.id,
       user.id,
-      selectedMatch.role
+      selectedMatch.role,
+      selectedMatch.slot
     );
 
     if (success) {

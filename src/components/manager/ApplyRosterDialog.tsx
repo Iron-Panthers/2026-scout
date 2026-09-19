@@ -127,6 +127,12 @@ export function ApplyRosterDialog({
     return scout?.name || "Unknown";
   };
 
+  // Combines the primary + co-scout name for a role into one display string.
+  const getRoleScoutNames = (primaryId: string | null, secondaryId: string | null): string => {
+    if (!secondaryId) return getScoutName(primaryId);
+    return `${getScoutName(primaryId)} + ${getScoutName(secondaryId)}`;
+  };
+
   const previewCount = getPreviewCount();
 
   return (
@@ -151,14 +157,14 @@ export function ApplyRosterDialog({
             <div className="bg-muted p-3 rounded-md space-y-2">
               <div className="font-semibold text-sm">Roster Assignments:</div>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                <div>Red 1: {getScoutName(roster.red1_scouter_id)}</div>
-                <div>Blue 1: {getScoutName(roster.blue1_scouter_id)}</div>
-                <div>Red 2: {getScoutName(roster.red2_scouter_id)}</div>
-                <div>Blue 2: {getScoutName(roster.blue2_scouter_id)}</div>
-                <div>Red 3: {getScoutName(roster.red3_scouter_id)}</div>
-                <div>Blue 3: {getScoutName(roster.blue3_scouter_id)}</div>
-                <div>Qual Red: {getScoutName(roster.qual_red_scouter_id)}</div>
-                <div>Qual Blue: {getScoutName(roster.qual_blue_scouter_id)}</div>
+                <div>Red 1: {getRoleScoutNames(roster.red1_scouter_id, roster.red1_scouter_id_2)}</div>
+                <div>Blue 1: {getRoleScoutNames(roster.blue1_scouter_id, roster.blue1_scouter_id_2)}</div>
+                <div>Red 2: {getRoleScoutNames(roster.red2_scouter_id, roster.red2_scouter_id_2)}</div>
+                <div>Blue 2: {getRoleScoutNames(roster.blue2_scouter_id, roster.blue2_scouter_id_2)}</div>
+                <div>Red 3: {getRoleScoutNames(roster.red3_scouter_id, roster.red3_scouter_id_2)}</div>
+                <div>Blue 3: {getRoleScoutNames(roster.blue3_scouter_id, roster.blue3_scouter_id_2)}</div>
+                <div>Qual Red: {getRoleScoutNames(roster.qual_red_scouter_id, roster.qual_red_scouter_id_2)}</div>
+                <div>Qual Blue: {getRoleScoutNames(roster.qual_blue_scouter_id, roster.qual_blue_scouter_id_2)}</div>
               </div>
             </div>
           )}
