@@ -186,14 +186,14 @@ function PicklistColumn({
   const { setNodeRef } = useDroppable({ id: columnKey });
 
   return (
-    <div>
+    <div className="flex h-full flex-col">
       <div className="mb-1.5 flex h-6 items-center justify-between gap-2">
         <h3 className="text-xs font-semibold uppercase text-muted-foreground">{title}</h3>
         {headerAction}
       </div>
       <div
         ref={setNodeRef}
-        className="flex min-h-32 flex-col gap-2 rounded-lg border border-dashed p-1.5"
+        className="flex min-h-32 flex-1 flex-col gap-2 rounded-lg border border-dashed p-1.5"
       >
         {teams.length === 0 && (
           <p className="flex flex-1 items-center justify-center p-4 text-center text-sm text-muted-foreground">
@@ -482,10 +482,26 @@ export default function StrategyDashboard() {
       const [movedTeam] = sourceArr.splice(fromIndex, 1);
 
       const targetArr = [...arraysByColumn[overColumn]];
-      const overIndex = overIsColumn
+      const overIndexRaw = overIsColumn
         ? targetArr.length
         : targetArr.findIndex((t) => t.team_number === Number(overId));
-      targetArr.splice(overIndex >= 0 ? overIndex : targetArr.length, 0, movedTeam);
+      let overIndex = overIndexRaw >= 0 ? overIndexRaw : targetArr.length;
+
+      // Dropping on a card always inserted *before* it, so a team dragged
+      // straight onto the last card in a column landed one spot short of
+      // the bottom instead of at it. Compare the dragged card's vertical
+      // center to the hovered card's to tell which half it was dropped on,
+      // and insert after when it's the bottom half.
+      if (!overIsColumn && overIndexRaw >= 0) {
+        const overRect = over.rect;
+        const activeRect = active.rect.current.translated ?? active.rect.current.initial;
+        if (overRect && activeRect) {
+          const overCenterY = overRect.top + overRect.height / 2;
+          const activeCenterY = activeRect.top + activeRect.height / 2;
+          if (activeCenterY > overCenterY) overIndex += 1;
+        }
+      }
+      targetArr.splice(overIndex, 0, movedTeam);
 
       commit(sourceColumn, sourceArr);
       commit(overColumn, targetArr);
@@ -612,8 +628,8 @@ export default function StrategyDashboard() {
                   onDragStart={handleDndDragStart}
                   onDragEnd={handleDndDragEnd}
                 >
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-4">
-                    <div className={mobilePicklistTab === "doNotPick" ? "hidden sm:block" : ""}>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-4 items-stretch">
+                    <div className={mobilePicklistTab === "doNotPick" ? "hidden h-full sm:block" : "h-full"}>
                       <PicklistColumn
                         columnKey="picklist"
                         title="Your Picklist"
@@ -629,7 +645,7 @@ export default function StrategyDashboard() {
                       />
                     </div>
 
-                    <div className={mobilePicklistTab === "picklist" ? "hidden sm:block" : ""}>
+                    <div className={mobilePicklistTab === "picklist" ? "hidden h-full sm:block" : "h-full"}>
                       <PicklistColumn
                         columnKey="doNotPick"
                         title="Do Not Pick"

@@ -119,7 +119,6 @@ export function TeamInfoDialog({
 
   const [notesOpen, setNotesOpen] = useState(false);
   const [notesLoading, setNotesLoading] = useState(false);
-  const [notesLoaded, setNotesLoaded] = useState(false);
   const [notes, setNotes] = useState("");
   const [notesSaving, setNotesSaving] = useState(false);
 
@@ -228,22 +227,30 @@ export function TeamInfoDialog({
   }, [open, teamNumber, eventId, eventCode]);
 
   // Reset the notes editor whenever a different team/dialog session opens,
-  // so stale text from the previous team never briefly shows.
+  // so stale text from the previous team never briefly shows, and fetch the
+  // note eagerly right away — previously this only happened lazily on the
+  // first click of "My Notes", but that click-tracking state got reset on
+  // every close, so reopening the dialog always required re-clicking to see
+  // anything. Fetching here means it's already loaded by the time the
+  // section is expanded, however many times the dialog is reopened.
   useEffect(() => {
     setNotesOpen(false);
-    setNotesLoaded(false);
     setNotes("");
-  }, [open, teamNumber]);
-
-  async function handleOpenNotes(nextOpen: boolean) {
-    setNotesOpen(nextOpen);
-    if (nextOpen && !notesLoaded && userId && eventId && teamNumber) {
-      setNotesLoading(true);
-      const existing = await getTeamNote(userId, eventId, teamNumber);
+    if (!open || !teamNumber || !userId || !eventId) return;
+    let mounted = true;
+    setNotesLoading(true);
+    getTeamNote(userId, eventId, teamNumber).then((existing) => {
+      if (!mounted) return;
       setNotes(existing);
-      setNotesLoaded(true);
       setNotesLoading(false);
-    }
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [open, teamNumber, userId, eventId]);
+
+  function handleOpenNotes(nextOpen: boolean) {
+    setNotesOpen(nextOpen);
   }
 
   async function handleSaveNotes() {
