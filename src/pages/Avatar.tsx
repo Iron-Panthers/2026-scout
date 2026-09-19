@@ -58,8 +58,12 @@ export default function AvatarPage({
   async function handleEquip(item: CosmeticDefinition) {
     if (!user?.id) return;
     // Reflect the equip immediately — the button/badge/avatar preview
-    // shouldn't wait on the round-trip to feel responsive. loadProfile()
-    // below reconciles with the server once it resolves either way.
+    // shouldn't wait on the round-trip to feel responsive. We already know
+    // exactly what the resulting state is, so on success we trust this
+    // local update as-is rather than re-fetching: a re-fetch here can race
+    // the write and resolve with the pre-equip data, snapping the UI back
+    // to the old cosmetic before flipping again on the *next* interaction.
+    // Only re-sync from the server if the write actually failed.
     setGameProfile((prev) =>
       prev
         ? { ...prev, equipped_cosmetics: { ...(prev.equipped_cosmetics ?? {}), [item.category]: item.id } }
@@ -73,8 +77,8 @@ export default function AvatarPage({
       toast({ title: `${item.name} equipped!` });
     } else {
       toast({ title: "Failed to equip", description: result.error, variant: "destructive" });
+      loadProfile();
     }
-    loadProfile();
   }
 
   async function handleUnequip(item: CosmeticDefinition) {
@@ -93,8 +97,8 @@ export default function AvatarPage({
       toast({ title: `${item.name} unequipped.` });
     } else {
       toast({ title: "Failed to unequip", description: result.error, variant: "destructive" });
+      loadProfile();
     }
-    loadProfile();
   }
 
   const rarityCompare = (a: CosmeticDefinition, b: CosmeticDefinition) =>

@@ -310,10 +310,12 @@ export default function Dashboard() {
     if (!user?.id) return;
     setClocingIn(true);
     // Flip the button/status immediately instead of waiting on the
-    // write-then-refetch round-trip to feel responsive.
+    // write-then-refetch round-trip to feel responsive. Only re-sync from
+    // the server on failure — refetching unconditionally can race the write
+    // and resolve with the pre-clock-in data, snapping the UI back.
     patchProfile({ clocked_in: true });
-    await clockIn(user.id);
-    await refreshProfile();
+    const success = await clockIn(user.id);
+    if (!success) await refreshProfile();
     setClocingIn(false);
   };
 
@@ -321,8 +323,8 @@ export default function Dashboard() {
     if (!user?.id) return;
     setClocingIn(true);
     patchProfile({ clocked_in: false });
-    await clockOut(user.id);
-    await refreshProfile();
+    const success = await clockOut(user.id);
+    if (!success) await refreshProfile();
     setClocingIn(false);
   };
 
