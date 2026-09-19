@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useState, useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import { useAuth } from "./AuthContext";
 import settingsConfig from "@/config/settings.json";
@@ -18,6 +18,12 @@ const SettingsContext = createContext<SettingsContextType | undefined>(
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [settings, setSettings] = useState<Record<string, any>>({});
+  // Tracks whether the user has explicitly changed the theme locally (e.g.
+  // by equipping one) since this provider mounted. The background fetch
+  // below resyncs the theme from the account on load, but it can resolve
+  // *after* a live equip — without this guard it would silently clobber the
+  // just-equipped theme back to whatever it read before the equip happened.
+  const userChangedThemeRef = useRef(false);
 
   // Initialize settings with defaults
   useEffect(() => {
@@ -40,11 +46,16 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     if (navigator.onLine) {
       getActiveEvent().then((event) => {
         if (event?.event_code) {
-          const updated = { ...loadedSettings, "active-event-code": event.event_code };
-          setSettings(updated);
-          if (user?.id) {
-            localStorage.setItem(`settings_${user.id}`, JSON.stringify(updated));
-          }
+          // Merge into whatever the *current* settings are, not the
+          // mount-time snapshot — otherwise this can resolve after some
+          // other change (e.g. an equip) and wipe it out.
+          setSettings((prev) => {
+            const updated = { ...prev, "active-event-code": event.event_code };
+            if (user?.id) {
+              localStorage.setItem(`settings_${user.id}`, JSON.stringify(updated));
+            }
+            return updated;
+          });
         }
       });
 
@@ -54,6 +65,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       // account rather than just the browser it was last set in.
       if (user?.id) {
         getGameProfile(user.id).then((gameProfile) => {
+          // The user already equipped/unequipped a theme locally while this
+          // fetch was in flight — their live action wins, don't overwrite it.
+          if (userChangedThemeRef.current) return;
           const equippedThemeId = gameProfile?.equipped_cosmetics?.["theme"];
           const themeValue = equippedThemeId
             ? COSMETICS.find((c) => c.id === equippedThemeId)?.themeValue
@@ -81,6 +95,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   }, [settings["theme"]]);
 
   const updateSetting = (key: string, value: any) => {
+    if (key === "theme") userChangedThemeRef.current = true;
     const newSettings = { ...settings, [key]: value };
     setSettings(newSettings);
     if (user?.id) {
