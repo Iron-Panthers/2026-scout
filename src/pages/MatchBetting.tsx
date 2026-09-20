@@ -416,25 +416,24 @@ export default function MatchBetting() {
           ? await getStatboticsMatch(eventCode, m.match_number)
           : getCachedStatboticsMatch(eventCode, m.match_number);
 
+        if (!sb.result && m.statbotics_red_win_prob != null) {
+          sb = {
+            key: `${eventCode}_qm${m.match_number}`,
+            event: eventCode,
+            match_number: m.match_number,
+            comp_level: "qm",
+            pred: {
+              winner: null,
+              red_win_prob: m.statbotics_red_win_prob,
+              red_score: 0,
+              blue_score: 0,
+            },
+            time: sb?.time,
+            result: results,
+          };
+        }
+        
         if (sb.result) {
-          // Fall back to DB-stored prediction when API and cache both miss
-          if (!sb.result && m.statbotics_red_win_prob != null) {
-            sb = {
-              key: `${eventCode}_qm${m.match_number}`,
-              event: eventCode,
-              match_number: m.match_number,
-              comp_level: "qm",
-              pred: {
-                winner: null,
-                red_win_prob: m.statbotics_red_win_prob,
-                red_score: 0,
-                blue_score: 0,
-              },
-              time: sb?.time,
-              result: results,
-            };
-          }
-
           if (sb?.result.winner === null)
             sb.result = results;
 
