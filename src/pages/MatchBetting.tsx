@@ -733,7 +733,7 @@ export default function MatchBetting() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center flex-col gap-4">
         <p className="text-muted-foreground">Match not found.</p>
-        <Button onClick={() => navigate("/betting")}>Back to markets</Button>
+        <Button onClick={() => navigate("/dashboard?page=betting")}>Back to markets</Button>
       </div>
     );
   }
@@ -744,7 +744,7 @@ export default function MatchBetting() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/betting")}>
+            <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard?page=betting")}>
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div>

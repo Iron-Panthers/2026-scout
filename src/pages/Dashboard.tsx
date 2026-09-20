@@ -22,7 +22,7 @@ import {
   Sparkles,
   TrendingUp,
 } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { getUserMatches, removeUserFromMatch, getEvents } from "@/lib/matches";
 import { getMatchTeam } from "@/lib/blueAlliance";
@@ -63,9 +63,18 @@ export default function Dashboard() {
   const [pitAssignments, setPitAssignments] = useState<UserPitAssignment[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [clockingIn, setClocingIn] = useState(false);
+  const [searchParams] = useSearchParams();
+  // Lets a link like /dashboard?page=betting land directly on that tab —
+  // used by MatchBetting's back button, since Betting now lives here as a
+  // tab instead of at its old standalone /betting route.
+  const initialPage = searchParams.get("page");
   const [dashboardPage, setDashboardPage] = useState<
     "scout" | "shop" | "avatar" | "betting"
-  >("scout");
+  >(
+    initialPage === "shop" || initialPage === "avatar" || initialPage === "betting"
+      ? initialPage
+      : "scout"
+  );
   const [headerActionsEl, setHeaderActionsEl] = useState<HTMLDivElement | null>(null);
   const shopSubtitle = useRandomSubtitle(SHOP_SUBTITLES, [dashboardPage === "shop"]);
   const avatarSubtitle = useRandomSubtitle(AVATAR_SUBTITLES, [dashboardPage === "avatar"]);
