@@ -13,7 +13,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { getActiveEvent } from "@/lib/matches";
 import { getGameProfile } from "@/lib/gameProfiles";
-import { getBulkMatchOdds, getUserBets, blendOddsRedPct } from "@/lib/betting";
+import { getBulkMatchOdds, getUserBets, blendOddsRedPct, settleMatchBets } from "@/lib/betting";
 import { getMatchLabel, wasUpset } from "@/lib/match13";
 import { getEventMatches, getMatchScores, getMatchTeam } from "@/lib/blueAlliance";
 import { supabase } from "@/lib/supabase";
@@ -1023,6 +1023,35 @@ export default function Betting({
       supabase.removeChannel(channel);
     };
   }, [load]);
+
+  // Settlement previously only happened when a user opened that specific
+  // match's own detail page — a bet stayed "pending" indefinitely on this
+  // list until someone went back and looked at it. Settle any of the
+  // current user's bets whose match already has a winner, right from here,
+  // since this list page is visited far more often.
+  const settlingRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const decidedPending = myBets.filter(
+      (b) => b.status === "pending" && b.match?.winning_alliance && !settlingRef.current.has(b.id)
+    );
+    if (decidedPending.length === 0) return;
+
+    decidedPending.forEach((b) => settlingRef.current.add(b.id));
+    (async () => {
+      for (const bet of decidedPending) {
+        if (!bet.match_id || !bet.match?.winning_alliance) continue;
+        const redWinProb = bet.match.match_number != null
+          ? m13Map.get(bet.match.match_number)?.pred.red_win_prob ?? 0.5
+          : 0.5;
+        await settleMatchBets(
+          bet.match_id,
+          bet.match.winning_alliance as "red" | "blue" | "tie",
+          redWinProb
+        );
+      }
+      load();
+    })();
+  }, [myBets, m13Map, load]);
 
   const refresh = async () => {
     setRefreshing(true);

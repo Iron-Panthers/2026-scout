@@ -325,7 +325,7 @@ interface TBAMatchFull {
 export default function MatchBetting() {
   const { match_id } = useParams<{ match_id: string }>();
   const navigate = useNavigate();
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const isOnline = useOnlineStatus();
 
   const [match, setMatch] = useState<Match | null>(null);
@@ -349,7 +349,6 @@ export default function MatchBetting() {
   const [betAmount, setBetAmount] = useState(10);
   const [placing, setPlacing] = useState(false);
   const [cancelling, setCancelling] = useState(false);
-  const [settling, setSettling] = useState(false);
   const [feedback, setFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
 
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -634,27 +633,10 @@ export default function MatchBetting() {
     setCancelling(false);
   }
 
-  async function handleSettle(winner: "red" | "blue" | "tie") {
-    if (!match_id) return;
-    setSettling(true);
-    const prob = m13Match?.pred.red_win_prob ?? 0.5;
-    const result = await settleMatchBets(match_id, winner, prob);
-    if (result.success) {
-      setMatch((prev) => prev ? { ...prev, winning_alliance: winner } : prev);
-      setFeedback({ ok: true, msg: `Match settled — ${winner.toUpperCase()} wins!` });
-      await refreshPoints();
-      await refreshUserBet();
-    } else {
-      setFeedback({ ok: false, msg: result.error ?? "Settlement failed." });
-    }
-    setSettling(false);
-  }
-
   // ---------------------------------------------------------------------------
   // Derived
   // ---------------------------------------------------------------------------
   const isSettled = !!match?.winning_alliance && userBet?.status !== "pending";
-  const isManager = profile?.is_manager ?? false;
 
   // Points and event-points bets form separate pools, so odds are derived
   // per-currency from the raw bet list (online) or a cached snapshot (offline).
@@ -1137,36 +1119,6 @@ export default function MatchBetting() {
           </Card>
         )}
 
-        {/* Manager settle */}
-        {isManager && !isSettled && !matchComplete && (
-          <Card className="border-purple-700/30 bg-purple-900/10">
-            <CardHeader className="pb-2 pt-4">
-              <CardTitle className="text-sm text-purple-300">Manager: Settle Bets</CardTitle>
-            </CardHeader>
-            <CardContent className="pt-0 pb-4">
-              <p className="text-xs text-muted-foreground mb-3">
-                Payouts are probability-adjusted via match13 ({m13RedProb !== undefined
-                  ? `red predicted at ${(m13RedProb * 100).toFixed(1)}%`
-                  : "no prediction data — using 50/50"}).
-                Upsets pay more than favorites.
-              </p>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" className="flex-1 border-red-700/40 text-red-400 hover:bg-red-900/20"
-                  onClick={() => handleSettle("red")} disabled={settling || !isOnline}>
-                  {settling ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Red Wins"}
-                </Button>
-                <Button variant="outline" size="sm" className="flex-1 border-blue-700/40 text-blue-400 hover:bg-blue-900/20"
-                  onClick={() => handleSettle("blue")} disabled={settling || !isOnline}>
-                  {settling ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Blue Wins"}
-                </Button>
-                <Button variant="outline" size="sm" className="border-gray-700/40 text-muted-foreground hover:bg-muted/20"
-                  onClick={() => handleSettle("tie")} disabled={settling || !isOnline}>
-                  Tie
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
       </main>
     </div>
   );
