@@ -380,6 +380,7 @@ export default function MatchBetting() {
       // Match row
       const { data: matchData } = await supabase
         .from("matches").select("*").eq("id", match_id).maybeSingle();
+      console.log(cancelled, matchData)
       if (!matchData || cancelled) { setLoading(false); return; }
       const m = matchData as Match;
       if (!cancelled) setMatch(m);
@@ -463,6 +464,10 @@ export default function MatchBetting() {
           };
           if (!cancelled) setM13Match(m13);
         }
+        
+        if (sb.result) {
+          if (sb?.result.winner === null)
+            sb.result = results;
 
         const predTimeSeconds = found?.predicted_time;
         if (!predTimeSeconds && !m.pred_time) {
