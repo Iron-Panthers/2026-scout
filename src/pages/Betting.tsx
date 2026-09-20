@@ -643,8 +643,14 @@ function CompletedMatchCard({ match, odds, tba, m13, userBet, onClick }: Complet
   // always just a copy of the DB-persisted (TBA-sourced) score/winner.
   const m13Red = m13?.result?.red_score;
   const m13Blue = m13?.result?.blue_score;
-  const red = (m13Red != null && m13Red >= 0) ? m13Red : (match.red_score ?? null);
-  const blue = (m13Blue != null && m13Blue >= 0) ? m13Blue : (match.blue_score ?? null);
+  // TBA's convention (used throughout this codebase) is that a negative
+  // score means "not actually played" — guard the DB-cached fallback too,
+  // not just the match13-sourced value, since a stale/bad -1 cached in the
+  // DB should never render.
+  const dbRed = match.red_score != null && match.red_score >= 0 ? match.red_score : null;
+  const dbBlue = match.blue_score != null && match.blue_score >= 0 ? match.blue_score : null;
+  const red = (m13Red != null && m13Red >= 0) ? m13Red : dbRed;
+  const blue = (m13Blue != null && m13Blue >= 0) ? m13Blue : dbBlue;
   const isUpset = m13 && winner && winner !== "tie"
     ? wasUpset(winner, m13.pred.red_win_prob) : false;
 
@@ -726,16 +732,24 @@ interface LeaderEntry {
   total: number;
 }
 
-function Leaderboard({ userId }: { userId?: string }) {
+function Leaderboard({ userId, matchIds }: { userId?: string; matchIds: string[] }) {
   const [entries, setEntries] = useState<LeaderEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const matchIdsKey = matchIds.join(",");
 
   useEffect(() => {
+    if (matchIds.length === 0) {
+      setEntries([]);
+      setLoading(false);
+      return;
+    }
+
     async function load() {
       const { data } = await supabase
         .from("bets")
         .select("user_id, amount, payout, status")
-        .in("status", ["won", "lost"]);
+        .in("status", ["won", "lost"])
+        .in("match_id", matchIds);
 
       if (!data) { setLoading(false); return; }
 
@@ -770,7 +784,7 @@ function Leaderboard({ userId }: { userId?: string }) {
       setLoading(false);
     }
     load();
-  }, []);
+  }, [matchIdsKey]);
 
   if (loading) return <div className="text-center text-muted-foreground py-8">Loading…</div>;
   if (entries.length === 0) return (
@@ -831,14 +845,26 @@ export default function Betting({
   const [m13Loading, setM13Loading] = useState(false);
   const [showM13Loading, setShowM13Loading] = useState(false);
 
+  // `load()` fires on mount, every 30s, and (implicitly) can overlap itself if
+  // a call is still in flight when the next tick starts. Its several async
+  // tails (matches, odds, TBA, match13) aren't otherwise sequenced, so a
+  // slower *older* call can resolve after a faster *newer* one and silently
+  // overwrite fresh state with stale data — the page appears to "revert."
+  // Each call captures its own generation number and every state-setting
+  // continuation checks it's still the latest before applying.
+  const loadGenerationRef = useRef(0);
+
   const load = useCallback(async () => {
     if (!user?.id) return;
+    const generation = ++loadGenerationRef.current;
+    const isStale = () => loadGenerationRef.current !== generation;
 
     const [activeEvent, gameProfile, userBets] = await Promise.all([
       getActiveEvent(),
       getGameProfile(user.id),
       getUserBets(user.id),
     ]);
+    if (isStale()) return;
 
     setPoints(gameProfile?.points ?? 0);
     setMyBets(userBets);
@@ -851,6 +877,7 @@ export default function Betting({
       .select("*")
       .eq("event_id", activeEvent.id)
       .order("match_number");
+    if (isStale()) return;
 
     const rows = (matchRows ?? []) as Match[];
     setMatches(rows);
@@ -885,7 +912,7 @@ export default function Betting({
     setLoading(false);
 
     // Odds, TBA, and match13 all load in parallel without blocking render
-    getBulkMatchOdds(ids).then((odds) => setOddsMap(odds)).catch(() => {});
+    getBulkMatchOdds(ids).then((odds) => { if (!isStale()) setOddsMap(odds); }).catch(() => {});
 
     setTimeout(() => {
       if (m13Loading)
@@ -897,6 +924,7 @@ export default function Betting({
       setM13Loading(true);
 
       getEventMatches(code).then((tba) => {
+        if (isStale()) return;
         if (tba) {
           const map = new Map<number, TBAMatchData>();
           (tba as TBAMatchData[]).forEach((m) => {
@@ -905,7 +933,7 @@ export default function Betting({
           setTbaMap(map);
         }
         setTbaLoading(false);
-      }).catch(() => setTbaLoading(false));
+      }).catch(() => { if (!isStale()) setTbaLoading(false); });
 
       // match13 sends no CORS headers and its key must stay off the client,
       // so predictions come from sync-match-results — which calls match13
@@ -914,6 +942,7 @@ export default function Betting({
         supabase.functions.invoke("sync-match-results", {
           headers: session ? { Authorization: `Bearer ${session.access_token}` } : undefined,
         }).then(({ data }) => {
+          if (isStale()) return;
           const predictions = (data?.predictions ?? []) as Array<{
             matchNumber: number;
             redWinProb: number;
@@ -956,7 +985,7 @@ export default function Betting({
           }
           if (map.size > 0) setM13Map(map);
           setM13Loading(false);
-        }).catch(() => setM13Loading(false));
+        }).catch(() => { if (!isStale()) setM13Loading(false); });
       });
     }
   }, [user?.id]);
@@ -968,6 +997,32 @@ export default function Betting({
     const id = setInterval(() => { if (isOnline) load(); }, 30_000);
     return () => clearInterval(id);
   }, [isOnline, load]);
+
+  // Without this, a fresh mount's read can land a moment before a
+  // fire-and-forget write from elsewhere (e.g. the match detail page caching
+  // a score, or bet settlement) actually commits — the page would then show
+  // that stale snapshot for up to 30s until the interval above catches up,
+  // which reads as the page having "reverted." Reload as soon as either
+  // table changes instead of waiting on the poll.
+  useEffect(() => {
+    const channel = supabase
+      .channel("betting-dashboard-updates")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "matches" },
+        () => load()
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "bets" },
+        () => load()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [load]);
 
   const refresh = async () => {
     setRefreshing(true);
@@ -1225,7 +1280,7 @@ export default function Betting({
 
             {/* ── LEADERBOARD ── */}
             <TabsContent value="leaderboard" className="max-w-2xl mx-auto">
-              <Leaderboard userId={user?.id} />
+              <Leaderboard userId={user?.id} matchIds={matches.map((m) => m.id)} />
             </TabsContent>
           </Tabs>
         )}

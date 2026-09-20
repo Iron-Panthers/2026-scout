@@ -363,11 +363,11 @@ export default function Dashboard() {
   const clockInBar = (
     <>
       {profile?.clocked_in ? (
-        <div className="flex items-center justify-between p-4 bg-red-900/20 border border-red-700/40 rounded-lg">
+        <div className="flex items-center justify-between p-4 bg-primary/10 border border-primary/40 rounded-lg">
           <div className="flex items-center gap-3">
-            <div className="mx-5 h-3 w-3 rounded-full bg-red-500 animate-pulse" />
+            <div className="mx-5 h-3 w-3 rounded-full bg-primary animate-pulse" />
             <div>
-              <p className="font-semibold text-red-400">Clocked In</p>
+              <p className="font-semibold text-primary">Clocked In</p>
               <p className="text-xs text-muted-foreground">You're in stands!</p>
             </div>
           </div>
@@ -375,7 +375,7 @@ export default function Dashboard() {
             variant="outline"
             size="sm"
             disabled={clockingIn}
-            className="h-16 border-red-700/40 text-red-400 hover:bg-red-900/20 hover:text-red-300"
+            className="h-16 border-primary/40 text-primary hover:bg-primary/10 hover:text-primary"
             onClick={handleClockOut}
           >
             {clockingIn ? (

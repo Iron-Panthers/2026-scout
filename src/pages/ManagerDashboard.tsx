@@ -137,6 +137,13 @@ export default function ManagerDashboard() {
 
   // Track whether we've set the initial selected event
   const initialEventSet = useRef(false);
+  // Realtime "matches" changes include the echo of this tab's own writes —
+  // without this, that echo can trigger a loadData() that races the optimistic
+  // update and briefly reverts the UI to the pre-write assignment before
+  // flipping back once the (redundant) refetch settles. Suppress reload for a
+  // moment after our own writes; unrelated changes from other managers still
+  // show up once the window passes.
+  const suppressReloadUntilRef = useRef(0);
 
   // Active tab state for mobile dropdown
   const [activeTab, setActiveTab] = useState<string>("assignments");
@@ -296,6 +303,10 @@ export default function ManagerDashboard() {
         },
         (payload) => {
           console.log("Match assignment changed (manager view):", payload);
+          // Skip the echo of our own just-fired write — reloading now would
+          // race the optimistic update with a redundant refetch and briefly
+          // flicker the UI back to the pre-write assignment.
+          if (Date.now() < suppressReloadUntilRef.current) return;
           // Reload matches when any match is updated
           loadData();
         }
@@ -440,6 +451,8 @@ export default function ManagerDashboard() {
       // Capture previous state for rollback
       const previousAssignment = currentMatch[assignmentsKey]?.[selectedCell.role];
 
+      suppressReloadUntilRef.current = Date.now() + 3000;
+
       // 3. Fire database operation in background
       updateMatchAssignment(
         currentMatch.matchId,
@@ -549,6 +562,8 @@ export default function ManagerDashboard() {
 
       // Capture previous state for rollback
       const previousAssignment = currentMatch[assignmentsKey]?.[role];
+
+      suppressReloadUntilRef.current = Date.now() + 3000;
 
       // 1. Update UI immediately (optimistic)
       setMatches((prevMatches) =>

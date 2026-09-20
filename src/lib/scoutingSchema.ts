@@ -267,7 +267,7 @@ export async function submitScoutingData(
   team_num: number,
   match_type: string = "qual"
 ) {
-  const alreadySubmitted = await hasExistingSubmission(matchId, role);
+  const alreadySubmitted = await hasExistingSubmission(matchId, role, scouterId);
 
   const { data, error } = await supabase
     .from("scouting_submissions")
@@ -319,7 +319,7 @@ export async function submitQualScoutingData(
   scoutingData: Record<string, any>,
   scouterId?: string
 ): Promise<QualScoutingSubmission> {
-  const alreadySubmitted = await hasExistingQualSubmission(matchId, role);
+  const alreadySubmitted = await hasExistingQualSubmission(matchId, role, scouterId);
 
   const { data, error } = await supabase
     .from("qual_scouting_submissions")
@@ -476,9 +476,10 @@ export async function deleteScoutingSubmission(submissionId: string) {
  */
 export async function hasExistingSubmission(
   matchId: string,
-  role: string
+  role: string,
+  scouterId?: string
 ): Promise<boolean> {
-  return hasSubmissionForRole("scouting_submissions", matchId, role);
+  return hasSubmissionForRole("scouting_submissions", matchId, role, scouterId);
 }
 
 /**
@@ -486,22 +487,32 @@ export async function hasExistingSubmission(
  */
 export async function hasExistingQualSubmission(
   matchId: string,
-  role: string
+  role: string,
+  scouterId?: string
 ): Promise<boolean> {
-  return hasSubmissionForRole("qual_scouting_submissions", matchId, role);
+  return hasSubmissionForRole("qual_scouting_submissions", matchId, role, scouterId);
 }
 
+// Checked per-scouter (not just per match+role) so that when a role has two
+// assigned scouts (primary + co-scout), the second one's own first-time
+// submission still counts as "new" for reward purposes — otherwise it always
+// reads the first scout's submission as "already submitted" and silently
+// skips awarding them points/event points.
 async function hasSubmissionForRole(
   table: "scouting_submissions" | "qual_scouting_submissions",
   matchId: string,
-  role: string
+  role: string,
+  scouterId?: string
 ): Promise<boolean> {
-  const { data, error } = await supabase
+  let query = supabase
     .from(table)
     .select("id")
     .eq("match_id", matchId)
-    .eq("role", role)
-    .limit(1);
+    .eq("role", role);
+
+  if (scouterId) query = query.eq("scouter_id", scouterId);
+
+  const { data, error } = await query.limit(1);
 
   if (error) {
     console.error(`Error checking for existing ${table} submission:`, error);

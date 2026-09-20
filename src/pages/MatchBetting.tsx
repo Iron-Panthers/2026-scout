@@ -215,8 +215,12 @@ function ResultCard({ m13Match, winner, dbRedScore, dbBlueScore }: ResultCardPro
   // here is always just a copy of the TBA-sourced score/winner.
   const m13Red = m13Match.result.red_score;
   const m13Blue = m13Match.result.blue_score;
-  const red = (m13Red != null && m13Red >= 0) ? m13Red : (dbRedScore ?? 0);
-  const blue = (m13Blue != null && m13Blue >= 0) ? m13Blue : (dbBlueScore ?? 0);
+  // Guard the DB-cached fallback too (a stale/bad -1 — TBA's "not played"
+  // sentinel — should never render), not just the match13-sourced value.
+  const safeDbRed = dbRedScore != null && dbRedScore >= 0 ? dbRedScore : 0;
+  const safeDbBlue = dbBlueScore != null && dbBlueScore >= 0 ? dbBlueScore : 0;
+  const red = (m13Red != null && m13Red >= 0) ? m13Red : safeDbRed;
+  const blue = (m13Blue != null && m13Blue >= 0) ? m13Blue : safeDbBlue;
 
   return (
     <Card className={`border-2 ${winner === "red" ? "border-red-600/50 bg-red-900/10"
