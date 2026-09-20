@@ -422,7 +422,13 @@ export default function Shop({
           </DialogHeader>
 
           {buyTarget?.category === "theme" && buyTarget.themeValue && (
-            <div data-theme={buyTarget.themeValue} className="rounded-lg border border-border overflow-hidden">
+            // bg-neutral-900 is a theme-independent fallback, not a preview of
+            // anything — Ben Mode's --background is intentionally transparent
+            // (so its full-page image shows through app-wide), which would
+            // otherwise let the dialog's own background — following whatever
+            // theme is currently equipped — show through here instead, making
+            // this preview look different depending on what's equipped.
+            <div data-theme={buyTarget.themeValue} className="rounded-lg border border-border overflow-hidden bg-neutral-900">
               <div className="bg-background p-4 flex flex-col items-center gap-3">
                 <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Preview</span>
                 <span className="px-4 py-2 rounded-md text-sm font-semibold bg-primary text-primary-foreground">

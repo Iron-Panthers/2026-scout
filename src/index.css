@@ -550,6 +550,114 @@ html[data-theme="ben"] body {
   --sidebar-ring: hsl(359, 82.6%, 57.1%);
 }
 
+/* Greybots — near-black grey background, burnt orange primary (#202020 / #e3781d) */
+[data-theme="greybots"] {
+  --background: hsl(0, 0%, 12.5%);
+  --foreground: hsl(0, 0%, 95%);
+  --card: hsl(0, 0%, 16%);
+  --card-foreground: hsl(0, 0%, 95%);
+  --popover: hsl(0, 0%, 18%);
+  --popover-foreground: hsl(0, 0%, 95%);
+  --primary: hsl(27.6, 78%, 50.2%);
+  --primary-foreground: hsl(27.6, 60%, 10%);
+  --secondary: hsl(0, 0%, 22%);
+  --secondary-foreground: hsl(0, 0%, 95%);
+  --muted: hsl(0, 0%, 22%);
+  --muted-foreground: hsl(0, 0%, 65%);
+  --accent: hsl(27.6, 78%, 50.2%);
+  --accent-foreground: hsl(27.6, 60%, 10%);
+  --destructive: hsl(0, 84%, 60%);
+  --destructive-foreground: hsl(0, 0%, 98%);
+  --border: hsl(0, 0%, 28%);
+  --input: hsl(0, 0%, 28%);
+  --ring: hsl(27.6, 78%, 50.2%);
+  --chart-1: hsl(27.6, 78%, 50.2%);
+  --chart-2: hsl(0, 0%, 60%);
+  --chart-3: hsl(27.6, 50%, 65%);
+  --chart-4: hsl(0, 0%, 40%);
+  --chart-5: hsl(27.6, 78%, 35%);
+  --sidebar: hsl(0, 0%, 10%);
+  --sidebar-foreground: hsl(0, 0%, 95%);
+  --sidebar-primary: hsl(27.6, 78%, 50.2%);
+  --sidebar-primary-foreground: hsl(27.6, 60%, 10%);
+  --sidebar-accent: hsl(0, 0%, 22%);
+  --sidebar-accent-foreground: hsl(0, 0%, 95%);
+  --sidebar-border: hsl(0, 0%, 28%);
+  --sidebar-ring: hsl(27.6, 78%, 50.2%);
+}
+
+/* Space Cookies — dark night-sky background, caramel-tan primary, light-blue accent (#84caea / #be874d) */
+[data-theme="space_cookies"] {
+  --background: hsl(199, 45%, 8%);
+  --foreground: hsl(199, 30%, 95%);
+  --card: hsl(199, 40%, 12%);
+  --card-foreground: hsl(199, 30%, 95%);
+  --popover: hsl(199, 40%, 14%);
+  --popover-foreground: hsl(199, 30%, 95%);
+  --primary: hsl(30.8, 46.5%, 52.4%);
+  --primary-foreground: hsl(30.8, 60%, 10%);
+  --secondary: hsl(199, 35%, 18%);
+  --secondary-foreground: hsl(199, 30%, 95%);
+  --muted: hsl(199, 35%, 18%);
+  --muted-foreground: hsl(199, 20%, 70%);
+  --accent: hsl(198.8, 70.8%, 71.8%);
+  --accent-foreground: hsl(199, 60%, 12%);
+  --destructive: hsl(0, 84%, 60%);
+  --destructive-foreground: hsl(0, 0%, 98%);
+  --border: hsl(199, 30%, 24%);
+  --input: hsl(199, 30%, 24%);
+  --ring: hsl(30.8, 46.5%, 52.4%);
+  --chart-1: hsl(30.8, 46.5%, 52.4%);
+  --chart-2: hsl(198.8, 70.8%, 71.8%);
+  --chart-3: hsl(30.8, 40%, 65%);
+  --chart-4: hsl(198.8, 50%, 50%);
+  --chart-5: hsl(0, 84%, 60%);
+  --sidebar: hsl(199, 45%, 6%);
+  --sidebar-foreground: hsl(199, 30%, 95%);
+  --sidebar-primary: hsl(30.8, 46.5%, 52.4%);
+  --sidebar-primary-foreground: hsl(30.8, 60%, 10%);
+  --sidebar-accent: hsl(199, 35%, 18%);
+  --sidebar-accent-foreground: hsl(199, 30%, 95%);
+  --sidebar-border: hsl(199, 30%, 24%);
+  --sidebar-ring: hsl(30.8, 46.5%, 52.4%);
+}
+
+/* Peddie Robotics — navy background, gold primary (#0b2240 / #b78b2f) */
+[data-theme="peddie"] {
+  --background: hsl(213.9, 55%, 10%);
+  --foreground: hsl(213.9, 25%, 96%);
+  --card: hsl(213.9, 50%, 14%);
+  --card-foreground: hsl(213.9, 25%, 96%);
+  --popover: hsl(213.9, 50%, 16%);
+  --popover-foreground: hsl(213.9, 25%, 96%);
+  --primary: hsl(40.6, 59.1%, 45.1%);
+  --primary-foreground: hsl(40.6, 60%, 10%);
+  --secondary: hsl(213.9, 42%, 20%);
+  --secondary-foreground: hsl(213.9, 25%, 96%);
+  --muted: hsl(213.9, 42%, 20%);
+  --muted-foreground: hsl(213.9, 20%, 72%);
+  --accent: hsl(213.9, 45%, 26%);
+  --accent-foreground: hsl(213.9, 25%, 96%);
+  --destructive: hsl(0, 84%, 60%);
+  --destructive-foreground: hsl(0, 0%, 98%);
+  --border: hsl(213.9, 35%, 28%);
+  --input: hsl(213.9, 35%, 28%);
+  --ring: hsl(40.6, 59.1%, 45.1%);
+  --chart-1: hsl(40.6, 59.1%, 45.1%);
+  --chart-2: hsl(213.9, 45%, 55%);
+  --chart-3: hsl(40.6, 45%, 65%);
+  --chart-4: hsl(213.9, 30%, 40%);
+  --chart-5: hsl(0, 84%, 60%);
+  --sidebar: hsl(213.9, 55%, 8%);
+  --sidebar-foreground: hsl(213.9, 25%, 96%);
+  --sidebar-primary: hsl(40.6, 59.1%, 45.1%);
+  --sidebar-primary-foreground: hsl(40.6, 60%, 10%);
+  --sidebar-accent: hsl(213.9, 42%, 20%);
+  --sidebar-accent-foreground: hsl(213.9, 25%, 96%);
+  --sidebar-border: hsl(213.9, 35%, 28%);
+  --sidebar-ring: hsl(40.6, 59.1%, 45.1%);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

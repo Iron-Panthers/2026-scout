@@ -821,6 +821,36 @@ export const COSMETICS: CosmeticDefinition[] = [
     rarity: "legendary",
     themeValue: "ben",
   },
+  {
+    id: "theme_greybots",
+    name: "Greybots",
+    description: "very grey",
+    category: "theme",
+    url: "/shop/theme_greybots.png",
+    cost: 100,
+    rarity: "uncommon",
+    themeValue: "greybots",
+  },
+  {
+    id: "theme_space_cookies",
+    name: "Space Cookies",
+    description: "yummers",
+    category: "theme",
+    url: "/shop/theme_space_cookies.png",
+    cost: 250,
+    rarity: "rare",
+    themeValue: "space_cookies",
+  },
+  {
+    id: "theme_peddie",
+    name: "Peddie Robotics",
+    description: "I'm pedding it!!!",
+    category: "theme",
+    url: "/shop/theme_peddie_robotics.png",
+    cost: 100,
+    rarity: "uncommon",
+    themeValue: "peddie",
+  },
 ];
 
 // Dev guard: catch duplicate IDs
