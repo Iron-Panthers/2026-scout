@@ -379,6 +379,7 @@ export default function MatchBetting() {
       // Match row
       const { data: matchData } = await supabase
         .from("matches").select("*").eq("id", match_id).maybeSingle();
+      console.log(cancelled, matchData)
       if (!matchData || cancelled) { setLoading(false); return; }
       const m = matchData as Match;
       if (!cancelled) setMatch(m);
@@ -415,51 +416,53 @@ export default function MatchBetting() {
           ? await getStatboticsMatch(eventCode, m.match_number)
           : getCachedStatboticsMatch(eventCode, m.match_number);
 
-        // Fall back to DB-stored prediction when API and cache both miss
-        if (!sb.result && m.statbotics_red_win_prob != null) {
-          sb = {
-            key: `${eventCode}_qm${m.match_number}`,
-            event: eventCode,
-            match_number: m.match_number,
-            comp_level: "qm",
-            pred: {
-              winner: null,
-              red_win_prob: m.statbotics_red_win_prob,
-              red_score: 0,
-              blue_score: 0,
-            },
-            time: sb?.time,
-            result: results,
-          };
-        }
+        if (sb.result) {
+          // Fall back to DB-stored prediction when API and cache both miss
+          if (!sb.result && m.statbotics_red_win_prob != null) {
+            sb = {
+              key: `${eventCode}_qm${m.match_number}`,
+              event: eventCode,
+              match_number: m.match_number,
+              comp_level: "qm",
+              pred: {
+                winner: null,
+                red_win_prob: m.statbotics_red_win_prob,
+                red_score: 0,
+                blue_score: 0,
+              },
+              time: sb?.time,
+              result: results,
+            };
+          }
 
-        if (sb?.result.winner === null)
-          sb.result = results;
+          if (sb?.result.winner === null)
+            sb.result = results;
 
-        if (sb && !cancelled) setSbMatch(sb);
+          if (sb && !cancelled) setSbMatch(sb);
 
-        const pred_time = sb?.time ?? localStorage.getItem(`pred_time_match_${match_id}`)?.predTime
-        if (!pred_time) {
-          setLoading(true);
-          return;
-        }
-        // Save pred_time to DB + localStorage when Statbotics provides match time
-        if (pred_time && isOnline && !cancelled) {
-          const predTimeIso = new Date(pred_time * 1000).toISOString();
-          try {
-            localStorage.setItem(
-              `pred_time_match_${match_id}`,
-              JSON.stringify({ matchId: match_id, matchNumber: m.match_number, predTime: pred_time, fetchedAt: new Date().toISOString() })
-            );
-          } catch { /* ignore */ }
-          // Only write to DB if the value changed
-          const { data: updatedMatch } = await supabase
-            .from("matches")
-            .update({ pred_time: predTimeIso })
-            .eq("id", match_id)
-            .select()
-            .maybeSingle();
-          if (updatedMatch && !cancelled) setMatch(updatedMatch as Match);
+          const pred_time = sb?.time ?? localStorage.getItem(`pred_time_match_${match_id}`)?.predTime
+          if (!pred_time) {
+            setLoading(true);
+            return;
+          }
+          // Save pred_time to DB + localStorage when Statbotics provides match time
+          if (pred_time && isOnline && !cancelled) {
+            const predTimeIso = new Date(pred_time * 1000).toISOString();
+            try {
+              localStorage.setItem(
+                `pred_time_match_${match_id}`,
+                JSON.stringify({ matchId: match_id, matchNumber: m.match_number, predTime: pred_time, fetchedAt: new Date().toISOString() })
+              );
+            } catch { /* ignore */ }
+            // Only write to DB if the value changed
+            const { data: updatedMatch } = await supabase
+              .from("matches")
+              .update({ pred_time: predTimeIso })
+              .eq("id", match_id)
+              .select()
+              .maybeSingle();
+            if (updatedMatch && !cancelled) setMatch(updatedMatch as Match);
+          }
         }
       }
 
