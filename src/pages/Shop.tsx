@@ -51,7 +51,7 @@ function CosmeticCard({ item, owned, equipped, canAfford, eventName, eventCode, 
   return (
     <Card
       className={`relative overflow-hidden transition-all border pt-0 ${
-        canAfford || owned ? "" : "opacity-70"
+        canAfford || owned ? "" : "opacity-45 grayscale-[60%]"
       }`}
       style={
         {
@@ -703,7 +703,7 @@ function CratesTab({ points, ownedCosmetics, tier, onPrevTier, onNextTier, onOpe
       </Button>
 
       <p className="text-xs text-muted-foreground text-center px-4">
-        Crates give random cosmetics from any rarity. Already-owned items are marked as such.
+        Crates give random cosmetics from any rarity. Duplicates return a 50% refund.
       </p>
 
       {/* Full crate cosmetic catalog */}
@@ -712,7 +712,7 @@ function CratesTab({ points, ownedCosmetics, tier, onPrevTier, onNextTier, onOpe
           <DialogHeader>
             <DialogTitle>All Crate Cosmetics</DialogTitle>
             <DialogDescription>
-              Every cosmetic obtainable from crates — hats and decorations, unowned items first.
+              Every cosmetic obtainable from crates.
             </DialogDescription>
           </DialogHeader>
 
@@ -723,7 +723,8 @@ function CratesTab({ points, ownedCosmetics, tier, onPrevTier, onNextTier, onOpe
                 .sort((a, b) => {
                   const aOwned = ownedCosmetics.includes(a.id);
                   const bOwned = ownedCosmetics.includes(b.id);
-                  return aOwned === bOwned ? 0 : aOwned ? 1 : -1;
+                  if (aOwned !== bOwned) return aOwned ? 1 : -1;
+                  return RARITY_VALUE[a.rarity] - RARITY_VALUE[b.rarity];
                 });
               if (items.length === 0) return null;
               return (
