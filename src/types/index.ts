@@ -4,6 +4,11 @@ export interface Scout {
   name: string;
   initials: string;
   avatar: string;
+  // Whether this scout is on the currently selected event's registered
+  // roster (availableScouts) vs. only found in the full scout list
+  // (allScouts) as a fallback — false surfaces a "Not registered for
+  // Event" warning in the manager's assignment grid.
+  registered?: boolean;
 }
 
 // Profile Type (from Supabase)
@@ -71,7 +76,10 @@ export interface Match {
   blue3_scouter_id_2: string | null;
   qual_blue_scouter_id_2: string | null;
   winning_alliance: "red" | "blue" | "tie" | null;
+  // Deprecated — predictions now come from match13 (see match13_red_win_prob).
+  // Left in place since dropping the column isn't necessary; nothing writes to it anymore.
   statbotics_red_win_prob: number | null;
+  match13_red_win_prob: number | null;
   pred_time: string | null;
   red_score: number | null;
   blue_score: number | null;

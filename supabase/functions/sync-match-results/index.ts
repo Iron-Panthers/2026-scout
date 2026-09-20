@@ -1,7 +1,12 @@
-// Supabase Edge Function: Sync match results from TBA + Statbotics into the matches table.
+// Supabase Edge Function: Sync match results from TBA + predictions from
+// match13 into the matches table.
 //
 // Called from the Betting page on load to ensure winning_alliance is up-to-date
-// before the client renders bet/settle state.
+// before the client renders bet/settle state, and to fetch match13 predictions
+// (match13's API sends no CORS headers and its key must stay server-side, so
+// this is the only place that can call it — the browser reads predictions
+// back from this function's response / the match13_red_win_prob column it
+// writes, never match13 directly).
 //
 // Request body: (none required — operates on the active event automatically)
 //
@@ -9,11 +14,12 @@
 // {
 //   updated: number,           // matches whose winning_alliance was just set
 //   alreadySettled: number,    // matches already had winning_alliance
-//   eventCode: string | null
+//   eventCode: string | null,
+//   predictions: Array<{ matchNumber, redWinProb, redScore, blueScore }>
 // }
 //
 // Deploy: supabase functions deploy sync-match-results --no-verify-jwt
-// Secrets required: TBA_AUTH_KEY
+// Secrets required: TBA_AUTH_KEY, M13_API_KEY
 // (SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set automatically by Supabase)
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -21,6 +27,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const TBA_AUTH_KEY = Deno.env.get("TBA_AUTH_KEY")!;
+const M13_API_KEY = Deno.env.get("M13_API_KEY")!;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -37,28 +44,26 @@ interface TBAMatch {
   key: string;
   comp_level: string;
   match_number: number;
+  /** Unix timestamp (seconds) of the scheduled/predicted match start */
+  predicted_time?: number | null;
   alliances: {
     red: { score: number; team_keys: string[] };
     blue: { score: number; team_keys: string[] };
   };
 }
 
-interface StatboticsMatch {
-  key: string;
-  comp_level: string;
-  match_number: number;
-  /** Unix timestamp (seconds) of predicted match start time */
-  time?: number | null;
-  pred: {
-    red_win_prob: number; // 0–1
-    red_score: number;
-    blue_score: number;
-  } | null;
-  result: {
-    winner: "red" | "blue" | "tie" | null;
-    red_score: number | null;
-    blue_score: number | null;
-  };
+interface Match13EventMatches {
+  eventKey: string;
+  year: number;
+  matches: Array<{
+    key: string;
+    bye?: boolean;
+    pred: {
+      winProb: number; // 0–1, chance red wins
+      redScore: number;
+      blueScore: number;
+    };
+  }>;
 }
 
 // ---------------------------------------------------------------------------
@@ -75,6 +80,12 @@ function tbaWinner(match: TBAMatch): "red" | "blue" | "tie" | null {
   return "tie";
 }
 
+/** Qual match number parsed from a match13/TBA-style key ("2025casj_qm42" -> 42). */
+function qualMatchNumber(key: string): number | null {
+  const m = key.match(/_qm(\d+)$/);
+  return m ? parseInt(m[1], 10) : null;
+}
+
 async function fetchTBA<T>(path: string): Promise<T | null> {
   try {
     const res = await fetch(`https://www.thebluealliance.com/api/v3${path}`, {
@@ -88,14 +99,24 @@ async function fetchTBA<T>(path: string): Promise<T | null> {
   }
 }
 
-async function fetchStatbotics<T>(path: string): Promise<T | null> {
+async function fetchMatch13<T>(path: string): Promise<T | null> {
+  if (!M13_API_KEY) {
+    console.error("M13_API_KEY secret is not set — skipping match13 fetch");
+    return null;
+  }
   try {
-    const res = await fetch(`https://api.statbotics.io/v3${path}`, {
+    const res = await fetch(`https://actions.match13.com${path}`, {
+      headers: { Authorization: `Bearer ${M13_API_KEY}` },
       signal: AbortSignal.timeout(8000),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      console.error(`match13 ${path} -> ${res.status} ${res.statusText}: ${body}`);
+      return null;
+    }
     return (await res.json()) as T;
-  } catch {
+  } catch (err) {
+    console.error(`match13 ${path} threw:`, err);
     return null;
   }
 }
@@ -140,10 +161,10 @@ Deno.serve(async (req) => {
       return json({ updated: 0, alreadySettled: 0, eventCode }, 200);
     }
 
-    // 3. Fetch results from TBA and Statbotics in parallel
-    const [tbaMatches, sbMatches] = await Promise.all([
+    // 3. Fetch results from TBA and predictions from match13 in parallel
+    const [tbaMatches, m13Data] = await Promise.all([
       fetchTBA<TBAMatch[]>(`/event/${eventCode}/matches`),
-      fetchStatbotics<StatboticsMatch[]>(`/event_matches?event=${eventCode}&limit=200`),
+      fetchMatch13<Match13EventMatches>(`/v1/events/${eventCode}/matches`),
     ]);
 
     // Build lookup maps by match_number (qual matches only)
@@ -154,54 +175,63 @@ Deno.serve(async (req) => {
       }
     }
 
-    const sbByNum = new Map<number, StatboticsMatch>();
-    if (sbMatches) {
-      for (const m of sbMatches) {
-        if (m.comp_level === "qm") sbByNum.set(m.match_number, m);
+    const m13ByNum = new Map<number, { redWinProb: number; redScore: number; blueScore: number }>();
+    if (m13Data?.matches) {
+      for (const m of m13Data.matches) {
+        if (m.bye || !m.pred) continue;
+        const num = qualMatchNumber(m.key);
+        if (num == null) continue;
+        m13ByNum.set(num, {
+          redWinProb: m.pred.winProb,
+          redScore: m.pred.redScore,
+          blueScore: m.pred.blueScore,
+        });
       }
     }
 
-    // 4. Update matches: winning_alliance for newly-played matches,
-    //    and statbotics_red_win_prob whenever Statbotics has prediction data.
+    // 4. Update matches: winning_alliance for newly-played matches (TBA is
+    //    authoritative — match13 never reports actual results, only
+    //    forecasts), and match13_red_win_prob whenever match13 has a
+    //    prediction. pred_time also comes from TBA now, since match13's API
+    //    carries no scheduled/predicted match time.
     let updated = 0;
     let alreadySettled = 0;
     let predUpdated = 0;
+    const predictions: Array<{
+      matchNumber: number;
+      redWinProb: number;
+      redScore: number;
+      blueScore: number;
+    }> = [];
 
     for (const dbMatch of dbMatches) {
       const tba = tbaByNum.get(dbMatch.match_number);
-      const sb = sbByNum.get(dbMatch.match_number);
+      const m13 = m13ByNum.get(dbMatch.match_number);
 
       const fieldsToUpdate: Record<string, unknown> = {};
 
-      // Store Statbotics win probability and pred_time whenever available
-      if (sb?.pred && typeof sb.pred.red_win_prob === "number") {
-        fieldsToUpdate.statbotics_red_win_prob = sb.pred.red_win_prob;
+      if (m13) {
+        fieldsToUpdate.match13_red_win_prob = m13.redWinProb;
+        predictions.push({ matchNumber: dbMatch.match_number, ...m13 });
       }
-      if (sb?.time) {
-        fieldsToUpdate.pred_time = new Date(sb.time * 1000).toISOString();
+      if (tba?.predicted_time) {
+        fieldsToUpdate.pred_time = new Date(tba.predicted_time * 1000).toISOString();
       }
 
-      // Save scores once available — prefer TBA (authoritative), fall back to Statbotics
+      // Save scores once available — TBA is the only source of actual results
       if (dbMatch.red_score == null || dbMatch.blue_score == null) {
         const tbaRed = tba?.alliances?.red?.score;
         const tbaBlue = tba?.alliances?.blue?.score;
         if (tbaRed != null && tbaBlue != null && tbaRed >= 0 && tbaBlue >= 0) {
           fieldsToUpdate.red_score = tbaRed;
           fieldsToUpdate.blue_score = tbaBlue;
-        } else if (
-          sb?.result?.red_score != null && sb?.result?.blue_score != null &&
-          sb.result.red_score >= 0 && sb.result.blue_score >= 0
-        ) {
-          fieldsToUpdate.red_score = sb.result.red_score;
-          fieldsToUpdate.blue_score = sb.result.blue_score;
         }
       }
 
       if (dbMatch.winning_alliance) {
         alreadySettled++;
       } else {
-        // TBA is the authoritative source; Statbotics is the fallback
-        const winner = (tba ? tbaWinner(tba) : null) ?? sb?.result?.winner ?? null;
+        const winner = tba ? tbaWinner(tba) : null;
         if (winner) fieldsToUpdate.winning_alliance = winner;
       }
 
@@ -214,11 +244,11 @@ Deno.serve(async (req) => {
 
       if (!updateError) {
         if (fieldsToUpdate.winning_alliance) updated++;
-        if (fieldsToUpdate.statbotics_red_win_prob !== undefined) predUpdated++;
+        if (fieldsToUpdate.match13_red_win_prob !== undefined) predUpdated++;
       }
     }
 
-    return json({ updated, alreadySettled, predUpdated, eventCode }, 200);
+    return json({ updated, alreadySettled, predUpdated, eventCode, predictions }, 200);
   } catch (err: any) {
     console.error("sync-match-results error:", err);
     return json({ error: err.message }, 500);

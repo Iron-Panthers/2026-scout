@@ -18,7 +18,7 @@ interface MatchRowProps {
   roles: Role[];
   onOpenDialog: (matchNumber: number, role: Role, slot?: 1 | 2) => void;
   onClearAssignment: (matchNumber: number, role: Role, slot?: 1 | 2) => void;
-  completedSubmissions: Set<string>;
+  completedSubmissions: Set<string>; // Set of "matchId:role:scouterId" — per-scouter, not per-role
   actualScouters: Map<string, string>; // Map of "matchId:role" -> scouter_id
   availableScouts: Profile[]; // All profiles to look up names
   cosmeticsMap?: Record<string, Record<string, string>>; // userId -> equipped cosmetics
@@ -57,9 +57,20 @@ export const MatchRow = memo(
           Q-{match.matchNumber}
         </TableCell>
         {roles.map((role) => {
-          const isCompleted =
-            match.matchId &&
-            completedSubmissions.has(`${match.matchId}:${role}`);
+          const assignment1 = match.assignments[role];
+          const assignment2 = match.assignments2?.[role];
+
+          // Each slot's checkmark reflects only that specific scouter's own
+          // submission, so one scout completing their part doesn't also mark
+          // the other (primary vs. co-scout) as done.
+          const isCompleted1 = !!(
+            match.matchId && assignment1 &&
+            completedSubmissions.has(`${match.matchId}:${role}:${assignment1.id}`)
+          );
+          const isCompleted2 = !!(
+            match.matchId && assignment2 &&
+            completedSubmissions.has(`${match.matchId}:${role}:${assignment2.id}`)
+          );
 
           // Get actual scouter if submission exists
           const actualScouterId = match.matchId
@@ -69,13 +80,21 @@ export const MatchRow = memo(
             ? availableScouts.find((s) => s.id === actualScouterId)
             : null;
 
-          const cellColorClass = isCompleted
-            ? "bg-green-900/30"
-            : getRoleCellColor(role);
+          // Green once every scouter assigned to this role has submitted,
+          // yellow if only some of them have (e.g. the primary but not the
+          // co-scout yet), and the normal alliance color if none have.
+          const assignedCount = (assignment1 ? 1 : 0) + (assignment2 ? 1 : 0);
+          const completedCount = (isCompleted1 ? 1 : 0) + (isCompleted2 ? 1 : 0);
+          const cellColorClass =
+            assignedCount > 0 && completedCount === assignedCount
+              ? "bg-green-900/30"
+              : completedCount > 0
+              ? "bg-yellow-900/30"
+              : getRoleCellColor(role);
 
           const renderSlot = (slot: 1 | 2) => {
-            const assignment =
-              slot === 2 ? match.assignments2?.[role] : match.assignments[role];
+            const assignment = slot === 2 ? assignment2 : assignment1;
+            const isCompleted = slot === 2 ? isCompleted2 : isCompleted1;
             const isDifferentScouter =
               slot === 1 && actualScouter && assignment && actualScouter.id !== assignment.id;
 
@@ -95,7 +114,7 @@ export const MatchRow = memo(
                   <span className="text-[9px] leading-tight md:text-[11px] font-medium text-center truncate w-full">
                     {assignment.name}
                   </span>
-                  {slot === 1 && isCompleted && !isDifferentScouter && (
+                  {isCompleted && !isDifferentScouter && (
                     <Check className="h-3 w-3 text-green-400" />
                   )}
                   {isDifferentScouter && actualScouter && (

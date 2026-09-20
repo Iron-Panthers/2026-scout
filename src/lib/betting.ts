@@ -105,18 +105,18 @@ export function computeOddsFromBets(bets: Bet[]): MatchOdds {
 }
 
 // ---------------------------------------------------------------------------
-// Blended display odds (bet pool + Statbotics)
+// Blended display odds (bet pool + match13 prediction)
 // ---------------------------------------------------------------------------
 
 /**
- * Blend bet-based red% with Statbotics predicted red win probability.
+ * Blend bet-based red% with match13's predicted red win probability.
  *
- * Uses a pool-weighted formula so Statbotics dominates when few bets have
+ * Uses a pool-weighted formula so match13 dominates when few bets have
  * been placed and smoothly shifts toward pure bet-based odds as the pool grows.
  *
  *   betWeight = pool / (pool + ALPHA)
  *
- * At pool = 0   → 100% Statbotics
+ * At pool = 0   → 100% match13
  * At pool = ALPHA → 50 / 50 blend
  * At pool → ∞   → 100% bet-based
  */
@@ -124,11 +124,11 @@ const BLEND_ALPHA = 50; // pts of pool = 50 / 50 crossover
 
 export function blendOddsRedPct(
   betRedPct: number,
-  sbRedWinProb: number, // 0–1
+  redWinProb: number, // 0–1
   totalPool: number
 ): number {
   const betWeight = totalPool / (totalPool + BLEND_ALPHA);
-  return betWeight * betRedPct + (1 - betWeight) * sbRedWinProb * 100;
+  return betWeight * betRedPct + (1 - betWeight) * redWinProb * 100;
 }
 
 // ---------------------------------------------------------------------------
@@ -167,7 +167,7 @@ export function computeTimeDecayFactor(
 // Probability-adjusted payout formula
 // ---------------------------------------------------------------------------
 /**
- * Calculates the payout multiplier given Statbotics win probability.
+ * Calculates the payout multiplier given the predicted win probability.
  *
  * Formula: effectiveMultiplier = min(fairMultiplier, maxMultiplier)
  *   - fairMultiplier = 1/p_winner  (e.g. 80% fav → 1.25×, 20% underdog → 5×)
@@ -184,7 +184,7 @@ export function calcPayout(
   amount: number,
   winnerPool: number,
   totalPool: number,
-  winnerPredictedProb: number,  // Statbotics predicted prob for the winning side
+  winnerPredictedProb: number,  // match13 predicted prob for the winning side
   timeDecayFactor: number = 1.0
 ): number {
   if (amount <= 0 || winnerPool <= 0) return amount; // refund edge case
@@ -201,14 +201,14 @@ export function calcPayout(
  * Estimated payout if the user places `amount` on `alliance` right now.
  * Uses the same probability-adjusted formula as settlement, including time decay.
  *
- * @param statboticsRedWinProb - Statbotics prediction (for red). Pass undefined for 50/50.
+ * @param redWinProb - match13's prediction (for red). Pass undefined for 50/50.
  * @param predTime - ISO string of predicted match start. Used to compute time decay.
  */
 export function estimatePayout(
   amount: number,
   alliance: BetAlliance,
   odds: MatchOdds,
-  statboticsRedWinProb?: number,
+  redWinProb?: number,
   predTime?: string | null
 ): number {
   if (amount <= 0) return 0;
@@ -219,10 +219,10 @@ export function estimatePayout(
 
   // p for the alliance they're betting on
   const p =
-    statboticsRedWinProb !== undefined
+    redWinProb !== undefined
       ? alliance === "red"
-        ? statboticsRedWinProb
-        : 1 - statboticsRedWinProb
+        ? redWinProb
+        : 1 - redWinProb
       : 0.5;
 
   const timeDecayFactor = predTime

@@ -14,12 +14,12 @@ import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { getActiveEvent } from "@/lib/matches";
 import { getGameProfile } from "@/lib/gameProfiles";
 import { getBulkMatchOdds, getUserBets, blendOddsRedPct } from "@/lib/betting";
-import { getStatboticsEventMatches, getMatchLabel, wasUpset } from "@/lib/statbotics";
+import { getMatchLabel, wasUpset } from "@/lib/match13";
 import { getEventMatches, getMatchScores, getMatchTeam } from "@/lib/blueAlliance";
 import { supabase } from "@/lib/supabase";
 import type { Match, Event } from "@/types";
 import type { MatchOdds, BetWithMatch } from "@/types/betting";
-import type { StatboticsMatch } from "@/lib/statbotics";
+import type { Match13Match } from "@/lib/match13";
 import { useRandomSubtitle } from "@/hooks/useRandomSubtitle";
 import { BETTING_SUBTITLES } from "@/config/headerSubtitles";
 
@@ -77,13 +77,13 @@ function useTimeRemaining(predTime: string | null | undefined): number | null {
 // ---------------------------------------------------------------------------
 function matchInterestScore(
   match: Match,
-  sb?: StatboticsMatch,
+  m13?: Match13Match,
   odds?: MatchOdds,
   hasBet?: boolean
 ): number {
   let score = 0;
-  if (sb) {
-    const pMax = Math.max(sb.pred.red_win_prob, 1 - sb.pred.red_win_prob);
+  if (m13) {
+    const pMax = Math.max(m13.pred.red_win_prob, 1 - m13.pred.red_win_prob);
     if (pMax < 0.57) score += 100;   // coin flip — most interesting
     else if (pMax > 0.85) score += 70; // dominant — also dramatic
     else if (pMax > 0.70) score += 40; // heavy favorite
@@ -102,14 +102,14 @@ interface MarketCardProps {
   match: Match;
   odds?: MatchOdds;
   tba?: TBAMatchData;
-  sb?: StatboticsMatch;
+  m13?: Match13Match;
   userBetAlliance?: "red" | "blue";
   tbaLoading?: boolean;
-  sbLoading?: boolean;
+  m13Loading?: boolean;
   onClick: () => void;
 }
 
-function SpotlightCard({ match, odds, tba, sb, userBetAlliance, tbaLoading, sbLoading, onClick }: MarketCardProps) {
+function SpotlightCard({ match, odds, tba, m13, userBetAlliance, tbaLoading, m13Loading, onClick }: MarketCardProps) {
   const effectivePredTime = match.pred_time
     ?? (tba?.predicted_time ? new Date(tba.predicted_time * 1000).toISOString() : null);
   const bettingClosed = !!effectivePredTime && Date.now() >= new Date(effectivePredTime).getTime();
@@ -117,19 +117,19 @@ function SpotlightCard({ match, odds, tba, sb, userBetAlliance, tbaLoading, sbLo
   const showCountdown = !bettingClosed && secondsLeft !== null && secondsLeft < 15 * 60;
 
   const rawRedPct = odds?.redPct ?? 50;
-  const redPct = sb
-    ? blendOddsRedPct(rawRedPct, sb.pred.red_win_prob, odds?.totalPool ?? 0)
+  const redPct = m13
+    ? blendOddsRedPct(rawRedPct, m13.pred.red_win_prob, odds?.totalPool ?? 0)
     : rawRedPct;
   const bluePct = 100 - redPct;
 
-  const { label: matchLabel, flavor } = sb
-    ? getMatchLabel(sb.pred.red_win_prob)
+  const { label: matchLabel, flavor } = m13
+    ? getMatchLabel(m13.pred.red_win_prob)
     : { label: "Match", flavor: "slight" as const };
 
-  const sbRedPct = sb ? sb.pred.red_win_prob * 100 : null;
+  const m13RedPct = m13 ? m13.pred.red_win_prob * 100 : null;
   const betFavour = redPct > 50 ? "red" : "blue";
-  const sbFavour = sbRedPct !== null ? (sbRedPct > 50 ? "red" : "blue") : null;
-  const isUpsetAlert = sbFavour !== null && betFavour !== sbFavour;
+  const m13Favour = m13RedPct !== null ? (m13RedPct > 50 ? "red" : "blue") : null;
+  const isUpsetAlert = m13Favour !== null && betFavour !== m13Favour;
 
   const borderGlow =
     flavor === "coinflip" ? "border-yellow-500/50 shadow-yellow-500/5" :
@@ -157,7 +157,7 @@ function SpotlightCard({ match, odds, tba, sb, userBetAlliance, tbaLoading, sbLo
           <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-primary/10 text-primary border-primary/30 animate-pulse">
             ★ Featured
           </Badge>
-          {sb && (
+          {m13 && (
             <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${flavorBadgeClass}`}>
               {matchLabel}
             </Badge>
@@ -232,20 +232,20 @@ function SpotlightCard({ match, odds, tba, sb, userBetAlliance, tbaLoading, sbLo
         </div>
       </div>
 
-      {/* Statbotics thin bar */}
-      {sbRedPct !== null ? (
+      {/* match13 thin bar */}
+      {m13RedPct !== null ? (
         <>
           <div className="flex h-1.5 rounded overflow-hidden mt-2">
-            <div className="bg-red-500/40 transition-all" style={{ width: `${sbRedPct}%` }} />
-            <div className="bg-blue-500/40 transition-all" style={{ width: `${100 - sbRedPct}%` }} />
+            <div className="bg-red-500/40 transition-all" style={{ width: `${m13RedPct}%` }} />
+            <div className="bg-blue-500/40 transition-all" style={{ width: `${100 - m13RedPct}%` }} />
           </div>
           <div className="flex justify-between text-[10px] text-muted-foreground/50 mt-0.5">
-            <span>Statbotics {sbRedPct.toFixed(1)}%</span>
-            {sb && <span>Pred. {Math.round(sb.pred.red_score)}–{Math.round(sb.pred.blue_score)}</span>}
-            <span>{(100 - sbRedPct).toFixed(1)}%</span>
+            <span>match13 {m13RedPct.toFixed(1)}%</span>
+            {m13 && <span>Pred. {Math.round(m13.pred.red_score)}–{Math.round(m13.pred.blue_score)}</span>}
+            <span>{(100 - m13RedPct).toFixed(1)}%</span>
           </div>
         </>
-      ) : sbLoading ? (
+      ) : m13Loading ? (
         <div className="h-1.5 rounded bg-muted/40 animate-pulse mt-2" />
       ) : null}
     </div>
@@ -255,7 +255,7 @@ function SpotlightCard({ match, odds, tba, sb, userBetAlliance, tbaLoading, sbLo
 // ---------------------------------------------------------------------------
 // Grid card — compact, lives in the 2-col grid below the spotlight
 // ---------------------------------------------------------------------------
-function GridCard({ match, odds, tba, sb, userBetAlliance, tbaLoading, sbLoading, onClick }: MarketCardProps) {
+function GridCard({ match, odds, tba, m13, userBetAlliance, tbaLoading, m13Loading, onClick }: MarketCardProps) {
   const effectivePredTime = match.pred_time
     ?? (tba?.predicted_time ? new Date(tba.predicted_time * 1000).toISOString() : null);
   const bettingClosed = !!effectivePredTime && Date.now() >= new Date(effectivePredTime).getTime();
@@ -263,13 +263,13 @@ function GridCard({ match, odds, tba, sb, userBetAlliance, tbaLoading, sbLoading
   const showCountdown = !bettingClosed && secondsLeft !== null && secondsLeft < 15 * 60;
 
   const rawRedPct = odds?.redPct ?? 50;
-  const redPct = sb
-    ? blendOddsRedPct(rawRedPct, sb.pred.red_win_prob, odds?.totalPool ?? 0)
+  const redPct = m13
+    ? blendOddsRedPct(rawRedPct, m13.pred.red_win_prob, odds?.totalPool ?? 0)
     : rawRedPct;
   const bluePct = 100 - redPct;
 
-  const { flavor } = sb
-    ? getMatchLabel(sb.pred.red_win_prob)
+  const { flavor } = m13
+    ? getMatchLabel(m13.pred.red_win_prob)
     : { flavor: "slight" as const };
 
   const borderClass = bettingClosed ? "border-red-800/50 opacity-70" :
@@ -333,13 +333,13 @@ function GridCard({ match, odds, tba, sb, userBetAlliance, tbaLoading, sbLoading
 
       <div className="flex items-center justify-between text-[10px] text-muted-foreground/60">
         <span>
-          {sb ? (
+          {m13 ? (
             <>
               {flavor === "coinflip" && <span className="text-yellow-400">Coin Flip</span>}
               {flavor === "dominant" && <span className="text-pink-400">Dominant</span>}
               {flavor === "heavy"    && <span className="text-purple-400">Heavy Fav.</span>}
             </>
-          ) : sbLoading ? (
+          ) : m13Loading ? (
             <div className="h-2 w-12 rounded bg-muted/60 animate-pulse" />
           ) : null}
         </span>
@@ -356,14 +356,14 @@ interface MarketGridProps {
   openMatches: Match[];
   oddsMap: Map<string, MatchOdds>;
   tbaMap: Map<number, TBAMatchData>;
-  sbMap: Map<number, StatboticsMatch>;
+  m13Map: Map<number, Match13Match>;
   myBetByMatch: Map<string, BetWithMatch>;
   tbaLoading: boolean;
-  sbLoading: boolean;
+  m13Loading: boolean;
   navigate: (path: string) => void;
 }
 
-function MarketGrid({ openMatches, oddsMap, tbaMap, sbMap, myBetByMatch, tbaLoading, sbLoading, navigate }: MarketGridProps) {
+function MarketGrid({ openMatches, oddsMap, tbaMap, m13Map, myBetByMatch, tbaLoading, m13Loading, navigate }: MarketGridProps) {
   const [spotlightIndex, setSpotlightIndex] = useState(0);
   const [fading, setFading] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -372,7 +372,7 @@ function MarketGrid({ openMatches, oddsMap, tbaMap, sbMap, myBetByMatch, tbaLoad
   const ordered = [...openMatches]
     .map((m) => ({
       m,
-      score: matchInterestScore(m, sbMap.get(m.match_number), oddsMap.get(m.id), !!myBetByMatch.get(m.id)),
+      score: matchInterestScore(m, m13Map.get(m.match_number), oddsMap.get(m.id), !!myBetByMatch.get(m.id)),
     }))
     .sort((a, b) => b.score - a.score)
     .map((s) => s.m);
@@ -454,10 +454,10 @@ function MarketGrid({ openMatches, oddsMap, tbaMap, sbMap, myBetByMatch, tbaLoad
           match={spotlight}
           odds={oddsMap.get(spotlight.id)}
           tba={tbaMap.get(spotlight.match_number)}
-          sb={sbMap.get(spotlight.match_number)}
+          m13={m13Map.get(spotlight.match_number)}
           userBetAlliance={myBetByMatch.get(spotlight.id)?.alliance as "red" | "blue" | undefined}
           tbaLoading={tbaLoading && !tbaMap.get(spotlight.match_number)}
-          sbLoading={sbLoading && !sbMap.get(spotlight.match_number)}
+          m13Loading={m13Loading && !m13Map.get(spotlight.match_number)}
           onClick={() => navigate(`/betting/${spotlight.id}`)}
         />
       </div>
@@ -500,10 +500,10 @@ function MarketGrid({ openMatches, oddsMap, tbaMap, sbMap, myBetByMatch, tbaLoad
               match={match}
               odds={oddsMap.get(match.id)}
               tba={tbaMap.get(match.match_number)}
-              sb={sbMap.get(match.match_number)}
+              m13={m13Map.get(match.match_number)}
               userBetAlliance={myBetByMatch.get(match.id)?.alliance as "red" | "blue" | undefined}
               tbaLoading={tbaLoading && !tbaMap.get(match.match_number)}
-              sbLoading={sbLoading && !sbMap.get(match.match_number)}
+              m13Loading={m13Loading && !m13Map.get(match.match_number)}
               onClick={() => navigate(`/betting/${match.id}`)}
             />
           ))}
@@ -520,20 +520,20 @@ interface OpenMatchCardProps {
   match: Match;
   odds?: MatchOdds;
   tba?: TBAMatchData;
-  sb?: StatboticsMatch;
+  m13?: Match13Match;
   userBetAlliance?: "red" | "blue";
   onClick: () => void;
 }
 
-function OpenMatchCard({ match, odds, tba, sb, userBetAlliance, onClick }: OpenMatchCardProps) {
+function OpenMatchCard({ match, odds, tba, m13, userBetAlliance, onClick }: OpenMatchCardProps) {
   const rawRedPct = odds?.redPct ?? 50;
-  const redPct = sb
-    ? blendOddsRedPct(rawRedPct, sb.pred.red_win_prob, odds?.totalPool ?? 0)
+  const redPct = m13
+    ? blendOddsRedPct(rawRedPct, m13.pred.red_win_prob, odds?.totalPool ?? 0)
     : rawRedPct;
-  const sbRedPct = sb ? sb.pred.red_win_prob * 100 : null;
+  const m13RedPct = m13 ? m13.pred.red_win_prob * 100 : null;
 
-  const { label: matchLabel, flavor } = sb
-    ? getMatchLabel(sb.pred.red_win_prob)
+  const { label: matchLabel, flavor } = m13
+    ? getMatchLabel(m13.pred.red_win_prob)
     : { label: "Unknown", flavor: "slight" as const };
 
   const flavorBorder: Record<string, string> = {
@@ -550,8 +550,8 @@ function OpenMatchCard({ match, odds, tba, sb, userBetAlliance, onClick }: OpenM
   };
 
   const betFavour = redPct > 50 ? "red" : "blue";
-  const sbFavour = sbRedPct !== null ? (sbRedPct > 50 ? "red" : "blue") : null;
-  const isUpsetAlert = sbFavour !== null && betFavour !== sbFavour;
+  const m13Favour = m13RedPct !== null ? (m13RedPct > 50 ? "red" : "blue") : null;
+  const isUpsetAlert = m13Favour !== null && betFavour !== m13Favour;
 
   return (
     <Card
@@ -562,7 +562,7 @@ function OpenMatchCard({ match, odds, tba, sb, userBetAlliance, onClick }: OpenM
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-bold text-base">{match.name}</span>
-            {sb && (
+            {m13 && (
               <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${flavorBadge[flavor]}`}>
                 {matchLabel}
               </Badge>
@@ -605,18 +605,18 @@ function OpenMatchCard({ match, odds, tba, sb, userBetAlliance, onClick }: OpenM
           <span className="text-blue-400 font-medium">Blue {Math.round(100 - redPct)}%</span>
         </div>
 
-        {sbRedPct !== null && (
+        {m13RedPct !== null && (
           <>
             <div className="flex h-1.5 rounded overflow-hidden">
-              <div className="bg-red-500/50 transition-all" style={{ width: `${sbRedPct}%` }} />
-              <div className="bg-blue-500/50 transition-all" style={{ width: `${100 - sbRedPct}%` }} />
+              <div className="bg-red-500/50 transition-all" style={{ width: `${m13RedPct}%` }} />
+              <div className="bg-blue-500/50 transition-all" style={{ width: `${100 - m13RedPct}%` }} />
             </div>
             <div className="flex justify-between text-[10px] text-muted-foreground/60 -mt-1">
-              <span>Statbotics: Red {sbRedPct.toFixed(1)}%</span>
-              {sb && (
-                <span>Pred. {Math.round(sb.pred.red_score)} – {Math.round(sb.pred.blue_score)}</span>
+              <span>match13: Red {m13RedPct.toFixed(1)}%</span>
+              {m13 && (
+                <span>Pred. {Math.round(m13.pred.red_score)} – {Math.round(m13.pred.blue_score)}</span>
               )}
-              <span>Blue {(100 - sbRedPct).toFixed(1)}%</span>
+              <span>Blue {(100 - m13RedPct).toFixed(1)}%</span>
             </div>
           </>
         )}
@@ -632,20 +632,21 @@ interface CompletedMatchCardProps {
   match: Match;
   odds?: MatchOdds;
   tba?: TBAMatchData;
-  sb?: StatboticsMatch;
+  m13?: Match13Match;
   userBet?: BetWithMatch;
   onClick: () => void;
 }
 
-function CompletedMatchCard({ match, odds, tba, sb, userBet, onClick }: CompletedMatchCardProps) {
-  const winner = (match.winning_alliance ?? sb?.result?.winner) as "red" | "blue" | "tie" | null | undefined;
-  const sbRed = sb?.result?.red_score;
-  const sbBlue = sb?.result?.blue_score;
-  // Prefer Statbotics scores when valid (>= 0), fall back to DB-cached scores
-  const red = (sbRed != null && sbRed >= 0) ? sbRed : (match.red_score ?? null);
-  const blue = (sbBlue != null && sbBlue >= 0) ? sbBlue : (match.blue_score ?? null);
-  const isUpset = sb && winner && winner !== "tie"
-    ? wasUpset(winner, sb.pred.red_win_prob) : false;
+function CompletedMatchCard({ match, odds, tba, m13, userBet, onClick }: CompletedMatchCardProps) {
+  const winner = (match.winning_alliance ?? m13?.result?.winner) as "red" | "blue" | "tie" | null | undefined;
+  // match13 only forecasts — it has no actual result, so `m13.result` here is
+  // always just a copy of the DB-persisted (TBA-sourced) score/winner.
+  const m13Red = m13?.result?.red_score;
+  const m13Blue = m13?.result?.blue_score;
+  const red = (m13Red != null && m13Red >= 0) ? m13Red : (match.red_score ?? null);
+  const blue = (m13Blue != null && m13Blue >= 0) ? m13Blue : (match.blue_score ?? null);
+  const isUpset = m13 && winner && winner !== "tie"
+    ? wasUpset(winner, m13.pred.red_win_prob) : false;
 
   const winnerBorder = winner === "red" ? "border-red-700/40 bg-red-900/5"
     : winner === "blue" ? "border-blue-700/40 bg-blue-900/5"
@@ -821,24 +822,17 @@ export default function Betting({
   const [matches, setMatches] = useState<Match[]>([]);
   const [oddsMap, setOddsMap] = useState<Map<string, MatchOdds>>(new Map());
   const [tbaMap, setTbaMap] = useState<Map<number, TBAMatchData>>(new Map());
-  const [sbMap, setSbMap] = useState<Map<number, StatboticsMatch>>(new Map());
+  const [m13Map, setM13Map] = useState<Map<number, Match13Match>>(new Map());
   const [myBets, setMyBets] = useState<BetWithMatch[]>([]);
   const [points, setPoints] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [tbaLoading, setTbaLoading] = useState(false);
-  const [sbLoading, setSbLoading] = useState(false);
-  const [showSBloading, setShowSBLoading] = useState(false);
+  const [m13Loading, setM13Loading] = useState(false);
+  const [showM13Loading, setShowM13Loading] = useState(false);
 
   const load = useCallback(async () => {
     if (!user?.id) return;
-
-    // Fire sync in the background — don't block rendering on it
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      supabase.functions.invoke("sync-match-results", {
-        headers: session ? { Authorization: `Bearer ${session.access_token}` } : undefined,
-      }).catch(() => {});
-    });
 
     const [activeEvent, gameProfile, userBets] = await Promise.all([
       getActiveEvent(),
@@ -864,11 +858,11 @@ export default function Betting({
     const ids = rows.map((m) => m.id);
     const code = activeEvent.event_code;
 
-    // Seed sbMap from DB-stored predictions immediately — API will update in background
+    // Seed m13Map from DB-stored predictions immediately — API will update in background
     if (code) {
-      const dbMap = new Map<number, StatboticsMatch>();
+      const dbMap = new Map<number, Match13Match>();
       for (const m of rows) {
-        if (m.statbotics_red_win_prob != null) {
+        if (m.match13_red_win_prob != null) {
           dbMap.set(m.match_number, {
             key: `${code}_qm${m.match_number}`,
             event: code,
@@ -876,31 +870,31 @@ export default function Betting({
             comp_level: "qm",
             pred: {
               winner: null,
-              red_win_prob: m.statbotics_red_win_prob,
+              red_win_prob: m.match13_red_win_prob,
               red_score: 0,
               blue_score: 0,
             },
-            result: { winner: m.winning_alliance ?? null, red_score: m.red_score ?? null, blue_score: m.blue_score ?? null, red_auto_points: null, blue_auto_points: null },
+            result: { winner: m.winning_alliance ?? null, red_score: m.red_score ?? null, blue_score: m.blue_score ?? null },
           });
         }
       }
-      if (dbMap.size > 0) setSbMap(dbMap);
+      if (dbMap.size > 0) setM13Map(dbMap);
     }
 
-    // Show the UI immediately — TBA/SB/odds load in the background
+    // Show the UI immediately — TBA/match13/odds load in the background
     setLoading(false);
 
-    // Odds, TBA, and Statbotics all load in parallel without blocking render
+    // Odds, TBA, and match13 all load in parallel without blocking render
     getBulkMatchOdds(ids).then((odds) => setOddsMap(odds)).catch(() => {});
 
     setTimeout(() => {
-      if (sbLoading)
-        setShowSBLoading(true);
+      if (m13Loading)
+        setShowM13Loading(true);
     }, 5000)
 
     if (code) {
       setTbaLoading(true);
-      setSbLoading(true);
+      setM13Loading(true);
 
       getEventMatches(code).then((tba) => {
         if (tba) {
@@ -913,34 +907,57 @@ export default function Betting({
         setTbaLoading(false);
       }).catch(() => setTbaLoading(false));
 
-      getStatboticsEventMatches(code).then((sb) => {
-        const map = new Map<number, StatboticsMatch>();
-        if (sb && sb.length > 0) {
-          sb.forEach((m) => {
-            if (m.key?.includes("_qm")) map.set(m.match_number, m);
-          });
-        }
-        // Fill in any gaps from DB predictions
-        for (const m of rows) {
-          if (!map.has(m.match_number) && m.statbotics_red_win_prob != null) {
-            map.set(m.match_number, {
-              key: `${code}_qm${m.match_number}`,
+      // match13 sends no CORS headers and its key must stay off the client,
+      // so predictions come from sync-match-results — which calls match13
+      // directly, server-side — instead of a direct browser fetch.
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        supabase.functions.invoke("sync-match-results", {
+          headers: session ? { Authorization: `Bearer ${session.access_token}` } : undefined,
+        }).then(({ data }) => {
+          const predictions = (data?.predictions ?? []) as Array<{
+            matchNumber: number;
+            redWinProb: number;
+            redScore: number;
+            blueScore: number;
+          }>;
+          const map = new Map<number, Match13Match>();
+          predictions.forEach((p) => {
+            map.set(p.matchNumber, {
+              key: `${code}_qm${p.matchNumber}`,
               event: code,
-              match_number: m.match_number,
+              match_number: p.matchNumber,
               comp_level: "qm",
               pred: {
                 winner: null,
-                red_win_prob: m.statbotics_red_win_prob,
-                red_score: 0,
-                blue_score: 0,
+                red_win_prob: p.redWinProb,
+                red_score: p.redScore,
+                blue_score: p.blueScore,
               },
-              result: { winner: m.winning_alliance ?? null, red_score: m.red_score ?? null, blue_score: m.blue_score ?? null, red_auto_points: null, blue_auto_points: null },
+              result: { winner: null, red_score: null, blue_score: null },
             });
+          });
+          // Fill in any gaps from DB predictions (e.g. sync failed/rate-limited)
+          for (const m of rows) {
+            if (!map.has(m.match_number) && m.match13_red_win_prob != null) {
+              map.set(m.match_number, {
+                key: `${code}_qm${m.match_number}`,
+                event: code,
+                match_number: m.match_number,
+                comp_level: "qm",
+                pred: {
+                  winner: null,
+                  red_win_prob: m.match13_red_win_prob,
+                  red_score: 0,
+                  blue_score: 0,
+                },
+                result: { winner: m.winning_alliance ?? null, red_score: m.red_score ?? null, blue_score: m.blue_score ?? null },
+              });
+            }
           }
-        }
-        if (map.size > 0) setSbMap(map);
-        setSbLoading(false);
-      }).catch(() => setSbLoading(false));
+          if (map.size > 0) setM13Map(map);
+          setM13Loading(false);
+        }).catch(() => setM13Loading(false));
+      });
     }
   }, [user?.id]);
 
@@ -969,12 +986,12 @@ export default function Betting({
     return m;
   }).filter((m) => {
     if (m.winning_alliance) return true;
-    return !!sbMap.get(m.match_number)?.result?.winner;
+    return !!m13Map.get(m.match_number)?.result?.winner;
   });
 
   const openMatches = matches.filter((m) => {
     if (m.winning_alliance) return false;
-    return !sbMap.get(m.match_number)?.result?.winner;
+    return !m13Map.get(m.match_number)?.result?.winner;
   });
 
   const myBetByMatch = new Map<string, BetWithMatch>();
@@ -996,9 +1013,9 @@ export default function Betting({
   return (
     <div className={embedded ? undefined : "min-h-screen bg-background my-5"}>
       <main className="container mx-auto p-4 pb-10">
-        { showSBloading && (
+        { showM13Loading && (
           <div className="p-3 bg-yellow-900/20 border border-yellow-700/40 rounded-lg mb-5">
-            <p className="text-sm text-yellow-400">Statbotics data is unable to be retrieved... Please connect to internet.</p>
+            <p className="text-sm text-yellow-400">match13 data is unable to be retrieved... Please connect to internet.</p>
           </div>
         )}
         {/* Header */}
@@ -1101,10 +1118,10 @@ export default function Betting({
                 openMatches={openMatches}
                 oddsMap={oddsMap}
                 tbaMap={tbaMap}
-                sbMap={sbMap}
+                m13Map={m13Map}
                 myBetByMatch={myBetByMatch}
                 tbaLoading={tbaLoading}
-                sbLoading={sbLoading}
+                m13Loading={m13Loading}
                 navigate={navigate}
               />
             </TabsContent>
@@ -1120,10 +1137,10 @@ export default function Betting({
 
               {completedMatches.length > 0 && (() => {
                 const upsets = completedMatches.filter((m) => {
-                  const sb = sbMap.get(m.match_number);
-                  const winner = m.winning_alliance ?? sb?.result?.winner;
-                  return sb && winner && winner !== "tie" &&
-                    wasUpset(winner as "red" | "blue", sb.pred.red_win_prob);
+                  const m13 = m13Map.get(m.match_number);
+                  const winner = m.winning_alliance ?? m13?.result?.winner;
+                  return m13 && winner && winner !== "tie" &&
+                    wasUpset(winner as "red" | "blue", m13.pred.red_win_prob);
                 });
                 const normal = completedMatches.sort((a,b) => b.match_number - a.match_number);
 
@@ -1141,7 +1158,7 @@ export default function Betting({
                         {normal.map((match) => (
                           <CompletedMatchCard key={match.id} match={match}
                             odds={oddsMap.get(match.id)} tba={tbaMap.get(match.match_number)}
-                            sb={sbMap.get(match.match_number)} userBet={myBetByMatch.get(match.id)}
+                            m13={m13Map.get(match.match_number)} userBet={myBetByMatch.get(match.id)}
                             onClick={() => navigate(`/betting/${match.id}`)} />
                         ))}
                       </>
@@ -1160,7 +1177,7 @@ export default function Betting({
                 </div>
               )}
               {myBets.map((bet) => {
-                const sb = bet.match?.match_number ? sbMap.get(bet.match.match_number) : undefined;
+                const m13 = bet.match?.match_number ? m13Map.get(bet.match.match_number) : undefined;
                 return (
                   <Card key={bet.id}
                     className="cursor-pointer hover:bg-muted/30 transition-colors"
@@ -1176,11 +1193,11 @@ export default function Betting({
                             {bet.alliance.toUpperCase()}
                           </span>
                           <span className="text-xs text-muted-foreground">{bet.amount} pts</span>
-                          {sb && (
+                          {m13 && (
                             <span className="text-[10px] text-muted-foreground/60">
                               ({bet.alliance === "red"
-                                ? (sb.pred.red_win_prob * 100).toFixed(0)
-                                : ((1 - sb.pred.red_win_prob) * 100).toFixed(0)}% predicted)
+                                ? (m13.pred.red_win_prob * 100).toFixed(0)
+                                : ((1 - m13.pred.red_win_prob) * 100).toFixed(0)}% predicted)
                             </span>
                           )}
                         </div>

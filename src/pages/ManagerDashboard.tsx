@@ -192,6 +192,7 @@ export default function ManagerDashboard() {
                 .toUpperCase()
                 .slice(0, 2),
               avatar: profile.avatar_url || "",
+              registered: true,
             };
           }
           else if (backupProfile) {
@@ -204,6 +205,7 @@ export default function ManagerDashboard() {
                 .join("")
                 .toUpperCase()
                 .slice(0, 2),
+              registered: false,
               avatar: backupProfile.avatar_url || "",
             };
           }
@@ -388,13 +390,16 @@ export default function ManagerDashboard() {
       if (error) throw error;
       if (qualError) throw qualError;
 
-      // Create Set of "matchId:role" strings for quick lookup
+      // Keyed by "matchId:role:scouterId" (not just "matchId:role") so that
+      // when a role has two scouts (primary + co-scout), each one's
+      // completion checkmark reflects only their own submission — one
+      // scout submitting doesn't mark the other's checkmark done too.
       const completedSet = new Set(
-        (submissions || []).map((s) => `${s.match_id}:${s.role}`)
+        (submissions || []).map((s) => `${s.match_id}:${s.role}:${s.scouter_id}`)
       );
 
       qualSubmissions?.forEach(sub => {
-        completedSet.add(`${sub.match_id}:${sub.role}`);
+        completedSet.add(`${sub.match_id}:${sub.role}:${sub.scouter_id}`);
       });
 
       // Create Map of "matchId:role" -> scouter_id

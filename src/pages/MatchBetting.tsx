@@ -17,15 +17,13 @@ import {
   cacheMatchOdds, getCachedMatchOdds, blendOddsRedPct,
   computeTimeDecayFactor, FULL_VALUE_MS,
 } from "@/lib/betting";
-import {
-  getStatboticsMatch, getCachedStatboticsMatch, getMatchLabel, wasUpset,
-} from "@/lib/statbotics";
+import { getMatchLabel, wasUpset } from "@/lib/match13";
 import { getEventMatches, getEventTeams, getMatchScores } from "@/lib/blueAlliance";
 import { isEventWithinWindow } from "@/lib/matches";
 import { getEventCurrencyLogo } from "@/config/eventCurrency";
 import type { Match, Event } from "@/types";
 import type { Bet, BetCurrency, MatchOdds, OddsHistoryPoint } from "@/types/betting";
-import type { StatboticsMatch } from "@/lib/statbotics";
+import type { Match13Match } from "@/lib/match13";
 import type { TBATeamSimple } from "@/lib/blueAlliance";
 
 // ---------------------------------------------------------------------------
@@ -114,16 +112,16 @@ function OddsChart({ history, isLive }: OddsChartProps) {
 }
 
 // ---------------------------------------------------------------------------
-// Statbotics probability bar (shows prediction vs bet-based odds)
+// match13 probability bar (shows prediction vs bet-based odds)
 // ---------------------------------------------------------------------------
 interface PredictionBarProps {
-  sbMatch: StatboticsMatch;
+  m13Match: Match13Match;
 }
 
-function PredictionBar({ sbMatch }: PredictionBarProps) {
-  const rp = sbMatch.pred.red_win_prob * 100;
+function PredictionBar({ m13Match }: PredictionBarProps) {
+  const rp = m13Match.pred.red_win_prob * 100;
   const bp = 100 - rp;
-  const { label, flavor } = getMatchLabel(sbMatch.pred.red_win_prob);
+  const { label, flavor } = getMatchLabel(m13Match.pred.red_win_prob);
 
   const flavorColor: Record<string, string> = {
     coinflip:  "text-yellow-400 border-yellow-600/30 bg-yellow-900/10",
@@ -136,7 +134,7 @@ function PredictionBar({ sbMatch }: PredictionBarProps) {
     <div className="space-y-1.5">
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <span className="font-medium text-red-400">
-          Statbotics: Red {rp.toFixed(1)}%
+          match13: Red {rp.toFixed(1)}%
         </span>
         <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${flavorColor[flavor]}`}>
           {label}
@@ -149,11 +147,11 @@ function PredictionBar({ sbMatch }: PredictionBarProps) {
         <div className="bg-red-600/70 transition-all" style={{ width: `${rp}%` }} />
         <div className="bg-blue-600/70 transition-all" style={{ width: `${bp}%` }} />
       </div>
-      {(sbMatch.pred.red_score > 0 || sbMatch.pred.blue_score > 0) && (
+      {(m13Match.pred.red_score > 0 || m13Match.pred.blue_score > 0) && (
         <div className="flex justify-between text-[10px] text-muted-foreground">
-          <span>Predicted: <span className="text-red-400">{Math.round(sbMatch.pred.red_score)}</span></span>
+          <span>Predicted: <span className="text-red-400">{Math.round(m13Match.pred.red_score)}</span></span>
           <span>vs</span>
-          <span>Predicted: <span className="text-blue-400">{Math.round(sbMatch.pred.blue_score)}</span></span>
+          <span>Predicted: <span className="text-blue-400">{Math.round(m13Match.pred.blue_score)}</span></span>
         </div>
       )}
     </div>
@@ -205,19 +203,20 @@ function AllianceCard({ alliance, teamKeys, teamInfo }: AllianceCardProps) {
 // Result card (shown when match is complete)
 // ---------------------------------------------------------------------------
 interface ResultCardProps {
-  sbMatch: StatboticsMatch;
+  m13Match: Match13Match;
   winner: "red" | "blue" | "tie";
   dbRedScore?: number | null;
   dbBlueScore?: number | null;
 }
 
-function ResultCard({ sbMatch, winner, dbRedScore, dbBlueScore }: ResultCardProps) {
-  const upset = wasUpset(winner, sbMatch.pred.red_win_prob);
-  const sbRed = sbMatch.result.red_score;
-  const sbBlue = sbMatch.result.blue_score;
-  // Prefer Statbotics scores when valid (>= 0), fall back to DB-cached scores
-  const red = (sbRed != null && sbRed >= 0) ? sbRed : (dbRedScore ?? 0);
-  const blue = (sbBlue != null && sbBlue >= 0) ? sbBlue : (dbBlueScore ?? 0);
+function ResultCard({ m13Match, winner, dbRedScore, dbBlueScore }: ResultCardProps) {
+  const upset = wasUpset(winner, m13Match.pred.red_win_prob);
+  // match13 only forecasts — it has no actual result, so `m13Match.result`
+  // here is always just a copy of the TBA-sourced score/winner.
+  const m13Red = m13Match.result.red_score;
+  const m13Blue = m13Match.result.blue_score;
+  const red = (m13Red != null && m13Red >= 0) ? m13Red : (dbRedScore ?? 0);
+  const blue = (m13Blue != null && m13Blue >= 0) ? m13Blue : (dbBlueScore ?? 0);
 
   return (
     <Card className={`border-2 ${winner === "red" ? "border-red-600/50 bg-red-900/10"
@@ -256,9 +255,9 @@ function ResultCard({ sbMatch, winner, dbRedScore, dbBlueScore }: ResultCardProp
             <div className="text-xs text-blue-400 font-medium">BLUE</div>
           </div>
         </div>
-        {(sbMatch.pred.red_score > 0) && (
+        {(m13Match.pred.red_score > 0) && (
           <div className="text-center text-[10px] text-muted-foreground mt-2">
-            Predicted: {Math.round(sbMatch.pred.red_score)} – {Math.round(sbMatch.pred.blue_score)}
+            Predicted: {Math.round(m13Match.pred.red_score)} – {Math.round(m13Match.pred.blue_score)}
           </div>
         )}
       </CardContent>
@@ -311,6 +310,8 @@ function AmountPicker({ value, onChange, max }: AmountPickerProps) {
 interface TBAMatchFull {
   match_number: number;
   comp_level: string;
+  /** Unix timestamp (seconds) of the scheduled/predicted match start */
+  predicted_time?: number | null;
   alliances: {
     red: { team_keys: string[]; score: number };
     blue: { team_keys: string[]; score: number };
@@ -332,7 +333,7 @@ export default function MatchBetting() {
   const [eventPoints, setEventPoints] = useState<number>(0);
   const [betCurrency, setBetCurrency] = useState<BetCurrency>("points");
 
-  const [sbMatch, setSbMatch] = useState<StatboticsMatch | null>(null);
+  const [m13Match, setM13Match] = useState<Match13Match | null>(null);
   const [tbaMatch, setTbaMatch] = useState<TBAMatchFull | null>(null);
   const [teamInfo, setTeamInfo] = useState<Map<number, TBATeamSimple>>(new Map());
 
@@ -394,11 +395,31 @@ export default function MatchBetting() {
         }
       }
 
-      // Statbotics — try API first, then localStorage cache, then DB-stored value
-      let sb: StatboticsMatch | null = null;
+      // TBA — best-effort. Fetched up front since it's the only source of
+      // actual scores/winner and of the scheduled match time (match13 has
+      // neither — it only forecasts).
+      let m13: Match13Match | null = null;
       if (eventCode) {
+        const [tbaMatches, teams] = await Promise.all([
+          getEventMatches(eventCode),
+          getEventTeams(eventCode),
+        ]);
+
+        let found: TBAMatchFull | undefined;
+        if (tbaMatches) {
+          found = (tbaMatches as TBAMatchFull[]).find(
+            (t) => t.comp_level === "qm" && t.match_number === m.match_number
+          );
+          if (found && !cancelled) setTbaMatch(found);
+        }
+        if (teams && !cancelled) {
+          const map = new Map<number, TBATeamSimple>();
+          teams.forEach((t) => map.set(t.team_number, t));
+          setTeamInfo(map);
+        }
+
         const tba_scores = await getMatchScores(eventCode, m.match_number);
-        let results = {}
+        let results: Match13Match["result"] = { winner: null, red_score: null, blue_score: null };
         if (tba_scores !== null && tba_scores.length == 2 && tba_scores[0] > 0 && tba_scores[1] > 0) {
           results = {
             winner: tba_scores[0] > tba_scores[1] ? 'red' : 'blue', red_score: tba_scores[0], blue_score: tba_scores[1]
@@ -411,75 +432,54 @@ export default function MatchBetting() {
           }
         }
 
-        sb = isOnline
-          ? await getStatboticsMatch(eventCode, m.match_number)
-          : getCachedStatboticsMatch(eventCode, m.match_number);
+        // match13 sends no CORS headers and its key must stay off the client,
+        // so predictions come from sync-match-results — which calls match13
+        // directly, server-side — instead of a direct browser fetch.
+        let redWinProb: number | null = null;
+        if (isOnline) {
+          try {
+            const { data: session } = await supabase.auth.getSession();
+            const { data } = await supabase.functions.invoke("sync-match-results", {
+              headers: session.session
+                ? { Authorization: `Bearer ${session.session.access_token}` }
+                : undefined,
+            });
+            const predictions = (data?.predictions ?? []) as Array<{
+              matchNumber: number; redWinProb: number;
+            }>;
+            redWinProb = predictions.find((p) => p.matchNumber === m.match_number)?.redWinProb ?? null;
+          } catch { /* fall through to DB value below */ }
+        }
+        if (redWinProb == null) redWinProb = m.match13_red_win_prob;
 
-        // Fall back to DB-stored prediction when API and cache both miss
-        if (!sb.result && m.statbotics_red_win_prob != null) {
-          sb = {
+        if (redWinProb != null) {
+          m13 = {
             key: `${eventCode}_qm${m.match_number}`,
             event: eventCode,
             match_number: m.match_number,
             comp_level: "qm",
-            pred: {
-              winner: null,
-              red_win_prob: m.statbotics_red_win_prob,
-              red_score: 0,
-              blue_score: 0,
-            },
-            time: sb?.time,
+            pred: { winner: null, red_win_prob: redWinProb, red_score: 0, blue_score: 0 },
             result: results,
           };
+          if (!cancelled) setM13Match(m13);
         }
 
-        if (sb?.result.winner === null)
-          sb.result = results;
-
-        if (sb && !cancelled) setSbMatch(sb);
-
-        const pred_time = sb?.time ?? localStorage.getItem(`pred_time_match_${match_id}`)?.predTime
-        if (!pred_time) {
+        const predTimeSeconds = found?.predicted_time;
+        if (!predTimeSeconds && !m.pred_time) {
           setLoading(true);
           return;
         }
-        // Save pred_time to DB + localStorage when Statbotics provides match time
-        if (pred_time && isOnline && !cancelled) {
-          const predTimeIso = new Date(pred_time * 1000).toISOString();
-          try {
-            localStorage.setItem(
-              `pred_time_match_${match_id}`,
-              JSON.stringify({ matchId: match_id, matchNumber: m.match_number, predTime: pred_time, fetchedAt: new Date().toISOString() })
-            );
-          } catch { /* ignore */ }
-          // Only write to DB if the value changed
-          const { data: updatedMatch } = await supabase
-            .from("matches")
-            .update({ pred_time: predTimeIso })
-            .eq("id", match_id)
-            .select()
-            .maybeSingle();
-          if (updatedMatch && !cancelled) setMatch(updatedMatch as Match);
-        }
-      }
-
-      // TBA — best-effort
-      if (eventCode) {
-        const [tbaMatches, teams] = await Promise.all([
-          getEventMatches(eventCode),
-          getEventTeams(eventCode),
-        ]);
-        if (!cancelled) {
-          if (tbaMatches) {
-            const found = (tbaMatches as TBAMatchFull[]).find(
-              (t) => t.comp_level === "qm" && t.match_number === m.match_number
-            );
-            if (found) setTbaMatch(found);
-          }
-          if (teams) {
-            const map = new Map<number, TBATeamSimple>();
-            teams.forEach((t) => map.set(t.team_number, t));
-            setTeamInfo(map);
+        // Save pred_time to DB once TBA provides the scheduled match time
+        if (predTimeSeconds && isOnline && !cancelled) {
+          const predTimeIso = new Date(predTimeSeconds * 1000).toISOString();
+          if (m.pred_time !== predTimeIso) {
+            const { data: updatedMatch } = await supabase
+              .from("matches")
+              .update({ pred_time: predTimeIso })
+              .eq("id", match_id)
+              .select()
+              .maybeSingle();
+            if (updatedMatch && !cancelled) setMatch(updatedMatch as Match);
           }
         }
       }
@@ -518,9 +518,9 @@ export default function MatchBetting() {
 
       setLoading(false);
 
-      // Auto-settle: fire when a winner is known (from Statbotics/TBA or already stored
+      // Auto-settle: fire when a winner is known (from match13/TBA or already stored
       // in the DB by sync-match-results) AND there are still pending bets to process.
-      const knownWinner = (m.winning_alliance ?? sb?.result?.winner) as "red" | "blue" | "tie" | null | undefined;
+      const knownWinner = (m.winning_alliance ?? m13?.result?.winner) as "red" | "blue" | "tie" | null | undefined;
       const hasPendingBets = loadedBets.some((b) => b.status === "pending");
       if (
         isOnline &&
@@ -530,7 +530,7 @@ export default function MatchBetting() {
       ) {
         settledRef.current = true;
         if (!cancelled) setAutoSettling(true);
-        const prob = sb?.pred?.red_win_prob ?? 0.5;
+        const prob = m13?.pred?.red_win_prob ?? 0.5;
         await settleMatchBets(match_id!, knownWinner, prob);
         // Reload match + user data
         const { data: refreshed } = await supabase
@@ -633,7 +633,7 @@ export default function MatchBetting() {
   async function handleSettle(winner: "red" | "blue" | "tie") {
     if (!match_id) return;
     setSettling(true);
-    const prob = sbMatch?.pred.red_win_prob ?? 0.5;
+    const prob = m13Match?.pred.red_win_prob ?? 0.5;
     const result = await settleMatchBets(match_id, winner, prob);
     if (result.success) {
       setMatch((prev) => prev ? { ...prev, winning_alliance: winner } : prev);
@@ -669,19 +669,19 @@ export default function MatchBetting() {
 
   // Event points can only be bet on the active event's own matches.
   const eventBettingAvailable = !!event && event.is_active && isEventWithinWindow(event);
-  const sbRedProb = sbMatch?.pred.red_win_prob;
+  const m13RedProb = m13Match?.pred.red_win_prob;
 
-  // Blended display odds: combines Statbotics prediction with bet-pool distribution.
-  // When few bets are placed, Statbotics dominates; as pool grows, bets take over.
-  const blendedRedPct = sbRedProb !== undefined
-    ? blendOddsRedPct(currentOdds.redPct, sbRedProb, currentOdds.totalPool)
+  // Blended display odds: combines match13 prediction with bet-pool distribution.
+  // When few bets are placed, match13 dominates; as pool grows, bets take over.
+  const blendedRedPct = m13RedProb !== undefined
+    ? blendOddsRedPct(currentOdds.redPct, m13RedProb, currentOdds.totalPool)
     : currentOdds.redPct;
   const blendedBluePct = 100 - blendedRedPct;
 
-  const blendedHistory = sbRedProb !== undefined
+  const blendedHistory = m13RedProb !== undefined
     ? (currentOdds.history ?? []).map((pt) => {
         const pool = pt.redTotal + pt.blueTotal;
-        const blended = blendOddsRedPct(pt.redPct, sbRedProb, pool);
+        const blended = blendOddsRedPct(pt.redPct, m13RedProb, pool);
         return { ...pt, redPct: blended, bluePct: 100 - blended };
       })
     : (currentOdds.history ?? []);
@@ -695,19 +695,19 @@ export default function MatchBetting() {
   const inDecayWindow = currentDecayFactor < 1.0 && !bettingClosed;
 
   const estPayout = selectedAlliance
-    ? estimatePayout(betAmount, selectedAlliance, currentOdds as MatchOdds, sbRedProb, predTime)
+    ? estimatePayout(betAmount, selectedAlliance, currentOdds as MatchOdds, m13RedProb, predTime)
     : null;
 
-  // Winning alliance is complete if Statbotics result says so OR match row says so
-  const effectiveWinner = (match?.winning_alliance ?? sbMatch?.result?.winner) as
+  // Winning alliance is complete if match13 result says so OR match row says so
+  const effectiveWinner = (match?.winning_alliance ?? m13Match?.result?.winner) as
     | "red" | "blue" | "tie" | null | undefined;
   const matchComplete = !!effectiveWinner;
 
   // Is the current user's bet an upset win?
   const betWasUpset =
     userBet?.status === "won" &&
-    sbRedProb !== undefined &&
-    wasUpset(userBet.alliance as "red" | "blue", sbRedProb);
+    m13RedProb !== undefined &&
+    wasUpset(userBet.alliance as "red" | "blue", m13RedProb);
 
   // ---------------------------------------------------------------------------
   // Render helpers
@@ -834,20 +834,20 @@ export default function MatchBetting() {
 
         {!tbaMatch && (
           <div className="p-3 bg-yellow-900/20 border border-yellow-700/40 rounded-lg">
-            <p className="text-sm text-yellow-400">Statbotics match data is loading... (percentages only represent betting, not predicted outcomes)</p>
+            <p className="text-sm text-yellow-400">Match data is loading... (percentages only represent betting, not predicted outcomes)</p>
           </div>
         )}
 
         {/* Result card (if match is complete) */}
-        {sbMatch && effectiveWinner && effectiveWinner !== "tie" && (
-          <ResultCard sbMatch={sbMatch} winner={effectiveWinner} dbRedScore={match?.red_score} dbBlueScore={match?.blue_score} />
+        {m13Match && effectiveWinner && effectiveWinner !== "tie" && (
+          <ResultCard m13Match={m13Match} winner={effectiveWinner} dbRedScore={match?.red_score} dbBlueScore={match?.blue_score} />
         )}
 
-        {/* Statbotics prediction bar */}
-        {sbMatch && !matchComplete && (
+        {/* match13 prediction bar */}
+        {m13Match && !matchComplete && (
           <Card>
             <CardContent className="pt-3 pb-3">
-              <PredictionBar sbMatch={sbMatch} />
+              <PredictionBar m13Match={m13Match} />
             </CardContent>
           </Card>
         )}
@@ -883,7 +883,7 @@ export default function MatchBetting() {
           <CardContent className="p-3">
             <div className="flex items-center justify-between mb-1">
               <span className="text-xs text-muted-foreground font-medium">
-                Combined win probability (bets + Statbotics)
+                Combined win probability (bets + match13)
               </span>
               <span className="text-xs text-muted-foreground">
                 Pool: {currentOdds.totalPool} {betCurrency === "event" ? "evt" : "pts"}
@@ -928,11 +928,11 @@ export default function MatchBetting() {
                 <div className="text-sm text-muted-foreground mt-0.5">
                   Bet {userBet.amount} {userBet.currency === "event" ? "evt" : "pts"} on {userBet.alliance.toUpperCase()}
                 </div>
-                {sbRedProb !== undefined && (
+                {m13RedProb !== undefined && (
                   <div className="text-xs text-muted-foreground mt-0.5">
                     {userBet.alliance === "red"
-                      ? `${Math.round(sbRedProb * 100)}% predicted win chance`
-                      : `${Math.round((1 - sbRedProb) * 100)}% predicted win chance`}
+                      ? `${Math.round(m13RedProb * 100)}% predicted win chance`
+                      : `${Math.round((1 - m13RedProb) * 100)}% predicted win chance`}
                   </div>
                 )}
               </div>
@@ -973,7 +973,7 @@ export default function MatchBetting() {
                   <div className="text-xs text-muted-foreground mt-1">
                     Est. payout:{" "}
                     {estimatePayout(userBet.amount, userBet.alliance as "red" | "blue",
-                      currentOdds as MatchOdds, sbRedProb)} {userBet.currency === "event" ? "evt" : "pts"} if {userBet.alliance} wins
+                      currentOdds as MatchOdds, m13RedProb)} {userBet.currency === "event" ? "evt" : "pts"} if {userBet.alliance} wins
                   </div>
                 </div>
                 <Button
@@ -1059,8 +1059,8 @@ export default function MatchBetting() {
               <div className="grid grid-cols-2 gap-3">
                 {(["red", "blue"] as const).map((side) => {
                   const pct = side === "red" ? currentOdds.redPct : currentOdds.bluePct;
-                  const sbPct = sbRedProb !== undefined
-                    ? side === "red" ? sbRedProb * 100 : (1 - sbRedProb) * 100
+                  const m13Pct = m13RedProb !== undefined
+                    ? side === "red" ? m13RedProb * 100 : (1 - m13RedProb) * 100
                     : null;
                   const isSelected = selectedAlliance === side;
                   return (
@@ -1074,10 +1074,10 @@ export default function MatchBetting() {
                       <div className="text-xs text-muted-foreground mt-0.5">
                         Bet odds: {Math.round(pct)}%
                       </div>
-                      {sbPct !== null && (
+                      {m13Pct !== null && (
                         <div className={`text-[10px] mt-0.5 ${
                           side === "red" ? "text-red-400/70" : "text-blue-400/70"}`}>
-                          Statbotics: {sbPct.toFixed(1)}%
+                          match13: {m13Pct.toFixed(1)}%
                         </div>
                       )}
                     </button>
@@ -1104,9 +1104,9 @@ export default function MatchBetting() {
                       {estPayout - betAmount >= 0 ? "+" : ""}{estPayout - betAmount} {betCurrency === "event" ? "evt" : "pts"}
                     </span>
                   </div>
-                  {sbRedProb !== undefined && (
+                  {m13RedProb !== undefined && (
                     <p className="text-[10px] text-muted-foreground">
-                      Adjusted for Statbotics prediction. Upsets pay more than favorites.
+                      Adjusted for match13 prediction. Upsets pay more than favorites.
                     </p>
                   )}
                 </div>
@@ -1141,8 +1141,8 @@ export default function MatchBetting() {
             </CardHeader>
             <CardContent className="pt-0 pb-4">
               <p className="text-xs text-muted-foreground mb-3">
-                Payouts are probability-adjusted via Statbotics ({sbRedProb !== undefined
-                  ? `red predicted at ${(sbRedProb * 100).toFixed(1)}%`
+                Payouts are probability-adjusted via match13 ({m13RedProb !== undefined
+                  ? `red predicted at ${(m13RedProb * 100).toFixed(1)}%`
                   : "no prediction data — using 50/50"}).
                 Upsets pay more than favorites.
               </p>
