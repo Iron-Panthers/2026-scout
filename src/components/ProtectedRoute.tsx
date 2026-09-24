@@ -5,11 +5,13 @@ import { useAuth } from "@/contexts/AuthContext";
 interface ProtectedRouteProps {
   children: React.ReactNode;
   requireManager?: boolean;
+  requireDeveloper?: boolean;
 }
 
 export default function ProtectedRoute({
   children,
   requireManager = false,
+  requireDeveloper = false,
 }: ProtectedRouteProps) {
   const { user, profile, loading } = useAuth();
   const [searchParams] = useSearchParams();
@@ -35,6 +37,10 @@ export default function ProtectedRoute({
   }
 
   if (requireManager && !profile?.is_manager) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  if (requireDeveloper && !profile?.is_developer) {
     return <Navigate to="/dashboard" replace />;
   }
 

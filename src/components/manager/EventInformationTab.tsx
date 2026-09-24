@@ -723,7 +723,7 @@ export function EventInformationTab({
                     <div className="flex-1">
                       <p className="font-medium">{profile.name || "Unknown"}</p>
                       <p className="text-sm text-muted-foreground">
-                        {profile.role} {profile.is_manager && "• Manager"}
+                        {profile.role} {profile.is_manager && "• Manager"} {profile.is_developer && "• Developer"}
                       </p>
                     </div> 
                     {profile.clocked_in &&

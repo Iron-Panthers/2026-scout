@@ -128,7 +128,7 @@ export default function AvatarPage({
                 }}
               >
                 {isEquipped && (
-                  <div className="absolute top-2 right-2">
+                  <div className={`absolute right-2 ${eventSource ? "top-8" : "top-2"}`}>
                     <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/40 text-xs gap-1">
                       <CheckCircle2 className="h-3 w-3" />
                       Equipped

@@ -40,12 +40,15 @@ import { GameCard } from "@/components/GameCard";
 import { GamePurchaseDialog } from "@/components/GamePurchaseDialog";
 import { GamePlayer } from "@/components/GamePlayer";
 import { useSettings } from "@/contexts/SettingsContext";
+import { useDevMode } from "@/contexts/DevModeContext";
+import { isDevMatchId, getDevMatch, getDevEvent, getDevMatchTeamForRole } from "@/lib/devMode";
 
 export default function ScoutConfig() {
   const { match_id: param_match_id } = useParams();
   const [search_params] = useSearchParams();
   const { user } = useAuth();
   const { settings, updateSetting } = useSettings();
+  const { devMode } = useDevMode();
   const navigate = useNavigate();
 
   const [match_id, setMatchId] = useState(param_match_id || "");
@@ -121,6 +124,34 @@ export default function ScoutConfig() {
       if (!param_match_id) {
         console.log("No match_id provided, entering manual mode");
         setManualMode(true);
+        return;
+      }
+
+      // Sandbox mode: resolve against the fake generated schedule instead
+      // of Supabase/TBA — the role is already in the URL (Dashboard passes
+      // it), so this only needs to fill in event + team number.
+      if (devMode && user?.id && isDevMatchId(param_match_id)) {
+        const devMatch = getDevMatch(user.id, param_match_id);
+        if (!devMatch) {
+          setManualMode(true);
+          return;
+        }
+        const devEvent = getDevEvent(user.id);
+        setEventId(devEvent.id);
+        setEventCode(devEvent.event_code || "");
+        setEventName(devEvent.name);
+        setMatchNumber(devMatch.match_number || 0);
+        if (role) {
+          setRole(role);
+          setLockedRole(role);
+          setLockedMatchType("Qualification");
+          const teamNumber = getDevMatchTeamForRole(user.id, devMatch.match_number, role);
+          if (teamNumber) {
+            setTeamNumber(teamNumber);
+            setIsTeamNumberAutofilled(true);
+          }
+        }
+        setManualMode(false);
         return;
       }
 
@@ -218,7 +249,7 @@ export default function ScoutConfig() {
     };
 
     loadMatchData();
-  }, [param_match_id, user?.id]);
+  }, [param_match_id, user?.id, devMode]);
 
   const updateTeamNum = async () => {
     if (matchType === "Practice" || matchType === "Playoff" || matchType === "Final") return;

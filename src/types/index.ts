@@ -15,8 +15,11 @@ export interface Scout {
 export interface Profile {
   id: string;
   name: string | null;
-  role: "scout" | "manager" | "admin";
+  role: "scout" | "manager" | "admin" | "developer";
   is_manager: boolean;
+  // Gates access to the internal dev/test tools (mirrors is_manager) —
+  // separate from `role`, which is just a display label.
+  is_developer: boolean;
   avatar_url: string | null;
   clocked_in: boolean;
   clocked_in_at: string | null;

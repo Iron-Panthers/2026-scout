@@ -840,6 +840,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     cost: 250,
     rarity: "rare",
     themeValue: "space_cookies",
+    isLight: true,
   },
   {
     id: "theme_peddie",

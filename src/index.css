@@ -586,39 +586,39 @@ html[data-theme="ben"] body {
   --sidebar-ring: hsl(27.6, 78%, 50.2%);
 }
 
-/* Space Cookies — dark night-sky background, caramel-tan primary, light-blue accent (#84caea / #be874d) */
+/* Space Cookies — light-blue background, caramel-tan primary button (#84caea / #be874d) */
 [data-theme="space_cookies"] {
-  --background: hsl(199, 45%, 8%);
-  --foreground: hsl(199, 30%, 95%);
-  --card: hsl(199, 40%, 12%);
-  --card-foreground: hsl(199, 30%, 95%);
-  --popover: hsl(199, 40%, 14%);
-  --popover-foreground: hsl(199, 30%, 95%);
+  --background: hsl(198.8, 70.8%, 71.8%);
+  --foreground: hsl(199, 45%, 12%);
+  --card: hsl(0, 0%, 100%);
+  --card-foreground: hsl(199, 45%, 12%);
+  --popover: hsl(0, 0%, 100%);
+  --popover-foreground: hsl(199, 45%, 12%);
   --primary: hsl(30.8, 46.5%, 52.4%);
-  --primary-foreground: hsl(30.8, 60%, 10%);
-  --secondary: hsl(199, 35%, 18%);
-  --secondary-foreground: hsl(199, 30%, 95%);
-  --muted: hsl(199, 35%, 18%);
-  --muted-foreground: hsl(199, 20%, 70%);
-  --accent: hsl(198.8, 70.8%, 71.8%);
-  --accent-foreground: hsl(199, 60%, 12%);
-  --destructive: hsl(0, 84%, 60%);
+  --primary-foreground: hsl(0, 0%, 98%);
+  --secondary: hsl(198.8, 50%, 88%);
+  --secondary-foreground: hsl(199, 45%, 12%);
+  --muted: hsl(198.8, 50%, 88%);
+  --muted-foreground: hsl(199, 20%, 35%);
+  --accent: hsl(198.8, 60%, 85%);
+  --accent-foreground: hsl(199, 45%, 12%);
+  --destructive: hsl(0, 84%, 48%);
   --destructive-foreground: hsl(0, 0%, 98%);
-  --border: hsl(199, 30%, 24%);
-  --input: hsl(199, 30%, 24%);
+  --border: hsl(198.8, 40%, 65%);
+  --input: hsl(198.8, 40%, 65%);
   --ring: hsl(30.8, 46.5%, 52.4%);
   --chart-1: hsl(30.8, 46.5%, 52.4%);
-  --chart-2: hsl(198.8, 70.8%, 71.8%);
-  --chart-3: hsl(30.8, 40%, 65%);
-  --chart-4: hsl(198.8, 50%, 50%);
-  --chart-5: hsl(0, 84%, 60%);
-  --sidebar: hsl(199, 45%, 6%);
-  --sidebar-foreground: hsl(199, 30%, 95%);
+  --chart-2: hsl(198.8, 70.8%, 55%);
+  --chart-3: hsl(30.8, 40%, 40%);
+  --chart-4: hsl(198.8, 50%, 40%);
+  --chart-5: hsl(0, 84%, 48%);
+  --sidebar: hsl(198.8, 60%, 90%);
+  --sidebar-foreground: hsl(199, 45%, 12%);
   --sidebar-primary: hsl(30.8, 46.5%, 52.4%);
-  --sidebar-primary-foreground: hsl(30.8, 60%, 10%);
-  --sidebar-accent: hsl(199, 35%, 18%);
-  --sidebar-accent-foreground: hsl(199, 30%, 95%);
-  --sidebar-border: hsl(199, 30%, 24%);
+  --sidebar-primary-foreground: hsl(0, 0%, 98%);
+  --sidebar-accent: hsl(198.8, 50%, 88%);
+  --sidebar-accent-foreground: hsl(199, 45%, 12%);
+  --sidebar-border: hsl(198.8, 40%, 65%);
   --sidebar-ring: hsl(30.8, 46.5%, 52.4%);
 }
 

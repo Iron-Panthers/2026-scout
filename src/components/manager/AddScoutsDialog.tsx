@@ -137,7 +137,7 @@ export function AddScoutsDialog({
                     <div className="min-w-0">
                       <p className="truncate font-medium">{scout.name || "Unknown"}</p>
                       <p className="text-sm capitalize text-muted-foreground">
-                        {scout.role}{scout.is_manager ? " • Manager" : ""}
+                        {scout.role}{scout.is_manager ? " • Manager" : ""}{scout.is_developer ? " • Developer" : ""}
                       </p>
                     </div>
                   </label>

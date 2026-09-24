@@ -26,12 +26,16 @@ import { Toaster } from "./components/ui/toaster";
 import UpdateBanner from "./components/UpdateBanner";
 import NotificationNavigationListener from "./components/NotificationNavigationListener";
 import GuestDashboard from "./pages/GuestDashboard";
+import { DevModeProvider } from "./contexts/DevModeContext";
+import DevModeBanner from "./components/DevModeBanner";
 
 function App() {
   return (
     <AuthProvider>
       <SettingsProvider>
+        <DevModeProvider>
         <BrowserRouter basename={import.meta.env.BASE_URL}>
+          <DevModeBanner />
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
@@ -125,7 +129,7 @@ function App() {
             <Route
               path="/test-notifications"
               element={
-                <ProtectedRoute>
+                <ProtectedRoute requireDeveloper={true}>
                   <NotificationTest />
                 </ProtectedRoute>
               }
@@ -133,7 +137,7 @@ function App() {
             <Route
               path="/test-realtime"
               element={
-                <ProtectedRoute>
+                <ProtectedRoute requireDeveloper={true}>
                   <RealtimeTest />
                 </ProtectedRoute>
               }
@@ -141,7 +145,7 @@ function App() {
             <Route
               path="/test-simple"
               element={
-                <ProtectedRoute>
+                <ProtectedRoute requireDeveloper={true}>
                   <SimpleRealtimeTest />
                 </ProtectedRoute>
               }
@@ -149,7 +153,7 @@ function App() {
             <Route
               path="/test-push"
               element={
-                <ProtectedRoute>
+                <ProtectedRoute requireDeveloper={true}>
                   <PushTest />
                 </ProtectedRoute>
               }
@@ -195,6 +199,7 @@ function App() {
           <UpdateBanner />
           <NotificationNavigationListener />
         </BrowserRouter>
+        </DevModeProvider>
       </SettingsProvider>
     </AuthProvider>
   );
