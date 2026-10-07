@@ -12,6 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { UserRound } from "lucide-react";
 import { updateEvent } from "@/lib/matches";
+import { isDevEventId, updateDevEvent } from "@/lib/devMode";
 import type { Event, Profile } from "@/types";
 import CosmeticAvatar from "../CosmeticAvatar";
 
@@ -22,6 +23,7 @@ interface AddScoutsDialogProps {
   allScouts: Profile[];
   availableScouts: Profile[];
   cosmeticsMap?: Record<string, Record<string, string>>;
+  devUserId?: string;
   onSave: (users: string[]) => void;
 }
 
@@ -32,6 +34,7 @@ export function AddScoutsDialog({
   allScouts,
   availableScouts,
   cosmeticsMap = {},
+  devUserId,
   onSave,
 }: AddScoutsDialogProps) {
   const [possibleOptions, setPossibleOptions] = useState<Profile[]>([]);
@@ -66,7 +69,9 @@ export function AddScoutsDialog({
 
     setLoading(true);
     const userIds = [...new Set([...(event.users || []), ...selectedIds])];
-    const success = await updateEvent(event.id, { users: userIds });
+    const success = devUserId && isDevEventId(event.id)
+      ? updateDevEvent(devUserId, event.id, { users: userIds })
+      : await updateEvent(event.id, { users: userIds });
     if (success) {
       onSave(userIds);
       setSelectedIds(new Set());

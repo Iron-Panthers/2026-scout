@@ -1,11 +1,14 @@
 import { supabase } from "@/lib/supabase";
 import type { GameProfile } from "@/types";
+import { getDevGameProfile, isDevModeActive, updateDevGameProfile } from "@/lib/devMode";
 
 /**
  * Fetch the game profile for a user.
  * If no row exists yet (first visit), one is created automatically.
  */
 export async function getGameProfile(userId: string): Promise<GameProfile | null> {
+  if (isDevModeActive()) return getDevGameProfile(userId);
+
   const { data, error } = await supabase
     .from("game_profiles")
     .select("*")
@@ -61,6 +64,13 @@ export async function purchaseGame(
     return { success: false, newPoints: profile.points, error: "You already own this game." };
   }
 
+  if (isDevModeActive()) {
+    const updated = updateDevGameProfile(userId, {
+      unlocked_games: [...profile.unlocked_games, gameId],
+    });
+    return { success: true, newPoints: updated.points };
+  }
+
   if (profile.points < cost) {
     return {
       success: false,
@@ -91,6 +101,8 @@ export async function purchaseGame(
  * Award points to a user (manager-only action).
  */
 export async function awardPoints(targetUserId: string, amount: number): Promise<{ success: boolean; error?: string }> {
+  if (isDevModeActive()) return { success: true };
+
   // Use rpc or a read-then-write. Supabase doesn't support atomic increments
   // without an RPC, so we fetch and update.
   const profile = await getGameProfile(targetUserId);
@@ -116,6 +128,8 @@ export async function awardPoints(targetUserId: string, amount: number): Promise
  * Award event points to a user (separate currency from `points`).
  */
 export async function awardEventPoints(targetUserId: string, amount: number): Promise<{ success: boolean; error?: string }> {
+  if (isDevModeActive()) return { success: true };
+
   const profile = await getGameProfile(targetUserId);
 
   if (!profile) {
