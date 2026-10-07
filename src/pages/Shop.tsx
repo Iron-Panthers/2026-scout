@@ -377,7 +377,7 @@ export default function Shop({
                         game={game}
                         isUnlocked={isUnlocked}
                         userPoints={points}
-                        isPlayable={false}
+                        isPlayable={game.id === "frcdle"}
                         onBuy={() => setBuyGameTarget(game)}
                         onPlay={() => setPlayingGame(game)}
                       />

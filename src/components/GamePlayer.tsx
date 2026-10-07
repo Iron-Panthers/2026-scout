@@ -1,6 +1,7 @@
 import { ChevronLeft, Play } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import type { GameDefinition } from "@/types";
+import { FrcdleGame } from "@/components/FrcdleGame";
 
 interface GamePlayerProps {
   game: GameDefinition | null;
@@ -19,8 +20,10 @@ export function GamePlayer({ game, onClose, startUrl, onStartWithoutConfig }: Ga
   function handleStartMatch() {
     if (startUrl) {
       navigate(startUrl);
+    } else if (onStartWithoutConfig) {
+      onStartWithoutConfig();
     } else {
-      onStartWithoutConfig ? onStartWithoutConfig() : onClose();
+      onClose();
     }
   }
 
@@ -43,25 +46,30 @@ export function GamePlayer({ game, onClose, startUrl, onStartWithoutConfig }: Ga
 
         <span className="text-sm font-medium text-muted-foreground">{game.name}</span>
 
-        <button
-          onClick={handleStartMatch}
-          className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors bg-red-600 text-white hover:bg-red-700"
-          aria-label={startUrl ? "Start scouting match" : "Configure match in Settings first"}
-          title={startUrl ? undefined : "Set up a match in Settings first"}
-        >
-          <Play className="w-3.5 h-3.5 fill-current" />
-          Start Match
-        </button>
+        {game.id !== "frcdle" && (
+          <button
+            onClick={handleStartMatch}
+            className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors bg-red-600 text-white hover:bg-red-700"
+            aria-label={startUrl ? "Start scouting match" : "Configure match in Settings first"}
+            title={startUrl ? undefined : "Set up a match in Settings first"}
+          >
+            <Play className="w-3.5 h-3.5 fill-current" />
+            Start Match
+          </button>
+        )}
       </div>
 
-      {/* Game iframe — fills remaining height below the bar */}
-      <iframe
-        src={game.iframeUrl}
-        title={game.name}
-        className="w-full flex-1 border-none"
-        allow="fullscreen; autoplay"
-        sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-pointer-lock"
-      />
+      {game.id === "frcdle" ? (
+        <FrcdleGame />
+      ) : (
+        <iframe
+          src={game.iframeUrl}
+          title={game.name}
+          className="w-full flex-1 border-none"
+          allow="fullscreen; autoplay"
+          sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-pointer-lock"
+        />
+      )}
     </div>
   );
 }
