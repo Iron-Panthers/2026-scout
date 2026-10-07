@@ -15,10 +15,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useAuth } from "@/contexts/AuthContext";
+import { useDevMode } from "@/contexts/DevModeContext";
 import { getGameProfile } from "@/lib/gameProfiles";
 import { purchaseCosmetic, openCrate } from "@/lib/shopService";
 import { purchaseGame } from "@/lib/gameProfiles";
 import { getActiveEvent, isEventWithinWindow } from "@/lib/matches";
+import { getDevEvent } from "@/lib/devMode";
 import { COSMETICS, RARITY_CONFIG, RARITY_VALUE, type CosmeticDefinition, type CosmeticCategory, type CrateRarity } from "@/config/cosmetics";
 import { CRATE_TIERS, type CrateTier } from "@/config/crates";
 import { GAMES } from "@/config/games";
@@ -134,6 +136,7 @@ export default function Shop({
 }: { embedded?: boolean; headerActions?: HTMLElement | null } = {}) {
   const navigate = useNavigate();
   const { user, profile, getAvatarUrl } = useAuth();
+  const { devMode } = useDevMode();
   const { toast } = useToast();
   const subtitle = useRandomSubtitle(SHOP_SUBTITLES);
 
@@ -160,8 +163,21 @@ export default function Shop({
   }, [loadProfile]);
 
   useEffect(() => {
-    getActiveEvent().then(setActiveEvent);
-  }, []);
+    let mounted = true;
+    if (devMode && user?.id) {
+      setActiveEvent(getDevEvent(user.id));
+      return () => {
+        mounted = false;
+      };
+    }
+
+    getActiveEvent().then((event) => {
+      if (mounted) setActiveEvent(event);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [devMode, user?.id]);
 
   const owned = gameProfile?.owned_cosmetics ?? [];
   const equipped = gameProfile?.equipped_cosmetics ?? {};

@@ -31,10 +31,15 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useDevMode } from "@/contexts/DevModeContext";
 import {
   getDevEvent,
-  getDevMatches,
+  getDevEvents,
+  getAllDevMatches,
+  createDevEvent,
   setDevMatchAssignment,
   getDevScoutingSubmissions,
   getDevFakeScouts,
+  getDevRosters,
+  applyDevRosterToMatches,
+  isDevEventId,
   isDevMatchId,
 } from "@/lib/devMode";
 import {
@@ -125,6 +130,10 @@ export default function ManagerDashboard() {
   const [pointsMap, setPointsMap] = useState<Record<string, number>>({});
   const [events, setEvents] = useState<Event[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<string>("all");
+  const selectedEventRef = useRef(selectedEvent);
+  useEffect(() => {
+    selectedEventRef.current = selectedEvent;
+  }, [selectedEvent]);
   const [allDbMatches, setAllDbMatches] = useState<Match[]>([]);
   const [completedSubmissions, setCompletedSubmissions] = useState<Set<string>>(
     new Set()
@@ -254,15 +263,18 @@ export default function ManagerDashboard() {
     if (devState.devMode && devState.user?.id) {
       const devUserId = devState.user.id;
       const devEvent = getDevEvent(devUserId);
-      const devMatches = getDevMatches(devUserId);
+      const devEvents = getDevEvents(devUserId);
+      const devMatches = getAllDevMatches(devUserId);
       const devScouts = [
         ...(devState.myProfile ? [devState.myProfile] : []),
         ...getDevFakeScouts(),
       ];
-      setEvents([devEvent]);
+      setEvents(devEvents);
       setAllScouts(devScouts);
       setAllDbMatches(devMatches);
-      if (!initialEventSet.current) {
+      setCosmeticsMap({});
+      setPointsMap({ [devUserId]: 999999 });
+      if (!initialEventSet.current || !devEvents.some((event) => event.id === selectedEventRef.current)) {
         initialEventSet.current = true;
         setSelectedEvent(devEvent.id);
       }
@@ -272,10 +284,14 @@ export default function ManagerDashboard() {
 
     // console.log("trying to load data", selectedEvent)
     try {
+      const requestUserId = devState.user?.id;
       const [{ matches: dbMatches, profiles }, eventsData] = await Promise.all([
         getMatchesWithProfiles(),
         getEvents(),
       ]);
+      const latestDevState = devModeStateRef.current;
+      if (latestDevState.devMode || latestDevState.user?.id !== requestUserId) return;
+
       const profilesArray = Array.from(profiles.values());
       setAllScouts(profilesArray);
       setEvents(eventsData);
@@ -340,6 +356,8 @@ export default function ManagerDashboard() {
       isFirstDevModeRender.current = false;
       return;
     }
+    if (!devMode && isDevEventId(selectedEventRef.current)) setSelectedEvent("all");
+    setSelectedMatches(new Set());
     loadData();
   }, [devMode, loadData]);
 
@@ -403,6 +421,11 @@ export default function ManagerDashboard() {
   const loadRosters = useCallback(async () => {
     if (selectedEvent === "all") {
       setRosters([]);
+      return;
+    }
+    const devState = devModeStateRef.current;
+    if (devState.devMode && devState.user?.id && isDevEventId(selectedEvent)) {
+      setRosters(getDevRosters(devState.user.id, selectedEvent));
       return;
     }
     const rostersData = await getRostersForEvent(selectedEvent);
@@ -735,6 +758,7 @@ export default function ManagerDashboard() {
   const handleToggleAllMatches = useCallback(() => {
     setSelectedMatches((prev) => {
       const allMatchIds = matches
+        .filter((match) => !devMode || isDevMatchId(match.matchId))
         .filter((m) => m.matchId)
         .map((m) => m.matchId!);
 
@@ -744,7 +768,7 @@ export default function ManagerDashboard() {
         return new Set(allMatchIds);
       }
     });
-  }, [matches]);
+  }, [devMode, matches]);
 
   const handleSendNotifications = useCallback(async () => {
     if (selectedMatches.size === 0) return;
@@ -768,7 +792,10 @@ export default function ManagerDashboard() {
       if (selectedMatches.size === 0) return;
 
       const matchIds = Array.from(selectedMatches);
-      const result = await applyRosterToMatches(rosterId, matchIds);
+      const devState = devModeStateRef.current;
+      const result = devState.devMode && devState.user?.id && isDevEventId(selectedEvent)
+        ? applyDevRosterToMatches(devState.user.id, rosterId, matchIds)
+        : await applyRosterToMatches(rosterId, matchIds);
 
       if (result.success) {
         // Reload data to show updated assignments
@@ -778,7 +805,7 @@ export default function ManagerDashboard() {
         alert(result.error || "Failed to apply roster");
       }
     },
-    [selectedMatches, loadData]
+    [selectedEvent, selectedMatches, loadData]
   );
 
   const handleCreateEvent = async () => {
@@ -795,6 +822,22 @@ export default function ManagerDashboard() {
 
     setIsCreatingEvent(true);
     try {
+      if (devMode && user?.id) {
+        const sandboxEvent = createDevEvent(
+          user.id,
+          newEventName.trim(),
+          newEventCode.trim(),
+          numMatches
+        );
+        setNewEventName("");
+        setNewEventCode("");
+        setNumQualMatches("");
+        setSelectedEvent(sandboxEvent.id);
+        await loadData();
+        alert(`Sandbox event "${sandboxEvent.name}" created with ${numMatches} matches.`);
+        return;
+      }
+
       const result = await createEventWithMatches(
         newEventName.trim(),
         newEventCode.trim(),
@@ -899,6 +942,18 @@ export default function ManagerDashboard() {
   const handleEventUpdate = useCallback(() => {
     void loadData();
   }, [loadData]);
+
+  const handleSandboxEventDeleted = useCallback(() => {
+    if (user?.id) setSelectedEvent(getDevEvent(user.id).id);
+    void loadData();
+  }, [user, loadData]);
+
+  const assignmentEvents = devMode
+    ? events.filter((event) => isDevEventId(event.id))
+    : events;
+  const assignmentMatches = devMode
+    ? matches.filter((match) => isDevMatchId(match.matchId))
+    : matches;
 
   return (
     <div className="min-h-screen bg-background my-5">
@@ -1076,7 +1131,7 @@ export default function ManagerDashboard() {
                   setSelectedEvent(v);
                   const eventUsers = v === "all"
                     ? allScouts
-                    : (events.find((event) => event.id === v)?.users ?? [])
+                    : (assignmentEvents.find((event) => event.id === v)?.users ?? [])
                         .map((userId) => allScouts.find((scout) => scout.id === userId))
                         .filter((scout): scout is Profile => scout !== undefined);
                   setAvailableScouts([...new Map(eventUsers.map((scout) => [scout.id, scout])).values()]);
@@ -1086,7 +1141,7 @@ export default function ManagerDashboard() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Events</SelectItem>
-                  {events.map((event) => (
+                  {assignmentEvents.map((event) => (
                     <SelectItem key={event.id} value={event.id}>
                       {event.name}
                     </SelectItem>
@@ -1150,8 +1205,8 @@ export default function ManagerDashboard() {
                         <div className="flex items-center justify-center">
                           <Checkbox
                             checked={
-                              selectedMatches.size === matches.filter((m) => m.matchId).length &&
-                              matches.filter((m) => m.matchId).length > 0
+                              selectedMatches.size === assignmentMatches.filter((m) => m.matchId).length &&
+                              assignmentMatches.filter((m) => m.matchId).length > 0
                             }
                             onCheckedChange={handleToggleAllMatches}
                           />
@@ -1219,7 +1274,7 @@ export default function ManagerDashboard() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {matches.map((match) => (
+                    {assignmentMatches.map((match) => (
                       <MatchRow
                         key={`${selectedEvent}-${match.matchNumber}`}
                         match={match}
@@ -1249,6 +1304,7 @@ export default function ManagerDashboard() {
               rosters={rosters}
               matches={matches}
               selectedMatches={selectedMatches}
+              devUserId={devMode ? user?.id : undefined}
               onRosterChange={() => {
                 loadRosters();
                 loadData(); // Reload match data to show updated assignments
@@ -1265,7 +1321,9 @@ export default function ManagerDashboard() {
               availableScouts={availableScouts}
               allScouts={allScouts}
               cosmeticsMap={cosmeticsMap}
+              devUserId={devMode ? user?.id : undefined}
               onEventUpdate={handleEventUpdate}
+              onSandboxEventDeleted={handleSandboxEventDeleted}
             />
           </TabsContent>
 

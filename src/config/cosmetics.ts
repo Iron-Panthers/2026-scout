@@ -768,6 +768,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     cost: 250,
     rarity: "rare",
     themeValue: "bread",
+    isLight: true,
   },
   {
     id: "theme_citrus",

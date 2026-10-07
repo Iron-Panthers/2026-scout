@@ -10,6 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
+import { useDevMode } from "@/contexts/DevModeContext";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { getActiveEvent } from "@/lib/matches";
 import { getGameProfile } from "@/lib/gameProfiles";
@@ -22,6 +23,7 @@ import type { MatchOdds, BetWithMatch } from "@/types/betting";
 import type { Match13Match } from "@/lib/match13";
 import { useRandomSubtitle } from "@/hooks/useRandomSubtitle";
 import { BETTING_SUBTITLES } from "@/config/headerSubtitles";
+import { getDevEvent, getDevMatchTeams, getDevMatches } from "@/lib/devMode";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -826,6 +828,7 @@ export default function Betting({
   headerActions = null,
 }: { embedded?: boolean; headerActions?: HTMLElement | null } = {}) {
   const { user } = useAuth();
+  const { devMode } = useDevMode();
   const navigate = useNavigate();
   const isOnline = useOnlineStatus();
   const [searchParams] = useSearchParams();
@@ -858,6 +861,63 @@ export default function Betting({
     if (!user?.id) return;
     const generation = ++loadGenerationRef.current;
     const isStale = () => loadGenerationRef.current !== generation;
+
+    if (devMode) {
+      const sandboxEvent = getDevEvent(user.id);
+      const rows = getDevMatches(user.id, sandboxEvent.id);
+      const [gameProfile, userBets, odds] = await Promise.all([
+        getGameProfile(user.id),
+        getUserBets(user.id),
+        getBulkMatchOdds(rows.map((match) => match.id), "points", user.id),
+      ]);
+      if (isStale()) return;
+
+      const allianceMap = new Map<number, TBAMatchData>();
+      const predictionMap = new Map<number, Match13Match>();
+      for (const match of rows) {
+        const allianceTeams = getDevMatchTeams(user.id, match.match_number, sandboxEvent.id);
+        if (allianceTeams) {
+          allianceMap.set(match.match_number, {
+            match_number: match.match_number,
+            comp_level: "qm",
+            alliances: {
+              red: { team_keys: allianceTeams.red.map((team) => `frc${team}`) },
+              blue: { team_keys: allianceTeams.blue.map((team) => `frc${team}`) },
+            },
+          });
+        }
+        predictionMap.set(match.match_number, {
+          key: `${sandboxEvent.event_code}_qm${match.match_number}`,
+          event: sandboxEvent.event_code || "devsandbox",
+          match_number: match.match_number,
+          comp_level: "qm",
+          pred: {
+            winner: null,
+            red_win_prob: match.match13_red_win_prob ?? 0.5,
+            red_score: 0,
+            blue_score: 0,
+          },
+          result: {
+            winner: match.winning_alliance ?? null,
+            red_score: match.red_score ?? null,
+            blue_score: match.blue_score ?? null,
+          },
+        });
+      }
+
+      setEvent(sandboxEvent);
+      setMatches(rows);
+      setMyBets(userBets);
+      setPoints(gameProfile?.points ?? 999999);
+      setOddsMap(odds);
+      setTbaMap(allianceMap);
+      setM13Map(predictionMap);
+      setTbaLoading(false);
+      setM13Loading(false);
+      setShowM13Loading(false);
+      setLoading(false);
+      return;
+    }
 
     const [activeEvent, gameProfile, userBets] = await Promise.all([
       getActiveEvent(),
@@ -988,7 +1048,7 @@ export default function Betting({
         }).catch(() => { if (!isStale()) setM13Loading(false); });
       });
     }
-  }, [user?.id]);
+  }, [user?.id, devMode]);
 
   useEffect(() => { load(); }, [load]);
 

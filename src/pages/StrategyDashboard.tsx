@@ -8,6 +8,8 @@ import {
   useSensors,
   PointerSensor,
   TouchSensor,
+  pointerWithin,
+  type CollisionDetection,
   type DragStartEvent,
   type DragEndEvent,
 } from "@dnd-kit/core";
@@ -36,17 +38,118 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ListOrdered, ArrowUpDown, Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useDevMode } from "@/contexts/DevModeContext";
 import { getEvents } from "@/lib/matches";
 import { getEventTeams, type TBATeamSimple } from "@/lib/blueAlliance";
 import { getEventEpaMap } from "@/lib/statbotics";
 import { getEventScoutingAverages } from "@/lib/scoutingSchema";
 import { getPicklist, upsertPicklist } from "@/lib/picklists";
+import {
+  getDevEvent,
+  getDevEvents,
+  getDevPicklist,
+  getDevTeams,
+  isDevEventId,
+  saveDevPicklist,
+} from "@/lib/devMode";
 import UserProfileMenu from "@/components/UserProfileMenu";
 import { TeamLogo } from "@/components/TeamLogo";
 import { TeamInfoDialog } from "@/components/TeamInfoDialog";
 import type { Event } from "@/types";
 
 type PicklistColumnKey = "bank" | "picklist" | "doNotPick";
+
+const picklistCollisionDetection: CollisionDetection = (args) => {
+  const pointerCollisions = pointerWithin(args);
+  const pointer = args.pointerCoordinates;
+  if (pointer) {
+    const columnBelowLastCard = args.droppableContainers
+      .filter((container) => container.id === "picklist" || container.id === "doNotPick")
+      .map((column) => {
+        const columnRect = args.droppableRects.get(column.id);
+        const lastTeamCard = args.droppableContainers
+          .filter((container) => container.data.current?.column === column.id)
+          .map((container) => ({
+            container,
+            rect: args.droppableRects.get(container.id),
+          }))
+          .filter((entry) => entry.rect != null)
+          .sort((a, b) => b.rect!.bottom - a.rect!.bottom)[0];
+
+        return { columnRect, lastTeamCard };
+      })
+      .find(
+        ({ columnRect, lastTeamCard }) =>
+          columnRect != null &&
+          lastTeamCard != null &&
+          pointer.x >= columnRect.left &&
+          pointer.x <= columnRect.right &&
+          pointer.y > lastTeamCard.rect!.bottom
+      );
+
+    if (columnBelowLastCard?.lastTeamCard) {
+      return closestCenter({
+        ...args,
+        droppableContainers: [columnBelowLastCard.lastTeamCard.container],
+      });
+    }
+
+    if (pointerCollisions.length > 0) return pointerCollisions;
+
+    const sourceColumn = args.active.data.current?.column;
+    if (sourceColumn === "picklist" || sourceColumn === "doNotPick") {
+      const sourceColumnRect = args.droppableRects.get(sourceColumn);
+      if (sourceColumnRect && pointer.y < sourceColumnRect.top) {
+        const firstTeamCard = args.droppableContainers
+          .filter((container) => container.data.current?.column === sourceColumn)
+          .map((container) => ({
+            container,
+            rect: args.droppableRects.get(container.id),
+          }))
+          .filter((entry) => entry.rect != null)
+          .sort((a, b) => a.rect!.top - b.rect!.top)[0]?.container;
+
+        return closestCenter({
+          ...args,
+          droppableContainers: [firstTeamCard ?? args.droppableContainers.find(
+            (container) => container.id === sourceColumn
+          )!],
+        });
+      }
+    }
+
+    const columnBelowPointer = args.droppableContainers.find((container) => {
+      if (container.id !== "bank" && container.id !== "picklist" && container.id !== "doNotPick") {
+        return false;
+      }
+      const rect = args.droppableRects.get(container.id);
+      return (
+        rect != null &&
+        pointer.x >= rect.left &&
+        pointer.x <= rect.right &&
+        pointer.y > rect.bottom
+      );
+    });
+    if (columnBelowPointer) {
+      const lastTeamCard = args.droppableContainers
+        .filter((container) => container.data.current?.column === columnBelowPointer.id)
+        .map((container) => ({
+          container,
+          rect: args.droppableRects.get(container.id),
+        }))
+        .filter((entry) => entry.rect != null)
+        .sort((a, b) => b.rect!.bottom - a.rect!.bottom)[0]?.container;
+
+      return closestCenter({
+        ...args,
+        droppableContainers: [lastTeamCard ?? columnBelowPointer],
+      });
+    }
+  }
+
+  if (pointerCollisions.length > 0) return pointerCollisions;
+  return closestCenter(args);
+};
 
 function PicklistCardContent({
   team,
@@ -224,6 +327,7 @@ function PicklistColumn({
 
 export default function StrategyDashboard() {
   const { user, profile, getAvatarUrl } = useAuth();
+  const { devMode } = useDevMode();
   const [strategyPage, setStrategyPage] = useState<"picklist" | "event">("picklist");
   // Per-event snapshot of the picklist columns, kept for the life of this
   // page. Switching events re-reads from here instead of the server when
@@ -273,19 +377,44 @@ export default function StrategyDashboard() {
   const avatarUrl = getAvatarUrl();
 
   useEffect(() => {
-    getEvents().then((events) => {
+    let mounted = true;
+    const loadEvents = async () => {
+      if (devMode && user?.id) {
+        const events = getDevEvents(user.id);
+        if (!mounted) return;
+        setPicklistEvents(events);
+        setSelectedPicklistEventId(getDevEvent(user.id).id);
+        return;
+      }
+
+      const events = await getEvents();
+      if (!mounted) return;
       setPicklistEvents(events);
       const initialEvent = events.find((event) => event.is_active) ?? events[0];
       if (initialEvent) setSelectedPicklistEventId(initialEvent.id);
-    });
-  }, []);
+    };
+    void loadEvents();
+    return () => {
+      mounted = false;
+    };
+  }, [devMode, user?.id]);
 
   useEffect(() => {
+    let mounted = true;
+    if (devMode && (!user?.id || !isDevEventId(selectedPicklistEventId))) {
+      setBankTeams([]);
+      setPickedTeams([]);
+      setDoNotPickTeams([]);
+      setPicklistLoading(false);
+      return;
+    }
+
     const event = picklistEvents.find((item) => item.id === selectedPicklistEventId);
     if (!event?.event_code) {
       setBankTeams([]);
       setPickedTeams([]);
       setDoNotPickTeams([]);
+      setPicklistLoading(false);
       return;
     }
 
@@ -298,10 +427,23 @@ export default function StrategyDashboard() {
     } else {
       const loadPicklist = async () => {
         setPicklistLoading(true);
-        const teams = await getEventTeams(event.event_code!);
+        const isSandboxEvent = devMode && !!user?.id && isDevEventId(event.id);
+        const teams = isSandboxEvent
+          ? getDevTeams(user!.id).map((team) => ({
+              ...team,
+              city: null,
+              state_prov: null,
+            }))
+          : await getEventTeams(event.event_code!);
+        if (!mounted) return;
         const roster = teams.sort((a, b) => a.team_number - b.team_number);
 
-        const saved = user?.id ? await getPicklist(user.id, event.id) : null;
+        const saved = user?.id
+          ? isSandboxEvent
+            ? getDevPicklist(user.id, event.id)
+            : await getPicklist(user.id, event.id)
+          : null;
+        if (!mounted) return;
 
         let picked: TBATeamSimple[];
         let doNotPick: TBATeamSimple[];
@@ -338,7 +480,10 @@ export default function StrategyDashboard() {
     setEpaLoadedEventId(null);
     setTeamScoutingAvgMap(new Map());
     setScoutingAvgLoadedEventId(null);
-  }, [picklistEvents, selectedPicklistEventId, user?.id]);
+    return () => {
+      mounted = false;
+    };
+  }, [picklistEvents, selectedPicklistEventId, user?.id, devMode]);
 
   // Lazily fetch Statbotics EPA ratings the first time "Sort by EPA" is used
   // for this event.
@@ -346,6 +491,12 @@ export default function StrategyDashboard() {
     if (bankSortMode !== "epa") return;
     const event = picklistEvents.find((item) => item.id === selectedPicklistEventId);
     if (!event?.event_code || epaLoadedEventId === selectedPicklistEventId) return;
+    if (devMode && isDevEventId(event.id)) {
+      setTeamEpaMap(new Map());
+      setEpaLoadedEventId(selectedPicklistEventId);
+      setEpaLoading(false);
+      return;
+    }
 
     let mounted = true;
     setEpaLoading(true);
@@ -358,7 +509,7 @@ export default function StrategyDashboard() {
     return () => {
       mounted = false;
     };
-  }, [bankSortMode, picklistEvents, selectedPicklistEventId, epaLoadedEventId]);
+  }, [bankSortMode, picklistEvents, selectedPicklistEventId, epaLoadedEventId, devMode]);
 
   // Lazily fetch scouted averages the first time "Sort by Scouting Averages"
   // is used for this event.
@@ -366,6 +517,12 @@ export default function StrategyDashboard() {
     if (bankSortMode !== "scouting") return;
     const event = picklistEvents.find((item) => item.id === selectedPicklistEventId);
     if (!event || scoutingAvgLoadedEventId === selectedPicklistEventId) return;
+    if (devMode && isDevEventId(event.id)) {
+      setTeamScoutingAvgMap(new Map());
+      setScoutingAvgLoadedEventId(selectedPicklistEventId);
+      setScoutingAvgLoading(false);
+      return;
+    }
 
     let mounted = true;
     setScoutingAvgLoading(true);
@@ -378,7 +535,7 @@ export default function StrategyDashboard() {
     return () => {
       mounted = false;
     };
-  }, [bankSortMode, picklistEvents, selectedPicklistEventId, scoutingAvgLoadedEventId]);
+  }, [bankSortMode, picklistEvents, selectedPicklistEventId, scoutingAvgLoadedEventId, devMode]);
 
   const sortedBankTeams = useMemo(() => {
     const sortByMap = (map: Map<number, number>) =>
@@ -468,13 +625,18 @@ export default function StrategyDashboard() {
 
     if (sourceColumn === overColumn) {
       // The bank has no meaningful manual order (always re-sorted for
-      // display), and dropping on the column's own empty space is a no-op.
-      if (sourceColumn === "bank" || overIsColumn) return;
+      // display). Dropping a ranked team on its column background appends it.
+      if (sourceColumn === "bank") return;
       const arr = arraysByColumn[sourceColumn];
       const fromIndex = arr.findIndex((t) => t.team_number === activeTeamNumber);
-      const toIndex = arr.findIndex((t) => t.team_number === Number(overId));
-      if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return;
-      commit(sourceColumn, arrayMove(arr, fromIndex, toIndex));
+      if (overIsColumn) {
+        if (fromIndex < 0 || fromIndex === arr.length - 1) return;
+        commit(sourceColumn, arrayMove(arr, fromIndex, arr.length - 1));
+      } else {
+        const toIndex = arr.findIndex((t) => t.team_number === Number(overId));
+        if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return;
+        commit(sourceColumn, arrayMove(arr, fromIndex, toIndex));
+      }
     } else {
       const sourceArr = [...arraysByColumn[sourceColumn]];
       const fromIndex = sourceArr.findIndex((t) => t.team_number === activeTeamNumber);
@@ -537,12 +699,16 @@ export default function StrategyDashboard() {
       const eventId = selectedPicklistEventId;
       const pickedNumbers = nextPicked.map((t) => t.team_number);
       const doNotPickNumbers = nextDoNotPick.map((t) => t.team_number);
-      // Chain onto any still-pending save so writes always land in the
-      // order they were triggered, even if an earlier request happens to
-      // resolve slower than this one.
-      pendingSaveRef.current = pendingSaveRef.current.then(() =>
-        upsertPicklist(user.id, eventId, pickedNumbers, doNotPickNumbers)
-      );
+      if (devMode && isDevEventId(eventId)) {
+        saveDevPicklist(user.id, eventId, pickedNumbers, doNotPickNumbers);
+      } else {
+        // Chain onto any still-pending save so writes always land in the
+        // order they were triggered, even if an earlier request happens to
+        // resolve slower than this one.
+        pendingSaveRef.current = pendingSaveRef.current.then(() =>
+          upsertPicklist(user.id, eventId, pickedNumbers, doNotPickNumbers)
+        );
+      }
     }
   };
 
@@ -624,7 +790,7 @@ export default function StrategyDashboard() {
               ) : (
                 <DndContext
                   sensors={dndSensors}
-                  collisionDetection={closestCenter}
+                  collisionDetection={picklistCollisionDetection}
                   onDragStart={handleDndDragStart}
                   onDragEnd={handleDndDragEnd}
                 >

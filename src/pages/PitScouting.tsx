@@ -24,8 +24,10 @@ import {
 import { ArrowLeft, Loader2, RefreshCw } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useDevMode } from "@/contexts/DevModeContext";
 import { useToast } from "@/hooks/use-toast";
 import { getActiveEvent } from "@/lib/matches";
+import { getDevEvent } from "@/lib/devMode";
 import { pitScoutingQuestions } from "@/config/pitScoutingConfig";
 import type { PitScoutingQuestion } from "@/config/pitScoutingConfig";
 import type { Event } from "@/types";
@@ -45,6 +47,7 @@ export default function PitScouting() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user, profile } = useAuth();
+  const { devMode } = useDevMode();
   const { toast } = useToast();
 
   const rescoutMode = searchParams.get("rescout") === "true";
@@ -74,13 +77,24 @@ export default function PitScouting() {
   const duplicateCheckTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
+    let mounted = true;
     const loadActiveEvent = async () => {
+      if (devMode && user?.id) {
+        setActiveEvent(getDevEvent(user.id));
+        setLoadingEvent(false);
+        return;
+      }
+
       const event = await getActiveEvent();
+      if (!mounted) return;
       setActiveEvent(event);
       setLoadingEvent(false);
     };
-    loadActiveEvent();
-  }, []);
+    void loadActiveEvent();
+    return () => {
+      mounted = false;
+    };
+  }, [devMode, user?.id]);
 
   // Auto-fill from URL params
   useEffect(() => {
@@ -372,7 +386,9 @@ export default function PitScouting() {
   const eventMapCard = (
     <Card>
       <CardHeader>
-        <CardTitle>{activeEvent?.name || "Event"} Pit Map</CardTitle>
+        <CardTitle>
+          {devMode ? "Sandbox Event Pit Map" : `${activeEvent?.name || "Event"} Pit Map`}
+        </CardTitle>
       </CardHeader>
       <CardContent>
         {loadingEvent ? (

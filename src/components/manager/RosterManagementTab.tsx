@@ -14,6 +14,7 @@ import { PlusCircle, Edit, Trash2, Play } from "lucide-react";
 import { RosterDialog } from "./RosterDialog";
 import { ApplyRosterDialog } from "./ApplyRosterDialog";
 import { deleteRoster, applyRosterToMatches } from "@/lib/rosters";
+import { applyDevRosterToMatches, deleteDevRoster, isDevEventId } from "@/lib/devMode";
 import type { Roster, Profile, Event, MatchAssignment } from "@/types";
 
 interface RosterManagementTabProps {
@@ -23,6 +24,7 @@ interface RosterManagementTabProps {
   rosters: Roster[];
   matches: MatchAssignment[];
   selectedMatches: Set<string>;
+  devUserId?: string;
   onRosterChange: () => void;
 }
 
@@ -33,6 +35,7 @@ export function RosterManagementTab({
   rosters,
   matches,
   selectedMatches,
+  devUserId,
   onRosterChange,
 }: RosterManagementTabProps) {
   const [rosterDialogOpen, setRosterDialogOpen] = useState(false);
@@ -68,11 +71,13 @@ export function RosterManagementTab({
   const handleDeleteConfirm = async () => {
     if (!selectedRoster) return;
 
-    const result = await deleteRoster(selectedRoster.id);
-    if (result.success) {
+    const success = devUserId && isDevEventId(selectedEvent)
+      ? deleteDevRoster(devUserId, selectedRoster.id)
+      : (await deleteRoster(selectedRoster.id)).success;
+    if (success) {
       onRosterChange();
     } else {
-      alert(result.error || "Failed to delete roster");
+      alert("Failed to delete roster");
     }
     setDeleteDialogOpen(false);
     setSelectedRoster(null);
@@ -81,7 +86,9 @@ export function RosterManagementTab({
   const handleApplyRoster = async (matchIds: string[]) => {
     if (!selectedRoster) return;
 
-    const result = await applyRosterToMatches(selectedRoster.id, matchIds);
+    const result = devUserId && isDevEventId(selectedEvent)
+      ? applyDevRosterToMatches(devUserId, selectedRoster.id, matchIds)
+      : await applyRosterToMatches(selectedRoster.id, matchIds);
     if (result.success) {
       onRosterChange(); // Refresh to show updated assignments
     } else {
@@ -237,6 +244,7 @@ export function RosterManagementTab({
         mode={dialogMode}
         roster={selectedRoster}
         eventId={selectedEvent}
+        devUserId={devUserId}
         availableScouts={availableScouts}
         matches={matches}
         onSave={onRosterChange}

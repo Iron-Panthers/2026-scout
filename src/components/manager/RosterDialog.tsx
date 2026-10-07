@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { createRoster, updateRoster } from "@/lib/rosters";
+import { createDevRoster, isDevEventId, updateDevRoster } from "@/lib/devMode";
 import type { Roster, Profile, Role, MatchAssignment } from "@/types";
 import CosmeticAvatar from "@/components/CosmeticAvatar";
 
@@ -29,6 +30,7 @@ interface RosterDialogProps {
   mode: "create" | "edit";
   roster?: Roster | null;
   eventId: string;
+  devUserId?: string;
   availableScouts: Profile[];
   matches?: MatchAssignment[]; // For "Save from Match" feature
   onSave: () => void;
@@ -62,6 +64,7 @@ export function RosterDialog({
   mode,
   roster,
   eventId,
+  devUserId,
   availableScouts,
   matches = [],
   onSave,
@@ -148,13 +151,9 @@ export function RosterDialog({
 
     try {
       if (mode === "create") {
-        const result = await createRoster(
-          name.trim(),
-          eventId,
-          description.trim(),
-          assignments,
-          assignments2
-        );
+        const result = devUserId && isDevEventId(eventId)
+          ? createDevRoster(devUserId, eventId, name.trim(), description.trim(), assignments, assignments2)
+          : await createRoster(name.trim(), eventId, description.trim(), assignments, assignments2);
 
         if (!result.success) {
           setError(result.error || "Failed to create roster");
@@ -162,12 +161,15 @@ export function RosterDialog({
           return;
         }
       } else if (mode === "edit" && roster) {
-        const result = await updateRoster(roster.id, {
+        const updates = {
           name: name.trim(),
           description: description.trim(),
           assignments,
           assignments2,
-        });
+        };
+        const result = devUserId && isDevEventId(eventId)
+          ? updateDevRoster(devUserId, roster.id, updates)
+          : await updateRoster(roster.id, updates);
 
         if (!result.success) {
           setError(result.error || "Failed to update roster");

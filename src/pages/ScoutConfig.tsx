@@ -41,7 +41,13 @@ import { GamePurchaseDialog } from "@/components/GamePurchaseDialog";
 import { GamePlayer } from "@/components/GamePlayer";
 import { useSettings } from "@/contexts/SettingsContext";
 import { useDevMode } from "@/contexts/DevModeContext";
-import { isDevMatchId, getDevMatch, getDevEvent, getDevMatchTeamForRole } from "@/lib/devMode";
+import {
+  isDevMatchId,
+  getDevMatch,
+  getDevEvent,
+  getDevEvents,
+  getDevMatchTeamForRole,
+} from "@/lib/devMode";
 
 export default function ScoutConfig() {
   const { match_id: param_match_id } = useParams();
@@ -86,8 +92,25 @@ export default function ScoutConfig() {
 
   // Load active event on mount
   useEffect(() => {
+    let cancelled = false;
+
     const loadActiveEvent = async () => {
+      if (devMode && user?.id) {
+        const sandboxEvents = getDevEvents(user.id);
+        if (cancelled) return;
+        setAvailableEvents(sandboxEvents);
+
+        if (isDevMatchId(param_match_id)) return;
+
+        const sandboxEvent = getDevEvent(user.id);
+        setEventId(sandboxEvent.id);
+        setEventCode(sandboxEvent.event_code || "");
+        setEventName(sandboxEvent.name || "");
+        return;
+      }
+
       const events = await getEvents();
+      if (cancelled) return;
       setAvailableEvents(events);
 
       const activeEvent = events.find((event) => event.is_active);
@@ -115,8 +138,11 @@ export default function ScoutConfig() {
       }
     };
 
-    loadActiveEvent();
-  }, [settings["active-event-code"]]);
+    void loadActiveEvent();
+    return () => {
+      cancelled = true;
+    };
+  }, [settings["active-event-code"], devMode, user?.id, param_match_id]);
 
   // Load match data if match_id is provided
   useEffect(() => {
@@ -136,7 +162,7 @@ export default function ScoutConfig() {
           setManualMode(true);
           return;
         }
-        const devEvent = getDevEvent(user.id);
+        const devEvent = getDevEvent(user.id, devMatch.event_id || undefined);
         setEventId(devEvent.id);
         setEventCode(devEvent.event_code || "");
         setEventName(devEvent.name);
@@ -145,7 +171,12 @@ export default function ScoutConfig() {
           setRole(role);
           setLockedRole(role);
           setLockedMatchType("Qualification");
-          const teamNumber = getDevMatchTeamForRole(user.id, devMatch.match_number, role);
+          const teamNumber = getDevMatchTeamForRole(
+            user.id,
+            devMatch.match_number,
+            role,
+            devMatch.event_id || undefined
+          );
           if (teamNumber) {
             setTeamNumber(teamNumber);
             setIsTeamNumberAutofilled(true);

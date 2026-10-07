@@ -13,6 +13,13 @@ import {
 import { CalendarIcon, Save, Star, Trash2, PlusCircle, Upload } from "lucide-react";
 import { format, set } from "date-fns";
 import { updateEvent, setActiveEvent } from "@/lib/matches";
+import {
+  deleteDevEvent,
+  isDevEventId,
+  setDevActiveEvent,
+  setDevMatchCount,
+  updateDevEvent,
+} from "@/lib/devMode";
 import { uploadEventMap } from "@/lib/photoUpload";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
@@ -43,7 +50,9 @@ interface EventInformationTabProps {
   allScouts: Profile[];
   availableScouts: Profile[];
   cosmeticsMap?: Record<string, Record<string, string>>; // userId -> equipped cosmetics
+  devUserId?: string;
   onEventUpdate?: () => void;
+  onSandboxEventDeleted?: () => void;
 }
 
 export function EventInformationTab({
@@ -53,7 +62,9 @@ export function EventInformationTab({
   allScouts,
   availableScouts,
   cosmeticsMap = {},
+  devUserId,
   onEventUpdate,
+  onSandboxEventDeleted,
 }: EventInformationTabProps) {
   const currentEvent = events.find((e) => e.id === selectedEvent);
   const isAllEvents = selectedEvent === "all";
@@ -81,6 +92,23 @@ export function EventInformationTab({
     if (!currentEvent || isAllEvents) return;
 
     setIsSaving(true);
+    if (devUserId && isDevEventId(currentEvent.id)) {
+      const success = updateDevEvent(devUserId, currentEvent.id, {
+        name: editedEvent.name,
+        event_code: editedEvent.event_code || null,
+        location: editedEvent.location || null,
+        start_date: editedEvent.start_date || null,
+        end_date: editedEvent.end_date || null,
+        scouting_map_url: editedEvent.scouting_map_url || null,
+      });
+      if (success) {
+        setIsEditing(false);
+        onEventUpdate?.();
+      }
+      setIsSaving(false);
+      return;
+    }
+
     const success = await updateEvent(currentEvent.id, {
       name: editedEvent.name,
       event_code: editedEvent.event_code || undefined,
@@ -101,6 +129,14 @@ export function EventInformationTab({
     const file = e.target.files?.[0];
     e.target.value = ""; // allow re-selecting the same file
     if (!file || !currentEvent) return;
+    if (devUserId && isDevEventId(currentEvent.id)) {
+      toast({
+        title: "Sandbox map upload unavailable",
+        description: "Use the map URL field to keep this change local to the sandbox.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setUploadingMap(true);
     try {
@@ -125,6 +161,16 @@ export function EventInformationTab({
     if (!currentEvent || isAllEvents) return;
 
     setIsSettingActive(true);
+    if (devUserId && isDevEventId(currentEvent.id)) {
+      const success = setDevActiveEvent(devUserId, currentEvent.id);
+      if (success) {
+        toast({ title: "Active Event Set", description: `${currentEvent.name} is now the active sandbox event.` });
+        onEventUpdate?.();
+      }
+      setIsSettingActive(false);
+      return;
+    }
+
     const success = await setActiveEvent(currentEvent.id);
 
     if (success) {
@@ -156,6 +202,24 @@ export function EventInformationTab({
   };
 
   const handleDeleteEvent = async () => {
+    if (devUserId && currentEvent && isDevEventId(currentEvent.id)) {
+      const deleted = deleteDevEvent(devUserId, currentEvent.id);
+      if (!deleted) {
+        toast({
+          title: "Cannot Delete Event",
+          description: "The default sandbox event cannot be deleted.",
+          variant: "destructive",
+        });
+        return;
+      }
+      setDeleteEventDialog1(false);
+      setDeleteEventDialog2(false);
+      toast({ title: "Sandbox Event Deleted", description: `${currentEvent.name} was removed from this sandbox.` });
+      if (onSandboxEventDeleted) onSandboxEventDeleted();
+      else onEventUpdate?.();
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from("events")
@@ -190,6 +254,17 @@ export function EventInformationTab({
   const handleSetMatchCount = async (targetCount: number) => {
     if (!currentEvent || isAllEvents) return;
     targetCount = Math.min(MAX_MATCHES, Math.max(0, Math.trunc(targetCount)));
+
+    if (devUserId && isDevEventId(currentEvent.id)) {
+      const difference = setDevMatchCount(devUserId, targetCount, currentEvent.id);
+      if (difference === 0) return;
+      toast({
+        title: difference > 0 ? "Matches Added" : "Matches Removed",
+        description: `${difference > 0 ? "Added" : "Removed"} ${Math.abs(difference)} match${Math.abs(difference) === 1 ? "" : "es"}.`,
+      });
+      onEventUpdate?.();
+      return;
+    }
 
     try {
       const { data: existingMatches, error: fetchError } = await supabase
@@ -254,10 +329,14 @@ export function EventInformationTab({
   const handleDeleteClick = async (profile) => {
     const event = events.find(e => e.id === selectedEvent);
     if (!event) return;
-    event.users = event.users.filter(u => u !== profile.id);
+    const updatedUsers = event.users.filter(u => u !== profile.id);
     setIsLoading(true);
-    await updateEvent(event?.id, { users: event.users });
-    availableScouts = event?.users;
+    if (devUserId && isDevEventId(event.id)) {
+      updateDevEvent(devUserId, event.id, { users: updatedUsers });
+    } else {
+      await updateEvent(event.id, { users: updatedUsers });
+    }
+    availableScouts = updatedUsers;
 
     onEventUpdate();
     setIsLoading(false);
@@ -551,13 +630,13 @@ export function EventInformationTab({
                         id="scouting-map-upload"
                         className="hidden"
                         onChange={handleMapFileChange}
-                        disabled={uploadingMap}
+                        disabled={uploadingMap || (!!devUserId && isDevEventId(currentEvent?.id))}
                       />
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
-                        disabled={uploadingMap}
+                        disabled={uploadingMap || (!!devUserId && isDevEventId(currentEvent?.id))}
                         onClick={() =>
                           document.getElementById("scouting-map-upload")?.click()
                         }
@@ -643,6 +722,7 @@ export function EventInformationTab({
         allScouts={allScouts}
         cosmeticsMap={cosmeticsMap}
         event={events.find(e => e.id === selectedEvent)}
+        devUserId={devUserId}
         onSave={() => onEventUpdate?.()}
       ></AddScoutsDialog>
       <Card>

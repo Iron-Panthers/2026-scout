@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { getGameProfile } from "@/lib/gameProfiles";
+import { isDevModeActive, updateDevGameProfile } from "@/lib/devMode";
 import { COSMETICS } from "@/config/cosmetics";
 import type { GameProfile } from "@/types";
 
@@ -90,6 +91,16 @@ export async function purchaseCosmetic(
         }
       : { points: newBalance, owned_cosmetics: newOwned };
 
+  if (isDevModeActive()) {
+    const sandboxProfile = updateDevGameProfile(userId, {
+      owned_cosmetics: newOwned,
+      ...(currency === "event" && eventName
+        ? { event_cosmetic_sources: { ...(profile.event_cosmetic_sources ?? {}), [cosmeticId]: eventName } }
+        : {}),
+    });
+    return { success: true, newPoints: currency === "event" ? sandboxProfile.event_points : sandboxProfile.points };
+  }
+
   const { data, error } = await supabase
     .from("game_profiles")
     .update(update)
@@ -124,6 +135,11 @@ export async function equipCosmetic(
   }
 
   const newEquipped = { ...(profile.equipped_cosmetics ?? {}), [slot]: cosmeticId };
+
+  if (isDevModeActive()) {
+    updateDevGameProfile(userId, { equipped_cosmetics: newEquipped });
+    return { success: true };
+  }
 
   const { error } = await supabase
     .from("game_profiles")
@@ -170,6 +186,16 @@ export async function openCrate(
     ? (profile.owned_cosmetics ?? [])
     : [...(profile.owned_cosmetics ?? []), itemId];
 
+  if (isDevModeActive()) {
+    if (!isDuplicate) updateDevGameProfile(userId, { owned_cosmetics: newOwned });
+    return {
+      success: true,
+      newPoints: profile.points,
+      isDuplicate,
+      refund: 0,
+    };
+  }
+
   const { data, error } = await supabase
     .from("game_profiles")
     .update({ points: newPoints, owned_cosmetics: newOwned })
@@ -197,6 +223,11 @@ export async function unequipCosmetic(
 
   const newEquipped = { ...(profile.equipped_cosmetics ?? {}) };
   delete newEquipped[slot];
+
+  if (isDevModeActive()) {
+    updateDevGameProfile(userId, { equipped_cosmetics: newEquipped });
+    return { success: true };
+  }
 
   const { error } = await supabase
     .from("game_profiles")
