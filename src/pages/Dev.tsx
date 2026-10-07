@@ -28,6 +28,10 @@ export default function Dev() {
     updateProfile(authUser!.id, { is_manager: true });
   };
 
+  const makeDeveloper = async () => {
+    updateProfile(authUser!.id, { is_developer: true });
+  };
+
   const handleBackfillEventIds = async () => {
     setIsBackfilling(true);
     try {
@@ -100,6 +104,12 @@ export default function Dev() {
             className="px-4 py-2 bg-blue-500 text-white rounded"
           >
             {profile?.is_manager ? "Already manager" : "Make manager"}
+          </Button>
+          <Button
+            onClick={makeDeveloper}
+            className="px-4 py-2 bg-blue-500 text-white rounded"
+          >
+            {profile?.is_developer ? "Already developer" : "Make developer"}
           </Button>
         </div>
       </div>

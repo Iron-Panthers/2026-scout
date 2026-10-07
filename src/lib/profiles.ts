@@ -130,6 +130,7 @@ export async function createProfile(
         name,
         role: "scout",
         is_manager: false,
+        is_developer: false,
       },
     ])
     .select()

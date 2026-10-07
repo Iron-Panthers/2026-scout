@@ -1,6 +1,19 @@
 import { supabase } from "@/lib/supabase";
 import { getGameProfile } from "@/lib/gameProfiles";
 import { getActiveEvent, isEventWithinWindow } from "@/lib/matches";
+import {
+  cancelDevBet,
+  createDevBet,
+  getDevBetForUser,
+  getDevBetsForMatch,
+  getDevMatch,
+  getDevUserBets,
+  getDevEvent,
+  setDevMatchResult,
+  updateDevBetSettlement,
+  isDevMatchId,
+} from "@/lib/devMode";
+import { isDevModeActive } from "@/lib/devMode";
 import type { Bet, BetAlliance, BetCurrency, MatchOdds, OddsHistoryPoint, BetWithMatch } from "@/types/betting";
 
 /** Which game_profiles column a currency's balance lives in. */
@@ -258,7 +271,11 @@ export async function getMatchOdds(matchId: string, currency: BetCurrency = "poi
 }
 
 /** Fetch raw bets for a match sorted by time (both currencies — filter client-side if needed). */
-export async function getMatchBets(matchId: string): Promise<Bet[]> {
+export async function getMatchBets(matchId: string, userId?: string): Promise<Bet[]> {
+  if (isDevModeActive() && isDevMatchId(matchId)) {
+    return userId ? getDevBetsForMatch(userId, matchId) : [];
+  }
+
   const { data, error } = await supabase
     .from("bets")
     .select("id, user_id, alliance, amount, status, created_at, updated_at, payout, match_id, currency")
@@ -276,6 +293,10 @@ export async function getMatchUserBet(
   userId: string,
   currency: BetCurrency = "points"
 ): Promise<Bet | null> {
+  if (isDevModeActive() && isDevMatchId(matchId)) {
+    return getDevBetForUser(userId, matchId, userId, currency);
+  }
+
   const { data } = await supabase
     .from("bets")
     .select("*")
@@ -291,6 +312,8 @@ export async function getMatchUserBet(
 
 /** All bets for a user across all matches (both currencies). */
 export async function getUserBets(userId: string): Promise<BetWithMatch[]> {
+  if (isDevModeActive()) return getDevUserBets(userId, userId);
+
   const { data, error } = await supabase
     .from("bets")
     .select(
@@ -306,10 +329,19 @@ export async function getUserBets(userId: string): Promise<BetWithMatch[]> {
 /** Fetch odds for every match in a list, for one currency (single DB query). */
 export async function getBulkMatchOdds(
   matchIds: string[],
-  currency: BetCurrency = "points"
+  currency: BetCurrency = "points",
+  userId?: string
 ): Promise<Map<string, MatchOdds>> {
   const map = new Map<string, MatchOdds>();
   if (matchIds.length === 0) return map;
+
+  if (isDevModeActive() && matchIds.every(isDevMatchId)) {
+    for (const matchId of matchIds) {
+      const odds = computeOddsFromBets(userId ? getDevBetsForMatch(userId, matchId) : []);
+      map.set(matchId, odds);
+    }
+    return map;
+  }
 
   const { data: bets, error } = await supabase
     .from("bets")
@@ -350,6 +382,23 @@ export async function placeBet(
   amount: number,
   currency: BetCurrency = "points"
 ): Promise<{ success: boolean; error?: string }> {
+  if (isDevModeActive() && isDevMatchId(matchId)) {
+    const profile = await getGameProfile(userId);
+    if (!profile) return { success: false, error: "Could not load your game profile." };
+    if (balanceOf(profile, currency) < amount) {
+      return { success: false, error: "Not enough sandbox currency." };
+    }
+    if (currency === "event") {
+      const match = getDevMatch(userId, matchId);
+      const eventId = match?.event_id;
+      const activeEvent = getDevEvent(userId);
+      if (!eventId || eventId !== activeEvent.id || !activeEvent.is_active || !isEventWithinWindow(activeEvent)) {
+        return { success: false, error: "Event points can only be bet on the active sandbox event's matches." };
+      }
+    }
+    return createDevBet(userId, userId, matchId, alliance, amount, currency);
+  }
+
   const profile = await getGameProfile(userId);
   if (!profile) return { success: false, error: "Could not load your game profile." };
   const balance = balanceOf(profile, currency);
@@ -416,6 +465,11 @@ export async function cancelBet(
   betId: string,
   userId: string
 ): Promise<{ success: boolean; error?: string }> {
+  if (isDevModeActive() && betId.startsWith("dev-bet-")) {
+    const succeeded = cancelDevBet(userId, betId, userId);
+    return succeeded ? { success: true } : { success: false, error: "Could not cancel this sandbox bet." };
+  }
+
   const { data: bet } = await supabase
     .from("bets")
     .select("*")
@@ -457,8 +511,51 @@ export async function cancelBet(
 export async function settleMatchBets(
   matchId: string,
   winningAlliance: "red" | "blue" | "tie",
-  statboticsRedWinProb: number = 0.5
+  statboticsRedWinProb: number = 0.5,
+  sandboxUserId?: string
 ): Promise<{ success: boolean; error?: string }> {
+  if (isDevModeActive() && isDevMatchId(matchId)) {
+    if (!sandboxUserId) return { success: false, error: "Sandbox user is required to settle this match." };
+    const match = getDevMatch(sandboxUserId, matchId);
+    if (!match) return { success: false, error: "Sandbox match not found." };
+    const winner = (match.winning_alliance as "red" | "blue" | "tie" | null) ?? winningAlliance;
+    setDevMatchResult(sandboxUserId, matchId, winner);
+
+    const pendingBets = getDevBetsForMatch(sandboxUserId, matchId)
+      .filter((bet) => bet.status === "pending");
+    const probability = winner === "red"
+      ? statboticsRedWinProb
+      : winner === "blue"
+        ? 1 - statboticsRedWinProb
+        : 0.5;
+
+    for (const currency of ["points", "event"] as const) {
+      const pool = pendingBets.filter((bet) => (bet.currency ?? "points") === currency);
+      const redTotal = pool.filter((bet) => bet.alliance === "red").reduce((total, bet) => total + bet.amount, 0);
+      const blueTotal = pool.filter((bet) => bet.alliance === "blue").reduce((total, bet) => total + bet.amount, 0);
+      const totalPool = redTotal + blueTotal;
+      const winnerPool = winner === "red" ? redTotal : blueTotal;
+
+      for (const bet of pool) {
+        const won = winner === "tie" || bet.alliance === winner;
+        const payout = winner === "tie"
+          ? bet.amount
+          : won
+            ? calcPayout(
+                bet.amount,
+                winnerPool,
+                totalPool,
+                probability,
+                computeTimeDecayFactor(bet.created_at, match.pred_time)
+              )
+            : 0;
+        updateDevBetSettlement(sandboxUserId, bet.id, won ? "won" : "lost", payout);
+      }
+    }
+
+    return { success: true };
+  }
+
   // Check not already settled
   const { data: matchRow } = await supabase
     .from("matches")

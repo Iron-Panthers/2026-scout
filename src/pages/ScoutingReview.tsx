@@ -10,6 +10,7 @@ import { RecursiveJsonEditor } from "@/components/RecursiveJsonEditor";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { submitScoutingData, submitQualScoutingData, resolveMatchId } from "@/lib/scoutingSchema";
+import { isDevMatchId, submitDevScoutingData } from "@/lib/devMode";
 import { useToast } from "@/hooks/use-toast";
 import { SubmissionStatusModal } from "@/components/SubmissionStatusModal";
 import SafeQRCode from "@/components/SafeQRCode";
@@ -480,7 +481,10 @@ export default function ScoutingReview() {
     setIsSubmitting(true);
 
     try {
-      if (scoutingType === "qual") {
+      if (isDevMatchId(matchId) && user?.id) {
+        // Sandbox match — record locally only, never touches Supabase.
+        submitDevScoutingData(user.id, matchId, state.role, state.team_number ?? 0, state);
+      } else if (scoutingType === "qual") {
         await submitQualScoutingData(matchId, state.role, state, user?.id);
       } else {
         await submitScoutingData(matchId, state.role, state, user?.id, state.team_number ?? 0, state.match_type);

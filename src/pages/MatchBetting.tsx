@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
+import { useDevMode } from "@/contexts/DevModeContext";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { supabase } from "@/lib/supabase";
 import { getGameProfile } from "@/lib/gameProfiles";
@@ -25,6 +26,7 @@ import type { Match, Event } from "@/types";
 import type { Bet, BetCurrency, MatchOdds, OddsHistoryPoint } from "@/types/betting";
 import type { Match13Match } from "@/lib/match13";
 import type { TBATeamSimple } from "@/lib/blueAlliance";
+import { getDevEvent, getDevMatch, getDevMatchTeams, getDevTeams, isDevMatchId } from "@/lib/devMode";
 
 // ---------------------------------------------------------------------------
 // Odds Area Chart — pure SVG
@@ -326,6 +328,7 @@ export default function MatchBetting() {
   const { match_id } = useParams<{ match_id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { devMode } = useDevMode();
   const isOnline = useOnlineStatus();
 
   const [match, setMatch] = useState<Match | null>(null);
@@ -349,6 +352,7 @@ export default function MatchBetting() {
   const [betAmount, setBetAmount] = useState(10);
   const [placing, setPlacing] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [sandboxSettling, setSandboxSettling] = useState(false);
   const [feedback, setFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
 
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -380,6 +384,71 @@ export default function MatchBetting() {
     let cancelled = false;
 
     async function load() {
+      if (devMode && isDevMatchId(match_id)) {
+        const sandboxMatch = getDevMatch(user!.id, match_id!);
+        if (!sandboxMatch || cancelled) { setLoading(false); return; }
+        const sandboxEvent = getDevEvent(user!.id, sandboxMatch.event_id || undefined);
+        const allianceTeams = getDevMatchTeams(
+          user!.id,
+          sandboxMatch.match_number,
+          sandboxEvent.id
+        );
+        const fakeTeams = getDevTeams(user!.id);
+        const prediction = sandboxMatch.match13_red_win_prob ?? 0.5;
+        const localMatch13: Match13Match = {
+          key: `${sandboxEvent.event_code}_qm${sandboxMatch.match_number}`,
+          event: sandboxEvent.event_code || "devsandbox",
+          match_number: sandboxMatch.match_number,
+          comp_level: "qm",
+          pred: { winner: null, red_win_prob: prediction, red_score: 0, blue_score: 0 },
+          result: {
+            winner: sandboxMatch.winning_alliance ?? null,
+            red_score: sandboxMatch.red_score ?? null,
+            blue_score: sandboxMatch.blue_score ?? null,
+          },
+        };
+        const localTba: TBAMatchFull | null = allianceTeams ? {
+          match_number: sandboxMatch.match_number,
+          comp_level: "qm",
+          predicted_time: null,
+          alliances: {
+            red: { team_keys: allianceTeams.red.map((team) => `frc${team}`), score: -1 },
+            blue: { team_keys: allianceTeams.blue.map((team) => `frc${team}`), score: -1 },
+          },
+        } : null;
+        const [loadedBets, profile, pointsBet, eventBet] = await Promise.all([
+          getMatchBets(match_id!, user!.id),
+          getGameProfile(user!.id),
+          getMatchUserBet(match_id!, user!.id, "points"),
+          getMatchUserBet(match_id!, user!.id, "event"),
+        ]);
+        if (cancelled) return;
+        setMatch(sandboxMatch);
+        setEvent(sandboxEvent);
+        setM13Match(localMatch13);
+        setTbaMatch(localTba);
+        setTeamInfo(new Map(fakeTeams.map((team) => [team.team_number, {
+          team_number: team.team_number,
+          nickname: team.nickname,
+          city: null,
+          state_prov: null,
+        }])));
+        setBets(loadedBets);
+        setPoints(profile?.points ?? 999999);
+        setEventPoints(profile?.event_points ?? 999999);
+        if (pointsBet) {
+          setUserBet(pointsBet);
+          setBetCurrency("points");
+        } else if (eventBet) {
+          setUserBet(eventBet);
+          setBetCurrency("event");
+        } else {
+          setUserBet(null);
+        }
+        setLoading(false);
+        return;
+      }
+
       // Match row
       const { data: matchData } = await supabase
         .from("matches").select("*").eq("id", match_id).maybeSingle();
@@ -556,7 +625,7 @@ export default function MatchBetting() {
   // Realtime subscription
   // ---------------------------------------------------------------------------
   useEffect(() => {
-    if (!match_id || !isOnline) return;
+    if (!match_id || !isOnline || (devMode && isDevMatchId(match_id))) return;
 
     channelRef.current = supabase
       .channel(`bets-match-${match_id}`)
@@ -576,7 +645,7 @@ export default function MatchBetting() {
       .subscribe();
 
     return () => { if (channelRef.current) supabase.removeChannel(channelRef.current); };
-  }, [match_id, isOnline]);
+  }, [match_id, isOnline, devMode]);
 
   // ---------------------------------------------------------------------------
   // Countdown timer — ticks every second while pred_time is in the future
@@ -606,8 +675,7 @@ export default function MatchBetting() {
     if (result.success) {
       const unit = betCurrency === "event" ? "event points" : "pts";
       setFeedback({ ok: true, msg: `Bet placed! ${betAmount} ${unit} on ${selectedAlliance.toUpperCase()}.` });
-      if (betCurrency === "event") setEventPoints((p) => p - betAmount);
-      else setPoints((p) => p - betAmount);
+      await refreshPoints();
       await refreshUserBet();
       setSelectedAlliance(null);
     } else {
@@ -624,13 +692,43 @@ export default function MatchBetting() {
     if (result.success) {
       const unit = userBet.currency === "event" ? "event points" : "pts";
       setFeedback({ ok: true, msg: `Bet cancelled — ${userBet.amount} ${unit} refunded.` });
-      if (userBet.currency === "event") setEventPoints((p) => p + userBet.amount);
-      else setPoints((p) => p + userBet.amount);
+      await refreshPoints();
       setUserBet(null);
     } else {
       setFeedback({ ok: false, msg: result.error ?? "Failed to cancel." });
     }
     setCancelling(false);
+  }
+
+  async function handleSandboxSettle(winner: "red" | "blue" | "tie") {
+    if (!devMode || !user?.id || !match || !isDevMatchId(match.id) || matchComplete) return;
+    setSandboxSettling(true);
+    setFeedback(null);
+    const result = await settleMatchBets(match.id, winner, m13Match?.pred.red_win_prob ?? 0.5, user.id);
+    if (!result.success) {
+      setFeedback({ ok: false, msg: result.error ?? "Could not settle sandbox match." });
+      setSandboxSettling(false);
+      return;
+    }
+
+    const settledMatch = getDevMatch(user.id, match.id);
+    if (settledMatch) {
+      setMatch(settledMatch);
+      setM13Match((previous) => previous ? {
+        ...previous,
+        result: {
+          winner,
+          red_score: settledMatch.red_score,
+          blue_score: settledMatch.blue_score,
+        },
+      } : previous);
+    }
+    const updatedBets = await getMatchBets(match.id, user.id);
+    setBets(updatedBets);
+    const updatedUserBet = await getMatchUserBet(match.id, user.id, betCurrency);
+    setUserBet(updatedUserBet);
+    setFeedback({ ok: true, msg: `Sandbox match settled: ${winner.toUpperCase()} ${winner === "tie" ? "tie" : "wins"}.` });
+    setSandboxSettling(false);
   }
 
   // ---------------------------------------------------------------------------
@@ -652,6 +750,7 @@ export default function MatchBetting() {
   }, [currentOdds, isOnline, betCurrency, match_id]);
 
   const currentBalance = betCurrency === "event" ? eventPoints : points;
+  const canPlaceBets = isOnline || (devMode && isDevMatchId(match_id));
 
   // Event points can only be bet on the active event's own matches.
   const eventBettingAvailable = !!event && event.is_active && isEventWithinWindow(event);
@@ -887,6 +986,44 @@ export default function MatchBetting() {
           </div>
         )}
 
+        {devMode && isDevMatchId(match.id) && !matchComplete && (
+          <Card className="border-amber-600/30 bg-amber-900/10">
+            <CardContent className="space-y-3 pt-4">
+              <div>
+                <h2 className="font-semibold text-amber-200">Sandbox settlement</h2>
+                <p className="text-xs text-muted-foreground">
+                  Choose a simulated outcome to settle local bets. No real match or account data is changed.
+                </p>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <Button
+                  variant="outline"
+                  className="border-red-700/40 text-red-300 hover:bg-red-900/30"
+                  disabled={sandboxSettling}
+                  onClick={() => void handleSandboxSettle("red")}
+                >
+                  {sandboxSettling ? <Loader2 className="h-4 w-4 animate-spin" /> : "Red wins"}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="border-blue-700/40 text-blue-300 hover:bg-blue-900/30"
+                  disabled={sandboxSettling}
+                  onClick={() => void handleSandboxSettle("blue")}
+                >
+                  {sandboxSettling ? <Loader2 className="h-4 w-4 animate-spin" /> : "Blue wins"}
+                </Button>
+                <Button
+                  variant="outline"
+                  disabled={sandboxSettling}
+                  onClick={() => void handleSandboxSettle("tie")}
+                >
+                  {sandboxSettling ? <Loader2 className="h-4 w-4 animate-spin" /> : "Tie"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Feedback banner */}
         {feedback && (
           <div className={`flex items-center gap-2 rounded-lg px-4 py-3 text-sm ${
@@ -998,7 +1135,7 @@ export default function MatchBetting() {
         )}
 
         {/* Bet form — only when open, pred_time not passed, and no existing bet */}
-        {!matchComplete && !isSettled && !userBet && !bettingClosed && isOnline && (
+        {!matchComplete && !isSettled && !userBet && !bettingClosed && canPlaceBets && (
           <Card>
             <CardHeader className="pb-0 pt-0">
               <CardTitle className="text-base">Place a Bet</CardTitle>
@@ -1110,7 +1247,7 @@ export default function MatchBetting() {
           </Card>
         )}
 
-        {!matchComplete && !isSettled && !userBet && !bettingClosed && !isOnline && (
+        {!matchComplete && !isSettled && !userBet && !bettingClosed && !canPlaceBets && (
           <Card className="border-yellow-700/30">
             <CardContent className="pt-4 pb-4 flex items-center gap-3 text-sm text-muted-foreground">
               <WifiOff className="h-4 w-4 text-yellow-400 shrink-0" />

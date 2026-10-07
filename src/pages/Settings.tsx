@@ -15,7 +15,9 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSettings } from "@/contexts/SettingsContext";
+import { useDevMode } from "@/contexts/DevModeContext";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
+import { useToast } from "@/hooks/use-toast";
 import settingsConfig from "@/config/settings.json";
 
 const NOTIFICATION_FIELD_IDS = ["match-notifications", "reminder-notifications"];
@@ -24,6 +26,8 @@ export default function Settings() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { settings, updateSetting } = useSettings();
+  const { canUseDevMode, devMode, toggleDevMode, resetSandbox } = useDevMode();
+  const { toast } = useToast();
   const { supported, subscribed, loading, permission, error, toggleNotifications } =
     usePushNotifications();
   const [recording, setRecording] = useState<string | null>(null);
@@ -251,6 +255,44 @@ export default function Settings() {
             </CardContent>
           </Card>
         ))}
+
+        {/* Developer (only visible to accounts flagged is_developer) */}
+        {canUseDevMode && (
+          <Card className="mb-6 border-amber-500/40">
+            <CardHeader>
+              <CardTitle>Developer</CardTitle>
+              <CardDescription>
+                Sandbox mode: a fake event with a full match schedule and unlimited points,
+                for testing without touching real data.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="dev-mode-switch">Sandbox Mode</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Scout Dashboard shows a fake assigned schedule; nothing you do saves to your account.
+                  </p>
+                </div>
+                <Switch
+                  id="dev-mode-switch"
+                  checked={devMode}
+                  onCheckedChange={toggleDevMode}
+                />
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  resetSandbox();
+                  toast({ title: "Sandbox reset", description: "A fresh fake event/schedule will be generated next time it's viewed." });
+                }}
+              >
+                Reset Sandbox Data
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Danger Zone */}
         <Card className="border-destructive">

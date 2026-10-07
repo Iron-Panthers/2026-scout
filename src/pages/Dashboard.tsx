@@ -24,6 +24,8 @@ import {
 } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useDevMode } from "@/contexts/DevModeContext";
+import { getDevMatches, getDevMatchTeamForRole, hasDevSubmission, isDevMatchId } from "@/lib/devMode";
 import { getUserMatches, removeUserFromMatch, getEvents } from "@/lib/matches";
 import { getMatchTeam } from "@/lib/blueAlliance";
 import { filterMatchesWithoutSubmissions } from "@/lib/scoutingSchema";
@@ -53,6 +55,7 @@ interface UserMatch {
 
 export default function Dashboard() {
   const { user, profile, getAvatarUrl, refreshProfile, patchProfile } = useAuth();
+  const { devMode } = useDevMode();
   const [matches, setMatches] = useState<UserMatch[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedMatch, setSelectedMatch] = useState<UserMatch | null>(null);
@@ -95,6 +98,46 @@ export default function Dashboard() {
   // Load user's assigned matches
   const loadMatches = useCallback(async () => {
     if (!user?.id) return;
+
+    // Sandbox mode: build the list entirely from the fake generated
+    // schedule instead of Supabase/TBA, so nothing here touches real data.
+    if (devMode) {
+      try {
+        const devMatches = getDevMatches(user.id);
+        const formatted: UserMatch[] = [];
+        const teamNumbersMap: Record<string, number | null> = {};
+
+        for (const match of devMatches) {
+          const roleChecks: Array<{ column: string | null; role: Role; slot: 1 | 2 }> = [
+            { column: match.red1_scouter_id, role: "red1", slot: 1 },
+            { column: match.red2_scouter_id, role: "red2", slot: 1 },
+            { column: match.red3_scouter_id, role: "red3", slot: 1 },
+            { column: match.qual_red_scouter_id, role: "qualRed", slot: 1 },
+            { column: match.blue1_scouter_id, role: "blue1", slot: 1 },
+            { column: match.blue2_scouter_id, role: "blue2", slot: 1 },
+            { column: match.blue3_scouter_id, role: "blue3", slot: 1 },
+            { column: match.qual_blue_scouter_id, role: "qualBlue", slot: 1 },
+          ];
+          for (const { column, role, slot } of roleChecks) {
+            if (column !== user.id) continue;
+            if (hasDevSubmission(user.id, match.id, role)) continue; // already "scouted"
+            formatted.push({ matchNumber: match.name, role, slot, match });
+            if (role !== "qualRed" && role !== "qualBlue") {
+              const teamNumber = getDevMatchTeamForRole(user.id, match.match_number, role);
+              teamNumbersMap[`${match.id}-${role}`] = teamNumber;
+            }
+          }
+        }
+
+        setMatches(formatted);
+        setTeamNumbers(teamNumbersMap);
+      } catch (error) {
+        console.error("Failed to load dev sandbox matches:", error);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
 
     try {
       const { matches: userMatches } = await getUserMatches(user.id, true);
@@ -175,7 +218,7 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
     }
-  }, [user?.id]);
+  }, [user?.id, devMode]);
 
   useEffect(() => {
     loadMatches();
@@ -302,12 +345,17 @@ export default function Dashboard() {
   const handleDecline = async () => {
     if (!selectedMatch || !user?.id) return;
 
-    const success = await removeUserFromMatch(
-      selectedMatch.match.id,
-      user.id,
-      selectedMatch.role,
-      selectedMatch.slot
-    );
+    // Sandbox match — just drop it from local UI state, no real write. It's
+    // not persisted as "declined" in the fake dataset, so it reappears if
+    // the sandbox is reset/regenerated.
+    const success = isDevMatchId(selectedMatch.match.id)
+      ? true
+      : await removeUserFromMatch(
+          selectedMatch.match.id,
+          user.id,
+          selectedMatch.role,
+          selectedMatch.slot
+        );
 
     if (success) {
       // Remove from local state

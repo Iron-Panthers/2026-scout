@@ -92,7 +92,7 @@ export default function Scouting() {
       const key = e.key.toLowerCase();
       if (key === (settings["kb-add1"] ?? "z")) { e.preventDefault(); addShots(1); }
       else if (key === (settings["kb-add5"] ?? "x")) { e.preventDefault(); addShots(5); }
-      else if (key === (settings["kb-add20"] ?? "c")) { e.preventDefault(); addShots(20); }
+      else if (key === (settings["kb-add20"] ?? "c")) { e.preventDefault(); addShots(10); }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
@@ -218,17 +218,17 @@ export default function Scouting() {
 
         {/* Col 1: Shot buttons + score badge */}
         <div className="relative flex flex-col flex-[5] border-r border-border">
-          {/* +20 */}
+          {/* +10 */}
           <button
             className="flex-1 flex flex-col items-center justify-center
               bg-amber-100 dark:bg-amber-950/50
               hover:bg-amber-200 dark:hover:bg-amber-900/60
               active:bg-amber-300 dark:active:bg-amber-900/70
               border-b border-border transition-colors"
-            onPointerDown={(e) => { e.preventDefault(); addShots(20); }}
+            onPointerDown={(e) => { e.preventDefault(); addShots(10); }}
           >
             <div className="w-20 h-20 rounded-full border-2 border-amber-400/70 dark:border-amber-500/50 flex items-center justify-center bg-amber-50/60 dark:bg-amber-900/30">
-              <span className="text-2xl font-bold text-amber-700 dark:text-amber-300 tabular-nums">+20</span>
+              <span className="text-2xl font-bold text-amber-700 dark:text-amber-300 tabular-nums">+10</span>
             </div>
           </button>
 
