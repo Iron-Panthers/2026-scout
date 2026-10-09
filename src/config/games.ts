@@ -49,7 +49,7 @@ export const GAMES: GameDefinition[] = [
     id: "frcdle",
     name: "frcdle",
     description: "Spin six digits. Discover real FRC teams and their Match13 xP.",
-    cost: 5000,
+    cost: 100,
     iframeUrl: "/games/frcdle.html",
     thumbnailUrl: "/game-thumbnails/frcdle.svg",
     thumbnailFit: "contain",
