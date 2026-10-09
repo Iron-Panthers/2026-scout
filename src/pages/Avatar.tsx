@@ -1,9 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Sparkles, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSettings } from "@/contexts/SettingsContext";
 import { getGameProfile } from "@/lib/gameProfiles";
@@ -127,14 +126,6 @@ export default function AvatarPage({
                   backgroundColor: `${RARITY_CONFIG[item.rarity].color}0D`,
                 }}
               >
-                {isEquipped && (
-                  <div className={`absolute right-2 ${eventSource ? "top-8" : "top-2"}`}>
-                    <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/40 text-xs gap-1">
-                      <CheckCircle2 className="h-3 w-3" />
-                      Equipped
-                    </Badge>
-                  </div>
-                )}
                 <CardContent className="h-50 p-4 flex flex-col pb-0">
                   {eventSource && (
                     <div className="-mx-4 -mt-4 flex shrink-0 items-center justify-center gap-1 border-b border-sky-500/30 bg-sky-500/15 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-sky-300">

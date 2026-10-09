@@ -9,6 +9,7 @@
 import { supabase } from "./supabase";
 import { awardPoints, awardEventPoints } from "./gameProfiles";
 import { POINTS_PER_MATCH, EVENT_POINTS_PER_MATCH } from "@/config/games";
+import { ALL_ROLE_COLUMNS } from "./roleUtils";
 
 /**
  * Current schema version - increment when scouting data structure changes
@@ -257,6 +258,38 @@ export async function resolveMatchId(
 }
 
 /**
+ * Whether the scouter is assigned to this match in any role, as primary or co-scout.
+ */
+async function isAssignedToMatch(matchId: string, scouterId: string): Promise<boolean> {
+  const columns = ALL_ROLE_COLUMNS.map(({ column }) => column);
+  const { data, error } = await supabase
+    .from("matches")
+    .select(columns.join(", "))
+    .eq("id", matchId)
+    .maybeSingle();
+  if (error) {
+    console.error("Error checking match assignment for points:", error);
+    return false;
+  }
+  const row = data as Record<string, string | null> | null;
+  return !!row && columns.some((column) => row[column] === scouterId);
+}
+
+/**
+ * Award points + event points for a first-time submission, but only for a match
+ * the scouter was assigned to.
+ */
+async function awardMatchPoints(matchId: string, scouterId: string): Promise<void> {
+  if (!(await isAssignedToMatch(matchId, scouterId))) return;
+  awardPoints(scouterId, POINTS_PER_MATCH)
+    .then((r) => !r.success && console.error("Failed to award points for match submission:", r.error))
+    .catch((err) => console.error("Error awarding points for match submission:", err));
+  awardEventPoints(scouterId, EVENT_POINTS_PER_MATCH)
+    .then((r) => !r.success && console.error("Failed to award event points for match submission:", r.error))
+    .catch((err) => console.error("Error awarding event points for match submission:", err));
+}
+
+/**
  * Submit scouting data with current schema version
  */
 export async function submitScoutingData(
@@ -289,12 +322,7 @@ export async function submitScoutingData(
   }
 
   if (scouterId && !alreadySubmitted) {
-    awardPoints(scouterId, POINTS_PER_MATCH)
-      .then((r) => !r.success && console.error("Failed to award points for match submission:", r.error))
-      .catch((err) => console.error("Error awarding points for match submission:", err));
-    awardEventPoints(scouterId, EVENT_POINTS_PER_MATCH)
-      .then((r) => !r.success && console.error("Failed to award event points for match submission:", r.error))
-      .catch((err) => console.error("Error awarding event points for match submission:", err));
+    void awardMatchPoints(matchId, scouterId);
   }
 
   return data as ScoutingSubmission;
@@ -339,12 +367,7 @@ export async function submitQualScoutingData(
   }
 
   if (scouterId && !alreadySubmitted) {
-    awardPoints(scouterId, POINTS_PER_MATCH)
-      .then((r) => !r.success && console.error("Failed to award points for match submission:", r.error))
-      .catch((err) => console.error("Error awarding points for match submission:", err));
-    awardEventPoints(scouterId, EVENT_POINTS_PER_MATCH)
-      .then((r) => !r.success && console.error("Failed to award event points for match submission:", r.error))
-      .catch((err) => console.error("Error awarding event points for match submission:", err));
+    void awardMatchPoints(matchId, scouterId);
   }
 
   return data as QualScoutingSubmission;

@@ -374,6 +374,13 @@ export default function MatchBetting() {
     setUserBet(ub);
   }, [match_id, user?.id, betCurrency]);
 
+  // Re-read the match row (winner, scores) from the DB.
+  const refetchMatch = useCallback(async () => {
+    if (!match_id) return;
+    const { data, error } = await supabase.from("matches").select("*").eq("id", match_id).maybeSingle();
+    if (!error && data) setMatch(data as Match);
+  }, [match_id]);
+
   // Refetch this match's active bet whenever the selected currency changes.
   useEffect(() => {
     refreshUserBet();
@@ -492,14 +499,18 @@ export default function MatchBetting() {
 
         const tba_scores = await getMatchScores(eventCode, m.match_number);
         let results: Match13Match["result"] = { winner: null, red_score: null, blue_score: null };
-        if (tba_scores !== null && tba_scores.length == 2 && tba_scores[0] > 0 && tba_scores[1] > 0) {
+        // TBA reports -1 for an unplayed match; 0 is a real score, and equal scores are a tie.
+        const [redScore, blueScore] = tba_scores ?? [];
+        if (typeof redScore === "number" && typeof blueScore === "number" && redScore >= 0 && blueScore >= 0) {
           results = {
-            winner: tba_scores[0] > tba_scores[1] ? 'red' : 'blue', red_score: tba_scores[0], blue_score: tba_scores[1]
+            winner: redScore > blueScore ? "red" : blueScore > redScore ? "blue" : "tie",
+            red_score: redScore,
+            blue_score: blueScore,
           };
           // Cache scores in DB to avoid repeated API calls
-          if (isOnline && (m.red_score !== tba_scores[0] || m.blue_score !== tba_scores[1])) {
+          if (isOnline && (m.red_score !== redScore || m.blue_score !== blueScore)) {
             void supabase.from("matches")
-              .update({ red_score: tba_scores[0], blue_score: tba_scores[1] })
+              .update({ red_score: redScore, blue_score: blueScore })
               .eq("id", match_id);
           }
         }
@@ -589,31 +600,8 @@ export default function MatchBetting() {
       }
 
       setLoading(false);
-
-      // Auto-settle: fire when a winner is known (from match13/TBA or already stored
-      // in the DB by sync-match-results) AND there are still pending bets to process.
-      const knownWinner = (m.winning_alliance ?? m13?.result?.winner) as "red" | "blue" | "tie" | null | undefined;
-      const hasPendingBets = loadedBets.some((b) => b.status === "pending");
-      if (
-        isOnline &&
-        !settledRef.current &&
-        knownWinner &&
-        hasPendingBets
-      ) {
-        settledRef.current = true;
-        if (!cancelled) setAutoSettling(true);
-        const prob = m13?.pred?.red_win_prob ?? 0.5;
-        await settleMatchBets(match_id!, knownWinner, prob);
-        // Reload match + user data
-        const { data: refreshed } = await supabase
-          .from("matches").select("*").eq("id", match_id).maybeSingle();
-        if (refreshed && !cancelled) setMatch(refreshed as Match);
-        if (!cancelled) {
-          setAutoSettling(false);
-          await refreshUserBet();
-          await refreshPoints();
-        }
-      }
+      // Auto-settle runs from its own effect below, so it also fires for a
+      // winner that arrives after this initial load.
     }
 
     load();
@@ -642,10 +630,73 @@ export default function MatchBetting() {
       }, (payload) => {
         setMatch((prev) => prev ? { ...prev, ...(payload.new as Partial<Match>) } : prev);
       })
-      .subscribe();
+      .subscribe((status) => {
+        // Realtime doesn't replay changes made while the socket was down, so
+        // re-read the match whenever the channel (re)joins.
+        if (status === "SUBSCRIBED") void refetchMatch();
+      });
 
     return () => { if (channelRef.current) supabase.removeChannel(channelRef.current); };
-  }, [match_id, isOnline, devMode]);
+  }, [match_id, isOnline, devMode, refetchMatch]);
+
+  // ---------------------------------------------------------------------------
+  // Result resync — on a flaky connection the one sync at load, or the realtime
+  // UPDATE, can be lost. Until a winner is known, keep asking sync-match-results
+  // to pull it from TBA and re-read the row: every 30s, on reconnect, and when
+  // the tab comes back into view.
+  // ---------------------------------------------------------------------------
+  const hasWinner = !!match?.winning_alliance;
+  useEffect(() => {
+    if (!match_id || !isOnline || hasWinner || (devMode && isDevMatchId(match_id))) return;
+
+    const resync = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        await supabase.functions.invoke("sync-match-results", {
+          headers: session ? { Authorization: `Bearer ${session.access_token}` } : undefined,
+        });
+      } catch { /* still re-read the row below */ }
+      await refetchMatch();
+    };
+    const onVisible = () => { if (document.visibilityState === "visible") void resync(); };
+
+    void resync();
+    const timer = setInterval(() => void resync(), 30_000);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [match_id, isOnline, hasWinner, devMode, refetchMatch]);
+
+  // ---------------------------------------------------------------------------
+  // Auto-settle: once a winner is known (stored by sync-match-results or read
+  // from TBA) and this match still has pending bets, settle them — whether the
+  // winner was there at load or arrived later.
+  // ---------------------------------------------------------------------------
+  const knownWinner = (match?.winning_alliance ?? m13Match?.result?.winner) as "red" | "blue" | "tie" | null | undefined;
+  const hasPendingBets = bets.some((b) => b.status === "pending");
+  useEffect(() => {
+    if (!match_id || !isOnline || settledRef.current || !knownWinner || !hasPendingBets) return;
+    if (devMode && isDevMatchId(match_id)) return;
+    settledRef.current = true;
+    setAutoSettling(true);
+    (async () => {
+      try {
+        const result = await settleMatchBets(match_id, knownWinner, m13Match?.pred?.red_win_prob ?? 0.5);
+        if (!result.success) throw new Error(result.error);
+        await refetchMatch();
+        await refreshUserBet();
+        await refreshPoints();
+      } catch (err) {
+        // Let a later winner/bets update retry instead of staying stuck.
+        console.error("Auto-settle failed:", err);
+        settledRef.current = false;
+      } finally {
+        setAutoSettling(false);
+      }
+    })();
+  }, [match_id, isOnline, knownWinner, hasPendingBets, devMode, m13Match?.pred?.red_win_prob, refetchMatch, refreshUserBet, refreshPoints]);
 
   // ---------------------------------------------------------------------------
   // Countdown timer — ticks every second while pred_time is in the future

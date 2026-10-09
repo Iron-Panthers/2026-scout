@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FRCDLE_XP_CDF, FRCDLE_XP_TABLE_MAX } from "@/config/frcdleRarity";
 import { useAuth } from "@/contexts/AuthContext";
+import { useDevMode } from "@/contexts/DevModeContext";
 import { CURRENT_YEAR, getTeamLogo } from "@/lib/blueAlliance";
+import { getDevFrcdleSpins, getOrCreateDevFrcdleSpin } from "@/lib/devMode";
 import { supabase } from "@/lib/supabase";
 
 interface DailySpin {
@@ -109,11 +111,20 @@ function nextResetAt(date: Date, timeZone: string): Date {
   return target;
 }
 
-// Highest combined xP any roll can score, from the generated rarity table (1548.25 on 111148 for 2026).
+// Highest combined xP any roll can score, from the generated rarity table (1188.93 on 111148 for 2026, with digit multipliers).
 const XP_THEORETICAL_MAX = FRCDLE_XP_TABLE_MAX;
 
 // Delay before each digit locks in, measured from the previous digit (ms).
 const REVEAL_DELAYS_MS = [1000, 1000, 1000, 1000, 1500, 2000];
+
+// Balancing: short team numbers turn up in far more rolls, so they score less.
+// Keep in sync with DIGIT_MULTIPLIERS in scripts/frcdle-rarity/generate_table.py.
+const DIGIT_MULTIPLIERS: Record<number, number> = { 2: 0.6, 3: 0.8, 4: 1, 5: 1.2 };
+
+/** xP multiplier for a team, by how many digits its number has. */
+function xpMultiplier(teamNumber: number): number {
+  return DIGIT_MULTIPLIERS[String(teamNumber).length] ?? 1;
+}
 // Time each found team holds the spotlight before the next one appears (ms).
 const TEAM_REVEAL_MS = 2000;
 
@@ -333,6 +344,7 @@ function AllTeamsPage({ snapshot, earned, onBack }: {
 
 export function FrcdleGame() {
   const { user } = useAuth();
+  const { devMode } = useDevMode();
   const [spin, setSpin] = useState<DailySpin | null>(null);
   const [revealCount, setRevealCount] = useState(0);
   const [isRevealing, setIsRevealing] = useState(false);
@@ -355,6 +367,13 @@ export function FrcdleGame() {
   const number = spin?.spin_number ?? "000000";
 
   const fetchTodaySpin = useCallback(async (action: "status" | "spin") => {
+    // Sandbox rolls stay in the sandbox and never touch the account's real rolls.
+    if (devMode && user?.id) {
+      return {
+        spin: getOrCreateDevFrcdleSpin(user.id, localSpinDay(new Date(), timeZone), action === "spin"),
+        timeZone,
+      };
+    }
     const { data, error: invokeError } = await supabase.functions.invoke("frcdle-spin", {
       body: { action, timeZone },
     });
@@ -364,7 +383,7 @@ export function FrcdleGame() {
       spin: data?.spin as DailySpin | null,
       timeZone: data?.timeZone as string || timeZone,
     };
-  }, [timeZone]);
+  }, [devMode, user?.id, timeZone]);
 
   const resolveTeamResults = useCallback(async (spinNumber: string): Promise<FoundTeam[]> => {
     setIsResolvingTeams(true);
@@ -418,7 +437,9 @@ export function FrcdleGame() {
     if (!user?.id) return;
     let mounted = true;
     Promise.all([
-      supabase.from("frcdle_spins").select("spin_day, spin_number").eq("user_id", user.id),
+      devMode
+        ? Promise.resolve({ data: getDevFrcdleSpins(user.id), error: null })
+        : supabase.from("frcdle_spins").select("spin_day, spin_number").eq("user_id", user.id),
       loadSeasonSnapshot(),
     ])
       .then(([{ data, error: spinsError }, seasonTeams]) => {
@@ -428,14 +449,14 @@ export function FrcdleGame() {
         setPastRollsByDay(new Map((data ?? []).map(({ spin_day, spin_number }) => {
           const counts = [...rollTeamCounts(spin_number as string)].filter(([teamNumber]) => seasonTeams.has(teamNumber));
           return [spin_day as string, {
-            xp: boundedRollXp(counts.reduce((total, [teamNumber, count]) => total + seasonTeams.get(teamNumber)!.xp * count, 0)),
+            xp: boundedRollXp(counts.reduce((total, [teamNumber, count]) => total + seasonTeams.get(teamNumber)!.xp * xpMultiplier(teamNumber) * count, 0)),
             teamNumbers: counts.map(([teamNumber]) => teamNumber),
           }];
         })));
       })
       .catch((cause) => console.error("Could not load lifetime FRCdle xP:", cause));
     return () => { mounted = false; };
-  }, [user?.id]);
+  }, [user?.id, devMode]);
 
   useEffect(() => {
     const interval = window.setInterval(() => setNow(new Date()), 30_000);
@@ -500,7 +521,7 @@ export function FrcdleGame() {
     ))
     : teams;
   const spotlightTeam = teamReveal ? visibleTeams[teamReveal.shownTeams - 1]?.teamNumber : undefined;
-  const xpTotal = visibleTeams.reduce((total, team) => total + team.xp * team.count, 0);
+  const xpTotal = visibleTeams.reduce((total, team) => total + team.xp * xpMultiplier(team.teamNumber) * team.count, 0);
   const highlightedDigits = teamReveal?.digits;
   const boundedXpTotal = boundedRollXp(xpTotal);
   // Today's roll counts once its teams are on screen, so the reveal isn't spoiled.
@@ -562,6 +583,34 @@ export function FrcdleGame() {
               {isRevealing || isRevealingTeams ? "Revealing…" : isLoadingSpin ? "Checking spin…" : hasSpunToday ? "Already spun today" : "Spin today's number"}
             </Button>
           </div>
+          {spin && revealCount === 6 && (
+            <div className="mt-4 grid grid-cols-3 gap-2 border-t border-border pt-4 text-center sm:gap-4">
+              <div className="min-w-0">
+                <div className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground sm:text-xs">Combined xP</div>
+                <div className="mt-1 text-xl font-black tabular-nums sm:text-3xl">{boundedXpTotal.toFixed(1)}</div>
+              </div>
+              <div className="min-w-0">
+                <div className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground sm:text-xs">Lifetime xP</div>
+                <div className="mt-1 text-xl font-black tabular-nums sm:text-3xl">{pastRollsByDay ? lifetimeXp.toFixed(1) : "—"}</div>
+                <div className="mt-1 text-[10px] text-muted-foreground sm:text-xs">
+                  Across {lifetimeRolls} {lifetimeRolls === 1 ? "roll" : "rolls"}
+                </div>
+              </div>
+              <div className="min-w-0">
+                <div className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground sm:text-xs">Rarity</div>
+                {rarity ? (
+                  <div className="mt-1 flex flex-col items-center gap-1">
+                    <span className="text-xl font-black tabular-nums sm:text-3xl">{percentile!.toFixed(1)}%</span>
+                    <Badge variant="outline" className={`px-1.5 py-0.5 text-[10px] font-bold sm:px-2.5 sm:py-1 sm:text-sm ${RARITY_STYLES[rarity]}`}>{rarity}</Badge>
+                  </div>
+                ) : (
+                  <p className="mt-1 text-[10px] leading-relaxed text-muted-foreground sm:text-xs">
+                    {isRevealingTeams ? "Rarity appears once every team is revealed." : "No team xP to score this draw."}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
         </section>
 
         {error && (
@@ -573,68 +622,47 @@ export function FrcdleGame() {
         )}
 
         {spin && revealCount === 6 && (
-          <div className="grid gap-4 lg:grid-cols-[1fr_250px]">
-            <section className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h2 className="text-base font-bold">Teams in {spin.spin_number}</h2>
-                {isResolvingTeams && <span className="flex items-center gap-1.5 text-xs text-muted-foreground"><LoaderCircle className="h-3.5 w-3.5 animate-spin" />Searching teams & xP</span>}
+          <section className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-bold">Teams in {spin.spin_number}</h2>
+              {isResolvingTeams && <span className="flex items-center gap-1.5 text-xs text-muted-foreground"><LoaderCircle className="h-3.5 w-3.5 animate-spin" />Searching teams & xP</span>}
+            </div>
+            {!isResolvingTeams && teams.length === 0 && !error && (
+              <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+                There is nothing.
               </div>
-              {!isResolvingTeams && teams.length === 0 && !error && (
-                <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
-                  There is nothing.
+            )}
+            {/* Newest team first, so each reveal pushes the earlier ones down. */}
+            {[...visibleTeams].reverse().map((team) => (
+              <article
+                key={team.teamNumber}
+                className={`flex items-center gap-3 rounded-md border bg-card/90 p-3 transition-colors duration-300 ${isRevealingTeams ? "frcdle-card-in" : ""} ${spotlightTeam === team.teamNumber ? "border-amber-400/70" : "border-border"}`}
+              >
+                {team.logo ? (
+                  <img src={team.logo} alt={`Team ${team.teamNumber} logo`} className="h-12 w-12 rounded-md bg-white object-contain p-1" />
+                ) : (
+                  <div className="flex h-12 w-12 items-center justify-center rounded-md bg-muted text-xs font-bold text-muted-foreground">{team.teamNumber}</div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-semibold text-sky-300">FRC {team.teamNumber}</div>
+                  <div className="truncate font-semibold">{team.name}</div>
                 </div>
-              )}
-              {visibleTeams.map((team) => (
-                <article
-                  key={team.teamNumber}
-                  className={`flex items-center gap-3 rounded-md border bg-card/90 p-3 transition-colors duration-300 ${isRevealingTeams ? "frcdle-team-in" : ""} ${spotlightTeam === team.teamNumber ? "border-amber-400/70" : "border-border"}`}
-                >
-                  {team.logo ? (
-                    <img src={team.logo} alt={`Team ${team.teamNumber} logo`} className="h-12 w-12 rounded-md bg-white object-contain p-1" />
-                  ) : (
-                    <div className="flex h-12 w-12 items-center justify-center rounded-md bg-muted text-xs font-bold text-muted-foreground">{team.teamNumber}</div>
+                <div className="text-right">
+                  <div className="text-[10px] uppercase text-muted-foreground">Scored xP</div>
+                  <div className="font-mono text-lg font-bold tabular-nums">{(team.xp * xpMultiplier(team.teamNumber)).toFixed(1)}</div>
+                  {xpMultiplier(team.teamNumber) !== 1 && (
+                    <div className="text-[10px] tabular-nums text-muted-foreground">
+                      {team.xp.toFixed(1)} × {xpMultiplier(team.teamNumber)}
+                    </div>
                   )}
-                  <div className="min-w-0 flex-1">
-                    <div className="text-xs font-semibold text-sky-300">FRC {team.teamNumber}</div>
-                    <div className="truncate font-semibold">{team.name}</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-[10px] uppercase text-muted-foreground">2026 xP</div>
-                    <div className="font-mono text-lg font-bold tabular-nums">{team.xp.toFixed(1)}</div>
-                    <div className="text-[10px] tabular-nums text-muted-foreground">#{team.rank.toLocaleString()} of {team.rankTotal.toLocaleString()}</div>
-                  </div>
-                  {team.count > 1 && (
-                    <div key={team.count} className={`shrink-0 font-mono text-lg font-black tabular-nums text-amber-300 ${isRevealingTeams ? "frcdle-team-in" : ""}`}>x{team.count}</div>
-                  )}
-                </article>
-              ))}
-            </section>
-
-            <aside className="rounded-lg border border-border bg-card/90 p-4">
-              <div className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Combined xP</div>
-              <div className="mt-1 text-4xl font-black tabular-nums">{boundedXpTotal.toFixed(1)}</div>
-              <div className="mt-3 text-xs font-bold uppercase tracking-wide text-muted-foreground">Lifetime xP</div>
-              <div className="mt-1 text-2xl font-black tabular-nums">{pastRollsByDay ? lifetimeXp.toFixed(1) : "—"}</div>
-              <div className="mt-1 text-xs text-muted-foreground">
-                Across {lifetimeRolls} {lifetimeRolls === 1 ? "roll" : "rolls"}
-              </div>
-              <div className="my-4 h-px bg-border" />
-              {rarity ? (
-                <>
-                  <Badge variant="outline" className={`px-2.5 py-1 text-sm font-bold ${RARITY_STYLES[rarity]}`}>{rarity}</Badge>
-                  <div className="mt-3 text-2xl font-black tabular-nums">{percentile!.toFixed(1)}%</div>
-                  <div className="text-xs text-muted-foreground">rarity percentile</div>
-                </>
-              ) : (
-                <p className="text-xs leading-relaxed text-muted-foreground">
-                  {isRevealingTeams ? "Rarity appears once every team is revealed." : "No team xP to score this draw."}
-                </p>
-              )}
-              <p className="mt-4 text-[10px] leading-relaxed text-muted-foreground/70">
-                Ranked against the combined xP of all 1,000,000 possible rolls.
-              </p>
-            </aside>
-          </div>
+                  <div className="text-[10px] tabular-nums text-muted-foreground">#{team.rank.toLocaleString()} of {team.rankTotal.toLocaleString()}</div>
+                </div>
+                {team.count > 1 && (
+                  <div key={team.count} className={`shrink-0 font-mono text-lg font-black tabular-nums text-amber-300 ${isRevealingTeams ? "frcdle-team-in" : ""}`}>x{team.count}</div>
+                )}
+              </article>
+            ))}
+          </section>
         )}
       </div>
       <style>{`
@@ -648,12 +676,18 @@ export function FrcdleGame() {
           to { opacity: 1; transform: none; }
         }
         .frcdle-team-in { animation: frcdle-team-in 350ms ease-out; }
+        /* New team card grows from nothing at the top of the list, easing the others down. */
+        @keyframes frcdle-card-in {
+          from { opacity: 0; max-height: 0; padding-top: 0; padding-bottom: 0; transform: translateY(-6px); }
+          to { opacity: 1; max-height: 120px; transform: none; }
+        }
+        .frcdle-card-in { overflow: hidden; animation: frcdle-card-in 400ms ease-out; }
         @keyframes frcdle-digit-land {
           from { transform: scale(1.35); }
           to { transform: scale(1); }
         }
         .frcdle-digit-land { animation: frcdle-digit-land 500ms cubic-bezier(0.2, 0.8, 0.3, 1); }
-        @media (prefers-reduced-motion: reduce) { .frcdle-team-in, .frcdle-digit-land { animation: none; } }
+        @media (prefers-reduced-motion: reduce) { .frcdle-team-in, .frcdle-card-in, .frcdle-digit-land { animation: none; } }
       `}</style>
     </div>
   );

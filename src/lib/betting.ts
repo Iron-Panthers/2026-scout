@@ -180,17 +180,18 @@ export function computeTimeDecayFactor(
 // Probability-adjusted payout formula
 // ---------------------------------------------------------------------------
 /**
- * Calculates the payout multiplier given the predicted win probability.
+ * Payout for a winning bet.
  *
- * Formula: effectiveMultiplier = min(fairMultiplier, maxMultiplier)
- *   - fairMultiplier = 1/p_winner  (e.g. 80% fav → 1.25×, 20% underdog → 5×)
- *   - maxMultiplier  = totalPool / winnerPool  (can never exceed pool)
+ *   multiplier = 2 × (1 − p)^1.6 + 1.6        (1.6× for a sure thing → 3.6× for a total upset)
+ *   decayScale = 0.8 + 0.2 × timeDecayFactor  (late bets keep 80–100% of their share)
+ *   payout     = floor(amount / winnerPool × decayScale × totalPool × multiplier)
  *
- * This naturally rewards underdogs:
- *   • When underdog wins, winnerPool is small → maxMultiplier is high → pays fair odds
- *   • When favorite wins, fairMultiplier is small → caps payout → some points are burned
- *   • At 50/50 (no data): both equal → behaves like pure parimutuel
+ * so a bettor gets their share of the whole pool, scaled up more the less
+ * likely the winning side was. The multiplier is always ≥ 1.6, so payouts are
+ * minted on top of the pool rather than limited to it. Every winning bet gets
+ * at least `amount + 10`; a winnerPool of 0 just refunds.
  *
+ * @param winnerPredictedProb - match13's pre-match probability for the side that won (p)
  * @param timeDecayFactor - 0–1 multiplier from computeTimeDecayFactor (default 1.0)
  */
 export function calcPayout(
@@ -559,7 +560,7 @@ export async function settleMatchBets(
   // Check not already settled
   const { data: matchRow } = await supabase
     .from("matches")
-    .select("winning_alliance, pred_time")
+    .select("winning_alliance, pred_time, match13_red_win_prob")
     .eq("id", matchId)
     .maybeSingle();
 
@@ -591,12 +592,16 @@ export async function settleMatchBets(
 
   // Predicted probability for the winning side (same for both pools — it's
   // about the match outcome, not the currency).
+  // Prefer the prediction stored on the match (match13 freezes it once the
+  // match is played), so every caller settles with the same odds; fall back to
+  // the caller's value only when none is stored.
+  const redWinProb: number = matchRow?.match13_red_win_prob ?? statboticsRedWinProb;
   const p_winner =
     effectiveWinner === "tie"
       ? 0.5
       : (effectiveWinner === "red"
-      ? statboticsRedWinProb
-      : 1 - statboticsRedWinProb);
+      ? redWinProb
+      : 1 - redWinProb);
 
   // Points and event-points bets form entirely separate parimutuel pools —
   // an event bettor's payout must only ever come from other event bettors.
@@ -615,7 +620,7 @@ export async function settleMatchBets(
       let payout = 0;
       let status: "won" | "lost" = "lost";
 
-      const timeDecayFactor = computeTimeDecayFactor(matchPredTime, bet.created_at);
+      const timeDecayFactor = computeTimeDecayFactor(bet.created_at, matchPredTime);
 
       if (effectiveWinner === "tie") {
         // Refund on tie (no time decay on refunds)

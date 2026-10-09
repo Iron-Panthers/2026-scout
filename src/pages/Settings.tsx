@@ -283,17 +283,9 @@ export default function Settings() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={async () => {
-                  try {
-                    await resetSandbox();
-                    toast({ title: "Sandbox reset", description: "Your data has been reset." });
-                  } catch (cause) {
-                    toast({
-                      title: "Sandbox reset, but FRCdle roll was not",
-                      description: cause instanceof Error ? cause.message : "Could not reset the FRCdle roll.",
-                      variant: "destructive",
-                    });
-                  }
+                onClick={() => {
+                  resetSandbox();
+                  toast({ title: "Sandbox reset", description: "Your data has been reset." });
                 }}
               >
                 Reset Sandbox Data

@@ -2,12 +2,16 @@
 
 Scores all 1,000,000 six-digit FRCdle rolls the same way FrcdleGame does
 (every 2-5 digit window without a leading zero, a team counted once per
-appearance, teams missing from the snapshot count 0) and writes a CDF table:
+appearance and scaled by its digit-count multiplier, teams missing from the
+snapshot count 0) and writes a CDF table:
 for each xP breakpoint, the percent of rolls that score strictly less.
 
 Usage: python3 -I scripts/frcdle-rarity/generate_table.py src/config/frcdleSnapshot2026.json src/config/frcdleRarity.ts
 """
 import bisect, json, sys
+
+# Keep in sync with DIGIT_MULTIPLIERS in src/components/FrcdleGame.tsx.
+DIGIT_MULTIPLIERS = {2: 0.6, 3: 0.8, 4: 1.0, 5: 1.2}
 
 snapshot_path, out_path = sys.argv[1], sys.argv[2]
 snapshot = json.load(open(snapshot_path))
@@ -25,7 +29,7 @@ for n in range(1_000_000):
                 team = int(window)
                 if team in xp:
                     seen.append(team)
-    total = round(sum(xp[team] for team in seen), 2)
+    total = round(sum(xp[team] * DIGIT_MULTIPLIERS[len(str(team))] for team in seen), 2)
     totals.append(total)
     if total > best[0]:
         best = (total, digits, sorted(seen))
@@ -50,4 +54,3 @@ with open(out_path, "w") as out:
 
 print(f"{len(xp)} rated teams; max {best[0]} on roll {best[1]} {best[2]}; {len(cdf)} breakpoints")
 print("median", totals[count // 2], "p90", totals[int(count * 0.9)], "p99", totals[int(count * 0.99)])
-print("rolls above 871:", count - bisect.bisect_right(totals, 871))

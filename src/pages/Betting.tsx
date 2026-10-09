@@ -932,12 +932,14 @@ export default function Betting({
 
     if (!activeEvent) { setLoading(false); return; }
 
-    const { data: matchRows } = await supabase
+    const { data: matchRows, error: matchRowsError } = await supabase
       .from("matches")
       .select("*")
       .eq("event_id", activeEvent.id)
       .order("match_number");
     if (isStale()) return;
+    // A failed read on a bad connection would otherwise blank the list until the next poll.
+    if (matchRowsError) { setLoading(false); return; }
 
     const rows = (matchRows ?? []) as Match[];
     setMatches(rows);

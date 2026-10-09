@@ -38,6 +38,12 @@ const TEAM_NICKNAMES = [
   "Fault Tolerant", "Chain Reaction", "Torque Titans", "Redline", "Byte Force",
 ];
 
+export interface DevFrcdleSpin {
+  spin_day: string;
+  spin_number: string;
+  created_at: string;
+}
+
 interface DevData {
   event: Event;
   matches: Match[];
@@ -48,6 +54,8 @@ interface DevData {
   sandboxRosters?: Record<string, Roster[]>;
   sandboxPicklists?: Record<string, { picked_team_numbers: number[]; do_not_pick_team_numbers: number[] }>;
   sandboxBets?: Bet[];
+  /** FRCdle daily rolls made in the sandbox, kept apart from the account's real rolls. */
+  sandboxFrcdleSpins?: DevFrcdleSpin[];
   teams: Array<{ team_number: number; nickname: string }>;
   gameProfile: GameProfile;
   scoutingSubmissions: Array<{
@@ -126,8 +134,9 @@ function createAllianceTeams(teamNumbers: number[]): { red: number[]; blue: numb
   };
 }
 
+// Red's predicted win chance, anywhere from a sure loss/win (0% / 100%) to a coin flip.
 function randomWinProbability(): number {
-  return Math.round((0.2 + Math.random() * 0.6) * 1000) / 1000;
+  return Math.round(Math.random() * 1000) / 1000;
 }
 
 function createDevMatch(
@@ -319,6 +328,32 @@ export function resetDevData(userId: string): void {
   try {
     localStorage.removeItem(dataKey(userId));
   } catch { /* ignore */ }
+}
+
+// ---------------------------------------------------------------------------
+// FRCdle (sandbox stand-in for the frcdle-spin edge function)
+// ---------------------------------------------------------------------------
+
+export function getDevFrcdleSpins(userId: string): DevFrcdleSpin[] {
+  return getDevData(userId).sandboxFrcdleSpins ?? [];
+}
+
+/** The sandbox roll for `spinDay`, creating one when `create` is set and none exists. */
+export function getOrCreateDevFrcdleSpin(userId: string, spinDay: string, create: boolean): DevFrcdleSpin | null {
+  const data = getDevData(userId);
+  const spins = data.sandboxFrcdleSpins ?? [];
+  const existing = spins.find((spin) => spin.spin_day === spinDay);
+  if (existing || !create) return existing ?? null;
+  const value = new Uint32Array(1);
+  crypto.getRandomValues(value);
+  const spin: DevFrcdleSpin = {
+    spin_day: spinDay,
+    spin_number: String(value[0] % 1_000_000).padStart(6, "0"),
+    created_at: new Date().toISOString(),
+  };
+  data.sandboxFrcdleSpins = [...spins, spin];
+  saveDevData(userId, data);
+  return spin;
 }
 
 // ---------------------------------------------------------------------------
