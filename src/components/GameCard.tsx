@@ -34,7 +34,7 @@ export function GameCard({ game, isUnlocked, userPoints, isPlayable, onBuy, onPl
           <img
             src={game.thumbnailUrl}
             alt={game.name}
-            className="absolute inset-0 w-full h-full object-cover"
+            className={`absolute inset-0 w-full h-full ${game.thumbnailFit === "contain" ? "object-contain p-3" : "object-cover"}`}
             onError={(e) => {
               e.currentTarget.style.display = "none";
             }}

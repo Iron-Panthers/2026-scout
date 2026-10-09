@@ -13,7 +13,8 @@ export const AVATAR_SUBTITLES = [
   "*Insert shameless plugin here*",
   "Did you get them all?",
   "Will we ever add verity?",
-  "Don't tell anyone but we think you're the best scouter"
+  "Don't tell anyone but we think you're the best scouter",
+  "Guh"
 ];
 
 export const BETTING_SUBTITLES = [

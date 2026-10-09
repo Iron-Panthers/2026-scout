@@ -1,5 +1,21 @@
 # Edge Function Deployment Guide
 
+## frcdle Daily Game
+
+Apply the daily-spin table migration, then deploy both functions:
+
+```bash
+npx supabase db push
+npx supabase functions deploy frcdle-spin
+npx supabase functions deploy frcdle-team-xp
+```
+
+The functions use Supabase's built-in `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and
+`SUPABASE_SERVICE_ROLE_KEY` environment values. No Match13 API key is needed:
+the xP resolver fetches public team-page markdown server-side and spaces
+requests at least two seconds apart. The game uses the browser's local time
+zone and starts a new daily draw at 9:00 AM local time.
+
 ## Prerequisites
 
 1. **Supabase CLI** - Install if you haven't:

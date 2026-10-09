@@ -45,6 +45,15 @@ export const GAMES: GameDefinition[] = [
     iframeUrl: "https://77pen.github.io/p8/subway-surfers-newyork/",
     thumbnailUrl: "/game-thumbnails/subway-surfers.avif",
   },
+  {
+    id: "frcdle",
+    name: "frcdle",
+    description: "Spin six digits. Discover real FRC teams and their Match13 xP.",
+    cost: 5000,
+    iframeUrl: "/games/frcdle.html",
+    thumbnailUrl: "/game-thumbnails/frcdle.svg",
+    thumbnailFit: "contain",
+  },
 ];
 
 // Ensure no duplicate IDs at module load time (dev guard)

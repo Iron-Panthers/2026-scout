@@ -7,11 +7,13 @@ VALUES ('avatars', 'avatars', true)
 ON CONFLICT (id) DO NOTHING;
 
 -- Anyone can view avatars (public bucket)
+DROP POLICY IF EXISTS "Avatars are publicly viewable" ON storage.objects;
 CREATE POLICY "Avatars are publicly viewable"
   ON storage.objects FOR SELECT
   USING (bucket_id = 'avatars');
 
 -- Users can only upload/update their own avatar (stored at {userId}/avatar.{ext})
+DROP POLICY IF EXISTS "Users can upload their own avatar" ON storage.objects;
 CREATE POLICY "Users can upload their own avatar"
   ON storage.objects FOR INSERT
   WITH CHECK (
@@ -19,6 +21,7 @@ CREATE POLICY "Users can upload their own avatar"
     auth.uid()::text = (storage.foldername(name))[1]
   );
 
+DROP POLICY IF EXISTS "Users can update their own avatar" ON storage.objects;
 CREATE POLICY "Users can update their own avatar"
   ON storage.objects FOR UPDATE
   USING (
@@ -26,6 +29,7 @@ CREATE POLICY "Users can update their own avatar"
     auth.uid()::text = (storage.foldername(name))[1]
   );
 
+DROP POLICY IF EXISTS "Users can delete their own avatar" ON storage.objects;
 CREATE POLICY "Users can delete their own avatar"
   ON storage.objects FOR DELETE
   USING (

@@ -16,17 +16,20 @@ CREATE TABLE IF NOT EXISTS picklists (
 
 ALTER TABLE picklists ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view own picklists" ON picklists;
 CREATE POLICY "Users can view own picklists" ON picklists FOR SELECT
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can insert own picklists" ON picklists;
 CREATE POLICY "Users can insert own picklists" ON picklists FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update own picklists" ON picklists;
 CREATE POLICY "Users can update own picklists" ON picklists FOR UPDATE
   USING (auth.uid() = user_id);
 
-CREATE INDEX idx_picklists_user_id ON picklists(user_id);
-CREATE INDEX idx_picklists_event_id ON picklists(event_id);
+CREATE INDEX IF NOT EXISTS idx_picklists_user_id ON picklists(user_id);
+CREATE INDEX IF NOT EXISTS idx_picklists_event_id ON picklists(event_id);
 
 CREATE OR REPLACE FUNCTION update_picklists_updated_at()
 RETURNS TRIGGER AS $$
@@ -36,6 +39,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS picklists_updated_at ON picklists;
 CREATE TRIGGER picklists_updated_at
   BEFORE UPDATE ON picklists
   FOR EACH ROW EXECUTE FUNCTION update_picklists_updated_at();

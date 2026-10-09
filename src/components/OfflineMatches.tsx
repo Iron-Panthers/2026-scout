@@ -334,7 +334,7 @@ export default function OfflineMatches() {
             <CloudOff className="h-5 w-5" />
             Offline Matches
             {pendingMatches.length > 0 && (
-              <Badge variant="destructive" className="ml-2">
+              <Badge className="ml-2">
                 {pendingMatches.length} pending
               </Badge>
             )}
@@ -473,7 +473,7 @@ function MatchRow({
                 <AlertCircle className="h-4 w-4 text-yellow-600" title="Not found in database" />
               ) : null
             ) : (
-              <Badge variant="destructive" className="text-xs">Not Uploaded</Badge>
+              <Badge className="text-xs">Not Uploaded</Badge>
             )}
           </div>
           <div className="text-xs text-muted-foreground mt-1">

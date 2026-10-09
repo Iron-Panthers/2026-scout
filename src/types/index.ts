@@ -218,6 +218,8 @@ export interface GameDefinition {
   cost: number;
   iframeUrl: string;
   thumbnailUrl: string;
+  /** "contain" shows the whole thumbnail (e.g. a wide logo) instead of cropping it to fill. Defaults to "cover". */
+  thumbnailFit?: "cover" | "contain";
 }
 
 export interface GameProfile {
