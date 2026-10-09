@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { TableRow, TableCell } from "@/components/ui/table";
 import CosmeticAvatar from "@/components/CosmeticAvatar";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, X, Check } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import type { Role, MatchAssignment, Profile } from "@/types";
 
 const getRoleCellColor = (role: Role) => {
@@ -41,7 +41,8 @@ export const MatchRow = memo(
   }: MatchRowProps) => {
     return (
       <TableRow>
-        <TableCell className="border-r border-border">
+        {/* Keep the right padding the table drops for checkbox cells, so the box stays centered. */}
+        <TableCell className="border-r border-border [&:has([role=checkbox])]:pr-2">
           <div className="flex items-center justify-center">
             <Checkbox
               checked={isSelected}
@@ -51,7 +52,7 @@ export const MatchRow = memo(
           </div>
         </TableCell>
         <TableCell
-          className={`font-mono font-semibold border-r border-border ${onToggleSelect && match.matchId ? "cursor-pointer select-none hover:bg-accent/50" : ""}`}
+          className={`text-center font-mono font-semibold border-r border-border ${onToggleSelect && match.matchId ? "cursor-pointer select-none hover:bg-accent/50" : ""}`}
           onClick={() => onToggleSelect?.(match.matchId || "")}
         >
           Q-{match.matchNumber}
@@ -80,17 +81,9 @@ export const MatchRow = memo(
             ? availableScouts.find((s) => s.id === actualScouterId)
             : null;
 
-          // Green once every scouter assigned to this role has submitted,
-          // yellow if only some of them have (e.g. the primary but not the
-          // co-scout yet), and the normal alliance color if none have.
-          const assignedCount = (assignment1 ? 1 : 0) + (assignment2 ? 1 : 0);
-          const completedCount = (isCompleted1 ? 1 : 0) + (isCompleted2 ? 1 : 0);
-          const cellColorClass =
-            assignedCount > 0 && completedCount === assignedCount
-              ? "bg-green-900/30"
-              : completedCount > 0
-              ? "bg-yellow-900/30"
-              : getRoleCellColor(role);
+          // The cell keeps its alliance color; each scouter's own slot turns
+          // green once they've submitted, independent of their partner.
+          const cellColorClass = getRoleCellColor(role);
 
           const renderSlot = (slot: 1 | 2) => {
             const assignment = slot === 2 ? assignment2 : assignment1;
@@ -98,49 +91,48 @@ export const MatchRow = memo(
             const isDifferentScouter =
               slot === 1 && actualScouter && assignment && actualScouter.id !== assignment.id;
 
+            // Every slot is one avatar + a name (wrapping to at most two lines),
+            // so rows stay close to the size of a plain profile; status shows
+            // through the cell color, dimming and a tooltip instead of extra lines.
+            const statusTitle = [
+              assignment?.name,
+              isDifferentScouter && actualScouter ? `Scouted by ${actualScouter.name || "another scout"}` : isCompleted ? "Submitted" : null,
+              assignment && !assignment.registered ? "Not registered for event" : null,
+            ].filter(Boolean).join(" · ");
+
             return assignment ? (
-              <div className="relative group flex-1 min-w-0">
+              <div className={`relative group flex-1 min-w-0 p-1.5 md:p-2 ${isCompleted ? "bg-green-900/40" : ""}`}>
                 <button
                   onClick={() => onOpenDialog(match.matchNumber, role, slot)}
+                  title={statusTitle}
                   className="flex flex-col items-center gap-0.5 md:gap-1 hover:bg-accent/50 rounded-md p-1 md:p-1.5 transition-colors w-full"
                 >
-                  <CosmeticAvatar
-                    avatarUrl={assignment.avatar}
-                    initials={assignment.initials}
-                    equippedCosmetics={cosmeticsMap[assignment.id] ?? {}}
-                    size="sm"
-                    className="h-7 w-7 md:h-9 md:w-9"
-                  />
-                  <span className="text-[9px] leading-tight md:text-[11px] font-medium text-center truncate w-full">
+                  <div className={assignment.registered ? undefined : "opacity-50"}>
+                    <CosmeticAvatar
+                      avatarUrl={assignment.avatar}
+                      initials={assignment.initials}
+                      equippedCosmetics={cosmeticsMap[assignment.id] ?? {}}
+                      size="sm"
+                      className="h-7 w-7 md:h-9 md:w-9"
+                    />
+                  </div>
+                  <span className={`text-[9px] leading-tight md:text-[11px] font-medium text-center line-clamp-2 break-words w-full ${assignment.registered ? "" : "text-muted-foreground"}`}>
                     {assignment.name}
                   </span>
-                  {isCompleted && !isDifferentScouter && (
-                    <Check className="h-3 w-3 text-green-400" />
-                  )}
-                  {isDifferentScouter && actualScouter && (
-                    <span className="text-[9px] text-orange-400 font-semibold">
-                      ✓ by {actualScouter.name?.split(' ')[0] || 'Other'}
-                    </span>
-                  )}
-                  {!assignment.registered && (
-                    <span className="text-[9px] text-gray-400 font-semibold">
-                      Not registered for Event
-                    </span>
-                  )}
                 </button>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     onClearAssignment(match.matchNumber, role, slot);
                   }}
-                  className="absolute top-0 right-0 h-5 w-5 rounded-full bg-destructive/90 hover:bg-destructive text-destructive-foreground opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                  className="absolute top-1 right-1 h-5 w-5 rounded-full bg-destructive/90 hover:bg-destructive text-destructive-foreground opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
                   title="Clear assignment"
                 >
                   <X className="h-3 w-3" />
                 </button>
               </div>
             ) : (
-              <div className="flex flex-1 items-center justify-center min-w-0">
+              <div className="flex flex-1 flex-col items-center gap-0.5 md:gap-1 p-2.5 md:p-3.5 min-w-0">
                 <Button
                   variant="ghost"
                   size="icon"
@@ -150,13 +142,17 @@ export const MatchRow = memo(
                 >
                   <Plus className="h-4 w-4 text-muted-foreground" />
                 </Button>
+                {/* Blank name line so an empty slot is as tall as a filled one. */}
+                <span aria-hidden className="text-[9px] leading-tight md:text-[11px]">&nbsp;</span>
               </div>
             );
           };
 
           return (
-            <TableCell key={role} className={`p-1.5 md:p-2 ${cellColorClass}`}>
-              <div className="flex items-start gap-0.5">
+            // No cell padding: each slot carries its own, so a submitted
+            // scouter's green fills their whole share of the cell.
+            <TableCell key={role} className={`p-0 ${cellColorClass}`}>
+              <div className="flex items-stretch">
                 {renderSlot(1)}
                 {renderSlot(2)}
               </div>

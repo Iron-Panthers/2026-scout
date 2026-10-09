@@ -1198,10 +1198,12 @@ export default function ManagerDashboard() {
                 </div>
               )}
               <div className="overflow-auto max-h-[70vh]">
-                <Table noWrapper>
+                {/* Fixed layout so every role column gets the same width, rather
+                    than ones with co-scouts (like Red 2) growing wider than the rest. */}
+                <Table noWrapper className="table-fixed">
                   <TableHeader className="sticky top-0 bg-card z-20 shadow-sm">
                     <TableRow>
-                      <TableHead className="w-12 border-r border-border">
+                      <TableHead className="w-12 border-r border-border [&:has([role=checkbox])]:pr-2">
                         <div className="flex items-center justify-center">
                           <Checkbox
                             checked={
@@ -1212,60 +1214,60 @@ export default function ManagerDashboard() {
                           />
                         </div>
                       </TableHead>
-                      <TableHead className="w-28 md:w-32 text-xs md:text-sm font-semibold border-r border-border">
+                      <TableHead className="w-14 md:w-16 text-center text-xs md:text-sm font-semibold border-r border-border">
                         Match
                       </TableHead>
                       <TableHead
-                        className={`w-40 md:w-48 text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
+                        className={`w-52 md:w-64 text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
                           "red1"
                         )}`}
                       >
                         Red 1
                       </TableHead>
                       <TableHead
-                        className={`w-40 md:w-48 text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
+                        className={`w-52 md:w-64 text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
                           "red2"
                         )}`}
                       >
                         Red 2
                       </TableHead>
                       <TableHead
-                        className={`w-40 md:w-48 text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
+                        className={`w-52 md:w-64 text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
                           "red3"
                         )}`}
                       >
                         Red 3
                       </TableHead>
                       <TableHead
-                        className={`w-40 md:w-48 text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
+                        className={`w-52 md:w-64 text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
                           "qualRed"
                         )}`}
                       >
                         Qual Red
                       </TableHead>
                       <TableHead
-                        className={`w-40 md:w-48 text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
+                        className={`w-52 md:w-64 text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
                           "blue1"
                         )}`}
                       >
                         Blue 1
                       </TableHead>
                       <TableHead
-                        className={`w-40 md:w-48 text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
+                        className={`w-52 md:w-64 text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
                           "blue2"
                         )}`}
                       >
                         Blue 2
                       </TableHead>
                       <TableHead
-                        className={`w-40 md:w-48 text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
+                        className={`w-52 md:w-64 text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
                           "blue3"
                         )}`}
                       >
                         Blue 3
                       </TableHead>
                       <TableHead
-                        className={`w-40 md:w-48 text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
+                        className={`w-52 md:w-64 text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
                           "qualBlue"
                         )}`}
                       >

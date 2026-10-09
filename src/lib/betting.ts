@@ -180,14 +180,38 @@ export function computeTimeDecayFactor(
 // Probability-adjusted payout formula
 // ---------------------------------------------------------------------------
 /**
+ * Payout multiplier by the winning side's pre-match predicted chance (p),
+ * linearly interpolated between these points.
+ */
+const PAYOUT_MULTIPLIER_POINTS: ReadonlyArray<readonly [p: number, multiplier: number]> = [
+  [0, 1.8],
+  [0.3, 1.55],
+  [0.5, 1.32],
+  [0.7, 1.1],
+  [1, 1.05],
+];
+
+export function payoutMultiplier(p: number): number {
+  const clamped = Math.max(0, Math.min(1, p));
+  for (let i = 1; i < PAYOUT_MULTIPLIER_POINTS.length; i++) {
+    const [p1, m1] = PAYOUT_MULTIPLIER_POINTS[i];
+    if (clamped <= p1) {
+      const [p0, m0] = PAYOUT_MULTIPLIER_POINTS[i - 1];
+      return m0 + ((clamped - p0) / (p1 - p0)) * (m1 - m0);
+    }
+  }
+  return PAYOUT_MULTIPLIER_POINTS[PAYOUT_MULTIPLIER_POINTS.length - 1][1];
+}
+
+/**
  * Payout for a winning bet.
  *
- *   multiplier = 2 × (1 − p)^1.6 + 1.6        (1.6× for a sure thing → 3.6× for a total upset)
+ *   multiplier = payoutMultiplier(p)          (1.05× for a sure thing → 1.8× for a total upset)
  *   decayScale = 0.8 + 0.2 × timeDecayFactor  (late bets keep 80–100% of their share)
  *   payout     = floor(amount / winnerPool × decayScale × totalPool × multiplier)
  *
  * so a bettor gets their share of the whole pool, scaled up more the less
- * likely the winning side was. The multiplier is always ≥ 1.6, so payouts are
+ * likely the winning side was. The multiplier is always ≥ 1.05, so payouts are
  * minted on top of the pool rather than limited to it. Every winning bet gets
  * at least `amount + 10`; a winnerPool of 0 just refunds.
  *
@@ -202,8 +226,7 @@ export function calcPayout(
   timeDecayFactor: number = 1.0
 ): number {
   if (amount <= 0 || winnerPool <= 0) return amount; // refund edge case
-  const p = Math.max(0, Math.min(1, winnerPredictedProb)); // clamp
-  const multiplier = 2 * Math.pow(1 - p, 1.6) + 1.6; // baseline 0.2x
+  const multiplier = payoutMultiplier(winnerPredictedProb);
 
   // Bets placed close to pred_time keep only 80–100% of their multiplier
   // bonus (never below the guaranteed amount + 10 floor below) — full decay
