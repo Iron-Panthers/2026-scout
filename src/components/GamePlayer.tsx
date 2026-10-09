@@ -17,6 +17,9 @@ export function GamePlayer({ game, onClose, startUrl, onStartWithoutConfig }: Ga
 
   if (!game) return null;
 
+  // FRCdle is also playable from the Shop, which has no match to start.
+  const showStartMatch = game.id !== "frcdle" || Boolean(startUrl || onStartWithoutConfig);
+
   function handleStartMatch() {
     if (startUrl) {
       navigate(startUrl);
@@ -34,7 +37,7 @@ export function GamePlayer({ game, onClose, startUrl, onStartWithoutConfig }: Ga
       aria-label={`Playing ${game.name}`}
     >
       {/* Top bar — always above the iframe, never overlapping game controls */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-background shrink-0">
+      <div className="relative flex items-center justify-between px-3 py-2 border-b border-border bg-background shrink-0">
         <button
           onClick={onClose}
           className="flex items-center gap-1 rounded-full border border-border px-3 py-1.5 text-sm font-medium hover:bg-accent transition-colors"
@@ -44,12 +47,12 @@ export function GamePlayer({ game, onClose, startUrl, onStartWithoutConfig }: Ga
           Back
         </button>
 
-        <span className="text-sm font-medium text-muted-foreground">{game.name}</span>
+        <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 text-sm font-medium text-muted-foreground">{game.name}</span>
 
-        {game.id !== "frcdle" && (
+        {showStartMatch && (
           <button
             onClick={handleStartMatch}
-            className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors bg-red-600 text-white hover:bg-red-700"
+            className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors bg-primary text-primary-foreground hover:bg-primary/90"
             aria-label={startUrl ? "Start scouting match" : "Configure match in Settings first"}
             title={startUrl ? undefined : "Set up a match in Settings first"}
           >

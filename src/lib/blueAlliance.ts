@@ -237,18 +237,23 @@ export async function getTeamPhoto(
 
 const TBA_LOGO_CACHE_PFX = "tba_logo_";
 const TBA_LOGO_CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days — avatars rarely change
+// Session-only cache for bulk views that shouldn't fill localStorage (offline scouting data lives there too).
+const memoryLogoCache = new Map<string, string | null>();
 
 /**
  * Gets a team's FIRST-issued avatar/logo for a given year (as a data URI).
  * @param teamNumber - The team number (e.g., 1678)
  * @param year - The year (e.g., 2024, 2025)
+ * @param persist - Cache the result in localStorage (default) or only in memory for this session
  * @returns Data URI for the team's logo, or null if not found
  */
 export async function getTeamLogo(
   teamNumber: number,
-  year: number
+  year: number,
+  persist = true
 ): Promise<string | null> {
   const cKey = `${TBA_LOGO_CACHE_PFX}${teamNumber}_${year}`;
+  if (memoryLogoCache.has(cKey)) return memoryLogoCache.get(cKey)!;
   try {
     const raw = localStorage.getItem(cKey);
     if (raw) {
@@ -264,6 +269,10 @@ export async function getTeamLogo(
     ? `data:image/png;base64,${avatar.details.base64Image}`
     : null;
 
+  if (!persist) {
+    memoryLogoCache.set(cKey, logo);
+    return logo;
+  }
   try {
     localStorage.setItem(cKey, JSON.stringify({ data: logo, ts: Date.now() }));
   } catch { /* ignore */ }

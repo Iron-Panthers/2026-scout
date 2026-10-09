@@ -28,15 +28,16 @@ Deno.serve(async (request) => {
     const { data: { user }, error: authError } = await authClient.auth.getUser(token);
     if (authError || !user) return jsonResponse({ error: "Invalid session" }, 401);
 
-    const body = await request.json() as { teamNumbers?: number[] };
+    const body = await request.json() as { teamNumbers?: number[]; year?: number };
     const teamNumbers = body.teamNumbers;
-    if (!Array.isArray(teamNumbers) || teamNumbers.length > 3 || teamNumbers.some(
-      (number) => !Number.isInteger(number) || number < 1 || number > 9999
-    )) {
-      return jsonResponse({ error: "Provide at most three valid FRC team numbers" }, 400);
+    const year = body.year ?? new Date().getUTCFullYear();
+    if (!Array.isArray(teamNumbers) || teamNumbers.length > 14 || teamNumbers.some(
+      (number) => !Number.isInteger(number) || number < 10 || number > 99999
+    ) || !Number.isInteger(year) || year < 2002 || year > 2100) {
+      return jsonResponse({ error: "Provide at most fourteen valid FRC team numbers" }, 400);
     }
 
-    const results: Array<{ teamNumber: number; xp: number | null }> = [];
+    const results: Array<{ teamNumber: number; playedThisSeason: boolean; xp: number | null }> = [];
     for (let index = 0; index < teamNumbers.length; index++) {
       if (index > 0) await new Promise((resolve) => setTimeout(resolve, 2000));
 
@@ -47,15 +48,25 @@ Deno.serve(async (request) => {
           signal: AbortSignal.timeout(10_000),
         });
         if (!response.ok) {
-          results.push({ teamNumber, xp: null });
+          results.push({ teamNumber, playedThisSeason: false, xp: null });
           continue;
         }
         const markdown = await response.text();
-        const match = markdown.match(/xP rating:\s*\*\*([+-]?(?:\d+(?:\.\d*)?|\.\d+))\*\*/i);
-        results.push({ teamNumber, xp: match ? Number(match[1]) : null });
+        const seasonHeading = new RegExp(`(?:^|\\n)#{2,3}\\s*${year}\\s+season\\s*\\n`, "i").exec(markdown);
+        const seasonSection = seasonHeading
+          ? markdown.slice(seasonHeading.index + seasonHeading[0].length).split(/\n#{2,3}\s/)[0]
+          : "";
+        const xpMatch = seasonSection.match(/xP rating:\s*\*\*([+-]?(?:\d+(?:\.\d*)?|\.\d+))\*\*/i);
+        const recordMatch = seasonSection.match(/\bover\s+(\d+)\s+matches\b/i);
+        const playedThisSeason = !!recordMatch && Number(recordMatch[1]) > 0;
+        results.push({
+          teamNumber,
+          playedThisSeason,
+          xp: playedThisSeason && xpMatch ? Number(xpMatch[1]) : null,
+        });
       } catch (error) {
         console.warn(`Could not load Match13 xP for team ${teamNumber}:`, error);
-        results.push({ teamNumber, xp: null });
+        results.push({ teamNumber, playedThisSeason: false, xp: null });
       }
     }
 

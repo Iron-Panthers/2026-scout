@@ -52,6 +52,7 @@ export const GAMES: GameDefinition[] = [
     cost: 5000,
     iframeUrl: "/games/frcdle.html",
     thumbnailUrl: "/game-thumbnails/frcdle.svg",
+    thumbnailFit: "contain",
   },
 ];
 

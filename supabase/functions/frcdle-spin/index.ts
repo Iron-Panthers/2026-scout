@@ -60,8 +60,8 @@ Deno.serve(async (request) => {
     if (authError || !user) return jsonResponse({ error: "Invalid session" }, 401);
 
     const body = await request.json() as { action?: string; timeZone?: string };
-    if (body.action !== "status" && body.action !== "spin") {
-      return jsonResponse({ error: "Action must be status or spin" }, 400);
+    if (body.action !== "status" && body.action !== "spin" && body.action !== "reset") {
+      return jsonResponse({ error: "Action must be status, spin, or reset" }, 400);
     }
 
     const timeZone = body.timeZone || "UTC";
@@ -82,6 +82,25 @@ Deno.serve(async (request) => {
     if (latestError) return jsonResponse({ error: "Could not load spin history" }, 500);
     const effectiveTimeZone = latestSpin?.time_zone ?? timeZone;
     const spinDay = localSpinDay(effectiveTimeZone);
+
+    // Developer sandbox reset: clear today's roll so it can be spun again.
+    if (body.action === "reset") {
+      const { data: profile, error: profileError } = await database
+        .from("profiles")
+        .select("is_developer")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (profileError) return jsonResponse({ error: "Could not load profile" }, 500);
+      if (!profile?.is_developer) return jsonResponse({ error: "Developer access required" }, 403);
+      const { error: deleteError } = await database
+        .from("frcdle_spins")
+        .delete()
+        .eq("user_id", user.id)
+        .eq("spin_day", spinDay);
+      if (deleteError) return jsonResponse({ error: "Could not reset today's spin" }, 500);
+      return jsonResponse({ spin: null, timeZone: effectiveTimeZone, alreadySpun: false });
+    }
+
     const findExisting = () => database
       .from("frcdle_spins")
       .select("spin_day, spin_number, created_at")

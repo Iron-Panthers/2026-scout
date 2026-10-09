@@ -17,17 +17,20 @@ CREATE TABLE IF NOT EXISTS picklist_team_notes (
 
 ALTER TABLE picklist_team_notes ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view own picklist team notes" ON picklist_team_notes;
 CREATE POLICY "Users can view own picklist team notes" ON picklist_team_notes FOR SELECT
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can insert own picklist team notes" ON picklist_team_notes;
 CREATE POLICY "Users can insert own picklist team notes" ON picklist_team_notes FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update own picklist team notes" ON picklist_team_notes;
 CREATE POLICY "Users can update own picklist team notes" ON picklist_team_notes FOR UPDATE
   USING (auth.uid() = user_id);
 
-CREATE INDEX idx_picklist_team_notes_user_id ON picklist_team_notes(user_id);
-CREATE INDEX idx_picklist_team_notes_event_id ON picklist_team_notes(event_id);
+CREATE INDEX IF NOT EXISTS idx_picklist_team_notes_user_id ON picklist_team_notes(user_id);
+CREATE INDEX IF NOT EXISTS idx_picklist_team_notes_event_id ON picklist_team_notes(event_id);
 
 CREATE OR REPLACE FUNCTION update_picklist_team_notes_updated_at()
 RETURNS TRIGGER AS $$
@@ -37,6 +40,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS picklist_team_notes_updated_at ON picklist_team_notes;
 CREATE TRIGGER picklist_team_notes_updated_at
   BEFORE UPDATE ON picklist_team_notes
   FOR EACH ROW EXECUTE FUNCTION update_picklist_team_notes_updated_at();
