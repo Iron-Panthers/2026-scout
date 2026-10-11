@@ -17,7 +17,12 @@ const DEFAULT_SUBTITLES = [
   "Vote 5026 on frcmash.com!",
   "If you've been scouting for a while, get up and stretch a bit.",
   "Tell Liam to do his damn job >:(",
-  "I'm proud of you"
+  "I'm proud of you",
+  "bort",
+  "Go bother a random lead :D",
+  "Click for virus",
+  "Gurt",
+  "Did you do your frcdle yet"
 ];
 
 export default function DashboardHeader({

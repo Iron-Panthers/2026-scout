@@ -1,4 +1,4 @@
-"""List every team registered for the season (team number >= 10) with its nickname.
+"""List every team registered for the season (team number >= 1) with its nickname.
 
 Usage: TBA_AUTH_KEY=... python3 -I scripts/frcdle-rarity/fetch_tba_teams.py teams.json
 """
@@ -21,7 +21,7 @@ for page in range(100):
     teams += [
         {"team": t["team_number"], "nickname": t.get("nickname") or t.get("name") or f"FRC Team {t['team_number']}"}
         for t in batch
-        if t["team_number"] >= 10
+        if t["team_number"] >= 1
     ]
 
 teams.sort(key=lambda t: t["team"])

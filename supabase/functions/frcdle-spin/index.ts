@@ -60,8 +60,8 @@ Deno.serve(async (request) => {
     if (authError || !user) return jsonResponse({ error: "Invalid session" }, 401);
 
     const body = await request.json() as { action?: string; timeZone?: string };
-    if (body.action !== "status" && body.action !== "spin" && body.action !== "reset") {
-      return jsonResponse({ error: "Action must be status, spin, or reset" }, 400);
+    if (body.action !== "status" && body.action !== "spin" && body.action !== "reset" && body.action !== "top" && body.action !== "leaderboard") {
+      return jsonResponse({ error: "Action must be status, spin, reset, top, or leaderboard" }, 400);
     }
 
     const timeZone = body.timeZone || "UTC";
@@ -82,6 +82,71 @@ Deno.serve(async (request) => {
     if (latestError) return jsonResponse({ error: "Could not load spin history" }, 500);
     const effectiveTimeZone = latestSpin?.time_zone ?? timeZone;
     const spinDay = localSpinDay(effectiveTimeZone);
+
+    // Every player's roll for this spin day (the caller's included, flagged),
+    // so the client can score them against its season snapshot and show the
+    // day's best one. RLS keeps
+    // frcdle_spins private per user, so this goes through the service role.
+    if (body.action === "top") {
+      const { data: spins, error: spinsError } = await database
+        .from("frcdle_spins")
+        .select("user_id, spin_number, created_at")
+        .eq("spin_day", spinDay);
+      if (spinsError) return jsonResponse({ error: "Could not load today's spins" }, 500);
+
+      const userIds = [...new Set((spins ?? []).map((spin) => spin.user_id))];
+      const { data: profiles, error: profilesError } = userIds.length > 0
+        ? await database.from("profiles").select("id, name").in("id", userIds)
+        : { data: [], error: null };
+      if (profilesError) return jsonResponse({ error: "Could not load players" }, 500);
+      const nameById = new Map((profiles ?? []).map((profile) => [profile.id, profile.name as string | null]));
+
+      return jsonResponse({
+        spinDay,
+        spins: (spins ?? []).map((spin) => ({
+          spin_number: spin.spin_number,
+          created_at: spin.created_at,
+          name: nameById.get(spin.user_id) ?? null,
+          is_you: spin.user_id === user.id,
+        })),
+      });
+    }
+
+    // Every roll ever saved, for the client to score and rank by day, week, month
+    // and all time against the caller's spin day. Paged, since PostgREST caps
+    // each response at 1000 rows.
+    if (body.action === "leaderboard") {
+      const pageSize = 1000;
+      const spins: Array<{ user_id: string; spin_day: string; spin_number: string; created_at: string }> = [];
+      for (let from = 0; ; from += pageSize) {
+        const { data: page, error: pageError } = await database
+          .from("frcdle_spins")
+          .select("user_id, spin_day, spin_number, created_at")
+          .order("created_at", { ascending: true })
+          .range(from, from + pageSize - 1);
+        if (pageError) return jsonResponse({ error: "Could not load spins" }, 500);
+        spins.push(...(page ?? []));
+        if (!page || page.length < pageSize) break;
+      }
+
+      const userIds = [...new Set(spins.map((spin) => spin.user_id))];
+      const { data: profiles, error: profilesError } = userIds.length > 0
+        ? await database.from("profiles").select("id, name").in("id", userIds)
+        : { data: [], error: null };
+      if (profilesError) return jsonResponse({ error: "Could not load players" }, 500);
+      const nameById = new Map((profiles ?? []).map((profile) => [profile.id, profile.name as string | null]));
+
+      return jsonResponse({
+        spinDay,
+        spins: spins.map((spin) => ({
+          spin_number: spin.spin_number,
+          spin_day: spin.spin_day,
+          created_at: spin.created_at,
+          name: nameById.get(spin.user_id) ?? null,
+          is_you: spin.user_id === user.id,
+        })),
+      });
+    }
 
     // Developer sandbox reset: clear today's roll so it can be spun again.
     if (body.action === "reset") {

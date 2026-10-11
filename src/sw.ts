@@ -1,11 +1,7 @@
 /// <reference lib="webworker" />
 import { precacheAndRoute, cleanupOutdatedCaches } from "workbox-precaching";
 import { registerRoute } from "workbox-routing";
-import {
-  StaleWhileRevalidate,
-  CacheFirst,
-  NetworkFirst,
-} from "workbox-strategies";
+import { CacheFirst, NetworkFirst } from "workbox-strategies";
 import { ExpirationPlugin } from "workbox-expiration";
 import { CacheableResponsePlugin } from "workbox-cacheable-response";
 
@@ -18,13 +14,17 @@ cleanupOutdatedCaches();
 // ----- Runtime Caching Strategies -----
 
 // Supabase REST API calls (match data, profiles, etc.)
-// StaleWhileRevalidate: serve from cache immediately, update in background
+// NetworkFirst: always ask the server, falling back to the last cached copy
+// when offline or the network stalls. (StaleWhileRevalidate answered from the
+// cache first, so a re-read right after a write — e.g. the game profile after
+// buying a game — got the pre-write row until the next reload.)
 registerRoute(
   ({ url }) =>
     url.hostname.includes("supabase.co") &&
     url.pathname.startsWith("/rest/"),
-  new StaleWhileRevalidate({
+  new NetworkFirst({
     cacheName: "supabase-api",
+    networkTimeoutSeconds: 5,
     plugins: [
       new CacheableResponsePlugin({ statuses: [0, 200] }),
       new ExpirationPlugin({
