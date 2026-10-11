@@ -1,7 +1,7 @@
 """Build src/config/frcdleRarity.ts from the FRCdle season snapshot (build_snapshot.py).
 
 Scores all 1,000,000 six-digit FRCdle rolls the same way FrcdleGame does
-(every 2-5 digit window without a leading zero, a team counted once per
+(every 1-5 digit window without a leading zero, a team counted once per
 appearance and scaled by its digit-count multiplier, teams missing from the
 snapshot count 0) and writes a CDF table:
 for each xP breakpoint, the percent of rolls that score strictly less.
@@ -11,7 +11,7 @@ Usage: python3 -I scripts/frcdle-rarity/generate_table.py src/config/frcdleSnaps
 import bisect, json, sys
 
 # Keep in sync with DIGIT_MULTIPLIERS in src/components/FrcdleGame.tsx.
-DIGIT_MULTIPLIERS = {2: 0.6, 3: 0.8, 4: 1.0, 5: 1.2}
+DIGIT_MULTIPLIERS = {1: 0.2, 2: 0.6, 3: 0.8, 4: 1.0, 5: 1.2}
 
 snapshot_path, out_path = sys.argv[1], sys.argv[2]
 snapshot = json.load(open(snapshot_path))
@@ -22,7 +22,7 @@ best = (float("-inf"), "", [])
 for n in range(1_000_000):
     digits = f"{n:06d}"
     seen = []
-    for length in range(2, 6):
+    for length in range(1, 6):
         for start in range(7 - length):
             window = digits[start:start + length]
             if window[0] != "0":

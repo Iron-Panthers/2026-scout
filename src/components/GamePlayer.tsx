@@ -36,8 +36,10 @@ export function GamePlayer({ game, onClose, startUrl, onStartWithoutConfig }: Ga
       role="dialog"
       aria-label={`Playing ${game.name}`}
     >
-      {/* Top bar — always above the iframe, never overlapping game controls */}
-      <div className="relative flex items-center justify-between px-3 py-2 border-b border-border bg-background shrink-0">
+      {/* Top bar — always above the iframe, never overlapping game controls.
+          This overlay is fixed to the viewport, so it skips the body's
+          safe-area padding; pad for the notch / status bar here instead. */}
+      <div className="relative flex items-center justify-between px-3 pb-2 pt-[calc(env(safe-area-inset-top)_+_0.5rem)] border-b border-border bg-background shrink-0">
         <button
           onClick={onClose}
           className="flex items-center gap-1 rounded-full border border-border px-3 py-1.5 text-sm font-medium hover:bg-accent transition-colors"

@@ -580,97 +580,17 @@ export async function settleMatchBets(
     return { success: true };
   }
 
-  // Check not already settled
-  const { data: matchRow } = await supabase
-    .from("matches")
-    .select("winning_alliance, pred_time, match13_red_win_prob")
-    .eq("id", matchId)
-    .maybeSingle();
+  // Settlement runs server-side in one transaction: each bet is claimed
+  // (pending → won/lost) and paid out together, so a retry, a reload or a
+  // concurrent call can never pay the same bet twice. The payout math lives in
+  // supabase/migrations/20261009010_create_settle_match_bets_rpc.sql and
+  // mirrors calcPayout above.
+  const { error } = await supabase.rpc("settle_match_bets", {
+    p_match_id: matchId,
+    p_winner: winningAlliance,
+    p_red_win_prob: statboticsRedWinProb,
+  });
 
-  // If winning_alliance is already set (e.g. by sync-match-results edge function),
-  // use that as the authoritative winner rather than returning early — pending bets
-  // may not have been processed yet.
-  const effectiveWinner: "red" | "blue" | "tie" =
-    (matchRow?.winning_alliance as "red" | "blue" | "tie" | null) ?? winningAlliance;
-
-  const matchPredTime: string | null = matchRow?.pred_time ?? null;
-
-  const { data: bets, error } = await supabase
-    .from("bets")
-    .select("*")
-    .eq("match_id", matchId)
-    .eq("status", "pending");
-
-  if (error) return { success: false, error: "Failed to fetch bets." };
-
-  // Set winning_alliance if not already set (prevents duplicate settlement races)
-  if (!matchRow?.winning_alliance) {
-    await supabase
-      .from("matches")
-      .update({ winning_alliance: effectiveWinner })
-      .eq("id", matchId);
-  }
-
-  if (!bets || bets.length === 0) return { success: true };
-
-  // Predicted probability for the winning side (same for both pools — it's
-  // about the match outcome, not the currency).
-  // Prefer the prediction stored on the match (match13 freezes it once the
-  // match is played), so every caller settles with the same odds; fall back to
-  // the caller's value only when none is stored.
-  const redWinProb: number = matchRow?.match13_red_win_prob ?? statboticsRedWinProb;
-  const p_winner =
-    effectiveWinner === "tie"
-      ? 0.5
-      : (effectiveWinner === "red"
-      ? redWinProb
-      : 1 - redWinProb);
-
-  // Points and event-points bets form entirely separate parimutuel pools —
-  // an event bettor's payout must only ever come from other event bettors.
-  async function settlePool(poolBets: Bet[], currency: BetCurrency) {
-    if (poolBets.length === 0) return;
-    const column = balanceColumn(currency);
-
-    const redTotal = poolBets.filter((b) => b.alliance === "red").reduce((s, b) => s + b.amount, 0);
-    const blueTotal = poolBets.filter((b) => b.alliance === "blue").reduce((s, b) => s + b.amount, 0);
-    const totalPool = redTotal + blueTotal;
-    const winnerPool = effectiveWinner === "red" ? redTotal : blueTotal;
-
-    for (const bet of poolBets) {
-      if (bet.status !== "pending") continue;
-
-      let payout = 0;
-      let status: "won" | "lost" = "lost";
-
-      const timeDecayFactor = computeTimeDecayFactor(bet.created_at, matchPredTime);
-
-      if (effectiveWinner === "tie") {
-        // Refund on tie (no time decay on refunds)
-        payout = bet.amount;
-        status = "won";
-      } else if (bet.alliance === effectiveWinner) {
-        status = "won";
-        payout = calcPayout(bet.amount, winnerPool, totalPool, p_winner, timeDecayFactor);
-      }
-
-      await supabase.from("bets").update({ status, payout }).eq("id", bet.id);
-
-      if (payout > 0) {
-        const profile = await getGameProfile(bet.user_id);
-        if (profile) {
-          await supabase
-            .from("game_profiles")
-            .update({ [column]: balanceOf(profile, currency) + payout })
-            .eq("user_id", bet.user_id);
-        }
-      }
-    }
-  }
-
-  const allBets = bets as Bet[];
-  await settlePool(allBets.filter((b) => (b.currency ?? "points") === "points"), "points");
-  await settlePool(allBets.filter((b) => b.currency === "event"), "event");
-
+  if (error) return { success: false, error: "Failed to settle bets." };
   return { success: true };
 }

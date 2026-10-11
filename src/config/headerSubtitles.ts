@@ -6,6 +6,7 @@ export const SHOP_SUBTITLES = [
   "Baller",
   "Gotta catch em' all...",
   "Buy the event stuff before it's gone.",
+  "Yo",
 ];
 
 export const AVATAR_SUBTITLES = [
