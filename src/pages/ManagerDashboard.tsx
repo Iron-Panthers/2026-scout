@@ -932,6 +932,14 @@ export default function ManagerDashboard() {
     }
   };
 
+  // One or two scouter slots per role cell; "All events" keeps the full two-slot grid.
+  const scoutersPerRobot: 1 | 2 =
+    selectedEvent === "all"
+      ? 2
+      : events.find((event) => event.id === selectedEvent)?.scouters_per_robot ?? 2;
+  // Role columns are half as wide when each cell holds a single scouter.
+  const roleColumnWidth = scoutersPerRobot === 2 ? "w-52 md:w-64" : "w-28 md:w-32";
+
   const getRoleHeaderColor = (role: Role) => {
     if (role.startsWith("red") || role === "qualRed") {
       return "bg-red-900/30 text-red-400";
@@ -1125,7 +1133,10 @@ export default function ManagerDashboard() {
               </TabsTrigger>
             </TabsList>
 
-            <div className="flex items-center gap-2">
+            {/* Points are account-wide, so that tab lists every scout and has no event filter.
+                Below lg the header stacks, so the selector is removed outright (no empty row
+                above the tab content); on lg it only goes invisible so the tab bar doesn't shift. */}
+            <div className={`items-center gap-2 ${activeTab === "points" ? "hidden lg:invisible lg:flex" : "flex"}`}>
               <span className="text-sm text-muted-foreground">Event:</span>
               <Select value={selectedEvent} onValueChange={(v) => {
                   setSelectedEvent(v);
@@ -1218,56 +1229,56 @@ export default function ManagerDashboard() {
                         Match
                       </TableHead>
                       <TableHead
-                        className={`w-52 md:w-64 text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
+                        className={`${roleColumnWidth} text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
                           "red1"
                         )}`}
                       >
                         Red 1
                       </TableHead>
                       <TableHead
-                        className={`w-52 md:w-64 text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
+                        className={`${roleColumnWidth} text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
                           "red2"
                         )}`}
                       >
                         Red 2
                       </TableHead>
                       <TableHead
-                        className={`w-52 md:w-64 text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
+                        className={`${roleColumnWidth} text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
                           "red3"
                         )}`}
                       >
                         Red 3
                       </TableHead>
                       <TableHead
-                        className={`w-52 md:w-64 text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
+                        className={`${roleColumnWidth} text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
                           "qualRed"
                         )}`}
                       >
                         Qual Red
                       </TableHead>
                       <TableHead
-                        className={`w-52 md:w-64 text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
+                        className={`${roleColumnWidth} text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
                           "blue1"
                         )}`}
                       >
                         Blue 1
                       </TableHead>
                       <TableHead
-                        className={`w-52 md:w-64 text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
+                        className={`${roleColumnWidth} text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
                           "blue2"
                         )}`}
                       >
                         Blue 2
                       </TableHead>
                       <TableHead
-                        className={`w-52 md:w-64 text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
+                        className={`${roleColumnWidth} text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
                           "blue3"
                         )}`}
                       >
                         Blue 3
                       </TableHead>
                       <TableHead
-                        className={`w-52 md:w-64 text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
+                        className={`${roleColumnWidth} text-xs md:text-sm font-semibold text-center ${getRoleHeaderColor(
                           "qualBlue"
                         )}`}
                       >
@@ -1287,6 +1298,7 @@ export default function ManagerDashboard() {
                         actualScouters={actualScouters}
                         availableScouts={availableScouts}
                         cosmeticsMap={cosmeticsMap}
+                        scoutersPerRobot={scoutersPerRobot}
                         isSelected={selectedMatches.has(match.matchId || "")}
                         onToggleSelect={handleToggleMatch}
                       />
@@ -1376,7 +1388,7 @@ export default function ManagerDashboard() {
                   aria-label="Search scouts"
                 />
                 <div className="grid max-h-[45vh] grid-cols-1 gap-3 overflow-y-auto sm:grid-cols-2">
-                  {[...availableScouts]
+                  {[...allScouts]
                     .filter((scout) => `${scout.name || ""} ${scout.role}`.toLowerCase().includes(pointScoutSearch.trim().toLowerCase()))
                     .sort((a, b) => (a.name || "").localeCompare(b.name || ""))
                     .map((scout) => {
@@ -1457,7 +1469,7 @@ export default function ManagerDashboard() {
                         next[selectedPointScoutId] = targetPoints;
                         return next;
                       });
-                      const scout = availableScouts.find((item) => item.id === selectedPointScoutId);
+                      const scout = allScouts.find((item) => item.id === selectedPointScoutId);
                       toast({
                         title: "Points set",
                         description: `Set ${scout?.name ?? "scout"}'s points to ${targetPoints}.`,

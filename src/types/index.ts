@@ -37,6 +37,9 @@ export interface Event {
   start_date: string | null;
   end_date: string | null;
   scouting_map_url: string | null; // URL to the scouting map image
+  // Scouters assigned per robot each match: 2 = primary + co-scout, 1 = primary only.
+  // Missing on sandbox events created before the setting existed; treat that as 2.
+  scouters_per_robot?: 1 | 2;
   created_at: string;
   updated_at: string;
   users: string[];

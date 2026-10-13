@@ -55,6 +55,8 @@ import {
 import UserProfileMenu from "@/components/UserProfileMenu";
 import { TeamLogo } from "@/components/TeamLogo";
 import { TeamInfoDialog } from "@/components/TeamInfoDialog";
+import { ScoutingDataTable } from "@/components/strategy/ScoutingDataTable";
+import { SCOUTING_DATA_TYPES, type ScoutingDataType } from "@/lib/strategyData";
 import type { Event } from "@/types";
 
 type PicklistColumnKey = "bank" | "picklist" | "doNotPick";
@@ -92,6 +94,21 @@ const picklistCollisionDetection: CollisionDetection = (args) => {
         ...args,
         droppableContainers: [columnBelowLastCard.lastTeamCard.container],
       });
+    }
+
+    // In the gap between two cards (or the padding above the first) the pointer
+    // is inside a column but over no card, which the sortable list reads as "no
+    // position" and snaps the cards back. That space belongs to the card below it.
+    const isColumnId = (id: unknown) => id === "bank" || id === "picklist" || id === "doNotPick";
+    if (pointerCollisions.length > 0 && pointerCollisions.every((collision) => isColumnId(collision.id))) {
+      const cardBelowPointer = args.droppableContainers
+        .filter((container) => pointerCollisions.some((collision) => collision.id === container.data.current?.column))
+        .map((container) => ({ container, rect: args.droppableRects.get(container.id) }))
+        .filter((entry) => entry.rect != null && entry.rect.top >= pointer.y)
+        .sort((a, b) => a.rect!.top - b.rect!.top)[0]?.container;
+      if (cardBelowPointer) {
+        return closestCenter({ ...args, droppableContainers: [cardBelowPointer] });
+      }
     }
 
     if (pointerCollisions.length > 0) return pointerCollisions;
@@ -287,6 +304,11 @@ function PicklistColumn({
   onFlyDone,
 }: PicklistColumnProps) {
   const { setNodeRef } = useDroppable({ id: columnKey });
+  // Memoized: useDroppable re-renders this column whenever the drag target
+  // changes, and a fresh ids array each time makes dnd-kit's useSortable think
+  // the list changed, so it disables the transition on each card's first move
+  // (the cards jump instead of sliding).
+  const teamIds = useMemo(() => teams.map((t) => t.team_number), [teams]);
 
   return (
     <div className="flex h-full flex-col">
@@ -304,7 +326,7 @@ function PicklistColumn({
           </p>
         )}
         <SortableContext
-          items={teams.map((t) => t.team_number)}
+          items={teamIds}
           strategy={verticalListSortingStrategy}
         >
           {teams.map((team, index) => (
@@ -325,10 +347,31 @@ function PicklistColumn({
   );
 }
 
+type StrategyPage = "data" | "picklist" | "event";
+
+const STRATEGY_PAGES: Record<StrategyPage, { label: string; title: string; description: string }> = {
+  data: {
+    label: "Data",
+    title: "Data",
+    description: "Every scouting submission for the selected event.",
+  },
+  picklist: {
+    label: "Picklist",
+    title: "Picklist",
+    description: "Sort teams however you want! This list is only visible for you.",
+  },
+  event: {
+    label: "Event",
+    title: "Event",
+    description: "All teams competing at the selected event.",
+  },
+};
+
 export default function StrategyDashboard() {
   const { user, profile, getAvatarUrl } = useAuth();
   const { devMode } = useDevMode();
-  const [strategyPage, setStrategyPage] = useState<"picklist" | "event">("picklist");
+  const [strategyPage, setStrategyPage] = useState<StrategyPage>("picklist");
+  const [scoutingDataType, setScoutingDataType] = useState<ScoutingDataType>("quantitative");
   // Per-event snapshot of the picklist columns, kept for the life of this
   // page. Switching events re-reads from here instead of the server when
   // we've already loaded (and possibly locally edited) that event this
@@ -724,23 +767,19 @@ export default function StrategyDashboard() {
           <div className="flex items-center gap-3">
             <ListOrdered className="h-7 w-7 text-primary" />
             <div>
-              <h1 className="text-2xl font-bold">
-                {strategyPage === "picklist" ? "Picklist" : "Event"}
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                {strategyPage === "picklist"
-                  ? "Sort teams however you want! This list is only visible for you."
-                  : "All teams competing at the selected event."}
-              </p>
+              <h1 className="text-2xl font-bold">{STRATEGY_PAGES[strategyPage].title}</h1>
+              <p className="text-sm text-muted-foreground">{STRATEGY_PAGES[strategyPage].description}</p>
             </div>
           </div>
           <UserProfileMenu userName={userName} userInitials={userInitials} avatarUrl={avatarUrl} />
         </div>
 
         <section>
-          <div className="mb-4 flex justify-end">
+          {/* On the Data page the event sits left and the data type right, on one
+              line; the other pages keep the event dropdown on the right. */}
+          <div className={`mb-4 flex gap-2 ${strategyPage === "data" ? "justify-between" : "justify-end"}`}>
             <Select value={selectedPicklistEventId} onValueChange={setSelectedPicklistEventId}>
-              <SelectTrigger className="w-full sm:w-64" aria-label="Picklist event">
+              <SelectTrigger className="w-full min-w-0 flex-1 sm:w-64 sm:flex-none" aria-label="Picklist event">
                 <SelectValue placeholder="Select event" />
               </SelectTrigger>
               <SelectContent>
@@ -751,9 +790,34 @@ export default function StrategyDashboard() {
                 ))}
               </SelectContent>
             </Select>
+            {strategyPage === "data" && (
+              <Select
+                value={scoutingDataType}
+                onValueChange={(value) => setScoutingDataType(value as ScoutingDataType)}
+              >
+                <SelectTrigger className="w-full min-w-0 flex-1 sm:w-64 sm:flex-none" aria-label="Scouting data type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SCOUTING_DATA_TYPES.map(({ value, label }) => (
+                    <SelectItem key={value} value={value}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
 
-          {strategyPage === "picklist" ? (
+          {strategyPage === "data" ? (
+            <ScoutingDataTable
+              eventId={selectedPicklistEventId}
+              dataType={scoutingDataType}
+              userId={user?.id}
+              userName={profile?.name ?? null}
+              devMode={devMode}
+            />
+          ) : strategyPage === "picklist" ? (
             <>
               <div className="mb-4 flex items-center gap-1 rounded-lg border p-1">
                 <Button
@@ -923,30 +987,21 @@ export default function StrategyDashboard() {
         </section>
 
         <nav className="fixed inset-x-4 bottom-4 z-30 mx-auto mt-8 flex max-w-xl items-center justify-center gap-1 rounded-xl border-2 border-border bg-card p-1 shadow-xl backdrop-blur">
-          <Button
-            size="sm"
-            variant={strategyPage === "picklist" ? "default" : "ghost"}
-            className={
-              strategyPage === "picklist"
-                ? "flex-1 min-w-0 px-1.5 text-xs font-semibold shadow-sm sm:px-3 sm:text-sm"
-                : "flex-1 min-w-0 px-1.5 text-xs text-muted-foreground hover:text-foreground sm:px-3 sm:text-sm"
-            }
-            onClick={() => setStrategyPage("picklist")}
-          >
-            Picklist
-          </Button>
-          <Button
-            size="sm"
-            variant={strategyPage === "event" ? "default" : "ghost"}
-            className={
-              strategyPage === "event"
-                ? "flex-1 min-w-0 px-1.5 text-xs font-semibold shadow-sm sm:px-3 sm:text-sm"
-                : "flex-1 min-w-0 px-1.5 text-xs text-muted-foreground hover:text-foreground sm:px-3 sm:text-sm"
-            }
-            onClick={() => setStrategyPage("event")}
-          >
-            Event
-          </Button>
+          {(Object.keys(STRATEGY_PAGES) as StrategyPage[]).map((page) => (
+            <Button
+              key={page}
+              size="sm"
+              variant={strategyPage === page ? "default" : "ghost"}
+              className={
+                strategyPage === page
+                  ? "flex-1 min-w-0 px-1.5 text-xs font-semibold shadow-sm sm:px-3 sm:text-sm"
+                  : "flex-1 min-w-0 px-1.5 text-xs text-muted-foreground hover:text-foreground sm:px-3 sm:text-sm"
+              }
+              onClick={() => setStrategyPage(page)}
+            >
+              {STRATEGY_PAGES[page].label}
+            </Button>
+          ))}
         </nav>
       </main>
     </div>
