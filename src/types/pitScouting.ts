@@ -21,7 +21,7 @@ export interface PitScoutingFormData {
   "shooting-method"?: string[];
   "climb-levels"?: string[];
   "outpost-interaction"?: string;
-  "terrain-capability"?: string[];
+  "terrain-capability"?: string | string[]; // string[] on submissions from before it became single-select
   "driver-competitions"?: string;
   "additional-notes"?: string;
 }

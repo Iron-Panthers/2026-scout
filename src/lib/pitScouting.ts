@@ -1,5 +1,13 @@
 import { getEvents } from "./matches";
 import { supabase } from "./supabase";
+import {
+  addDevPitSubmission,
+  getDevEvent,
+  getDevPitSubmissions,
+  isDevEventId,
+  isDevPitSubmissionId,
+  updateDevPitSubmission,
+} from "./devMode";
 import type { PitScoutingSubmission, PitScoutingFormData } from "@/types/pitScouting";
 
 /**
@@ -25,6 +33,13 @@ export async function submitPitScouting(
   formData: PitScoutingFormData,
   photoUrl: string | null = null
 ): Promise<PitScoutingSubmission> {
+  // Sandbox events aren't in Supabase (the insert would violate its event foreign key); keep these locally.
+  if (isDevEventId(eventId) && scouterId) {
+    formData.event_code = getDevEvent(scouterId, eventId).event_code || "UNKNOWN";
+    return addDevPitSubmission(scouterId, {
+      team_num: teamNum, event_id: eventId, scouter_name: scouterName, pit_data: formData, photo_url: photoUrl, schema_version: PIT_SCHEMA_VERSION,
+    });
+  }
   formData.event_code = (await getEvents()).find((e) => e.id === eventId)?.event_code || "UNKNOWN";
 
   const { data, error } = await supabase
@@ -60,6 +75,9 @@ export async function hasExistingPitScouting(
   eventId: string,
   scouterId: string
 ): Promise<boolean> {
+  if (isDevEventId(eventId)) {
+    return getDevPitSubmissions(scouterId, eventId).some((s) => s.team_num === teamNum);
+  }
   const { data, error } = await supabase
     .from("pit_scouting_submissions")
     .select("id")
@@ -82,8 +100,12 @@ export async function hasExistingPitScouting(
  * @returns Array of pit scouting submissions
  */
 export async function getPitScoutingByEvent(
-  eventId: string
+  eventId: string,
+  devUserId?: string
 ): Promise<PitScoutingSubmission[]> {
+  if (isDevEventId(eventId) && devUserId) {
+    return getDevPitSubmissions(devUserId, eventId).sort((a, b) => a.team_num - b.team_num);
+  }
   const { data, error } = await supabase
     .from("pit_scouting_submissions")
     .select("*")
@@ -137,8 +159,14 @@ export async function updatePitScouting(
     pit_data: PitScoutingFormData;
     photo_url: string | null;
     scouter_name: string;
-  }>
+  }>,
+  devUserId?: string
 ): Promise<PitScoutingSubmission> {
+  if (isDevPitSubmissionId(submissionId)) {
+    const updated = devUserId ? updateDevPitSubmission(devUserId, submissionId, updates) : null;
+    if (!updated) throw new Error("Failed to update pit scouting: sandbox submission not found");
+    return updated;
+  }
   const { data, error } = await supabase
     .from("pit_scouting_submissions")
     .update(updates)
@@ -174,8 +202,14 @@ export async function deletePitScouting(submissionId: string): Promise<void> {
  */
 export async function getPitScoutingForTeamAtEvent(
   teamNum: number,
-  eventId: string
+  eventId: string,
+  devUserId?: string
 ): Promise<PitScoutingSubmission | null> {
+  if (isDevEventId(eventId)) {
+    if (!devUserId) return null;
+    const matches = getDevPitSubmissions(devUserId, eventId).filter((s) => s.team_num === teamNum);
+    return matches.sort((a, b) => b.created_at.localeCompare(a.created_at))[0] ?? null;
+  }
   const { data, error } = await supabase
     .from("pit_scouting_submissions")
     .select("*")

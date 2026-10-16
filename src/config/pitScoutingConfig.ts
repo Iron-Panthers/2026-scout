@@ -7,6 +7,9 @@ export interface PitScoutingQuestion {
   options?: string[];
 }
 
+/** Pseudo-field id for the robot photo in a targeted rescout. */
+export const PIT_PHOTO_FIELD = "photo";
+
 export const pitScoutingQuestions: PitScoutingQuestion[] = [
   // Robot Specifications
   {
@@ -71,7 +74,7 @@ export const pitScoutingQuestions: PitScoutingQuestion[] = [
   },
   {
     id: "terrain-capability",
-    type: "checkbox",
+    type: "radio",
     label: "Is your robot:",
     required: true,
     options: [

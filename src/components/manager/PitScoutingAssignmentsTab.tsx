@@ -26,6 +26,7 @@ import {
   removePitAssignment,
 } from "@/lib/pitScoutingAssignments";
 import { getPitScoutingByEvent } from "@/lib/pitScouting";
+import { RescoutConfig } from "@/components/manager/RescoutConfig";
 import { ScoutAssignmentDialog } from "@/components/manager/ScoutAssignmentDialog";
 import { RecursiveJsonEditor } from "@/components/RecursiveJsonEditor";
 import { useToast } from "@/hooks/use-toast";
@@ -33,6 +34,16 @@ import type { Event, Profile, PitScoutingAssignment } from "@/types";
 import type { PitScoutingSubmission } from "@/types/pitScouting";
 import { PhotoUpload } from "../PhotoUpload";
 import { useAuth } from "@/contexts/AuthContext";
+import {
+  getDevPitAssignments,
+  getDevTeams,
+  deleteDevPitSubmission,
+  isDevEventId,
+  isDevPitSubmissionId,
+  updateDevPitSubmission,
+  removeDevPitAssignment,
+  setDevPitAssignment,
+} from "@/lib/devMode";
 import { uploadPitPhoto } from "@/lib/photoUpload";
 
 interface PitScoutingAssignmentsTabProps {
@@ -55,6 +66,9 @@ export function PitScoutingAssignmentsTab({
   const [loadingTeams, setLoadingTeams] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [assigningTeam, setAssigningTeam] = useState<number | null>(null);
+  // Rescout flow: the team being configured, then the chosen fields until a scouter is picked.
+  const [rescoutTeam, setRescoutTeam] = useState<number | null>(null);
+  const [rescoutFields, setRescoutFields] = useState<string[] | null>(null);
   const [editPhoto, setEditPhoto] = useState<File | null>(null);
   
   // Edit state
@@ -72,6 +86,20 @@ export function PitScoutingAssignmentsTab({
 
   const loadData = useCallback(async () => {
     if (!currentEvent?.id) return;
+
+    // Sandbox events live in localStorage: the fake team pool, with its own assignments.
+    if (user?.id && isDevEventId(currentEvent.id)) {
+      setTeams(
+        getDevTeams(user.id)
+          .map((team) => ({ ...team, city: null, state_prov: null }))
+          .sort((a, b) => a.team_number - b.team_number)
+      );
+      setAssignments(getDevPitAssignments(user.id, currentEvent.id));
+      const devSubmissions = await getPitScoutingByEvent(currentEvent.id, user.id);
+      setSubmissions(devSubmissions);
+      setSubmittedTeams(new Map(devSubmissions.map((s) => [s.team_num, s.scouter_name])));
+      return;
+    }
 
     setLoadingTeams(true);
     try {
@@ -94,7 +122,7 @@ export function PitScoutingAssignmentsTab({
     } finally {
       setLoadingTeams(false);
     }
-  }, [currentEvent?.id, currentEvent?.event_code]);
+  }, [currentEvent?.id, currentEvent?.event_code, user?.id]);
 
   useEffect(() => {
     loadData();
@@ -123,7 +151,10 @@ export function PitScoutingAssignmentsTab({
 
     setDialogOpen(false);
     const teamNumber = assigningTeam;
+    const fields = rescoutFields;
     setAssigningTeam(null);
+    setRescoutFields(null);
+    setRescoutTeam(null);
 
     // Optimistic update
     setAssignments((prev) => {
@@ -131,7 +162,7 @@ export function PitScoutingAssignmentsTab({
       if (existing) {
         return prev.map((a) =>
           a.team_number === teamNumber
-            ? { ...a, scouter_id: profile.id }
+            ? { ...a, scouter_id: profile.id, rescout_fields: fields }
             : a
         );
       }
@@ -142,17 +173,20 @@ export function PitScoutingAssignmentsTab({
           event_id: currentEvent.id,
           team_number: teamNumber,
           scouter_id: profile.id,
+          rescout_fields: fields,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         },
       ];
     });
 
-    const success = await upsertPitAssignment(
-      currentEvent.id,
-      teamNumber,
-      profile.id
-    );
+    let success: boolean;
+    if (user?.id && isDevEventId(currentEvent.id)) {
+      setDevPitAssignment(user.id, currentEvent.id, teamNumber, profile.id, fields);
+      success = true;
+    } else {
+      success = await upsertPitAssignment(currentEvent.id, teamNumber, profile.id, fields);
+    }
 
     if (!success) {
       toast({
@@ -175,7 +209,13 @@ export function PitScoutingAssignmentsTab({
       prev.filter((a) => a.team_number !== teamNumber)
     );
 
-    const success = await removePitAssignment(currentEvent.id, teamNumber);
+    let success: boolean;
+    if (user?.id && isDevEventId(currentEvent.id)) {
+      removeDevPitAssignment(user.id, currentEvent.id, teamNumber);
+      success = true;
+    } else {
+      success = await removePitAssignment(currentEvent.id, teamNumber);
+    }
 
     if (!success) {
       toast({
@@ -208,12 +248,17 @@ export function PitScoutingAssignmentsTab({
         photoUrl = publicUrl;
       }
 
-      const { error } = await supabase
-        .from("pit_scouting_submissions")
-        .update(photoUrl !== null ? { pit_data: editData, photo_url: photoUrl } : { pit_data: editData })
-        .eq("id", editTarget.id);
+      const updates = photoUrl !== null ? { pit_data: editData, photo_url: photoUrl } : { pit_data: editData };
+      if (user?.id && isDevPitSubmissionId(editTarget.id)) {
+        updateDevPitSubmission(user.id, editTarget.id, updates);
+      } else {
+        const { error } = await supabase
+          .from("pit_scouting_submissions")
+          .update(updates)
+          .eq("id", editTarget.id);
 
-      if (error) throw error;
+        if (error) throw error;
+      }
 
       toast({
         title: "Saved",
@@ -245,12 +290,16 @@ export function PitScoutingAssignmentsTab({
     if (!deleteTarget) return;
     setIsDeleting(true);
     try {
-      const { error } = await supabase
-        .from("pit_scouting_submissions")
-        .delete()
-        .eq("id", deleteTarget.id);
+      if (user?.id && isDevPitSubmissionId(deleteTarget.id)) {
+        deleteDevPitSubmission(user.id, deleteTarget.id);
+      } else {
+        const { error } = await supabase
+          .from("pit_scouting_submissions")
+          .delete()
+          .eq("id", deleteTarget.id);
 
-      if (error) throw error;
+        if (error) throw error;
+      }
 
       toast({
         title: "Deleted",
@@ -276,6 +325,14 @@ export function PitScoutingAssignmentsTab({
     return availableScouts.find((s) => s.id === assignment.scouter_id);
   };
 
+  // Same rule as the scouter's dashboard: an assignment on an already-scouted team is a
+  // pending rescout only if it was made after the latest submission.
+  const hasPendingRescout = (teamNumber: number): boolean => {
+    const assignment = assignments.find((a) => a.team_number === teamNumber);
+    const submission = submissions.find((s) => s.team_num === teamNumber);
+    return !!assignment?.scouter_id && !!submission && assignment.updated_at > submission.updated_at;
+  };
+
   if (isAllEvents) {
     return (
       <div className="rounded-lg border border-border bg-card p-8 text-center">
@@ -294,6 +351,20 @@ export function PitScoutingAssignmentsTab({
           Information to load teams.
         </p>
       </div>
+    );
+  }
+
+  if (rescoutTeam !== null && rescoutFields === null) {
+    return (
+      <RescoutConfig
+        teamNumber={rescoutTeam}
+        submission={submissions.find((s) => s.team_num === rescoutTeam)}
+        onCancel={() => setRescoutTeam(null)}
+        onContinue={(fields) => {
+          setRescoutFields(fields);
+          openAssignDialog(rescoutTeam);
+        }}
+      />
     );
   }
 
@@ -382,7 +453,7 @@ export function PitScoutingAssignmentsTab({
                             Unassigned
                           </span>
                         )}
-                        {isSubmitted && scout && (
+                        {isSubmitted && scout && hasPendingRescout(team.team_number) && (
                           <Badge className="bg-yellow-700/30 text-yellow-400 border-yellow-600/40 border w-fit">
                             Rescout: {scout.name || "Unknown"}
                           </Badge>
@@ -427,12 +498,12 @@ export function PitScoutingAssignmentsTab({
                             variant="outline"
                             size="sm"
                             className="border-yellow-600/50 text-yellow-400 hover:bg-yellow-900/30"
-                            onClick={() => openAssignDialog(team.team_number)}
+                            onClick={() => setRescoutTeam(team.team_number)}
                           >
                             Assign Rescout
                           </Button>
                         )}
-                        {scout && (
+                        {scout && (!isSubmitted || hasPendingRescout(team.team_number)) && (
                           <Button
                             variant="ghost"
                             size="sm"
@@ -458,7 +529,11 @@ export function PitScoutingAssignmentsTab({
         open={dialogOpen}
         onOpenChange={(open) => {
           setDialogOpen(open);
-          if (!open) setAssigningTeam(null);
+          if (!open) {
+            setAssigningTeam(null);
+            // Dismissed without picking a scouter: back to the rescout config page.
+            setRescoutFields(null);
+          }
         }}
         availableScouts={availableScouts}
         onAssignScout={handleAssignScout}
