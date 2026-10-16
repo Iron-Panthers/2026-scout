@@ -1,4 +1,5 @@
-import type { Event, Match, GameProfile, Profile, Role, Roster } from "@/types";
+import type { Event, Match, GameProfile, PitScoutingAssignment, Profile, Role, Roster } from "@/types";
+import type { PitScoutingSubmission } from "@/types/pitScouting";
 import type { Bet, BetAlliance, BetCurrency, BetWithMatch } from "@/types/betting";
 import { ROLE_TO_COLUMN, ROLE_TO_COLUMN_2, roleColumn } from "./roleUtils";
 
@@ -54,6 +55,9 @@ interface DevData {
   sandboxRosters?: Record<string, Roster[]>;
   sandboxPicklists?: Record<string, { picked_team_numbers: number[]; do_not_pick_team_numbers: number[] }>;
   sandboxBets?: Bet[];
+  sandboxPitSubmissions?: PitScoutingSubmission[];
+  /** Pit scouting assignments per sandbox event id; seeded from the fake team pool on first read. */
+  sandboxPitAssignments?: Record<string, PitScoutingAssignment[]>;
   /** FRCdle daily rolls made in the sandbox, kept apart from the account's real rolls. */
   sandboxFrcdleSpins?: DevFrcdleSpin[];
   teams: Array<{ team_number: number; nickname: string }>;
@@ -461,6 +465,8 @@ export function deleteDevEvent(userId: string, eventId: string): boolean {
   data.additionalEvents = existingEvents.filter((event) => event.id !== eventId);
   delete data.additionalMatches?.[eventId];
   delete data.additionalMatchTeams?.[eventId];
+  delete data.sandboxPitAssignments?.[eventId];
+  data.sandboxPitSubmissions = data.sandboxPitSubmissions?.filter((submission) => submission.event_id !== eventId);
   const remainingMatchIds = new Set([
     ...data.matches,
     ...Object.values(data.additionalMatches ?? {}).flat(),
@@ -783,6 +789,109 @@ export function setDevMatchAssignment(
   (match as unknown as Record<string, string | null>)[column] = scouterId;
   saveDevData(userId, data);
   return match;
+}
+
+function makeDevPitAssignment(eventId: string, teamNumber: number, scouterId: string | null): PitScoutingAssignment {
+  const now = new Date().toISOString();
+  return { id: `${eventId}-pit-${teamNumber}`, event_id: eventId, team_number: teamNumber, scouter_id: scouterId, rescout_fields: null, created_at: now, updated_at: now };
+}
+
+function pitAssignmentsFor(data: DevData, userId: string, eventId: string): PitScoutingAssignment[] {
+  const store = (data.sandboxPitAssignments ??= {});
+  if (!store[eventId]) {
+    const scouterIds = [userId, ...getDevFakeScouts().map((scout) => scout.id)];
+    store[eventId] = data.teams.map((team, i) => makeDevPitAssignment(eventId, team.team_number, scouterIds[i % scouterIds.length]));
+  }
+  return store[eventId];
+}
+
+/**
+ * A sandbox event's pit assignments. The first read seeds one per team in the
+ * fake team pool, spread across you and the fake scouts.
+ */
+export function getDevPitAssignments(userId: string, eventId: string): PitScoutingAssignment[] {
+  const data = getDevData(userId);
+  const seeded = !data.sandboxPitAssignments?.[eventId];
+  const assignments = pitAssignmentsFor(data, userId, eventId);
+  if (seeded) saveDevData(userId, data);
+  return assignments;
+}
+
+/** Every sandbox event's pit assignments for one scouter, for their dashboard. */
+export function getDevUserPitAssignments(userId: string): PitScoutingAssignment[] {
+  return getDevEvents(userId)
+    .flatMap((event) => getDevPitAssignments(userId, event.id))
+    .filter((assignment) => assignment.scouter_id === userId);
+}
+
+/** Assigns (or, with scouterId=null, unassigns) a scout to a team's pit scouting. */
+export function setDevPitAssignment(userId: string, eventId: string, teamNumber: number, scouterId: string | null, rescoutFields: string[] | null = null): void {
+  const data = getDevData(userId);
+  const assignments = pitAssignmentsFor(data, userId, eventId);
+  const existing = assignments.find((assignment) => assignment.team_number === teamNumber);
+  if (existing) {
+    existing.scouter_id = scouterId;
+    existing.rescout_fields = rescoutFields;
+    existing.updated_at = new Date().toISOString();
+  } else {
+    assignments.push({ ...makeDevPitAssignment(eventId, teamNumber, scouterId), rescout_fields: rescoutFields });
+  }
+  saveDevData(userId, data);
+}
+
+export function removeDevPitAssignment(userId: string, eventId: string, teamNumber: number): void {
+  const data = getDevData(userId);
+  pitAssignmentsFor(data, userId, eventId);
+  data.sandboxPitAssignments![eventId] = data.sandboxPitAssignments![eventId].filter((assignment) => assignment.team_number !== teamNumber);
+  saveDevData(userId, data);
+}
+
+const DEV_PIT_SUBMISSION_PREFIX = "devpit-";
+
+export function isDevPitSubmissionId(id: string | null | undefined): boolean {
+  return !!id && id.startsWith(DEV_PIT_SUBMISSION_PREFIX);
+}
+
+export function getDevPitSubmissions(userId: string, eventId?: string): PitScoutingSubmission[] {
+  const submissions = getDevData(userId).sandboxPitSubmissions ?? [];
+  return eventId ? submissions.filter((submission) => submission.event_id === eventId) : submissions;
+}
+
+export function addDevPitSubmission(
+  userId: string,
+  submission: Pick<PitScoutingSubmission, "team_num" | "event_id" | "scouter_name" | "pit_data" | "photo_url" | "schema_version">
+): PitScoutingSubmission {
+  const data = getDevData(userId);
+  const now = new Date().toISOString();
+  const created: PitScoutingSubmission = {
+    ...submission,
+    id: `${DEV_PIT_SUBMISSION_PREFIX}${crypto.randomUUID()}`,
+    scouter_id: userId,
+    created_at: now,
+    updated_at: now,
+  };
+  (data.sandboxPitSubmissions ??= []).push(created);
+  saveDevData(userId, data);
+  return created;
+}
+
+export function updateDevPitSubmission(
+  userId: string,
+  submissionId: string,
+  updates: Partial<Pick<PitScoutingSubmission, "pit_data" | "photo_url" | "scouter_name">>
+): PitScoutingSubmission | null {
+  const data = getDevData(userId);
+  const submission = data.sandboxPitSubmissions?.find((s) => s.id === submissionId);
+  if (!submission) return null;
+  Object.assign(submission, updates, { updated_at: new Date().toISOString() });
+  saveDevData(userId, data);
+  return submission;
+}
+
+export function deleteDevPitSubmission(userId: string, submissionId: string): void {
+  const data = getDevData(userId);
+  data.sandboxPitSubmissions = data.sandboxPitSubmissions?.filter((s) => s.id !== submissionId);
+  saveDevData(userId, data);
 }
 
 export function getDevRosters(userId: string, eventId: string): Roster[] {

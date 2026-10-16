@@ -27,8 +27,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useDevMode } from "@/contexts/DevModeContext";
 import { useToast } from "@/hooks/use-toast";
 import { getActiveEvent } from "@/lib/matches";
-import { getDevEvent } from "@/lib/devMode";
-import { pitScoutingQuestions } from "@/config/pitScoutingConfig";
+import { getDevEvent, getDevPitAssignments, isDevEventId, removeDevPitAssignment } from "@/lib/devMode";
+import { PIT_PHOTO_FIELD, pitScoutingQuestions } from "@/config/pitScoutingConfig";
 import type { PitScoutingQuestion } from "@/config/pitScoutingConfig";
 import type { Event } from "@/types";
 import type { PitScoutingSubmission } from "@/types/pitScouting";
@@ -41,7 +41,7 @@ import {
   updatePitScouting,
   getPitScoutingForTeamAtEvent,
 } from "@/lib/pitScouting";
-import { removePitAssignment } from "@/lib/pitScoutingAssignments";
+import { getPitAssignment, removePitAssignment } from "@/lib/pitScoutingAssignments";
 
 export default function PitScouting() {
   const navigate = useNavigate();
@@ -72,6 +72,8 @@ export default function PitScouting() {
   const [pitDataEdit, setPitDataEdit] = useState<Record<string, any>>({});
   const [newPhoto, setNewPhoto] = useState<File | null>(null);
   const [replacePhoto, setReplacePhoto] = useState(false);
+  // Fields a manager's targeted rescout asks for (question ids / "photo"); null means edit the whole entry.
+  const [rescoutFields, setRescoutFields] = useState<string[] | null>(null);
 
   // Debounce ref for duplicate check
   const duplicateCheckTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -115,7 +117,7 @@ export default function PitScouting() {
     const teamNum = Number(teamNumber);
     if (!teamNum || teamNum <= 0) return;
 
-    getPitScoutingForTeamAtEvent(teamNum, activeEvent.id).then((sub) => {
+    getPitScoutingForTeamAtEvent(teamNum, activeEvent.id, user?.id).then((sub) => {
       if (sub) {
         navigate(`/pit-scouting?team=${teamNumber}&rescout=true`, { replace: true });
       }
@@ -129,11 +131,16 @@ export default function PitScouting() {
     if (!teamNum || teamNum <= 0) return;
 
     setLoadingExisting(true);
-    getPitScoutingForTeamAtEvent(teamNum, activeEvent.id).then((sub) => {
+    const assignmentPromise = isDevEventId(activeEvent.id) && user?.id
+      ? Promise.resolve(getDevPitAssignments(user.id, activeEvent.id).find((a) => a.team_number === teamNum) ?? null)
+      : getPitAssignment(activeEvent.id, teamNum);
+    Promise.all([getPitScoutingForTeamAtEvent(teamNum, activeEvent.id, user?.id), assignmentPromise]).then(([sub, assignment]) => {
       setExistingSubmission(sub);
       if (sub?.pit_data) {
         setPitDataEdit({ ...sub.pit_data });
+        setFormData({ ...sub.pit_data });
       }
+      setRescoutFields(assignment?.rescout_fields ?? null);
       setLoadingExisting(false);
     });
   }, [rescoutMode, teamNumber, activeEvent]);
@@ -146,7 +153,7 @@ export default function PitScouting() {
 
     if (duplicateCheckTimer.current) clearTimeout(duplicateCheckTimer.current);
     duplicateCheckTimer.current = setTimeout(async () => {
-      const existing = await getPitScoutingForTeamAtEvent(teamNum, activeEvent.id);
+      const existing = await getPitScoutingForTeamAtEvent(teamNum, activeEvent.id, user?.id);
       if (existing) {
         setDuplicateDialogOpen(true);
       }
@@ -223,6 +230,11 @@ export default function PitScouting() {
       return;
     }
 
+    if (rescoutFields?.includes(PIT_PHOTO_FIELD) && !newPhoto) {
+      toast({ title: "Photo required", description: "Please add a new robot photo.", variant: "destructive" });
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       let photoUrl = existingSubmission.photo_url;
@@ -233,14 +245,17 @@ export default function PitScouting() {
       }
 
       await updatePitScouting(existingSubmission.id, {
-        pit_data: pitDataEdit,
+        pit_data: rescoutFields
+          ? { ...existingSubmission.pit_data, ...Object.fromEntries(rescoutFields.filter((id) => id !== PIT_PHOTO_FIELD).map((id) => [id, formData[id]])) }
+          : pitDataEdit,
         photo_url: photoUrl,
         scouter_name: scouterName,
-      });
+      }, user?.id);
 
       // Clear the assignment so it no longer shows on dashboard or manager view
       if (activeEvent) {
-        await removePitAssignment(activeEvent.id, Number(teamNumber));
+        if (isDevEventId(activeEvent.id) && user?.id) removeDevPitAssignment(user.id, activeEvent.id, Number(teamNumber));
+        else await removePitAssignment(activeEvent.id, Number(teamNumber));
       }
 
       toast({ title: "Success", description: "Pit scouting updated successfully" });
@@ -427,8 +442,7 @@ export default function PitScouting() {
         <h1 className="text-4xl font-bold mb-8">
           {rescoutMode ? (
             <>
-              <span className="text-yellow-400">Update</span> Pit Scouting
-              {teamNumber && <span className="text-muted-foreground text-2xl ml-3">— Team {teamNumber}</span>}
+              <span className="text-primary">Pit</span> Scouting
             </>
           ) : (
             <>
@@ -438,7 +452,80 @@ export default function PitScouting() {
         </h1>
 
         {/* ---- RESCOUT MODE ---- */}
-        {rescoutMode ? (
+        {rescoutMode && rescoutFields && !loadingExisting ? (
+          <form onSubmit={handleRescoutSubmit} className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Scouter Information</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="scouter-name">
+                    Your Name <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="scouter-name"
+                    value={scouterName}
+                    onChange={(e) => setScouterName(e.target.value)}
+                    required
+                    disabled={isSubmitting}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>
+                    Team Number
+                    <span className="ml-2 text-xs text-muted-foreground">(pre-filled from assignment)</span>
+                  </Label>
+                  <Input value={teamNumber} readOnly disabled className="font-mono" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Fields to rescout</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {!existingSubmission ? (
+                  <p className="text-muted-foreground text-sm">No existing submission found for team {teamNumber}.</p>
+                ) : (
+                  pitScoutingQuestions.filter((q) => rescoutFields.includes(q.id)).map(renderQuestion)
+                )}
+              </CardContent>
+            </Card>
+
+            {rescoutFields.includes(PIT_PHOTO_FIELD) && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Robot Photo</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <PhotoUpload
+                    onPhotoSelected={setNewPhoto}
+                    onPhotoCleared={() => setNewPhoto(null)}
+                    disabled={isSubmitting}
+                  />
+                </CardContent>
+              </Card>
+            )}
+
+            <div className="flex justify-end gap-4">
+              <Button type="button" variant="outline" onClick={() => navigate("/dashboard")} disabled={isSubmitting}>
+                Cancel
+              </Button>
+              <Button type="submit" size="lg" disabled={isSubmitting || !existingSubmission}>
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Submit Rescout"
+                )}
+              </Button>
+            </div>
+          </form>
+        ) : rescoutMode ? (
           <form onSubmit={handleRescoutSubmit} className="space-y-6">
             {eventMapCard}
 

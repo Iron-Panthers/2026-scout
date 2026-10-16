@@ -26,7 +26,7 @@ import {
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDevMode } from "@/contexts/DevModeContext";
-import { getDevMatches, getDevMatchTeamForRole, hasDevSubmission, isDevMatchId } from "@/lib/devMode";
+import { getDevEvents, getDevPitSubmissions, getDevMatches, getDevMatchTeamForRole, getDevUserPitAssignments, hasDevSubmission, isDevMatchId } from "@/lib/devMode";
 import { getUserMatches, removeUserFromMatch, getEvents } from "@/lib/matches";
 import { getMatchTeam } from "@/lib/blueAlliance";
 import { filterMatchesWithoutSubmissions } from "@/lib/scoutingSchema";
@@ -229,9 +229,21 @@ export default function Dashboard() {
   // Load pit scouting assignments for current user
   const loadPitAssignments = useCallback(async () => {
     if (!user?.id) return;
+    if (devMode) {
+      const events = getDevEvents(user.id);
+      const submissions = getDevPitSubmissions(user.id);
+      setPitAssignments(getDevUserPitAssignments(user.id).flatMap((assignment) => {
+        // Same rule as getUserPitAssignments: a submitted team only returns when reassigned afterwards (rescout).
+        const submission = submissions.find((s) => s.event_id === assignment.event_id && s.team_num === assignment.team_number);
+        if (submission && assignment.updated_at <= submission.updated_at) return [];
+        const event = events.find((e) => e.id === assignment.event_id);
+        return [{ ...assignment, event_code: event?.event_code ?? null, event_name: event?.name ?? "Sandbox Event", isRescout: !!submission }];
+      }));
+      return;
+    }
     const data = await getUserPitAssignments(user.id);
     setPitAssignments(data);
-  }, [user?.id]);
+  }, [user?.id, devMode]);
 
   useEffect(() => {
     loadPitAssignments();
@@ -571,7 +583,7 @@ export default function Dashboard() {
                     <Card
                       className={`w-64 flex flex-col border-2 hover:scale-[1.02] transition-transform cursor-pointer ${
                         assignment.isRescout
-                          ? "bg-yellow-900/40 border-yellow-700/50"
+                          ? "bg-green-300/25 border-green-400/60"
                           : "bg-green-900/40 border-green-700/50"
                       }`}
                       onClick={() =>
@@ -584,7 +596,7 @@ export default function Dashboard() {
                             variant="outline"
                             className={`text-xs ${
                               assignment.isRescout
-                                ? "bg-yellow-600/20 text-yellow-400 border-yellow-600/30"
+                                ? "bg-green-300/30 text-green-300 border-green-300/50"
                                 : "bg-green-600/20 text-green-400 border-green-600/30"
                             }`}
                           >
@@ -602,11 +614,16 @@ export default function Dashboard() {
                               {userName}
                             </div>
                             <div className="text-xs">{assignment.event_name}</div>
+                            {assignment.rescout_fields && (
+                              <div className="text-xs mt-1">
+                                {assignment.rescout_fields.length} field{assignment.rescout_fields.length === 1 ? "" : "s"} to redo
+                              </div>
+                            )}
                           </div>
                           <Button
                             className={`w-full mt-4 ${
                               assignment.isRescout
-                                ? "bg-yellow-700 hover:bg-yellow-600"
+                                ? "bg-green-400 text-green-950 hover:bg-green-300"
                                 : "bg-green-700 hover:bg-green-600"
                             }`}
                             size="sm"
@@ -616,7 +633,7 @@ export default function Dashboard() {
                             }}
                           >
                             <Wrench className="h-4 w-4 mr-1" />
-                            {assignment.isRescout ? "Update Entry" : "Scout Pit"}
+                            {assignment.isRescout ? (assignment.rescout_fields ? "Start Rescout" : "Update Entry") : "Scout Pit"}
                           </Button>
                         </div>
                       </CardContent>

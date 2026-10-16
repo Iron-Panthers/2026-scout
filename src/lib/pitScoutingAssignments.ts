@@ -20,7 +20,8 @@ export async function getPitAssignmentsForEvent(
 export async function upsertPitAssignment(
   eventId: string,
   teamNumber: number,
-  scouterId: string | null
+  scouterId: string | null,
+  rescoutFields: string[] | null = null
 ): Promise<boolean> {
   const { error } = await supabase
     .from("pit_scouting_assignments")
@@ -29,6 +30,7 @@ export async function upsertPitAssignment(
         event_id: eventId,
         team_number: teamNumber,
         scouter_id: scouterId,
+        rescout_fields: rescoutFields,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "event_id,team_number" }
@@ -56,6 +58,24 @@ export async function removePitAssignment(
     return false;
   }
   return true;
+}
+
+/** One team's assignment at an event, or null. */
+export async function getPitAssignment(
+  eventId: string,
+  teamNumber: number
+): Promise<PitScoutingAssignment | null> {
+  const { data, error } = await supabase
+    .from("pit_scouting_assignments")
+    .select("*")
+    .eq("event_id", eventId)
+    .eq("team_number", teamNumber)
+    .maybeSingle();
+  if (error) {
+    console.error("Error fetching pit assignment:", error);
+    return null;
+  }
+  return data;
 }
 
 export interface UserPitAssignment extends PitScoutingAssignment {
@@ -103,6 +123,7 @@ export async function getUserPitAssignments(
       event_id: row.event_id,
       team_number: row.team_number,
       scouter_id: row.scouter_id,
+      rescout_fields: row.rescout_fields ?? null,
       created_at: row.created_at,
       updated_at: row.updated_at,
       event_code: row.events?.event_code ?? null,

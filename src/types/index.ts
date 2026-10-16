@@ -188,6 +188,8 @@ export interface PitScoutingAssignment {
   event_id: string;
   team_number: number;
   scouter_id: string | null;
+  /** Question ids (and "photo") a rescout asks the scouter to redo; null for a regular assignment. */
+  rescout_fields?: string[] | null;
   created_at: string;
   updated_at: string;
 }
