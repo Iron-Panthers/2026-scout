@@ -24,6 +24,7 @@ import type { Match13Match } from "@/lib/match13";
 import { useRandomSubtitle } from "@/hooks/useRandomSubtitle";
 import { BETTING_SUBTITLES } from "@/config/headerSubtitles";
 import { getDevEvent, getDevMatchTeams, getDevMatches } from "@/lib/devMode";
+import { getEventCurrencyLogo } from "@/config/eventCurrency";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -842,6 +843,8 @@ export default function Betting({
   const [m13Map, setM13Map] = useState<Map<number, Match13Match>>(new Map());
   const [myBets, setMyBets] = useState<BetWithMatch[]>([]);
   const [points, setPoints] = useState<number | null>(null);
+  // Shown in the developer sandbox and whenever an event is active; null hides the badge.
+  const [eventPoints, setEventPoints] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [tbaLoading, setTbaLoading] = useState(false);
@@ -909,6 +912,7 @@ export default function Betting({
       setMatches(rows);
       setMyBets(userBets);
       setPoints(gameProfile?.points ?? 999999);
+      setEventPoints(gameProfile?.event_points ?? 999999);
       setOddsMap(odds);
       setTbaMap(allianceMap);
       setM13Map(predictionMap);
@@ -927,6 +931,7 @@ export default function Betting({
     if (isStale()) return;
 
     setPoints(gameProfile?.points ?? 0);
+    setEventPoints(activeEvent ? gameProfile?.event_points ?? 0 : null);
     setMyBets(userBets);
     setEvent(activeEvent);
 
@@ -1193,10 +1198,22 @@ export default function Betting({
               <Button variant="ghost" size="icon" onClick={refresh} disabled={refreshing || !isOnline}>
                 <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
               </Button>
-              <div className="flex items-center gap-1.5 bg-muted rounded-full px-3 py-1.5">
-                <Coins className="h-4 w-4 text-yellow-400" />
-                <span className="font-bold text-sm">{points ?? "—"}</span>
-              </div>
+              <Badge
+                variant="outline"
+                className="gap-1.5 text-yellow-400 border-yellow-500/40 bg-yellow-500/10 text-sm font-semibold"
+              >
+                <Coins className="h-3.5 w-3.5" />
+                {points === null ? "—" : points.toLocaleString()} pts
+              </Badge>
+              {eventPoints !== null && (
+                <Badge
+                  variant="outline"
+                  className="gap-1.5 text-sky-400 border-sky-500/40 bg-sky-500/10 text-sm font-semibold"
+                >
+                  <img src={getEventCurrencyLogo(event?.event_code)} alt="Event currency" className="h-5 w-5" />
+                  {eventPoints.toLocaleString()}
+                </Badge>
+              )}
             </div>
           </div>
         )}
@@ -1212,10 +1229,22 @@ export default function Betting({
               <Button variant="ghost" size="icon" onClick={refresh} disabled={refreshing || !isOnline}>
                 <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
               </Button>
-              <div className="flex items-center gap-1.5 bg-muted rounded-full px-3 py-1.5">
-                <Coins className="h-4 w-4 text-yellow-400" />
-                <span className="font-bold text-sm">{points ?? "—"}</span>
-              </div>
+              <Badge
+                variant="outline"
+                className="gap-1.5 text-yellow-400 border-yellow-500/40 bg-yellow-500/10 text-sm font-semibold"
+              >
+                <Coins className="h-3.5 w-3.5" />
+                {points === null ? "—" : points.toLocaleString()} pts
+              </Badge>
+              {eventPoints !== null && (
+                <Badge
+                  variant="outline"
+                  className="gap-1.5 text-sky-400 border-sky-500/40 bg-sky-500/10 text-sm font-semibold"
+                >
+                  <img src={getEventCurrencyLogo(event?.event_code)} alt="Event currency" className="h-5 w-5" />
+                  {eventPoints.toLocaleString()}
+                </Badge>
+              )}
             </>,
             headerActions
           )}

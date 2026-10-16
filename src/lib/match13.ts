@@ -11,6 +11,8 @@
  * it never reports what actually happened).
  */
 
+import { supabase } from "@/lib/supabase";
+
 export interface Match13Pred {
   winner: "red" | "blue" | null;
   red_win_prob: number; // 0–1, match13's `pred.winProb`
@@ -53,4 +55,24 @@ export function wasUpset(
   if (winner === "tie") return false;
   const winnerProb = winner === "red" ? redWinProb : 1 - redWinProb;
   return winnerProb < 0.45;
+}
+
+/**
+ * Team number -> match13 xP average at an event, for sorting/ranking teams
+ * in the picklist. Fetched through the match13-event-xp edge function since
+ * match13's key must stay server-side. Returns an empty map on failure.
+ */
+export async function getEventXpMap(eventCode: string): Promise<Map<number, number>> {
+  const map = new Map<number, number>();
+  const { data, error } = await supabase.functions.invoke("match13-event-xp", {
+    body: { eventCode },
+  });
+  if (error || !Array.isArray(data?.teams)) {
+    console.error("Could not load match13 xP for", eventCode, error);
+    return map;
+  }
+  for (const t of data.teams as Array<{ teamNumber: number; xp: number | null }>) {
+    if (typeof t.xp === "number") map.set(t.teamNumber, t.xp);
+  }
+  return map;
 }

@@ -36,12 +36,20 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ListOrdered, ArrowUpDown, Loader2 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ListOrdered, ArrowUpDown, Loader2, RotateCcw } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDevMode } from "@/contexts/DevModeContext";
 import { getEvents } from "@/lib/matches";
 import { getEventTeams, type TBATeamSimple } from "@/lib/blueAlliance";
-import { getEventEpaMap } from "@/lib/statbotics";
+import { getEventXpMap } from "@/lib/match13";
 import { getEventScoutingAverages } from "@/lib/scoutingSchema";
 import { getPicklist, upsertPicklist } from "@/lib/picklists";
 import {
@@ -55,6 +63,10 @@ import {
 import UserProfileMenu from "@/components/UserProfileMenu";
 import { TeamLogo } from "@/components/TeamLogo";
 import { TeamInfoDialog } from "@/components/TeamInfoDialog";
+import { ScoutingDataTable } from "@/components/strategy/ScoutingDataTable";
+import { MatchDashboard } from "@/components/strategy/MatchDashboard";
+import { TeamInfoPage } from "@/components/strategy/TeamInfoPage";
+import { SCOUTING_DATA_TYPES, type ScoutingDataType } from "@/lib/strategyData";
 import type { Event } from "@/types";
 
 type PicklistColumnKey = "bank" | "picklist" | "doNotPick";
@@ -92,6 +104,21 @@ const picklistCollisionDetection: CollisionDetection = (args) => {
         ...args,
         droppableContainers: [columnBelowLastCard.lastTeamCard.container],
       });
+    }
+
+    // In the gap between two cards (or the padding above the first) the pointer
+    // is inside a column but over no card, which the sortable list reads as "no
+    // position" and snaps the cards back. That space belongs to the card below it.
+    const isColumnId = (id: unknown) => id === "bank" || id === "picklist" || id === "doNotPick";
+    if (pointerCollisions.length > 0 && pointerCollisions.every((collision) => isColumnId(collision.id))) {
+      const cardBelowPointer = args.droppableContainers
+        .filter((container) => pointerCollisions.some((collision) => collision.id === container.data.current?.column))
+        .map((container) => ({ container, rect: args.droppableRects.get(container.id) }))
+        .filter((entry) => entry.rect != null && entry.rect.top >= pointer.y)
+        .sort((a, b) => a.rect!.top - b.rect!.top)[0]?.container;
+      if (cardBelowPointer) {
+        return closestCenter({ ...args, droppableContainers: [cardBelowPointer] });
+      }
     }
 
     if (pointerCollisions.length > 0) return pointerCollisions;
@@ -287,6 +314,11 @@ function PicklistColumn({
   onFlyDone,
 }: PicklistColumnProps) {
   const { setNodeRef } = useDroppable({ id: columnKey });
+  // Memoized: useDroppable re-renders this column whenever the drag target
+  // changes, and a fresh ids array each time makes dnd-kit's useSortable think
+  // the list changed, so it disables the transition on each card's first move
+  // (the cards jump instead of sliding).
+  const teamIds = useMemo(() => teams.map((t) => t.team_number), [teams]);
 
   return (
     <div className="flex h-full flex-col">
@@ -304,7 +336,7 @@ function PicklistColumn({
           </p>
         )}
         <SortableContext
-          items={teams.map((t) => t.team_number)}
+          items={teamIds}
           strategy={verticalListSortingStrategy}
         >
           {teams.map((team, index) => (
@@ -325,10 +357,43 @@ function PicklistColumn({
   );
 }
 
+type StrategyPage = "data" | "dashboard" | "teams" | "picklist" | "event";
+
+const STRATEGY_PAGES: Record<StrategyPage, { label: string; title: string; description: string }> = {
+  data: {
+    label: "Data",
+    title: "Data",
+    description: "Every scouting submission for the selected event.",
+  },
+  dashboard: {
+    label: "Dashboard",
+    title: "Dashboard",
+    description: "The six teams in a match, with their scouting data from the whole event.",
+  },
+  teams: {
+    label: "Teams",
+    title: "Team Info",
+    description: "Pick a team to see everything scouted about it at this event.",
+  },
+  picklist: {
+    label: "Picklist",
+    title: "Picklist",
+    description: "Sort teams however you want! This list is only visible for you.",
+  },
+  event: {
+    label: "Event",
+    title: "Event",
+    description: "All teams competing at the selected event.",
+  },
+};
+
 export default function StrategyDashboard() {
   const { user, profile, getAvatarUrl } = useAuth();
   const { devMode } = useDevMode();
-  const [strategyPage, setStrategyPage] = useState<"picklist" | "event">("picklist");
+  const [strategyPage, setStrategyPage] = useState<StrategyPage>("picklist");
+  const [scoutingDataType, setScoutingDataType] = useState<ScoutingDataType>("quantitative");
+  // Where the Dashboard page puts its match picker, beside the event dropdown.
+  const [toolbarSlot, setToolbarSlot] = useState<HTMLDivElement | null>(null);
   // Per-event snapshot of the picklist columns, kept for the life of this
   // page. Switching events re-reads from here instead of the server when
   // we've already loaded (and possibly locally edited) that event this
@@ -345,10 +410,10 @@ export default function StrategyDashboard() {
   const [pickedTeams, setPickedTeams] = useState<TBATeamSimple[]>([]);
   const [doNotPickTeams, setDoNotPickTeams] = useState<TBATeamSimple[]>([]);
   const [bankTeams, setBankTeams] = useState<TBATeamSimple[]>([]);
-  const [bankSortMode, setBankSortMode] = useState<"number" | "epa" | "scouting">("number");
-  const [teamEpaMap, setTeamEpaMap] = useState<Map<number, number>>(new Map());
-  const [epaLoading, setEpaLoading] = useState(false);
-  const [epaLoadedEventId, setEpaLoadedEventId] = useState<string | null>(null);
+  const [bankSortMode, setBankSortMode] = useState<"number" | "xp" | "scouting">("number");
+  const [teamXpMap, setTeamXpMap] = useState<Map<number, number>>(new Map());
+  const [xpLoading, setXpLoading] = useState(false);
+  const [xpLoadedEventId, setXpLoadedEventId] = useState<string | null>(null);
   const [teamScoutingAvgMap, setTeamScoutingAvgMap] = useState<Map<number, number>>(new Map());
   const [scoutingAvgLoading, setScoutingAvgLoading] = useState(false);
   const [scoutingAvgLoadedEventId, setScoutingAvgLoadedEventId] = useState<string | null>(null);
@@ -362,6 +427,7 @@ export default function StrategyDashboard() {
   const [selectedPicklistEventId, setSelectedPicklistEventId] = useState("");
   const [teamInfoOpen, setTeamInfoOpen] = useState(false);
   const [teamInfoTeam, setTeamInfoTeam] = useState<TBATeamSimple | null>(null);
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [mobilePicklistTab, setMobilePicklistTab] = useState<"picklist" | "doNotPick">(
     "picklist"
   );
@@ -473,11 +539,11 @@ export default function StrategyDashboard() {
       loadPicklist();
     }
 
-    // EPA/scouting-average data is event-specific; drop the old event's
+    // xP/scouting-average data is event-specific; drop the old event's
     // data so we don't sort by the wrong event's numbers while the new
     // one (re)loads.
-    setTeamEpaMap(new Map());
-    setEpaLoadedEventId(null);
+    setTeamXpMap(new Map());
+    setXpLoadedEventId(null);
     setTeamScoutingAvgMap(new Map());
     setScoutingAvgLoadedEventId(null);
     return () => {
@@ -485,31 +551,31 @@ export default function StrategyDashboard() {
     };
   }, [picklistEvents, selectedPicklistEventId, user?.id, devMode]);
 
-  // Lazily fetch Statbotics EPA ratings the first time "Sort by EPA" is used
+  // Lazily fetch match13 xP averages the first time "Sort by xP" is used
   // for this event.
   useEffect(() => {
-    if (bankSortMode !== "epa") return;
+    if (bankSortMode !== "xp") return;
     const event = picklistEvents.find((item) => item.id === selectedPicklistEventId);
-    if (!event?.event_code || epaLoadedEventId === selectedPicklistEventId) return;
+    if (!event?.event_code || xpLoadedEventId === selectedPicklistEventId) return;
     if (devMode && isDevEventId(event.id)) {
-      setTeamEpaMap(new Map());
-      setEpaLoadedEventId(selectedPicklistEventId);
-      setEpaLoading(false);
+      setTeamXpMap(new Map());
+      setXpLoadedEventId(selectedPicklistEventId);
+      setXpLoading(false);
       return;
     }
 
     let mounted = true;
-    setEpaLoading(true);
-    getEventEpaMap(event.event_code).then((map) => {
+    setXpLoading(true);
+    getEventXpMap(event.event_code).then((map) => {
       if (!mounted) return;
-      setTeamEpaMap(map);
-      setEpaLoadedEventId(selectedPicklistEventId);
-      setEpaLoading(false);
+      setTeamXpMap(map);
+      setXpLoadedEventId(selectedPicklistEventId);
+      setXpLoading(false);
     });
     return () => {
       mounted = false;
     };
-  }, [bankSortMode, picklistEvents, selectedPicklistEventId, epaLoadedEventId, devMode]);
+  }, [bankSortMode, picklistEvents, selectedPicklistEventId, xpLoadedEventId, devMode]);
 
   // Lazily fetch scouted averages the first time "Sort by Scouting Averages"
   // is used for this event.
@@ -548,12 +614,12 @@ export default function StrategyDashboard() {
         return bVal - aVal;
       });
 
-    if (bankSortMode === "epa" && teamEpaMap.size > 0) return sortByMap(teamEpaMap);
+    if (bankSortMode === "xp" && teamXpMap.size > 0) return sortByMap(teamXpMap);
     if (bankSortMode === "scouting" && teamScoutingAvgMap.size > 0) {
       return sortByMap(teamScoutingAvgMap);
     }
     return [...bankTeams].sort((a, b) => a.team_number - b.team_number);
-  }, [bankTeams, bankSortMode, teamEpaMap, teamScoutingAvgMap]);
+  }, [bankTeams, bankSortMode, teamXpMap, teamScoutingAvgMap]);
 
   // Every team at the event belongs to exactly one of these three lists
   // (picked/do-not-pick from the saved picklist, everything else in the
@@ -588,6 +654,44 @@ export default function StrategyDashboard() {
         bankTeams.find((t) => t.team_number === activeDragTeamNumber) ??
         null
       : null;
+
+  // Shows a new picklist state and saves it for the selected event.
+  const applyPicklist = (
+    nextPicked: TBATeamSimple[],
+    nextDoNotPick: TBATeamSimple[],
+    nextBank: TBATeamSimple[]
+  ) => {
+    setBankTeams(nextBank);
+    setPickedTeams(nextPicked);
+    setDoNotPickTeams(nextDoNotPick);
+
+    // Keep the session cache in sync so switching away to another event and
+    // back re-reads this edit immediately, without waiting on (or racing) a
+    // save that may still be in flight.
+    if (selectedPicklistEventId) {
+      picklistCacheRef.current[selectedPicklistEventId] = {
+        picked: nextPicked,
+        doNotPick: nextDoNotPick,
+        bank: nextBank,
+      };
+    }
+
+    if (user?.id && selectedPicklistEventId) {
+      const eventId = selectedPicklistEventId;
+      const pickedNumbers = nextPicked.map((t) => t.team_number);
+      const doNotPickNumbers = nextDoNotPick.map((t) => t.team_number);
+      if (devMode && isDevEventId(eventId)) {
+        saveDevPicklist(user.id, eventId, pickedNumbers, doNotPickNumbers);
+      } else {
+        // Chain onto any still-pending save so writes always land in the
+        // order they were triggered, even if an earlier request happens to
+        // resolve slower than this one.
+        pendingSaveRef.current = pendingSaveRef.current.then(() =>
+          upsertPicklist(user.id, eventId, pickedNumbers, doNotPickNumbers)
+        );
+      }
+    }
+  };
 
   const handleDndDragStart = (event: DragStartEvent) => {
     setActiveDragTeamNumber(Number(event.active.id));
@@ -680,36 +784,14 @@ export default function StrategyDashboard() {
       }
     }
 
-    setBankTeams(nextBank);
-    setPickedTeams(nextPicked);
-    setDoNotPickTeams(nextDoNotPick);
+    applyPicklist(nextPicked, nextDoNotPick, nextBank);
+  };
 
-    // Keep the session cache in sync so switching away to another event and
-    // back re-reads this edit immediately, without waiting on (or racing) a
-    // save that may still be in flight.
-    if (selectedPicklistEventId) {
-      picklistCacheRef.current[selectedPicklistEventId] = {
-        picked: nextPicked,
-        doNotPick: nextDoNotPick,
-        bank: nextBank,
-      };
-    }
-
-    if (user?.id && selectedPicklistEventId) {
-      const eventId = selectedPicklistEventId;
-      const pickedNumbers = nextPicked.map((t) => t.team_number);
-      const doNotPickNumbers = nextDoNotPick.map((t) => t.team_number);
-      if (devMode && isDevEventId(eventId)) {
-        saveDevPicklist(user.id, eventId, pickedNumbers, doNotPickNumbers);
-      } else {
-        // Chain onto any still-pending save so writes always land in the
-        // order they were triggered, even if an earlier request happens to
-        // resolve slower than this one.
-        pendingSaveRef.current = pendingSaveRef.current.then(() =>
-          upsertPicklist(user.id, eventId, pickedNumbers, doNotPickNumbers)
-        );
-      }
-    }
+  // Clears both the picklist and do-not-pick list, returning every team to
+  // the bank.
+  const handleResetPicklists = () => {
+    applyPicklist([], [], allEventTeams);
+    setResetDialogOpen(false);
   };
 
   const selectedPicklistEvent = picklistEvents.find(
@@ -718,29 +800,28 @@ export default function StrategyDashboard() {
 
   return (
     <div className="min-h-screen bg-background my-5">
-      <main className="container mx-auto p-6 max-w-7xl">
+      {/* The dashboard uses the full width so all six robots fit in a row on wide
+          screens, and less padding so three fit across a phone. */}
+      <main className={`mx-auto ${strategyPage === "dashboard" ? "w-full p-3 sm:p-6" : "container p-6 max-w-7xl"}`}>
         {/* Header Section */}
         <div className="flex items-start justify-between mb-8">
           <div className="flex items-center gap-3">
             <ListOrdered className="h-7 w-7 text-primary" />
             <div>
-              <h1 className="text-2xl font-bold">
-                {strategyPage === "picklist" ? "Picklist" : "Event"}
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                {strategyPage === "picklist"
-                  ? "Sort teams however you want! This list is only visible for you."
-                  : "All teams competing at the selected event."}
-              </p>
+              <h1 className="text-2xl font-bold">{STRATEGY_PAGES[strategyPage].title}</h1>
+              <p className="text-sm text-muted-foreground">{STRATEGY_PAGES[strategyPage].description}</p>
             </div>
           </div>
           <UserProfileMenu userName={userName} userInitials={userInitials} avatarUrl={avatarUrl} />
         </div>
 
         <section>
-          <div className="mb-4 flex justify-end">
+          {/* On the Data and Dashboard pages the event sits left and the data type /
+              match picker right, on one line; the other pages keep the event
+              dropdown on the right. */}
+          <div className={`mb-4 flex gap-2 ${strategyPage === "data" || strategyPage === "dashboard" ? "justify-between" : "justify-end"}`}>
             <Select value={selectedPicklistEventId} onValueChange={setSelectedPicklistEventId}>
-              <SelectTrigger className="w-full sm:w-64" aria-label="Picklist event">
+              <SelectTrigger className="w-full min-w-0 flex-1 sm:w-64 sm:flex-none" aria-label="Picklist event">
                 <SelectValue placeholder="Select event" />
               </SelectTrigger>
               <SelectContent>
@@ -751,9 +832,63 @@ export default function StrategyDashboard() {
                 ))}
               </SelectContent>
             </Select>
+            {strategyPage === "picklist" && (
+              <Button
+                variant="outline"
+                className="shrink-0 gap-1.5"
+                disabled={picklistLoading || (pickedTeams.length === 0 && doNotPickTeams.length === 0)}
+                onClick={() => setResetDialogOpen(true)}
+              >
+                <RotateCcw className="h-4 w-4" />
+                Reset
+              </Button>
+            )}
+            {strategyPage === "dashboard" && (
+              <div ref={setToolbarSlot} className="flex min-w-0 flex-1 justify-end sm:flex-none" />
+            )}
+            {strategyPage === "data" && (
+              <Select
+                value={scoutingDataType}
+                onValueChange={(value) => setScoutingDataType(value as ScoutingDataType)}
+              >
+                <SelectTrigger className="w-full min-w-0 flex-1 sm:w-64 sm:flex-none" aria-label="Scouting data type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SCOUTING_DATA_TYPES.map(({ value, label }) => (
+                    <SelectItem key={value} value={value}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
 
-          {strategyPage === "picklist" ? (
+          {strategyPage === "dashboard" ? (
+            <MatchDashboard
+              event={selectedPicklistEvent}
+              userId={user?.id}
+              userName={profile?.name ?? null}
+              devMode={devMode}
+              toolbarSlot={toolbarSlot}
+            />
+          ) : strategyPage === "teams" ? (
+            <TeamInfoPage
+              event={selectedPicklistEvent}
+              userId={user?.id}
+              userName={profile?.name ?? null}
+              devMode={devMode}
+            />
+          ) : strategyPage === "data" ? (
+            <ScoutingDataTable
+              eventId={selectedPicklistEventId}
+              dataType={scoutingDataType}
+              userId={user?.id}
+              userName={profile?.name ?? null}
+              devMode={devMode}
+            />
+          ) : strategyPage === "picklist" ? (
             <>
               <div className="mb-4 flex items-center gap-1 rounded-lg border p-1">
                 <Button
@@ -838,7 +973,7 @@ export default function StrategyDashboard() {
                               size="sm"
                               className="h-6 gap-1 px-1.5 text-[10px] font-semibold uppercase text-muted-foreground"
                             >
-                              {epaLoading || scoutingAvgLoading ? (
+                              {xpLoading || scoutingAvgLoading ? (
                                 <Loader2 className="h-3 w-3 animate-spin" />
                               ) : (
                                 <ArrowUpDown className="h-3 w-3" />
@@ -850,14 +985,14 @@ export default function StrategyDashboard() {
                             <DropdownMenuRadioGroup
                               value={bankSortMode}
                               onValueChange={(value) =>
-                                setBankSortMode(value as "number" | "epa" | "scouting")
+                                setBankSortMode(value as "number" | "xp" | "scouting")
                               }
                             >
                               <DropdownMenuRadioItem value="number">
                                 Team Number
                               </DropdownMenuRadioItem>
-                              <DropdownMenuRadioItem value="epa">
-                                EPA (Statbotics)
+                              <DropdownMenuRadioItem value="xp">
+                                xP Average (match13)
                               </DropdownMenuRadioItem>
                               <DropdownMenuRadioItem value="scouting">
                                 Scouting Averages
@@ -915,38 +1050,50 @@ export default function StrategyDashboard() {
             open={teamInfoOpen}
             onOpenChange={setTeamInfoOpen}
             teamNumber={teamInfoTeam?.team_number ?? null}
-            nickname={teamInfoTeam?.nickname}
-            eventId={selectedPicklistEvent?.id}
-            eventCode={selectedPicklistEvent?.event_code}
+            event={selectedPicklistEvent}
             userId={user?.id}
+            userName={profile?.name ?? null}
+            devMode={devMode}
           />
+
+          <Dialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Reset Picklists?</DialogTitle>
+                <DialogDescription>
+                  This clears both Your Picklist and Do Not Pick
+                  {selectedPicklistEvent ? ` for ${selectedPicklistEvent.name}` : ""}, moving
+                  every team back to Available Teams. This can't be undone.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setResetDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button variant="destructive" onClick={handleResetPicklists}>
+                  Yes, Reset
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </section>
 
         <nav className="fixed inset-x-4 bottom-4 z-30 mx-auto mt-8 flex max-w-xl items-center justify-center gap-1 rounded-xl border-2 border-border bg-card p-1 shadow-xl backdrop-blur">
-          <Button
-            size="sm"
-            variant={strategyPage === "picklist" ? "default" : "ghost"}
-            className={
-              strategyPage === "picklist"
-                ? "flex-1 min-w-0 px-1.5 text-xs font-semibold shadow-sm sm:px-3 sm:text-sm"
-                : "flex-1 min-w-0 px-1.5 text-xs text-muted-foreground hover:text-foreground sm:px-3 sm:text-sm"
-            }
-            onClick={() => setStrategyPage("picklist")}
-          >
-            Picklist
-          </Button>
-          <Button
-            size="sm"
-            variant={strategyPage === "event" ? "default" : "ghost"}
-            className={
-              strategyPage === "event"
-                ? "flex-1 min-w-0 px-1.5 text-xs font-semibold shadow-sm sm:px-3 sm:text-sm"
-                : "flex-1 min-w-0 px-1.5 text-xs text-muted-foreground hover:text-foreground sm:px-3 sm:text-sm"
-            }
-            onClick={() => setStrategyPage("event")}
-          >
-            Event
-          </Button>
+          {(Object.keys(STRATEGY_PAGES) as StrategyPage[]).map((page) => (
+            <Button
+              key={page}
+              size="sm"
+              variant={strategyPage === page ? "default" : "ghost"}
+              className={
+                strategyPage === page
+                  ? "flex-1 min-w-0 px-1.5 text-xs font-semibold shadow-sm sm:px-3 sm:text-sm"
+                  : "flex-1 min-w-0 px-1.5 text-xs text-muted-foreground hover:text-foreground sm:px-3 sm:text-sm"
+              }
+              onClick={() => setStrategyPage(page)}
+            >
+              {STRATEGY_PAGES[page].label}
+            </Button>
+          ))}
         </nav>
       </main>
     </div>

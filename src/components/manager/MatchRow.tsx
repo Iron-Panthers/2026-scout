@@ -6,12 +6,15 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, X } from "lucide-react";
 import type { Role, MatchAssignment, Profile } from "@/types";
 
-const getRoleCellColor = (role: Role) => {
-  if (role.startsWith("red") || role === "qualRed") {
-    return "bg-red-900/10 border-r border-red-900/30";
-  }
-  return "bg-blue-900/10 border-r border-blue-900/30";
-};
+const isRedRole = (role: Role) => role.startsWith("red") || role === "qualRed";
+
+const getRoleCellBorder = (role: Role) =>
+  isRedRole(role) ? "border-r border-red-900/30" : "border-r border-blue-900/30";
+
+const getRoleCellBackground = (role: Role) =>
+  isRedRole(role) ? "bg-red-900/10" : "bg-blue-900/10";
+
+const SUBMITTED_BACKGROUND = "bg-green-900/40";
 
 interface MatchRowProps {
   match: MatchAssignment;
@@ -22,6 +25,8 @@ interface MatchRowProps {
   actualScouters: Map<string, string>; // Map of "matchId:role" -> scouter_id
   availableScouts: Profile[]; // All profiles to look up names
   cosmeticsMap?: Record<string, Record<string, string>>; // userId -> equipped cosmetics
+  /** 1 shows only the primary slot in each role cell; 2 adds the co-scout slot. */
+  scoutersPerRobot?: 1 | 2;
   isSelected?: boolean;
   onToggleSelect?: (matchId: string) => void;
 }
@@ -36,6 +41,7 @@ export const MatchRow = memo(
     actualScouters,
     availableScouts,
     cosmeticsMap = {},
+    scoutersPerRobot = 2,
     isSelected = false,
     onToggleSelect,
   }: MatchRowProps) => {
@@ -81,9 +87,14 @@ export const MatchRow = memo(
             ? availableScouts.find((s) => s.id === actualScouterId)
             : null;
 
-          // The cell keeps its alliance color; each scouter's own slot turns
-          // green once they've submitted, independent of their partner.
-          const cellColorClass = getRoleCellColor(role);
+          // With two slots, each scouter's own slot turns green once they've
+          // submitted, independent of their partner, and the cell keeps its
+          // alliance color. With one slot the whole cell turns green instead: a
+          // slot is only as tall as its own content, so when another cell in the
+          // row is taller (e.g. a name wrapping to two lines) a green slot would
+          // leave bands of the cell uncovered.
+          const singleSlotSubmitted = scoutersPerRobot === 1 && isCompleted1;
+          const cellColorClass = `${getRoleCellBorder(role)} ${singleSlotSubmitted ? SUBMITTED_BACKGROUND : getRoleCellBackground(role)}`;
 
           const renderSlot = (slot: 1 | 2) => {
             const assignment = slot === 2 ? assignment2 : assignment1;
@@ -101,7 +112,7 @@ export const MatchRow = memo(
             ].filter(Boolean).join(" · ");
 
             return assignment ? (
-              <div className={`relative group flex-1 min-w-0 p-1.5 md:p-2 ${isCompleted ? "bg-green-900/40" : ""}`}>
+              <div className={`relative group flex-1 min-w-0 p-1.5 md:p-2 ${isCompleted && scoutersPerRobot === 2 ? SUBMITTED_BACKGROUND : ""}`}>
                 <button
                   onClick={() => onOpenDialog(match.matchNumber, role, slot)}
                   title={statusTitle}
@@ -150,11 +161,11 @@ export const MatchRow = memo(
 
           return (
             // No cell padding: each slot carries its own, so a submitted
-            // scouter's green fills their whole share of the cell.
+            // scouter's green fills their whole share of the cell's width.
             <TableCell key={role} className={`p-0 ${cellColorClass}`}>
               <div className="flex items-stretch">
                 {renderSlot(1)}
-                {renderSlot(2)}
+                {scoutersPerRobot === 2 && renderSlot(2)}
               </div>
             </TableCell>
           );

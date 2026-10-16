@@ -4,6 +4,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Popover,
@@ -79,6 +80,7 @@ export function EventInformationTab({
   const [matchCountInput, setMatchCountInput] = useState(String(matches.length));
   const [isSettingActive, setIsSettingActive] = useState(false);
   const [uploadingMap, setUploadingMap] = useState(false);
+  const [isSavingScoutersPerRobot, setIsSavingScoutersPerRobot] = useState(false);
   const [editedEvent, setEditedEvent] = useState<Partial<Event>>({
     name: currentEvent?.name || "",
     event_code: currentEvent?.event_code || "",
@@ -250,6 +252,21 @@ export function EventInformationTab({
   useEffect(() => {
     setMatchCountInput(String(matches.length));
   }, [matches.length]);
+
+  // Saves right away, like the match count, rather than waiting for Edit Event.
+  const handleSetScoutersPerRobot = async (count: 1 | 2) => {
+    if (!currentEvent || isAllEvents) return;
+    setIsSavingScoutersPerRobot(true);
+    const success = devUserId && isDevEventId(currentEvent.id)
+      ? updateDevEvent(devUserId, currentEvent.id, { scouters_per_robot: count })
+      : await updateEvent(currentEvent.id, { scouters_per_robot: count });
+    setIsSavingScoutersPerRobot(false);
+    if (success) {
+      onEventUpdate?.();
+    } else {
+      toast({ title: "Could not update scouters per robot", variant: "destructive" });
+    }
+  };
 
   const handleSetMatchCount = async (targetCount: number) => {
     if (!currentEvent || isAllEvents) return;
@@ -605,6 +622,25 @@ export function EventInformationTab({
                 )}
               </div>
             </div>
+
+            {!isAllEvents && currentEvent && (
+              <div>
+                <Label htmlFor="two-scouters-per-robot" className="text-sm font-medium text-muted-foreground">
+                  Scouters per Robot
+                </Label>
+                <div className="mt-1 flex items-center gap-3">
+                  <Switch
+                    id="two-scouters-per-robot"
+                    checked={(currentEvent.scouters_per_robot ?? 2) === 2}
+                    onCheckedChange={(checked) => void handleSetScoutersPerRobot(checked ? 2 : 1)}
+                    disabled={isSavingScoutersPerRobot}
+                  />
+                  <span className="text-lg">
+                    {(currentEvent.scouters_per_robot ?? 2) === 2 ? "Two scouters" : "One scouter"}
+                  </span>
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div>

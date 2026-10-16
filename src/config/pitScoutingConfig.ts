@@ -72,11 +72,13 @@ export const pitScoutingQuestions: PitScoutingQuestion[] = [
   {
     id: "terrain-capability",
     type: "checkbox",
-    label: "Which field elements can you go through?",
+    label: "Is your robot:",
     required: true,
     options: [
-      "Can go over bump",
-      "Can go under trench",
+      "Short (can go under trench)",
+      "Tall (can only go over bump)",
+      "Modular (mechanism can change height)",
+      "Have a stretchy net (Has a net that can stretch above the height of the trench)",
     ],
   },
 
