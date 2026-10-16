@@ -18,7 +18,11 @@ interface TBATeamKey {
 interface TBAMatch {
   key: string;
   comp_level: string;
+  /** Playoff series (1-13 in double elimination); always 1 for qualifications. */
+  set_number: number;
   match_number: number;
+  /** "" for a tie or an unplayed match; playoffs name the tiebreak winner. */
+  winning_alliance?: "red" | "blue" | "";
   alliances: {
     red: {
       team_keys: string[]; // ["frc254", "frc971", "frc1678"]
@@ -29,6 +33,10 @@ interface TBAMatch {
       score: number;
     };
   };
+  /** Unix seconds: scheduled, predicted and actual start times (null when unknown). */
+  time?: number | null;
+  predicted_time?: number | null;
+  actual_time?: number | null;
   score_breakdown?: {
     red: TBAScoreBreakdown;
     blue: TBAScoreBreakdown;
@@ -42,6 +50,12 @@ interface TBAScoreBreakdown {
   endGameTowerRobot1: string;
   endGameTowerRobot2: string;
   endGameTowerRobot3: string;
+  /** Fuel scored in the alliance's hub, by match period. */
+  hubScore?: { autoCount: number; teleopCount: number; totalCount: number };
+  totalTowerPoints?: number;
+  /** Points awarded to this alliance for the opponent's fouls. */
+  foulPoints?: number;
+  rp?: number;
   [key: string]: unknown;
 }
 

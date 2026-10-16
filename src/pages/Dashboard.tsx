@@ -21,6 +21,7 @@ import {
   ShoppingBag,
   Sparkles,
   TrendingUp,
+  Trophy,
 } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -37,6 +38,7 @@ import UserProfileMenu from "@/components/UserProfileMenu";
 import Shop from "@/pages/Shop";
 import AvatarPage from "@/pages/Avatar";
 import Betting from "@/pages/Betting";
+import Leaderboard from "@/components/Leaderboard";
 import OfflineMatches from "@/components/OfflineMatches";
 import AnimatedContent from "@/components/AnimatedContent";
 import { TeamImage } from "@/components/TeamImage";
@@ -72,9 +74,9 @@ export default function Dashboard() {
   // tab instead of at its old standalone /betting route.
   const initialPage = searchParams.get("page");
   const [dashboardPage, setDashboardPage] = useState<
-    "scout" | "shop" | "avatar" | "betting"
+    "scout" | "shop" | "avatar" | "betting" | "leaderboard"
   >(
-    initialPage === "shop" || initialPage === "avatar" || initialPage === "betting"
+    initialPage === "shop" || initialPage === "avatar" || initialPage === "betting" || initialPage === "leaderboard"
       ? initialPage
       : "scout"
   );
@@ -495,6 +497,15 @@ export default function Dashboard() {
               </div>
             </div>
           )}
+          {dashboardPage === "leaderboard" && (
+            <div className="flex items-center gap-2">
+              <Trophy className="h-6 w-6 text-primary" />
+              <div>
+                <span className="text-2xl font-bold block">Leaderboard</span>
+                <p className="text-sm text-muted-foreground">Top scouters at every event</p>
+              </div>
+            </div>
+          )}
           <div className="flex items-center gap-3">
             <div ref={setHeaderActionsEl} className="flex items-center gap-2" />
             <UserProfileMenu
@@ -736,6 +747,10 @@ export default function Dashboard() {
           <section className="my-8">
             <AvatarPage embedded onVisitShop={() => setDashboardPage("shop")} />
           </section>
+        ) : dashboardPage === "leaderboard" ? (
+          <section className="my-8">
+            <Leaderboard />
+          </section>
         ) : (
           <section className="my-8">
             <Betting embedded headerActions={headerActionsEl} />
@@ -916,6 +931,18 @@ export default function Dashboard() {
             onClick={() => setDashboardPage("betting")}
           >
             Betting
+          </Button>
+          <Button
+            size="sm"
+            variant={dashboardPage === "leaderboard" ? "default" : "ghost"}
+            className={
+              dashboardPage === "leaderboard"
+                ? "flex-1 min-w-0 px-1.5 text-xs font-semibold shadow-sm sm:px-3 sm:text-sm"
+                : "flex-1 min-w-0 px-1.5 text-xs text-muted-foreground hover:text-foreground sm:px-3 sm:text-sm"
+            }
+            onClick={() => setDashboardPage("leaderboard")}
+          >
+            Leaderboard
           </Button>
         </nav>
       </main>

@@ -955,16 +955,20 @@ export default function MatchBetting() {
                 OPEN
               </Badge>
             )}
-            <div className="flex items-center gap-1 bg-muted rounded-full px-2.5 py-1">
-              <Coins className="h-3.5 w-3.5 text-yellow-400" />
-              <span className="font-bold text-sm">{points}</span>
-            </div>
-            {eventBettingAvailable && (
-              <div className="flex items-center gap-1 rounded-full bg-sky-500/10 border border-sky-500/40 px-2.5 py-1">
-                <img src={getEventCurrencyLogo(event?.event_code)} alt="Event currency" className="h-3.5 w-3.5" />
-                <span className="font-bold text-sm text-sky-300">{eventPoints}</span>
-              </div>
-            )}
+            <Badge
+              variant="outline"
+              className="gap-1.5 text-yellow-400 border-yellow-500/40 bg-yellow-500/10 text-sm font-semibold"
+            >
+              <Coins className="h-3.5 w-3.5" />
+              {points.toLocaleString()} pts
+            </Badge>
+            <Badge
+              variant="outline"
+              className="gap-1.5 text-sky-400 border-sky-500/40 bg-sky-500/10 text-sm font-semibold"
+            >
+              <img src={getEventCurrencyLogo(event?.event_code)} alt="Event currency" className="h-5 w-5" />
+              {eventPoints.toLocaleString()}
+            </Badge>
           </div>
         </div>
 

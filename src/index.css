@@ -289,38 +289,38 @@ html {
 
 /* Shop theme: BREAD */
 [data-theme="bread"] {
-  --background: hsl(20, 45%, 7%);
-  --foreground: hsl(33, 100%, 92%);
-  --card: hsl(20, 42%, 11%);
-  --card-foreground: hsl(33, 100%, 92%);
-  --popover: hsl(20, 42%, 13%);
-  --popover-foreground: hsl(33, 100%, 92%);
-  --primary: hsl(33, 100%, 86.5%);
-  --primary-foreground: hsl(19.8, 70.2%, 23.7%);
-  --secondary: hsl(20, 38%, 16%);
-  --secondary-foreground: hsl(33, 100%, 92%);
-  --muted: hsl(20, 38%, 16%);
-  --muted-foreground: hsl(30, 30%, 68%);
-  --accent: hsl(19.8, 55%, 22%);
-  --accent-foreground: hsl(33, 100%, 92%);
-  --destructive: hsl(0, 84%, 60%);
+  --background: hsl(36, 70%, 94%);
+  --foreground: hsl(20, 45%, 14%);
+  --card: hsl(38, 75%, 97%);
+  --card-foreground: hsl(20, 45%, 14%);
+  --popover: hsl(38, 75%, 97%);
+  --popover-foreground: hsl(20, 45%, 14%);
+  --primary: #672e12;
+  --primary-foreground: hsl(36, 100%, 95%);
+  --secondary: hsl(34, 55%, 88%);
+  --secondary-foreground: hsl(20, 45%, 18%);
+  --muted: hsl(34, 55%, 88%);
+  --muted-foreground: hsl(25, 28%, 38%);
+  --accent: hsl(33, 65%, 84%);
+  --accent-foreground: hsl(20, 45%, 18%);
+  --destructive: hsl(0, 72%, 45%);
   --destructive-foreground: hsl(0, 0%, 98%);
-  --border: hsl(20, 32%, 22%);
-  --input: hsl(20, 32%, 22%);
-  --ring: hsl(33, 100%, 86.5%);
-  --chart-1: hsl(33, 100%, 86.5%);
-  --chart-2: hsl(19.8, 70.2%, 23.7%);
-  --chart-3: hsl(30, 60%, 55%);
+  --border: hsl(32, 40%, 78%);
+  --input: hsl(32, 40%, 78%);
+  --ring: #672e12;
+  --chart-1: #672e12;
+  --chart-2: hsl(33, 70%, 55%);
+  --chart-3: hsl(30, 60%, 45%);
   --chart-4: hsl(38, 92%, 50%);
-  --chart-5: hsl(0, 84%, 60%);
-  --sidebar: hsl(20, 42%, 9%);
-  --sidebar-foreground: hsl(33, 100%, 92%);
-  --sidebar-primary: hsl(33, 100%, 86.5%);
-  --sidebar-primary-foreground: hsl(19.8, 70.2%, 23.7%);
-  --sidebar-accent: hsl(20, 38%, 16%);
-  --sidebar-accent-foreground: hsl(33, 100%, 92%);
-  --sidebar-border: hsl(20, 32%, 22%);
-  --sidebar-ring: hsl(33, 100%, 86.5%);
+  --chart-5: hsl(0, 72%, 45%);
+  --sidebar: hsl(36, 65%, 91%);
+  --sidebar-foreground: hsl(20, 45%, 14%);
+  --sidebar-primary: #672e12;
+  --sidebar-primary-foreground: hsl(36, 100%, 95%);
+  --sidebar-accent: hsl(34, 55%, 86%);
+  --sidebar-accent-foreground: hsl(20, 45%, 18%);
+  --sidebar-border: hsl(32, 40%, 78%);
+  --sidebar-ring: #672e12;
 }
 
 /* Citrus Circuits — bright white background, #3cd52e accent */
@@ -620,4 +620,29 @@ html {
     @apply bg-background text-foreground;
     padding-top: env(safe-area-inset-top);
   }
+}
+/* Team comparison overlay (strategy Teams tab): the first two categorical hues,
+   validated for colorblind separation and 3:1 contrast on the white and #1A1A1A cards. */
+:root {
+  --compare-a: #2a78d6;
+  --compare-b: #eb6834;
+}
+.dark {
+  --compare-a: #3987e5;
+  --compare-b: #d95926;
+}
+/* Fuel-by-match lines (strategy Teams tab): a dark auto and light teleop step of
+   blue, then orange for a compared team. Validated as one 4-color palette for
+   lightness, colorblind separation and 3:1 contrast on the white and #1A1A1A cards. */
+:root {
+  --fuel-a-auto: #1a4f99;
+  --fuel-a-teleop: #3f86d9;
+  --fuel-b-auto: #a8380c;
+  --fuel-b-teleop: #e4702f;
+}
+.dark {
+  --fuel-a-auto: #2c65bc;
+  --fuel-a-teleop: #4a99db;
+  --fuel-b-auto: #b8401b;
+  --fuel-b-teleop: #d07f2a;
 }

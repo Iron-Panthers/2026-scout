@@ -352,8 +352,8 @@ const QUAL_COLUMNS: DataColumn<QualRow>[] = [
     sortValue: (row) => (row.alliance === "red" ? 0 : row.alliance === "blue" ? 1 : null),
   },
   {
-    // In team 1, 2, 3 order, so each entry lines up with the comment columns
-    // after it; the color is the scout's ranking (green 1st, yellow 2nd, red 3rd).
+    // Best-ranked first (green 1st, yellow 2nd, red 3rd), so each entry lines up
+    // with the 1st / 2nd / 3rd comment columns after it.
     header: "Team rankings",
     value: (row) => rankedTeams(row).map((team) => team.teamNumber).join(", "),
     render: (row) => rankedTeams(row).map((team, index) => (
@@ -365,7 +365,7 @@ const QUAL_COLUMNS: DataColumn<QualRow>[] = [
     className: () => "tabular-nums",
   },
   ...[0, 1, 2].map((index): DataColumn<QualRow> => ({
-    header: `Team ${index + 1} comments`,
+    header: `${["1st", "2nd", "3rd"][index]} comments`,
     value: (row) => row.teams[index].comments,
     kind: "comment",
     popupTitle: (row) => `Team ${row.teams[index].teamNumber ?? index + 1} comments`,
