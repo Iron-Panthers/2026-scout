@@ -9,6 +9,8 @@ import { getUserMatches } from "@/lib/matches";
 import { uploadAvatar, updateProfile } from "@/lib/profiles";
 import { getGameProfile } from "@/lib/gameProfiles";
 import CosmeticAvatar from "@/components/CosmeticAvatar";
+import { ScoutingMap } from "@/components/ScoutingMap";
+import { getScoutedEvents, type ScoutedEvent } from "@/lib/scoutingHistory";
 import type { Match } from "@/types";
 
 export default function Profile() {
@@ -22,6 +24,7 @@ export default function Profile() {
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState("");
   const [savingName, setSavingName] = useState(false);
+  const [scoutedEvents, setScoutedEvents] = useState<ScoutedEvent[] | null>(null);
 
   useEffect(() => {
     const loadMatches = async () => {
@@ -32,6 +35,11 @@ export default function Profile() {
       }
     };
     loadMatches();
+  }, [authUser?.id]);
+
+  useEffect(() => {
+    if (!authUser?.id) return;
+    getScoutedEvents(authUser.id).then(setScoutedEvents);
   }, [authUser?.id]);
 
   useEffect(() => {
@@ -263,6 +271,24 @@ export default function Profile() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Map of every event scouted at */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Events Scouted</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {scoutedEvents === null ? (
+              <p className="text-muted-foreground text-center py-8">Loading events...</p>
+            ) : scoutedEvents.length === 0 ? (
+              <p className="text-muted-foreground text-center py-8">
+                No events yet. Events you scout at will show up here.
+              </p>
+            ) : (
+              <ScoutingMap events={scoutedEvents} />
+            )}
+          </CardContent>
+        </Card>
 
         {/* Recent Match Assignments */}
         <Card>

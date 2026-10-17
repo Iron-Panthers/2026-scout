@@ -103,6 +103,27 @@ async function tbaFetch<T>(endpoint: string): Promise<T | null> {
   }
 }
 
+/** Where an event is held, from TBA (lat/lng are often missing for recent events). */
+export interface TBAEventLocation {
+  city: string | null;
+  state_prov: string | null;
+  country: string | null;
+  lat: number | null;
+  lng: number | null;
+}
+
+export async function getEventLocation(eventCode: string): Promise<TBAEventLocation | null> {
+  const event = await tbaFetch<TBAEventLocation>(`/event/${eventCode}`);
+  if (!event) return null;
+  return {
+    city: event.city ?? null,
+    state_prov: event.state_prov ?? null,
+    country: event.country ?? null,
+    lat: event.lat ?? null,
+    lng: event.lng ?? null,
+  };
+}
+
 export async function getMatchScores(
   eventCode: string,
   matchNumber: number
