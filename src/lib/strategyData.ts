@@ -181,7 +181,7 @@ interface RawQuantSubmission {
   matchNumber: number | null;
 }
 
-function toQuantRow(raw: RawQuantSubmission, names: Map<string, string | null>): QuantRow {
+export function toQuantRow(raw: RawQuantSubmission, names: Map<string, string | null>): QuantRow {
   const version = raw.schema_version ?? CURRENT_SCHEMA_VERSION;
   const data: Record<string, unknown> = version < CURRENT_SCHEMA_VERSION
     ? migrateScoutingData(raw.scouting_data ?? {}, version)
