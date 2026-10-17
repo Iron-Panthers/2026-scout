@@ -646,3 +646,19 @@ html {
   --fuel-b-auto: #b8401b;
   --fuel-b-teleop: #d07f2a;
 }
+
+/* Shop: a bought game's lock opens (see GameCard.tsx). The shackle lifts, leaving
+   a gap above the body on its right side, then pivots around its left leg: the
+   horizontal flip reads as the shackle turning on that leg to the open position. */
+@keyframes game-lock-shackle-open {
+  0% { transform: translateY(0) scaleX(1); }
+  35% { transform: translateY(-4px) scaleX(1); }
+  50% { transform: translateY(-4px) scaleX(1); }
+  100% { transform: translateY(-4px) scaleX(-1); }
+}
+
+.game-lock-shackle-open {
+  transform-box: fill-box;
+  transform-origin: left bottom;
+  animation: game-lock-shackle-open 750ms ease-in-out forwards;
+}
