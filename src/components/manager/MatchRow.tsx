@@ -15,6 +15,7 @@ const getRoleCellBackground = (role: Role) =>
   isRedRole(role) ? "bg-red-900/10" : "bg-blue-900/10";
 
 const SUBMITTED_BACKGROUND = "bg-green-900/40";
+const ERROR_BACKGROUND = "bg-red-600/60";
 
 interface MatchRowProps {
   match: MatchAssignment;
@@ -22,6 +23,8 @@ interface MatchRowProps {
   onOpenDialog: (matchNumber: number, role: Role, slot?: 1 | 2) => void;
   onClearAssignment: (matchNumber: number, role: Role, slot?: 1 | 2) => void;
   completedSubmissions: Set<string>; // Set of "matchId:role:scouterId" — per-scouter, not per-role
+  scoutingErrors?: Map<string, string>; // "matchId:role:scouterId" -> scouting error comment
+  onOpenScoutingError?: (matchNumber: number, role: Role, slot: 1 | 2, scouterId: string, comment: string) => void;
   actualScouters: Map<string, string>; // Map of "matchId:role" -> scouter_id
   availableScouts: Profile[]; // All profiles to look up names
   cosmeticsMap?: Record<string, Record<string, string>>; // userId -> equipped cosmetics
@@ -38,6 +41,8 @@ export const MatchRow = memo(
     onOpenDialog,
     onClearAssignment,
     completedSubmissions,
+    scoutingErrors,
+    onOpenScoutingError,
     actualScouters,
     availableScouts,
     cosmeticsMap = {},
@@ -93,12 +98,16 @@ export const MatchRow = memo(
           // slot is only as tall as its own content, so when another cell in the
           // row is taller (e.g. a name wrapping to two lines) a green slot would
           // leave bands of the cell uncovered.
+          const errorOf = (assignment: typeof assignment1) =>
+            match.matchId && assignment ? scoutingErrors?.get(`${match.matchId}:${role}:${assignment.id}`) : undefined;
           const singleSlotSubmitted = scoutersPerRobot === 1 && isCompleted1;
-          const cellColorClass = `${getRoleCellBorder(role)} ${singleSlotSubmitted ? SUBMITTED_BACKGROUND : getRoleCellBackground(role)}`;
+          const singleSlotError = scoutersPerRobot === 1 && isCompleted1 && !!errorOf(assignment1);
+          const cellColorClass = `${getRoleCellBorder(role)} ${singleSlotError ? ERROR_BACKGROUND : singleSlotSubmitted ? SUBMITTED_BACKGROUND : getRoleCellBackground(role)}`;
 
           const renderSlot = (slot: 1 | 2) => {
             const assignment = slot === 2 ? assignment2 : assignment1;
             const isCompleted = slot === 2 ? isCompleted2 : isCompleted1;
+            const errorComment = isCompleted ? errorOf(assignment) : undefined;
             const isDifferentScouter =
               slot === 1 && actualScouter && assignment && actualScouter.id !== assignment.id;
 
@@ -108,13 +117,18 @@ export const MatchRow = memo(
             const statusTitle = [
               assignment?.name,
               isDifferentScouter && actualScouter ? `Scouted by ${actualScouter.name || "another scout"}` : isCompleted ? "Submitted" : null,
+              errorComment ? "Scouting error — click to review" : null,
               assignment && !assignment.registered ? "Not registered for event" : null,
             ].filter(Boolean).join(" · ");
 
             return assignment ? (
-              <div className={`relative group flex-1 min-w-0 p-1.5 md:p-2 ${isCompleted && scoutersPerRobot === 2 ? SUBMITTED_BACKGROUND : ""}`}>
+              <div className={`relative group flex-1 min-w-0 p-1.5 md:p-2 ${isCompleted && scoutersPerRobot === 2 ? (errorComment ? ERROR_BACKGROUND : SUBMITTED_BACKGROUND) : ""}`}>
                 <button
-                  onClick={() => onOpenDialog(match.matchNumber, role, slot)}
+                  onClick={() =>
+                    errorComment && assignment && onOpenScoutingError
+                      ? onOpenScoutingError(match.matchNumber, role, slot, assignment.id, errorComment)
+                      : onOpenDialog(match.matchNumber, role, slot)
+                  }
                   title={statusTitle}
                   className="flex flex-col items-center gap-0.5 md:gap-1 hover:bg-accent/50 rounded-md p-1 md:p-1.5 transition-colors w-full"
                 >
@@ -122,8 +136,9 @@ export const MatchRow = memo(
                     <CosmeticAvatar
                       avatarUrl={assignment.avatar}
                       initials={assignment.initials}
-                      equippedCosmetics={cosmeticsMap[assignment.id] ?? {}}
+                      equippedCosmetics={cosmeticsMap[assignment.id]}
                       size="sm"
+                      lowPower
                       className="h-7 w-7 md:h-9 md:w-9"
                     />
                   </div>

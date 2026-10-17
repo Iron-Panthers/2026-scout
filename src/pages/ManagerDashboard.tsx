@@ -56,6 +56,8 @@ import { MatchRow } from "@/components/manager/MatchRow";
 import { EventInformationTab } from "@/components/manager/EventInformationTab";
 import { CreateEventTab } from "@/components/manager/CreateEventTab";
 import { ScoutAssignmentDialog } from "@/components/manager/ScoutAssignmentDialog";
+import { ScoutingErrorDialog, type ScoutingErrorTarget } from "@/components/manager/ScoutingErrorDialog";
+import { assignMatchRescout } from "@/lib/matchRescouts";
 import { RosterManagementTab } from "@/components/manager/RosterManagementTab";
 import { PitScoutingAssignmentsTab } from "@/components/manager/PitScoutingAssignmentsTab";
 import { ScoutingDataTab } from "@/components/manager/ScoutingDataTab";
@@ -141,6 +143,11 @@ export default function ManagerDashboard() {
   const [actualScouters, setActualScouters] = useState<Map<string, string>>(
     new Map()
   ); // Map of "matchId:role" -> scouter_id
+  // "matchId:role:scouterId" -> the scouting error comment the scouter left on their submission
+  const [scoutingErrors, setScoutingErrors] = useState<Map<string, string>>(new Map());
+  const [errorCell, setErrorCell] = useState<
+    (ScoutingErrorTarget & { role: Role; slot: 1 | 2; scouterId: string }) | null
+  >(null);
 
   // New event form state
   const [newEventName, setNewEventName] = useState("");
@@ -462,6 +469,7 @@ export default function ManagerDashboard() {
     if (dbMatches.length === 0) {
       setCompletedSubmissions(new Set());
       setActualScouters(new Map());
+      setScoutingErrors(new Map());
       return;
     }
 
@@ -472,8 +480,14 @@ export default function ManagerDashboard() {
         subs.map((s) => `${s.match_id}:${s.role}:${s.scouter_id}`)
       );
       const scoutersMap = new Map(subs.map((s) => [`${s.match_id}:${s.role}`, s.scouter_id]));
+      const errorMap = new Map<string, string>();
+      subs.forEach((s) => {
+        const comment = s.scouting_data?.errors;
+        if (typeof comment === "string") errorMap.set(`${s.match_id}:${s.role}:${s.scouter_id}`, comment);
+      });
       setCompletedSubmissions(completedSet);
       setActualScouters(scoutersMap);
+      setScoutingErrors(errorMap);
       return;
     }
 
@@ -481,7 +495,7 @@ export default function ManagerDashboard() {
       const matchIds = dbMatches.map((m) => m.id);
       const { data: submissions, error } = await supabase
         .from("scouting_submissions")
-        .select("match_id, role, scouter_id")
+        .select("match_id, role, scouter_id, errors:scouting_data->>errors")
         .in("match_id", matchIds);
 
       const { data: qualSubmissions, error: qualError } = await supabase
@@ -513,8 +527,15 @@ export default function ManagerDashboard() {
       //   scoutersMap.(`${s.match_id}:${s.role}`, s.scouter_id);
       // });
 
+      // errors is only non-null when the scouter ticked "Scouting Errors?" on the review page.
+      const errorMap = new Map<string, string>();
+      (submissions || []).forEach((s) => {
+        if (typeof s.errors === "string") errorMap.set(`${s.match_id}:${s.role}:${s.scouter_id}`, s.errors);
+      });
+
       setCompletedSubmissions(completedSet);
       setActualScouters(scoutersMap);
+      setScoutingErrors(errorMap);
     } catch (error) {
       console.error("Error loading submission status:", error);
     }
@@ -634,6 +655,74 @@ export default function ManagerDashboard() {
       );
     },
     [selectedCell, matches, toast]
+  );
+
+  const openScoutingError = useCallback(
+    (matchNumber: number, role: Role, slot: 1 | 2, scouterId: string, comment: string) => {
+      const matchId = matches.find((m) => m.matchNumber === matchNumber)?.matchId;
+      if (!matchId) return;
+      setErrorCell({
+        matchId,
+        devUserId: devModeStateRef.current.user?.id,
+        matchNumber,
+        role,
+        slot,
+        scouterId,
+        comment,
+        scouterName: allScouts.find((s) => s.id === scouterId)?.name || "Unknown",
+      });
+    },
+    [allScouts, matches]
+  );
+
+  const handleAssignRescout = useCallback(
+    async (profile: Profile) => {
+      if (!errorCell) return;
+      const currentMatch = matches.find((m) => m.matchNumber === errorCell.matchNumber);
+      if (!currentMatch?.matchId) return;
+
+      suppressReloadUntilRef.current = Date.now() + 3000;
+      const success = await assignMatchRescout({
+        matchId: currentMatch.matchId,
+        role: errorCell.role,
+        slot: errorCell.slot,
+        oldScouterId: errorCell.scouterId,
+        newScouterId: profile.id,
+        reason: errorCell.comment,
+        devUserId: devModeStateRef.current.user?.id,
+      });
+      if (!success) {
+        toast({ title: "Rescout Failed", description: "Could not assign the rescout", variant: "destructive" });
+        return;
+      }
+
+      const key = `${currentMatch.matchId}:${errorCell.role}:${errorCell.scouterId}`;
+      setScoutingErrors((prev) => { const next = new Map(prev); next.delete(key); return next; });
+      setCompletedSubmissions((prev) => { const next = new Set(prev); next.delete(key); return next; });
+      const assignmentsKey = errorCell.slot === 2 ? "assignments2" : "assignments";
+      setMatches((prev) =>
+        prev.map((match) =>
+          match.matchNumber === errorCell.matchNumber
+            ? {
+                ...match,
+                [assignmentsKey]: {
+                  ...match[assignmentsKey],
+                  [errorCell.role]: {
+                    id: profile.id,
+                    name: profile.name || "Unknown",
+                    initials: (profile.name || "U").split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2),
+                    avatar: profile.avatar_url || "",
+                    registered: true,
+                  },
+                },
+              }
+            : match
+        )
+      );
+      setErrorCell(null);
+      toast({ title: "Rescout Assigned", description: `${profile.name || "Scout"} will rescout this match.` });
+    },
+    [errorCell, matches, toast]
   );
 
   const openAssignmentDialog = useCallback(
@@ -1295,6 +1384,8 @@ export default function ManagerDashboard() {
                         onOpenDialog={openAssignmentDialog}
                         onClearAssignment={handleClearAssignment}
                         completedSubmissions={completedSubmissions}
+                        scoutingErrors={scoutingErrors}
+                        onOpenScoutingError={openScoutingError}
                         actualScouters={actualScouters}
                         availableScouts={availableScouts}
                         cosmeticsMap={cosmeticsMap}
@@ -1486,6 +1577,14 @@ export default function ManagerDashboard() {
             </div>
           </TabsContent>
         </Tabs>
+
+        <ScoutingErrorDialog
+          target={errorCell}
+          onOpenChange={(open) => { if (!open) setErrorCell(null); }}
+          availableScouts={availableScouts}
+          cosmeticsMap={cosmeticsMap}
+          onAssignRescout={handleAssignRescout}
+        />
 
         {/* Assignment Dialog */}
         <ScoutAssignmentDialog

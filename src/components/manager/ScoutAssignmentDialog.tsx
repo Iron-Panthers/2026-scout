@@ -59,7 +59,7 @@ interface ScoutAssignmentDialogProps {
 }
 
 // Memoized scout item to prevent re-renders
-const ScoutItem = memo(({ profile, onSelect, equippedCosmetics }: { profile: Profile; onSelect: () => void; equippedCosmetics?: Record<string, string> }) => {
+const ScoutItem = memo(({ profile, onSelect, equippedCosmetics, selected = false }: { profile: Profile; onSelect: () => void; equippedCosmetics?: Record<string, string>; selected?: boolean }) => {
   const initials = useMemo(() =>
     (profile.name || "U")
       .split(" ")
@@ -74,7 +74,7 @@ const ScoutItem = memo(({ profile, onSelect, equippedCosmetics }: { profile: Pro
     <CommandItem
       key={profile.id}
       onSelect={onSelect}
-      className="flex items-center gap-3 px-4 py-3 cursor-pointer"
+      className={`flex items-center gap-3 px-4 py-3 cursor-pointer ${selected ? "bg-accent" : ""}`}
     >
       <div className="relative">
         <CosmeticAvatar
@@ -106,6 +106,45 @@ const ScoutItem = memo(({ profile, onSelect, equippedCosmetics }: { profile: Pro
 
 ScoutItem.displayName = "ScoutItem";
 
+/** Searchable, scrollable list of scouts with avatars; clocked-in scouts first. */
+export function ScoutPickerList({
+  availableScouts,
+  onSelect,
+  cosmeticsMap = {},
+  selectedId,
+  listClassName,
+}: {
+  listClassName?: string;
+  availableScouts: Profile[];
+  onSelect: (profile: Profile) => void;
+  cosmeticsMap?: Record<string, Record<string, string>>;
+  selectedId?: string | null;
+}) {
+  const sortedScouts = useMemo(
+    () => [...availableScouts].sort((a, b) => (b.clocked_in ? 1 : 0) - (a.clocked_in ? 1 : 0)),
+    [availableScouts]
+  );
+  return (
+    <Command className="h-auto rounded-lg border shadow-md">
+      <CommandInput placeholder="Search scouts..." />
+      <CommandList className={listClassName}>
+        <CommandEmpty>No scouts found.</CommandEmpty>
+        <CommandGroup>
+          {sortedScouts.map((profile) => (
+            <ScoutItem
+              key={profile.id}
+              profile={profile}
+              onSelect={() => onSelect(profile)}
+              equippedCosmetics={cosmeticsMap[profile.id]}
+              selected={profile.id === selectedId}
+            />
+          ))}
+        </CommandGroup>
+      </CommandList>
+    </Command>
+  );
+}
+
 export function ScoutAssignmentDialog({
   open,
   onOpenChange,
@@ -134,22 +173,7 @@ export function ScoutAssignmentDialog({
             )}
           </DialogTitle>
         </DialogHeader>
-        <Command className="rounded-lg border shadow-md">
-          <CommandInput placeholder="Search scouts..." />
-          <CommandList>
-            <CommandEmpty>No scouts found.</CommandEmpty>
-            <CommandGroup>
-              {sortedScouts.map((profile) => (
-                <ScoutItem
-                  key={profile.id}
-                  profile={profile}
-                  onSelect={() => onAssignScout(profile)}
-                  equippedCosmetics={cosmeticsMap[profile.id]}
-                />
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
+        <ScoutPickerList availableScouts={availableScouts} onSelect={onAssignScout} cosmeticsMap={cosmeticsMap} />
       </InstantDialogContent>
     </Dialog>
   );

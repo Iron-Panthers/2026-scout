@@ -3,17 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogDescription,
-} from "@/components/ui/dialog";
-import {
   ClipboardList,
   Wrench,
-  X,
   RefreshCw,
   LogIn,
   LogOut,
@@ -26,8 +17,9 @@ import {
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDevMode } from "@/contexts/DevModeContext";
-import { getDevEvents, getDevPitSubmissions, getDevMatches, getDevMatchTeamForRole, getDevUserPitAssignments, hasDevSubmission, isDevMatchId } from "@/lib/devMode";
-import { getUserMatches, removeUserFromMatch, getEvents } from "@/lib/matches";
+import { getUserRescouts } from "@/lib/matchRescouts";
+import { getDevMatchRescouts, getDevEvents, getDevPitSubmissions, getDevMatches, getDevMatchTeamForRole, getDevUserPitAssignments, hasDevSubmission } from "@/lib/devMode";
+import { getUserMatches, getEvents } from "@/lib/matches";
 import { getMatchTeam } from "@/lib/blueAlliance";
 import { filterMatchesWithoutSubmissions } from "@/lib/scoutingSchema";
 import { getUserPitAssignments, type UserPitAssignment } from "@/lib/pitScoutingAssignments";
@@ -41,7 +33,6 @@ import Betting from "@/pages/Betting";
 import Leaderboard from "@/components/Leaderboard";
 import OfflineMatches from "@/components/OfflineMatches";
 import AnimatedContent from "@/components/AnimatedContent";
-import { TeamImage } from "@/components/TeamImage";
 import type { Match, Role } from "@/types";
 import { prettifyRole } from "@/lib/roleUtils";
 import { useRandomSubtitle } from "@/hooks/useRandomSubtitle";
@@ -59,9 +50,9 @@ export default function Dashboard() {
   const { user, profile, getAvatarUrl, refreshProfile, patchProfile } = useAuth();
   const { devMode } = useDevMode();
   const [matches, setMatches] = useState<UserMatch[]>([]);
+  // "matchId:role" -> scouting error that prompted this rescout
+  const [rescouts, setRescouts] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
-  const [selectedMatch, setSelectedMatch] = useState<UserMatch | null>(null);
-  const [dialogOpen, setDialogOpen] = useState(false);
   const [teamNumbers, setTeamNumbers] = useState<Record<string, number | null>>(
     {}
   );
@@ -100,6 +91,11 @@ export default function Dashboard() {
   // Load user's assigned matches
   const loadMatches = useCallback(async () => {
     if (!user?.id) return;
+
+    const rescoutRows = devMode
+      ? getDevMatchRescouts(user.id).filter((r) => r.scouter_id === user.id)
+      : await getUserRescouts(user.id);
+    setRescouts(new Map(rescoutRows.map((r) => [`${r.match_id}:${r.role}`, r.reason])));
 
     // Sandbox mode: build the list entirely from the fake generated
     // schedule instead of Supabase/TBA, so nothing here touches real data.
@@ -344,48 +340,19 @@ export default function Dashboard() {
     return "bg-blue-900/40 border-blue-700/50";
   };
 
+  // Lighter than the regular cards so a rescout stands out.
+  const getRescoutColor = (role: string) => {
+    if (role.startsWith("red") || role === "qualRed") {
+      return "bg-red-300/25 border-red-300/60";
+    }
+    return "bg-blue-300/25 border-blue-300/60";
+  };
+
   const getRoleBadgeColor = (role: string) => {
     if (role.startsWith("red") || role === "qualRed") {
       return "bg-red-600/20 text-red-400 border-red-600/30";
     }
     return "bg-blue-600/20 text-blue-400 border-blue-600/30";
-  };
-
-  const handleMatchClick = async (userMatch: UserMatch) => {
-    setSelectedMatch(userMatch);
-    setDialogOpen(true);
-  };
-
-  const handleDecline = async () => {
-    if (!selectedMatch || !user?.id) return;
-
-    // Sandbox match — just drop it from local UI state, no real write. It's
-    // not persisted as "declined" in the fake dataset, so it reappears if
-    // the sandbox is reset/regenerated.
-    const success = isDevMatchId(selectedMatch.match.id)
-      ? true
-      : await removeUserFromMatch(
-          selectedMatch.match.id,
-          user.id,
-          selectedMatch.role,
-          selectedMatch.slot
-        );
-
-    if (success) {
-      // Remove from local state
-      setMatches((prev) =>
-        prev.filter(
-          (m) =>
-            !(
-              m.match.id === selectedMatch.match.id &&
-              m.role === selectedMatch.role
-            )
-        )
-      );
-      setDialogOpen(false);
-    } else {
-      console.error("Failed to decline match");
-    }
   };
 
   const handleClockIn = async () => {
@@ -410,15 +377,9 @@ export default function Dashboard() {
     setClocingIn(false);
   };
 
-  const handleQueueScouting = async () => {
-    if (!selectedMatch) return;
-    console.log("Selected match:", selectedMatch);
-    console.log("Match ID:", selectedMatch.match.id);
-    console.log("Match Name:", selectedMatch.match.name);
-    console.log("Match object:", selectedMatch.match);
-
-    // Validate that we have a UUID
-    const matchId = selectedMatch.match.id;
+  // Straight to the scout config page for this match and role.
+  const handleMatchClick = (userMatch: UserMatch) => {
+    const matchId = userMatch.match.id;
     const uuidRegex =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -428,7 +389,7 @@ export default function Dashboard() {
       return;
     }
 
-    navigate(`/config/${matchId}?role=${selectedMatch?.role}`);
+    navigate(`/config/${matchId}?role=${userMatch.role}`);
   };
 
   const clockInBar = (
@@ -614,11 +575,6 @@ export default function Dashboard() {
                               {userName}
                             </div>
                             <div className="text-xs">{assignment.event_name}</div>
-                            {assignment.rescout_fields && (
-                              <div className="text-xs mt-1">
-                                {assignment.rescout_fields.length} field{assignment.rescout_fields.length === 1 ? "" : "s"} to redo
-                              </div>
-                            )}
                           </div>
                           <Button
                             className={`w-full mt-4 ${
@@ -686,9 +642,11 @@ export default function Dashboard() {
                     className="flex-shrink-0 flex"
                   >
                     <Card
-                      className={`w-64 flex flex-col ${getRoleColor(
-                        userMatch.role
-                      )} border-2 hover:scale-[1.02] transition-transform cursor-pointer`}
+                      className={`w-64 flex flex-col ${
+                        rescouts.has(`${userMatch.match.id}:${userMatch.role}`)
+                          ? getRescoutColor(userMatch.role)
+                          : getRoleColor(userMatch.role)
+                      } border-2 hover:scale-[1.02] transition-transform cursor-pointer`}
                       onClick={() => handleMatchClick(userMatch)}
                     >
                       <CardHeader className="pb-2">
@@ -696,14 +654,6 @@ export default function Dashboard() {
                           <span className="font-mono text-2xl font-bold">
                             {userMatch.matchNumber}
                           </span>
-                          <Badge
-                            variant="outline"
-                            className={`${getRoleBadgeColor(
-                              userMatch.role
-                            )} whitespace-nowrap text-xs`}
-                          >
-                            {userMatch.role.toUpperCase()}
-                          </Badge>
                         </div>
                         <CardTitle className="text-lg">
                           Match #{userMatch.match.match_number}
@@ -715,9 +665,14 @@ export default function Dashboard() {
                             <div className="font-semibold text-foreground mb-1">
                               {userName}
                             </div>
-                            <div className="text-xs break-words">
-                              Role: {userMatch.role}
-                            </div>
+                            <Badge
+                              variant="outline"
+                              className={`${getRoleBadgeColor(
+                                userMatch.role
+                              )} max-w-full whitespace-normal break-words text-xs`}
+                            >
+                              {rescouts.has(`${userMatch.match.id}:${userMatch.role}`) ? "RESCOUT · " : ""}{userMatch.role.toUpperCase()}
+                            </Badge>
                             {teamNumbers[
                               `${userMatch.match.id}-${userMatch.role}`
                             ] && (
@@ -773,132 +728,6 @@ export default function Dashboard() {
             <Betting embedded headerActions={headerActionsEl} />
           </section>
         )}
-
-        {/* Match Details Dialog */}
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent className="max-w-[95vw] sm:max-w-[425px] md:max-w-[600px] p-3 landscape:px-4 landscape:py-2 md:p-6">
-            <DialogHeader className="space-y-1 landscape:space-y-0.5 md:space-y-2">
-              <DialogTitle className="text-lg md:text-2xl flex items-center justify-between pr-6">
-                <span>{selectedMatch?.matchNumber}</span>
-                <Badge
-                  variant="outline"
-                  className={
-                    selectedMatch ? getRoleBadgeColor(selectedMatch.role) : ""
-                  }
-                >
-                  {selectedMatch?.role.toUpperCase()}
-                </Badge>
-              </DialogTitle>
-              <DialogDescription>
-                Match #{selectedMatch?.match.match_number}
-              </DialogDescription>
-            </DialogHeader>
-
-            {/* Two-column layout on landscape/small screens, stacked on portrait and desktop */}
-            <div className="flex flex-col landscape:flex-row landscape:md:flex-col gap-3 landscape:gap-3 landscape:md:gap-4 py-3 landscape:py-2 landscape:md:py-4">
-              {/* Robot Image */}
-              <div className="w-full landscape:w-44 landscape:md:w-full landscape:flex-shrink-0 landscape:md:flex-shrink h-32 sm:h-40 md:h-48 landscape:h-full landscape:min-h-[180px] landscape:md:min-h-0 landscape:md:h-48 bg-muted rounded-lg border-2 border-border overflow-hidden">
-                {selectedMatch && selectedMatch.role !== "qualRed" && selectedMatch.role !== "qualBlue" ? (
-                  <TeamImage
-                    teamNumber={teamNumbers[`${selectedMatch.match.id}-${selectedMatch.role}`] || 0}
-                    eventId={selectedMatch.match.event_id || undefined}
-                    className="w-full h-full object-contain"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <p className="text-xs md:text-sm text-muted-foreground font-semibold">
-                      Robot Image
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {/* Match Details - grows to fill remaining space */}
-              <div className="space-y-2 landscape:space-y-2 landscape:md:space-y-3 flex-1 landscape:flex landscape:flex-col landscape:justify-between landscape:md:block">
-                <div className="space-y-2 landscape:space-y-2 landscape:md:space-y-3">
-                  {selectedMatch &&
-                    teamNumbers[
-                      `${selectedMatch.match.id}-${selectedMatch.role}`
-                    ] && (
-                      <div className="flex justify-between items-center p-2 landscape:p-2 md:p-3 bg-accent/50 rounded-lg">
-                        <span className="text-xs sm:text-sm md:text-sm font-medium text-muted-foreground">
-                          Team Number
-                        </span>
-                        <span className="text-sm sm:text-base md:text-base font-semibold">
-                          {
-                            teamNumbers[
-                              `${selectedMatch.match.id}-${selectedMatch.role}`
-                            ]
-                          }
-                        </span>
-                      </div>
-                    )}
-                  <div className="flex justify-between items-center p-2 landscape:p-2 md:p-3 bg-accent/50 rounded-lg">
-                    <span className="text-xs sm:text-sm md:text-sm font-medium text-muted-foreground">
-                      Your Role
-                    </span>
-                    <span className="text-sm sm:text-base md:text-base font-semibold">
-                      {selectedMatch ? prettifyRole(selectedMatch.role) : ""}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center p-2 landscape:p-2 md:p-3 bg-accent/50 rounded-lg">
-                    <span className="text-xs sm:text-sm md:text-sm font-medium text-muted-foreground">
-                      Match Type
-                    </span>
-                    <span className="text-sm sm:text-base md:text-base font-semibold">
-                      Qualification
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center p-2 landscape:p-2 md:p-3 bg-accent/50 rounded-lg">
-                    <span className="text-xs sm:text-sm font-medium text-muted-foreground">
-                      Alliance
-                    </span>
-                    <span className="text-sm sm:text-base font-semibold">
-                      {selectedMatch?.role.toLowerCase().includes("red")
-                        ? "Red"
-                        : "Blue"}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Footer buttons in landscape mode only (not desktop) */}
-                <div className="landscape:flex landscape:flex-col landscape:gap-2 landscape:md:hidden hidden">
-                  <Button
-                    variant="outline"
-                    onClick={handleDecline}
-                    className="w-full h-8"
-                  >
-                    <X className="h-3.5 w-3.5 mr-1" />
-                    <span className="text-xs">Decline</span>
-                  </Button>
-                  <Button onClick={handleQueueScouting} className="w-full h-8">
-                    <ClipboardList className="h-3.5 w-3.5 mr-1" />
-                    <span className="text-xs">Queue</span>
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            {/* Footer buttons in portrait mode and desktop */}
-            <DialogFooter className="flex-col sm:flex-row gap-2 landscape:hidden landscape:md:flex">
-              <Button
-                variant="outline"
-                onClick={handleDecline}
-                className="w-full sm:flex-1 h-10"
-              >
-                <X className="h-4 w-4 mr-1.5" />
-                <span className="text-sm">Decline</span>
-              </Button>
-              <Button
-                onClick={handleQueueScouting}
-                className="w-full sm:flex-1 h-10"
-              >
-                <ClipboardList className="h-4 w-4 mr-1.5" />
-                <span className="text-sm">Queue Scouting</span>
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
 
         <nav className="fixed inset-x-4 bottom-4 z-30 mx-auto mt-8 flex max-w-xl items-center justify-center gap-1 rounded-xl border-2 border-border bg-card p-1 shadow-xl backdrop-blur">
           <Button

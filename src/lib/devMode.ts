@@ -55,6 +55,7 @@ interface DevData {
   sandboxRosters?: Record<string, Roster[]>;
   sandboxPicklists?: Record<string, { picked_team_numbers: number[]; do_not_pick_team_numbers: number[] }>;
   sandboxBets?: Bet[];
+  sandboxMatchRescouts?: Array<{ match_id: string; role: string; scouter_id: string; reason: string }>;
   sandboxPitSubmissions?: PitScoutingSubmission[];
   /** Pit scouting assignments per sandbox event id; seeded from the fake team pool on first read. */
   sandboxPitAssignments?: Record<string, PitScoutingAssignment[]>;
@@ -891,6 +892,30 @@ export function updateDevPitSubmission(
 export function deleteDevPitSubmission(userId: string, submissionId: string): void {
   const data = getDevData(userId);
   data.sandboxPitSubmissions = data.sandboxPitSubmissions?.filter((s) => s.id !== submissionId);
+  saveDevData(userId, data);
+}
+
+export function deleteDevScoutingSubmission(userId: string, matchId: string, role: string, scouterId: string): void {
+  const data = getDevData(userId);
+  data.scoutingSubmissions = data.scoutingSubmissions.filter(
+    (s) => !(s.match_id === matchId && s.role === role && s.scouter_id === scouterId)
+  );
+  saveDevData(userId, data);
+}
+
+export function getDevMatchRescouts(userId: string) {
+  return getDevData(userId).sandboxMatchRescouts ?? [];
+}
+
+export function addDevMatchRescout(
+  userId: string,
+  rescout: { match_id: string; role: string; scouter_id: string; reason: string }
+): void {
+  const data = getDevData(userId);
+  const others = (data.sandboxMatchRescouts ?? []).filter(
+    (r) => !(r.match_id === rescout.match_id && r.role === rescout.role && r.scouter_id === rescout.scouter_id)
+  );
+  data.sandboxMatchRescouts = [...others, rescout];
   saveDevData(userId, data);
 }
 

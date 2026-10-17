@@ -47,7 +47,9 @@ import {
   getDevEvent,
   getDevEvents,
   getDevMatchTeamForRole,
+  getDevMatchRescouts,
 } from "@/lib/devMode";
+import { getUserRescouts } from "@/lib/matchRescouts";
 
 export default function ScoutConfig() {
   const { match_id: param_match_id } = useParams();
@@ -62,6 +64,8 @@ export default function ScoutConfig() {
   const [matchNumber, setMatchNumber] = useState("");
   const [teamNumber, setTeamNumber] = useState("");
   const [role, setRole] = useState(search_params.get("role") || "");
+  // Scouting error that prompted this assignment, when it's a rescout.
+  const [rescoutReason, setRescoutReason] = useState<string | null>(null);
   const isGuest = search_params.get("g") ?? false;
   const [eventId, setEventId] = useState("");
   const [eventCode, setEventCode] = useState("");
@@ -143,6 +147,23 @@ export default function ScoutConfig() {
       cancelled = true;
     };
   }, [settings["active-event-code"], devMode, user?.id, param_match_id]);
+
+  useEffect(() => {
+    if (!user?.id || !param_match_id || !role) {
+      setRescoutReason(null);
+      return;
+    }
+    let cancelled = false;
+    const userId = user.id;
+    (async () => {
+      const rows = devMode && isDevMatchId(param_match_id)
+        ? getDevMatchRescouts(userId).filter((r) => r.scouter_id === userId)
+        : await getUserRescouts(userId);
+      const rescout = rows.find((r) => r.match_id === param_match_id && r.role === role);
+      if (!cancelled) setRescoutReason(rescout ? rescout.reason : null);
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id, param_match_id, role, devMode]);
 
   // Load match data if match_id is provided
   useEffect(() => {
@@ -689,6 +710,16 @@ export default function ScoutConfig() {
                   onChange={(e) => setEventCode(e.target.value)}
                 />
               </div>
+              {rescoutReason !== null && (
+                <div className="space-y-1 p-3 rounded-lg border border-red-500/50 bg-red-500/10">
+                  <span className="block text-sm font-semibold text-red-400">
+                    Rescout — scouting error to fix
+                  </span>
+                  <p className="text-sm whitespace-pre-wrap break-words">
+                    {rescoutReason || "No comment was left."}
+                  </p>
+                </div>
+              )}
             </div>
           </TabsContent>
           <TabsContent value="game">
