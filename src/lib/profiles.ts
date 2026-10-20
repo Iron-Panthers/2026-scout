@@ -41,6 +41,28 @@ export async function getAllData(): Promise<Object> {
   return [ p_data.data, e_data.data, m_data.data ];
 }
 
+/** What you can see of another user: no email or settings. */
+export interface PublicProfile {
+  id: string;
+  name: string;
+  avatar_url: string | null;
+  role: string | null;
+  is_manager: boolean;
+  created_at: string | null;
+  equipped_cosmetics: Record<string, string>;
+  team_years: number[];
+}
+
+/** Another user's public profile (read through a function, since profiles are private by row). */
+export async function getPublicProfile(userId: string): Promise<PublicProfile | null> {
+  const { data, error } = await supabase.rpc("get_public_profile", { p_user: userId });
+  if (error) {
+    console.error("Error fetching public profile:", error);
+    return null;
+  }
+  return ((data as PublicProfile[] | null) ?? [])[0] ?? null;
+}
+
 export async function updateProfile(
   userId: string,
   updates: Partial<Profile>

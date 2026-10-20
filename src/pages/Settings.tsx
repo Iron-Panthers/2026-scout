@@ -18,13 +18,17 @@ import { useSettings } from "@/contexts/SettingsContext";
 import { useDevMode } from "@/contexts/DevModeContext";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { useToast } from "@/hooks/use-toast";
+import { updateProfile } from "@/lib/profiles";
 import settingsConfig from "@/config/settings.json";
 
-const NOTIFICATION_FIELD_IDS = ["match-notifications", "reminder-notifications"];
+const NOTIFICATION_FIELD_IDS = ["match-notifications", "reminder-notifications", "message-notifications"];
+// Saved on the profile rather than just this browser, since the server checks it before
+// sending a message push
+const MESSAGE_NOTIFICATIONS_FIELD = "message-notifications";
 
 export default function Settings() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, profile, refreshProfile } = useAuth();
   const { settings, updateSetting } = useSettings();
   const { canUseDevMode, devMode, toggleDevMode, resetSandbox } = useDevMode();
   const { toast } = useToast();
@@ -63,12 +67,22 @@ export default function Settings() {
       }
     }
 
+    if (fieldId === MESSAGE_NOTIFICATIONS_FIELD) {
+      if (!user?.id || !(await updateProfile(user.id, { message_notifications: checked }))) {
+        toast({ title: "Couldn't save", description: "Try changing the Messages setting again.", variant: "destructive" });
+        return;
+      }
+      await refreshProfile();
+    }
+
     updateSetting(fieldId, checked);
 
-    // If both notification settings are off, unsubscribe
+    // If every notification setting is off, unsubscribe
     if (!checked) {
       const otherNotifFields = NOTIFICATION_FIELD_IDS.filter((id) => id !== fieldId);
-      const allOff = otherNotifFields.every((id) => !settings[id]);
+      const allOff = otherNotifFields.every((id) =>
+        id === MESSAGE_NOTIFICATIONS_FIELD ? !profile?.message_notifications : !settings[id]
+      );
       if (allOff) {
         console.log("All notifications off, unsubscribing...");
         await toggleNotifications(false);
@@ -187,7 +201,11 @@ export default function Settings() {
                       </div>
                       <Switch
                         id={field.id}
-                        checked={settings[field.id] ?? field.defaultValue}
+                        checked={
+                          field.id === MESSAGE_NOTIFICATIONS_FIELD
+                            ? profile?.message_notifications ?? field.defaultValue
+                            : settings[field.id] ?? field.defaultValue
+                        }
                         onCheckedChange={(checked) =>
                           isNotificationField
                             ? handleNotificationToggle(field.id, checked)

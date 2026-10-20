@@ -1,21 +1,29 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Mail, Calendar, CheckCircle2, Clock, Camera, Pencil, Save, X } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { ArrowLeft, Mail, Calendar, CheckCircle2, Clock, Camera, MessageCircle, Pencil, Save, X } from "lucide-react";
+import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect, useRef, useState } from "react";
 import { getUserMatches } from "@/lib/matches";
-import { uploadAvatar, updateProfile } from "@/lib/profiles";
+import { getPublicProfile, uploadAvatar, updateProfile, type PublicProfile } from "@/lib/profiles";
 import { getGameProfile } from "@/lib/gameProfiles";
 import CosmeticAvatar from "@/components/CosmeticAvatar";
 import { ScoutingMap } from "@/components/ScoutingMap";
+import { TeamYears } from "@/components/TeamYears";
+import { AddEventsDialog } from "@/components/AddEventsDialog";
 import { getScoutedEvents, type ScoutedEvent } from "@/lib/scoutingHistory";
 import type { Match } from "@/types";
 
 export default function Profile() {
   const navigate = useNavigate();
   const { user: authUser, profile, getAvatarUrl, refreshProfile } = useAuth();
+  // /profile is your own; /profile/:userId is someone else's (read-only), e.g. from Messages
+  const { userId: routeUserId } = useParams();
+  const isOwn = !routeUserId || routeUserId === authUser?.id;
+  const viewedId = isOwn ? authUser?.id : routeUserId;
+  const [otherProfile, setOtherProfile] = useState<PublicProfile | null>(null);
+  const [otherLoaded, setOtherLoaded] = useState(false);
   const [userMatches, setUserMatches] = useState<Match[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -25,42 +33,52 @@ export default function Profile() {
   const [editedName, setEditedName] = useState("");
   const [savingName, setSavingName] = useState(false);
   const [scoutedEvents, setScoutedEvents] = useState<ScoutedEvent[] | null>(null);
+  const [addEventsOpen, setAddEventsOpen] = useState(false);
 
   useEffect(() => {
     const loadMatches = async () => {
-      if (authUser?.id) {
-        const { matches } = await getUserMatches(authUser.id);
+      if (viewedId) {
+        const { matches } = await getUserMatches(viewedId);
         setUserMatches(matches);
         setLoading(false);
       }
     };
     loadMatches();
-  }, [authUser?.id]);
+  }, [viewedId]);
 
   useEffect(() => {
-    if (!authUser?.id) return;
-    getScoutedEvents(authUser.id).then(setScoutedEvents);
-  }, [authUser?.id]);
+    if (!viewedId) return;
+    getScoutedEvents(viewedId).then(setScoutedEvents);
+  }, [viewedId]);
 
   useEffect(() => {
-    if (!authUser?.id) return;
-    getGameProfile(authUser.id).then((gp) => {
-      if (gp?.equipped_cosmetics) setEquippedCosmetics(gp.equipped_cosmetics);
+    if (!viewedId) return;
+    if (isOwn) {
+      getGameProfile(viewedId).then((gp) => {
+        if (gp?.equipped_cosmetics) setEquippedCosmetics(gp.equipped_cosmetics);
+      });
+      return;
+    }
+    getPublicProfile(viewedId).then((other) => {
+      setOtherProfile(other);
+      setOtherLoaded(true);
+      setEquippedCosmetics(other?.equipped_cosmetics ?? {});
     });
-  }, [authUser?.id]);
+  }, [viewedId, isOwn]);
 
-  const userName =
-    profile?.name ||
-    authUser?.user_metadata?.name ||
-    authUser?.email?.split("@")[0] ||
-    "User";
+  const userName = isOwn
+    ? profile?.name ||
+      authUser?.user_metadata?.name ||
+      authUser?.email?.split("@")[0] ||
+      "User"
+    : otherProfile?.name ?? (otherLoaded ? "Unknown user" : "Loading...");
   const userInitials = userName
     .split(" ")
     .map((n: string) => n[0])
     .join("")
     .toUpperCase()
     .slice(0, 2);
-  const avatarUrl = getAvatarUrl();
+  const avatarUrl = isOwn ? getAvatarUrl() : otherProfile?.avatar_url ?? "";
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -89,20 +107,28 @@ export default function Profile() {
     setIsEditingName(false);
   };
 
+  const handleSaveTeamYears = async (years: number[]) => {
+    if (!authUser?.id) return false;
+    const success = await updateProfile(authUser.id, { team_years: years });
+    if (success) await refreshProfile();
+    return success;
+  };
+
   const handleCancelEditName = () => {
     setIsEditingName(false);
     setEditedName("");
   };
 
-  const email = authUser?.email || "";
-  const userRole = profile?.role || "scout";
-  const isManager = profile?.is_manager || false;
-  const joinDate = profile?.created_at
-    ? new Date(profile.created_at).toLocaleDateString("en-US", {
+  const email = isOwn ? authUser?.email || "" : "";
+  const userRole = (isOwn ? profile?.role : otherProfile?.role) || "scout";
+  const isManager = (isOwn ? profile?.is_manager : otherProfile?.is_manager) || false;
+  const createdAt = isOwn ? profile?.created_at : otherProfile?.created_at;
+  const joinDate = createdAt
+    ? new Date(createdAt).toLocaleDateString("en-US", {
         month: "long",
         year: "numeric",
       })
-    : authUser?.created_at
+    : isOwn && authUser?.created_at
     ? new Date(authUser.created_at).toLocaleDateString("en-US", {
         month: "long",
         year: "numeric",
@@ -133,6 +159,8 @@ export default function Profile() {
                   size="lg"
                   className="h-32 w-32"
                 />
+                {isOwn && (
+                <>
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -148,6 +176,8 @@ export default function Profile() {
                 >
                   <Camera className="h-4 w-4" />
                 </button>
+                </>
+                )}
               </div>
               <div className="flex-1 text-center md:text-left">
                 {isEditingName ? (
@@ -182,14 +212,16 @@ export default function Profile() {
                 ) : (
                   <div className="flex items-center gap-2 justify-center md:justify-start">
                     <h1 className="text-3xl font-bold mb-2">{userName}</h1>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={handleStartEditName}
-                      className="mb-2"
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
+                    {isOwn && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={handleStartEditName}
+                        className="mb-2"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
                 )}
                 <div className="flex gap-2 justify-center md:justify-start mb-4">
@@ -199,15 +231,27 @@ export default function Profile() {
                   {isManager && <Badge variant="default">Manager</Badge>}
                 </div>
                 <div className="space-y-2 mt-4">
-                  <div className="flex items-center justify-center md:justify-start gap-2 text-muted-foreground">
-                    <Mail className="h-4 w-4" />
-                    <span className="text-sm">{email}</span>
-                  </div>
+                  {email && (
+                    <div className="flex items-center justify-center md:justify-start gap-2 text-muted-foreground">
+                      <Mail className="h-4 w-4" />
+                      <span className="text-sm">{email}</span>
+                    </div>
+                  )}
                   <div className="flex items-center justify-center md:justify-start gap-2 text-muted-foreground">
                     <Calendar className="h-4 w-4" />
                     <span className="text-sm">Joined {joinDate}</span>
                   </div>
+                  <TeamYears
+                    years={(isOwn ? profile?.team_years : otherProfile?.team_years) ?? []}
+                    onSave={isOwn ? handleSaveTeamYears : undefined}
+                  />
                 </div>
+                {!isOwn && viewedId && (
+                  <Button className="mt-4 gap-2" onClick={() => navigate(`/messages?with=${viewedId}`)}>
+                    <MessageCircle className="h-4 w-4" />
+                    Message
+                  </Button>
+                )}
               </div>
             </div>
           </CardContent>
@@ -282,10 +326,32 @@ export default function Profile() {
               <p className="text-muted-foreground text-center py-8">Loading events...</p>
             ) : scoutedEvents.length === 0 ? (
               <p className="text-muted-foreground text-center py-8">
-                No events yet. Events you scout at will show up here.
+                {isOwn ? "No events yet. Events you scout at will show up here." : "No events scouted yet."}
               </p>
             ) : (
               <ScoutingMap events={scoutedEvents} />
+            )}
+            {/* Your own map: add events the app has no record of */}
+            {isOwn && authUser?.id && scoutedEvents !== null && (
+              <>
+                <div className="mt-2 text-right">
+                  <button
+                    type="button"
+                    onClick={() => setAddEventsOpen(true)}
+                    className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                  >
+                    Incorrect?
+                  </button>
+                </div>
+                <AddEventsDialog
+                  open={addEventsOpen}
+                  onOpenChange={setAddEventsOpen}
+                  userId={authUser.id}
+                  teamYears={profile?.team_years ?? []}
+                  mapEvents={scoutedEvents}
+                  onChanged={() => getScoutedEvents(authUser.id).then(setScoutedEvents)}
+                />
+              </>
             )}
           </CardContent>
         </Card>

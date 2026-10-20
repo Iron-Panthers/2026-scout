@@ -55,9 +55,65 @@ const LID_HEIGHT = 46; // px of the 160px crate
 const LID_DEPTH = 120;
 /** Weak perspective, so the far (hinge) edge of the open lid barely narrows. */
 const LID_PERSPECTIVE = 1600;
-const WOOD = "linear-gradient(145deg, #c48940 0%, #8b5520 42%, #6a3e10 100%)";
+/**
+ * Looks for each crate tier: all the same wooden crate, told apart by the clasp and key:
+ * bronze (common), silver (uncommon) and gold (rare). `blocky`, `bevel` and `texture`
+ * allow a tier its own style.
+ */
+interface CratePalette {
+  /** Front faces of the base and lid */
+  face: string;
+  /** Outer border */
+  border: string;
+  /** Seam between lid and base, and the lid underside's border */
+  seam: string;
+  /** Sheen across the top of the lid (RGB) */
+  sheen: string;
+  /** Inside of the lid, seen once it's open */
+  underside: string;
+  /** Surface pattern laid over the faces (wood grain, metal plates, obsidian specks) */
+  texture: string;
+  /** Square corners instead of rounded ones */
+  blocky: boolean;
+  /** Inset bevel on the faces (light top-left, dark bottom-right); "" for none */
+  bevel: string;
+  /** The latch / lock plate (its metal also colours the key) */
+  lock: { metal: Metal; face: string; border: string; keyhole: string; glow: string };
+}
+
 const WOOD_GRAIN =
   "repeating-linear-gradient(0deg, transparent, transparent 26px, rgba(0,0,0,0.07) 26px, rgba(0,0,0,0.07) 28px)";
+
+/** Clasp-and-key metals: each crate tier's clasp and the key that opens it share one. */
+type Metal = "bronze" | "silver" | "gold";
+
+const METALS: Record<Metal, { light: string; mid: string; dark: string; outline: string }> = {
+  bronze: { light: "#f3c08a", mid: "#c47f3c", dark: "#7a4a1e", outline: "#5a3412" },
+  silver: { light: "#f8fafc", mid: "#b6bcc6", dark: "#6b7280", outline: "#4b5563" },
+  gold: { light: "#fff4c2", mid: "#e8b923", dark: "#9a6e08", outline: "#7a5a07" },
+};
+
+function metalLock(metal: Metal): CratePalette["lock"] {
+  const { light, mid, dark, outline } = METALS[metal];
+  return { metal, face: `linear-gradient(160deg, ${light} 0%, ${mid} 55%, ${dark} 100%)`, border: outline, keyhole: "#1c0d02", glow: "" };
+}
+
+const WOODEN_CRATE: Omit<CratePalette, "lock"> = {
+  face: "linear-gradient(145deg, #c48940 0%, #8b5520 42%, #6a3e10 100%)",
+  border: "#3b2008",
+  seam: "#2d1600",
+  sheen: "255,210,110",
+  underside: "linear-gradient(180deg, #4a2a0c 0%, #5e3712 60%, #6f4216 100%)",
+  texture: WOOD_GRAIN,
+  blocky: false,
+  bevel: "",
+};
+
+const CRATE_PALETTES: Record<CrateTier["id"], CratePalette> = {
+  common: { ...WOODEN_CRATE, lock: metalLock("bronze") },
+  uncommon: { ...WOODEN_CRATE, lock: metalLock("silver") },
+  rare: { ...WOODEN_CRATE, lock: metalLock("gold") },
+};
 
 export interface CrateParts {
   lid?: React.Ref<HTMLDivElement>;
@@ -81,29 +137,63 @@ const KEY_LINEUP_OFFSET = 45;
 const KEY_NEAR_SCALE = 1.8;
 const KEY_NEAR_SHADOW = "drop-shadow(0px 22px 10px rgba(0,0,0,0.55))";
 const KEY_LOCK_SHADOW = "drop-shadow(0px 2px 1px rgba(0,0,0,0.55))";
+/** How far above the lock the key's flight curve is pulled (the key itself peaks only a few px above). */
+const KEY_ARC_LIFT = 40;
+/** The gold key (rare crate) grows from this to this as it swings across, coming closer. */
+const GOLD_KEY_START_SCALE = 0.6;
+const GOLD_KEY_NEAR_SCALE = 2.3;
+/** Width of the overlay's content column (Tailwind max-w-sm), used to aim the gold key at the empty space beside it. */
+const CONTENT_COLUMN_WIDTH = 384;
+/** The silver key (uncommon crate) lies on the floor at this size, a little closer to the viewer than the crate. */
+const SILVER_KEY_FLOOR_SCALE = 1.3;
+/** How high the silver key's handle is lifted off the floor before it's carried to the lock (px). */
+const SILVER_KEY_LIFT = 90;
+/** How long the silver key hangs from its handle, swinging, before it's carried to the lock. */
+const SILVER_KEY_DANGLE_MS = 200;
+/** Its gentle swing while hanging: starting size (°), time for one full swing (s), and how fast it dies down (s). */
+const SILVER_KEY_SWAY_DEGREES = 9;
+const SILVER_KEY_SWAY_PERIOD = 0.85;
+const SILVER_KEY_SWAY_DECAY = 0.9;
+/** The key's handle (centre of its ring in KeyGraphic), as a transform origin: where it's held when picked up. */
+const KEY_HANDLE_ORIGIN = "58px 13.5px";
+/** Pause between the rare crate landing and its gold key swinging in. */
+const GOLD_KEY_ENTRANCE_DELAY_MS = 500;
+/** How long the gold key's swing in, and its flight from there to the lock, take. */
+const GOLD_KEY_SWING_SECONDS = 0.9;
+const GOLD_KEY_FLIGHT_SECONDS = 0.8;
+/** How far right of the straight line the gold key's flight to the lock curves out (px). */
+const GOLD_KEY_FLIGHT_BOW = 160;
+/** The gold key's angle while it sparkles: tilted 45°, handle up and to the right. */
+const GOLD_KEY_REST_ANGLE = -45;
+/** How far through the swing (0–1 of its time) the sparkle starts: where the eased-out swing has all but stopped (~98% of the way). */
+const GOLD_KEY_SPARKLE_AT = 0.65;
+/** Where the gold key's sparkle appears, in the key drawing: the top-right edge of its ring. */
+const KEY_SPARKLE_AT = { x: 65, y: 5 };
 /** How long the key's arcing flight from the corner of the screen to the keyhole takes. */
 const KEY_FLIGHT_SECONDS = 1.3;
 /** Where the lined-up key sits, in crate coordinates. */
 const KEY_LINEUP_LEFT = KEYHOLE_X - KEY_INSERT_DEPTH + KEY_LINEUP_OFFSET;
 const KEY_LINEUP_TOP = KEYHOLE_Y - KEY_SHAFT_Y;
 
-/** A silver key lying sideways, bit on the left so it slides left into the keyhole. */
-function KeyGraphic() {
+/** A key lying sideways, bit on the left so it slides left into the keyhole, in its crate's clasp metal. */
+function KeyGraphic({ metal = "silver" }: { metal?: Metal }) {
+  const { light, mid, dark, outline } = METALS[metal];
+  const gradientId = `crate-key-${metal}`;
   return (
     <svg width="72" height="28" viewBox="0 0 72 28" aria-hidden style={{ display: "block", overflow: "visible" }}>
       <defs>
-        <linearGradient id="crate-key-silver" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#f8fafc" />
-          <stop offset="55%" stopColor="#b6bcc6" />
-          <stop offset="100%" stopColor="#6b7280" />
+        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={light} />
+          <stop offset="55%" stopColor={mid} />
+          <stop offset="100%" stopColor={dark} />
         </linearGradient>
       </defs>
       {/* Bit teeth */}
-      <path d="M2 14 V20 H6 V17 H10 V21 H14 V14 Z" fill="url(#crate-key-silver)" stroke="#4b5563" strokeWidth="1" />
+      <path d="M2 14 V20 H6 V17 H10 V21 H14 V14 Z" fill={`url(#${gradientId})`} stroke={outline} strokeWidth="1" />
       {/* Shaft */}
-      <rect x="1" y="11" width="46" height="5" rx="1.5" fill="url(#crate-key-silver)" stroke="#4b5563" strokeWidth="1" />
+      <rect x="1" y="11" width="46" height="5" rx="1.5" fill={`url(#${gradientId})`} stroke={outline} strokeWidth="1" />
       {/* Bow */}
-      <circle cx="58" cy="13.5" r="11" fill="url(#crate-key-silver)" stroke="#4b5563" strokeWidth="1.2" />
+      <circle cx="58" cy="13.5" r="11" fill={`url(#${gradientId})`} stroke={outline} strokeWidth="1.2" />
       <circle cx="60" cy="13.5" r="2.75" fill="#3b2008" />
     </svg>
   );
@@ -116,12 +206,16 @@ function KeyGraphic() {
 export function CrateVisual({
   intensity = 0,
   size = CRATE_SIZE,
+  tier = "common",
   parts = {},
 }: {
   intensity?: number;
   size?: number;
+  /** Which crate: sets its colour (common wood, uncommon green, rare blue). */
+  tier?: CrateTier["id"];
   parts?: CrateParts;
 }) {
+  const palette = CRATE_PALETTES[tier] ?? CRATE_PALETTES.common;
   // Intensity 0 = resting shadow, 1-3 = warm gold glow (not rarity-revealing)
   const glowColor =
     intensity === 0
@@ -192,15 +286,16 @@ export function CrateVisual({
             right: 0,
             top: LID_HEIGHT,
             bottom: 0,
-            background: WOOD,
-            border: "5px solid #3b2008",
-            borderTop: "4px solid #2d1600",
-            borderRadius: "0 0 10px 10px",
+            background: palette.face,
+            border: `5px solid ${palette.border}`,
+            borderTop: `4px solid ${palette.seam}`,
+            borderRadius: palette.blocky ? 0 : "0 0 10px 10px",
+            boxShadow: palette.bevel || undefined,
             overflow: "hidden",
             zIndex: 1,
           }}
         >
-          <div style={{ position: "absolute", inset: 0, background: WOOD_GRAIN }} />
+          <div style={{ position: "absolute", inset: 0, background: palette.texture }} />
         </div>
 
         {/* Lid: a 3D box with its front face (what you normally see) and its underside,
@@ -222,20 +317,20 @@ export function CrateVisual({
             style={{
               position: "absolute",
               inset: 0,
-              background: WOOD,
-              border: "5px solid #3b2008",
-              borderRadius: "10px 10px 3px 3px",
+              background: palette.face,
+              border: `5px solid ${palette.border}`,
+              borderRadius: palette.blocky ? 0 : "10px 10px 3px 3px",
               overflow: "hidden",
-              boxShadow: "0 3px 4px rgba(0,0,0,0.45)",
+              boxShadow: [palette.bevel, "0 3px 4px rgba(0,0,0,0.45)"].filter(Boolean).join(", "),
               backfaceVisibility: "hidden",
             }}
           >
-            <div style={{ position: "absolute", inset: 0, background: WOOD_GRAIN }} />
+            <div style={{ position: "absolute", inset: 0, background: palette.texture }} />
             <div
               style={{
                 position: "absolute",
                 inset: 0,
-                background: "linear-gradient(180deg, rgba(255,210,110,0.28) 0%, rgba(255,210,110,0) 100%)",
+                background: `linear-gradient(180deg, rgba(${palette.sheen},0.28) 0%, rgba(${palette.sheen},0) 100%)`,
               }}
             />
           </div>
@@ -249,14 +344,14 @@ export function CrateVisual({
               height: LID_DEPTH,
               transformOrigin: "50% 0%",
               transform: "rotateX(-90deg)",
-              background: "linear-gradient(180deg, #4a2a0c 0%, #5e3712 60%, #6f4216 100%)",
-              border: "5px solid #2d1600",
-              borderRadius: 3,
+              background: palette.underside,
+              border: `5px solid ${palette.seam}`,
+              borderRadius: palette.blocky ? 0 : 3,
               boxShadow: "inset 0 0 14px rgba(0,0,0,0.6)",
               backfaceVisibility: "hidden",
             }}
           >
-            <div style={{ position: "absolute", inset: 0, background: WOOD_GRAIN }} />
+            <div style={{ position: "absolute", inset: 0, background: palette.texture }} />
           </div>
 
           {/* Lock plate (hasp) with keyhole: fixed to the lid's front and hanging over the
@@ -270,10 +365,12 @@ export function CrateVisual({
               top: LID_HEIGHT - 14,
               width: 34,
               height: 44,
-              borderRadius: "6px 6px 10px 10px",
-              background: "linear-gradient(160deg, #f1f5f9 0%, #a8b0bc 55%, #5b6370 100%)",
-              border: "2px solid #4b5563",
-              boxShadow: "inset 0 1.5px 2px rgba(255,255,255,0.55), 0 2px 4px rgba(0,0,0,0.5)",
+              borderRadius: palette.blocky ? 2 : "6px 6px 10px 10px",
+              background: palette.lock.face,
+              border: `2px solid ${palette.lock.border}`,
+              boxShadow: ["inset 0 1.5px 2px rgba(255,255,255,0.55)", "0 2px 4px rgba(0,0,0,0.5)", palette.lock.glow]
+                .filter(Boolean)
+                .join(", "),
               // Stays visible from behind too: once the lid swings past upright, the clasp
               // sticks up off its top edge with its back toward us
               transform: "translateZ(1px)",
@@ -289,7 +386,7 @@ export function CrateVisual({
                 height: 9,
                 marginLeft: -4.5,
                 borderRadius: "50%",
-                background: "#1c0d02",
+                background: palette.lock.keyhole,
               }}
             />
             <div
@@ -302,7 +399,7 @@ export function CrateVisual({
                 marginLeft: -4,
                 borderLeft: "4px solid transparent",
                 borderRight: "4px solid transparent",
-                borderBottom: "11px solid #1c0d02",
+                borderBottom: `11px solid ${palette.lock.keyhole}`,
               }}
             />
           </div>
@@ -324,7 +421,7 @@ export function CrateVisual({
             }}
           >
             <div ref={parts.key} style={{ position: "absolute", left: -KEY_INSERT_DEPTH, top: 0, opacity: 0, filter: KEY_LOCK_SHADOW }}>
-              <KeyGraphic />
+              <KeyGraphic metal={palette.lock.metal} />
             </div>
           </div>
         )}
@@ -407,7 +504,9 @@ export function CrateOpeningAnimation({ isOpen, tier, points, ownedCosmetics, on
     setShakeIntensity(0);
   }, [isOpen]);
 
-  // Idle float animation
+  // Idle float animation. Depends on isOpen too: the component is mounted closed (it
+  // renders nothing), so on the very first open the phase is already "idle" and this
+  // would otherwise never run, leaving the key unplaced and invisible until it reaches the lock.
   useEffect(() => {
     if (phase !== "idle" || !crateRef.current) return;
     const tween = gsap.to(crateRef.current, {
@@ -433,21 +532,45 @@ export function CrateOpeningAnimation({ isOpen, tier, points, ownedCosmetics, on
       tween.kill();
       window.removeEventListener("resize", placeKey);
     };
-  }, [phase]);
+  }, [phase, isOpen, tier.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /**
    * Offset that moves the preview key from its spot lined up with the keyhole to just
    * below the bottom-right of the screen, out of view (the key lives inside the crate's box).
    */
   function previewKeyStartOffset(): { x: number; y: number } {
+    // The gold key (rare crate) enters from high on the left instead
+    if (tier.id === "rare") return keyOffsetForScreenPoint(-140, window.innerHeight * 0.12);
+    // The silver key (uncommon crate) falls in from above the top of the screen, beside the crate
+    if (tier.id === "uncommon") {
+      const floor = silverKeyFloorPoint();
+      return keyOffsetForScreenPoint(floor.x, -120);
+    }
+    // Far enough below the bottom edge that the enlarged, tilted key is fully hidden
+    return keyOffsetForScreenPoint(window.innerWidth - 90, window.innerHeight + 90);
+  }
+
+  /**
+   * Where the silver key comes to rest on the floor: just right of the crate (kept on
+   * screen on phones), lying on the line the crate stands on. Screen coordinates of its centre.
+   */
+  function silverKeyFloorPoint(): { x: number; y: number } {
+    const crate = crateRef.current?.getBoundingClientRect();
+    if (!crate) return { x: window.innerWidth * 0.75, y: window.innerHeight * 0.6 };
+    return {
+      x: Math.min(window.innerWidth - 60, crate.left + CRATE_SIZE + 70),
+      // Lying flat: its centre half its (scaled) thickness above the floor
+      y: crate.top + CRATE_SIZE - (28 / 2) * SILVER_KEY_FLOOR_SCALE,
+    };
+  }
+
+  /** The preview key's x/y offset that puts its centre at a point on screen (it lives inside the crate's box). */
+  function keyOffsetForScreenPoint(screenX: number, screenY: number): { x: number; y: number } {
     const crate = crateRef.current?.getBoundingClientRect();
     if (!crate) return { x: 0, y: 0 };
-    const keyCenterX = crate.left + KEY_LINEUP_LEFT + 36;
-    const keyCenterY = crate.top + KEY_LINEUP_TOP + 14;
     return {
-      x: window.innerWidth - 90 - keyCenterX,
-      // Far enough below the bottom edge that the enlarged, tilted key is fully hidden
-      y: window.innerHeight + 90 - keyCenterY,
+      x: screenX - (crate.left + KEY_LINEUP_LEFT + 36),
+      y: screenY - (crate.top + KEY_LINEUP_TOP + 14),
     };
   }
 
@@ -474,32 +597,122 @@ export function CrateOpeningAnimation({ isOpen, tier, points, ownedCosmetics, on
   }
 
   /**
-   * Flies the preview key up from below the screen to the keyhole along a wide arc: a
-   * quadratic curve whose control point swings far up and out to the right, so the key
-   * rises up the side of the screen, sweeps over, and drops in toward the lock.
+   * Flies the preview key up from below the screen to the keyhole on a gentle curve: a
+   * quadratic whose control point sits just above the lock's height, so the key heads
+   * fairly directly for the lock and only rises a few pixels above it before settling in.
    */
   function flyKeyInArc(keyEl: HTMLDivElement): Promise<void> {
     const startX = Number(gsap.getProperty(keyEl, "x")) || 0;
+    return flyKeyAlong(keyEl, { x: 0, y: 0 }, { x: startX * 0.5, y: -KEY_ARC_LIFT }, KEY_FLIGHT_SECONDS);
+  }
+
+  /** Moves the preview key from where it is to `to` along a quadratic curve through `control`. */
+  function flyKeyAlong(
+    keyEl: HTMLDivElement,
+    to: { x: number; y: number },
+    control: { x: number; y: number },
+    duration: number,
+    ease = "power1.inOut"
+  ): Promise<void> {
+    const startX = Number(gsap.getProperty(keyEl, "x")) || 0;
     const startY = Number(gsap.getProperty(keyEl, "y")) || 0;
-    const controlX = startX + 60;
-    const controlY = -Math.max(220, Math.abs(startY) * 0.9);
     const path = { t: 0 };
     return new Promise((resolve) => {
       gsap.to(path, {
         t: 1,
-        duration: KEY_FLIGHT_SECONDS,
-        ease: "power1.inOut",
+        duration,
+        ease,
         onUpdate: () => {
           const t = path.t;
           const u = 1 - t;
           gsap.set(keyEl, {
-            x: u * u * startX + 2 * u * t * controlX,
-            y: u * u * startY + 2 * u * t * controlY,
+            x: u * u * startX + 2 * u * t * control.x + t * t * to.x,
+            y: u * u * startY + 2 * u * t * control.y + t * t * to.y,
           });
         },
         onComplete: () => resolve(),
       });
     });
+  }
+
+  /**
+   * The gold key's flourish: a single sparkle that twinkles on the edge of its handle (the
+   * ring). Drawn inside the key itself, so it turns and grows with it.
+   */
+  function sparkleKey(keyInnerEl: HTMLDivElement): Promise<void> {
+    const size = 14;
+    const sparkle = document.createElement("div");
+    sparkle.innerHTML = `<svg viewBox="0 0 20 20" width="${size}" height="${size}" style="display:block;overflow:visible"><path d="M10 0 C11 7 13 9 20 10 C13 11 11 13 10 20 C9 13 7 11 0 10 C7 9 9 7 10 0 Z" fill="#ffffff"/></svg>`;
+    Object.assign(sparkle.style, {
+      position: "absolute",
+      // Top-right of the ring (centred at 58, 13.5 in the key drawing, radius 11)
+      left: `${KEY_SPARKLE_AT.x - size / 2}px`,
+      top: `${KEY_SPARKLE_AT.y - size / 2}px`,
+      pointerEvents: "none",
+      filter: "drop-shadow(0 0 3px rgba(255,230,140,1)) drop-shadow(0 0 8px rgba(255,210,80,0.8))",
+    });
+    keyInnerEl.appendChild(sparkle);
+    return new Promise((resolve) => {
+      gsap.fromTo(
+        sparkle,
+        { scale: 0, rotation: 0, opacity: 1 },
+        {
+          keyframes: [
+            { scale: 1.4, rotation: 90, duration: 0.3, ease: "back.out(2.5)" },
+            { scale: 1.1, rotation: 135, duration: 0.25, ease: "sine.inOut" },
+            { scale: 0, rotation: 180, opacity: 0, duration: 0.3, ease: "power2.in" },
+          ],
+          onComplete: () => {
+            sparkle.remove();
+            resolve();
+          },
+        }
+      );
+    });
+  }
+
+  /**
+   * A small puff of dust along the ground where the crate just landed: soft clouds that
+   * billow out sideways from under it and fade. Drawn in the crate's parent (not the crate),
+   * so the dust stays on the ground while the crate bounces.
+   */
+  function kickUpDust(container: HTMLElement, crateEl: HTMLElement) {
+    const crate = crateEl.getBoundingClientRect();
+    const box = container.getBoundingClientRect();
+    // The crate's bottom edge, in the container's coordinates (the crate is drawn at its full 160px)
+    const groundY = crate.top - box.top + CRATE_SIZE;
+    const centerX = crate.left - box.left + CRATE_SIZE / 2;
+    const count = 12;
+    for (let i = 0; i < count; i++) {
+      const side = i % 2 === 0 ? -1 : 1;
+      const size = 14 + Math.random() * 16;
+      const puff = document.createElement("div");
+      Object.assign(puff.style, {
+        position: "absolute",
+        left: `${centerX + side * (10 + Math.random() * 55) - size / 2}px`,
+        top: `${groundY - size / 2 - Math.random() * 6}px`,
+        width: `${size}px`,
+        height: `${size}px`,
+        borderRadius: "50%",
+        background: "radial-gradient(circle, rgba(200,185,160,0.55) 0%, rgba(200,185,160,0.25) 45%, rgba(200,185,160,0) 70%)",
+        pointerEvents: "none",
+        zIndex: "0",
+      });
+      container.appendChild(puff);
+      gsap.fromTo(
+        puff,
+        { x: 0, y: 0, scale: 0.4, opacity: 0.9 },
+        {
+          x: side * (40 + Math.random() * 70),
+          y: -(4 + Math.random() * 18),
+          scale: 1.5 + Math.random() * 0.8,
+          opacity: 0,
+          duration: 0.6 + Math.random() * 0.35,
+          ease: "power2.out",
+          onComplete: () => puff.remove(),
+        }
+      );
+    }
   }
 
   async function handleOpen() {
@@ -559,49 +772,191 @@ export function CrateOpeningAnimation({ isOpen, tier, points, ownedCosmetics, on
         onUpdate: holdKeyOnScreen,
       }
     );
-    // Lands with a little bounce
+    // Lands with a little bounce; the rare crate kicks up a puff of dust as it hits
+    if (tier.id === "rare" && crateEl.parentElement) kickUpDust(crateEl.parentElement, crateEl);
     await gsap.fromTo(crateEl, { y: 0 }, { y: -7, duration: 0.1, yoyo: true, repeat: 1, ease: "power2.out", onUpdate: holdKeyOnScreen });
 
-    // ── Once the crate has landed, the key flies up from below the screen in its arc,
-    // shrinking as it recedes from the viewer and levelling out at the keyhole (no spinning) ──
-    await Promise.all([
-      gsap.to(previewKeyInnerEl, {
+    if (tier.id === "rare") {
+      // A beat after the crate (and its dust) settles before the gold key appears
+      await new Promise<void>((r) => setTimeout(r, GOLD_KEY_ENTRANCE_DELAY_MS));
+
+      // ── Gold key: swings in from high on the left over to the empty dark space right of
+      // the crate's column,
+      // growing as it comes closer and turning smoothly to rest at 45° ──
+      // Halfway between the right edge of the content column (max-w-sm, centred on the
+      // crate) and the right edge of the screen; kept well inside the screen on phones
+      const crateBox = crateEl.getBoundingClientRect();
+      const columnRight = crateBox.left + crateBox.width / 2 + CONTENT_COLUMN_WIDTH / 2;
+      const restX = Math.min(window.innerWidth - 90, Math.max(window.innerWidth * 0.72, (columnRight + window.innerWidth) / 2));
+      const middle = keyOffsetForScreenPoint(restX, window.innerHeight * 0.4);
+      const start = { x: Number(gsap.getProperty(previewKeyEl, "x")) || 0, y: Number(gsap.getProperty(previewKeyEl, "y")) || 0 };
+      gsap.set(previewKeyInnerEl, { scale: GOLD_KEY_START_SCALE, rotation: GOLD_KEY_REST_ANGLE - 35 });
+      const swing = Promise.all([
+        // Sags below the straight line between the two points, like a swing, and slows
+        // down as it arrives where it sparkles
+        flyKeyAlong(previewKeyEl, middle, { x: (start.x + middle.x) / 2, y: Math.max(start.y, middle.y) + 160 }, GOLD_KEY_SWING_SECONDS, "power3.out"),
+        // One continuous turn and grow, eased exactly like the movement, so the angle
+        // changes smoothly the whole way with no sudden adjustments
+        gsap.to(previewKeyInnerEl, {
+          rotation: GOLD_KEY_REST_ANGLE,
+          scale: GOLD_KEY_NEAR_SCALE,
+          duration: GOLD_KEY_SWING_SECONDS,
+          ease: "power3.out",
+        }),
+      ]);
+
+      // ── A single sparkle on its handle, the moment the key comes to rest. The swing eases
+      // out, so it's visibly stopped well before the tween formally ends: sparkle then ──
+      await new Promise<void>((r) => setTimeout(r, GOLD_KEY_SWING_SECONDS * GOLD_KEY_SPARKLE_AT * 1000));
+      await Promise.all([swing, sparkleKey(previewKeyInnerEl)]);
+
+      // ── Then flies to the lock, bowing out to the right of a straight line and flipping
+      // over its long side on the way ──
+      gsap.set(previewKeyInnerEl, { transformPerspective: 500 });
+      const from = { x: Number(gsap.getProperty(previewKeyEl, "x")) || 0, y: Number(gsap.getProperty(previewKeyEl, "y")) || 0 };
+      await Promise.all([
+        gsap.to(previewKeyInnerEl, {
+          y: 0,
+          rotation: 0,
+          rotationX: 360,
+          scale: 1,
+          filter: KEY_LOCK_SHADOW,
+          duration: GOLD_KEY_FLIGHT_SECONDS,
+          ease: "power2.inOut",
+        }),
+        flyKeyAlong(
+          previewKeyEl,
+          { x: 0, y: 0 },
+          // (but not past the right edge of the screen)
+          {
+            x: Math.min(Math.max(from.x, 0) + GOLD_KEY_FLIGHT_BOW, keyOffsetForScreenPoint(window.innerWidth - 60, 0).x),
+            y: from.y / 2,
+          },
+          GOLD_KEY_FLIGHT_SECONDS,
+          "power1.inOut"
+        ),
+      ]);
+      gsap.set(previewKeyInnerEl, { rotationX: 0 });
+    } else if (tier.id === "uncommon") {
+      // ── Silver key: drops in from the top of the screen beside the crate, bounces a
+      // little and settles on the floor ──
+      const floor = keyOffsetForScreenPoint(silverKeyFloorPoint().x, silverKeyFloorPoint().y);
+      gsap.set(previewKeyEl, { x: floor.x });
+      // Pivots on its handle throughout (set now, while it's off screen, so changing it
+      // never makes the enlarged key jump), ready to be picked up by it later
+      gsap.set(previewKeyInnerEl, {
+        transformOrigin: KEY_HANDLE_ORIGIN,
         y: 0,
-        rotation: 0,
-        scale: 1,
-        filter: KEY_LOCK_SHADOW,
-        duration: KEY_FLIGHT_SECONDS,
-        ease: "power2.inOut",
-      }),
-      flyKeyInArc(previewKeyEl),
-    ]);
+        rotation: -25,
+        scale: SILVER_KEY_FLOOR_SCALE,
+        filter: KEY_NEAR_SHADOW,
+      });
+      await Promise.all([
+        gsap.to(previewKeyEl, { y: floor.y, duration: 0.55, ease: "power2.in" }),
+        // Tips level as it lands
+        gsap.to(previewKeyInnerEl, { rotation: 0, duration: 0.55, ease: "power1.in" }),
+      ]);
+      // Small bounce, then a smaller one, and it's down
+      await gsap.to(previewKeyEl, {
+        keyframes: [
+          { y: floor.y - 16, duration: 0.14, ease: "power2.out" },
+          { y: floor.y, duration: 0.14, ease: "power2.in" },
+          { y: floor.y - 5, duration: 0.08, ease: "power2.out" },
+          { y: floor.y, duration: 0.08, ease: "power2.in" },
+        ],
+      });
+
+      // ── A slight pause on the floor ──
+      await new Promise<void>((r) => setTimeout(r, 450));
+
+      // ── Picked up by its handle: the ring lifts first and the rest of the key swings down
+      // under it, until it hangs from the handle (bit pointing at the floor) ──
+      await Promise.all([
+        gsap.to(previewKeyEl, { y: floor.y - SILVER_KEY_LIFT, duration: 0.45, ease: "power2.out" }),
+        // The key trails the handle as it's lifted and swings down past straight, to the
+        // far end of its first swing (where a pendulum momentarily stops)
+        gsap.to(previewKeyInnerEl, { rotation: -90 - SILVER_KEY_SWAY_DEGREES, duration: 0.5, delay: 0.05, ease: "sine.out" }),
+      ]);
+      // ...then dangles, swinging gently back and forth like a pendulum, each swing a little
+      // smaller, until it's carried off (the flight then turns it level from wherever it is).
+      // Damped cosine: starts at that far end with no speed, so it carries on smoothly from the lift.
+      const sway = { t: 0 };
+      await gsap.to(sway, {
+        t: SILVER_KEY_DANGLE_MS / 1000,
+        duration: SILVER_KEY_DANGLE_MS / 1000,
+        ease: "none",
+        onUpdate: () => {
+          const damping = Math.exp(-sway.t / SILVER_KEY_SWAY_DECAY);
+          gsap.set(previewKeyInnerEl, {
+            rotation: -90 - SILVER_KEY_SWAY_DEGREES * damping * Math.cos((2 * Math.PI * sway.t) / SILVER_KEY_SWAY_PERIOD),
+          });
+        },
+      });
+
+      // ── Then carried over to the lock, still held by the handle, turning level on the
+      // way. Once it's level and full size the turning point no longer matters, so it lands
+      // exactly in place; only then does the origin go back to the centre. ──
+      const lifted = { x: Number(gsap.getProperty(previewKeyEl, "x")) || 0, y: Number(gsap.getProperty(previewKeyEl, "y")) || 0 };
+      await Promise.all([
+        gsap.to(previewKeyInnerEl, { rotation: 0, scale: 1, filter: KEY_LOCK_SHADOW, duration: 0.65, ease: "power2.inOut" }),
+        flyKeyAlong(previewKeyEl, { x: 0, y: 0 }, { x: lifted.x * 0.4, y: Math.min(lifted.y, 0) - 30 }, 0.65, "power2.inOut"),
+      ]);
+      gsap.set(previewKeyInnerEl, { transformOrigin: "50% 50%" });
+    } else {
+      // ── Once the crate has landed, the key flies up from below the screen in its arc,
+      // shrinking as it recedes from the viewer and levelling out at the keyhole (no spinning) ──
+      await Promise.all([
+        gsap.to(previewKeyInnerEl, {
+          y: 0,
+          rotation: 0,
+          scale: 1,
+          filter: KEY_LOCK_SHADOW,
+          duration: KEY_FLIGHT_SECONDS,
+          ease: "power2.inOut",
+        }),
+        flyKeyInArc(previewKeyEl),
+      ]);
+    }
 
     // Swap the free-floating key for the clipped one in the lock, at the same spot
     gsap.set(previewKeyEl, { opacity: 0 });
     gsap.set(keyEl, { opacity: 1 });
 
-    // ── Key creeps right up to the lock and pauses, tip just outside the keyhole ──
-    await gsap.to(keyEl, { x: KEY_INSERT_DEPTH + 4, duration: 0.25, ease: "power2.out" });
-    await new Promise<void>((r) => setTimeout(r, 350));
+    if (tier.id === "common") {
+      // ── Common crate: the key just slides in (everything past the keyhole is clipped away,
+      // so the bit disappears into it) and turns ──
+      await new Promise<void>((r) => setTimeout(r, 120));
+      await gsap.to(keyEl, { x: 0, duration: 0.35, ease: "power2.in" });
+      setShakeIntensity(1);
+      await gsap.to(keyEl, { scaleY: 0.2, duration: 0.18, ease: "power1.in" });
+      await gsap.to(keyEl, { scaleY: 1, duration: 0.18, ease: "power1.out" });
+      // Click — the crate hops as the lock releases
+      setShakeIntensity(2);
+      await gsap.fromTo(crateEl, { y: 0 }, { y: -6, duration: 0.08, yoyo: true, repeat: 1, ease: "power2.out" });
+    } else {
+      // ── Key creeps right up to the lock and pauses, tip just outside the keyhole ──
+      await gsap.to(keyEl, { x: KEY_INSERT_DEPTH + 4, duration: 0.25, ease: "power2.out" });
+      await new Promise<void>((r) => setTimeout(r, 350));
 
-    // ── Winds up: backs away from the lock ──
-    await gsap.to(keyEl, { x: 62, duration: 0.22, ease: "power2.out" });
+      // ── Winds up: backs away from the lock ──
+      await gsap.to(keyEl, { x: 62, duration: 0.22, ease: "power2.out" });
 
-    // ── Slams in (everything past the keyhole is clipped away, so the bit disappears into
-    // it) and turns as it hits ──
-    await gsap.to(keyEl, { x: 0, duration: 0.08, ease: "power4.in" });
-    setShakeIntensity(2);
-    // The impact knocks the crate back, and it springs upright again
-    gsap.fromTo(
-      crateEl,
-      { x: -9, rotation: -2.5 },
-      { x: 0, rotation: 0, duration: 0.45, ease: "elastic.out(1.1, 0.35)" }
-    );
-    // Quick turn: squash on its long axis like it's rotating in the lock
-    await gsap.to(keyEl, { scaleY: 0.15, duration: 0.08, ease: "power1.in" });
-    await gsap.to(keyEl, { scaleY: 1, duration: 0.1, ease: "power1.out" });
-    // Click — the crate jumps as the lock releases
-    await gsap.fromTo(crateEl, { y: 0 }, { y: -9, duration: 0.07, yoyo: true, repeat: 1, ease: "power2.out" });
+      // ── Slams in (everything past the keyhole is clipped away, so the bit disappears into
+      // it) and turns as it hits ──
+      await gsap.to(keyEl, { x: 0, duration: 0.08, ease: "power4.in" });
+      setShakeIntensity(2);
+      // The impact knocks the crate back, and it springs upright again
+      gsap.fromTo(
+        crateEl,
+        { x: -9, rotation: -2.5 },
+        { x: 0, rotation: 0, duration: 0.45, ease: "elastic.out(1.1, 0.35)" }
+      );
+      // Quick turn: squash on its long axis like it's rotating in the lock
+      await gsap.to(keyEl, { scaleY: 0.15, duration: 0.08, ease: "power1.in" });
+      await gsap.to(keyEl, { scaleY: 1, duration: 0.1, ease: "power1.out" });
+      // Click — the crate jumps as the lock releases
+      await gsap.fromTo(crateEl, { y: 0 }, { y: -9, duration: 0.07, yoyo: true, repeat: 1, ease: "power2.out" });
+    }
 
     // ── Lid flips open on hinges at the back; light pours out in the rarity's colour ──
     setShakeIntensity(3);
@@ -768,10 +1123,11 @@ export function CrateOpeningAnimation({ isOpen, tier, points, ownedCosmetics, on
                   style={{ position: "absolute", left: KEY_LINEUP_LEFT, top: KEY_LINEUP_TOP, zIndex: 6, pointerEvents: "none", opacity: 0 }}
                 >
                   <div ref={previewKeyInnerRef}>
-                    <KeyGraphic />
+                    <KeyGraphic metal={(CRATE_PALETTES[tier.id] ?? CRATE_PALETTES.common).lock.metal} />
                   </div>
                 </div>
                 <CrateVisual
+                  tier={tier.id}
                   intensity={shakeIntensity}
                   parts={{
                     lid: lidRef,

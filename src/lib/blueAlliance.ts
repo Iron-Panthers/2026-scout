@@ -124,6 +124,30 @@ export async function getEventLocation(eventCode: string): Promise<TBAEventLocat
   };
 }
 
+/** An event's official name on TBA, e.g. "Silicon Valley Regional". */
+export async function getEventName(eventCode: string): Promise<string | null> {
+  const event = await tbaFetch<{ name?: string }>(`/event/${eventCode}/simple`);
+  return event?.name ?? null;
+}
+
+/** An event in TBA's season list. */
+export interface TBAEventSimple {
+  key: string;
+  name: string;
+  city: string | null;
+  state_prov: string | null;
+  country: string | null;
+  start_date: string;
+  end_date: string;
+  event_type: number;
+}
+
+/** Every event in a season, by start date. */
+export async function getEventsForYear(year: number): Promise<TBAEventSimple[]> {
+  const events = await tbaFetch<TBAEventSimple[]>(`/events/${year}/simple`);
+  return (events ?? []).sort((a, b) => a.start_date.localeCompare(b.start_date) || a.name.localeCompare(b.name));
+}
+
 export async function getMatchScores(
   eventCode: string,
   matchNumber: number

@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDevMode } from "@/contexts/DevModeContext";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
-import { getActiveEvent } from "@/lib/matches";
+import { getActiveEvent, isEventWithinWindow } from "@/lib/matches";
 import { getGameProfile } from "@/lib/gameProfiles";
 import { getBulkMatchOdds, getUserBets, blendOddsRedPct, settleMatchBets } from "@/lib/betting";
 import { getMatchLabel, wasUpset } from "@/lib/match13";
@@ -931,7 +931,8 @@ export default function Betting({
     if (isStale()) return;
 
     setPoints(gameProfile?.points ?? 0);
-    setEventPoints(activeEvent ? gameProfile?.event_points ?? 0 : null);
+    // ChezCoins only show while the event is actually on (same window as the Shop's Event tab)
+    setEventPoints(activeEvent && isEventWithinWindow(activeEvent) ? gameProfile?.event_points ?? 0 : null);
     setMyBets(userBets);
     setEvent(activeEvent);
 

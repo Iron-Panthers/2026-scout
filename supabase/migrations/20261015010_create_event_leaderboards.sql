@@ -30,6 +30,7 @@ CREATE INDEX IF NOT EXISTS idx_event_leaderboards_event ON event_leaderboards(ev
 
 ALTER TABLE event_leaderboards ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Authenticated users can view event leaderboards" ON event_leaderboards;
 CREATE POLICY "Authenticated users can view event leaderboards"
   ON event_leaderboards FOR SELECT USING (auth.uid() IS NOT NULL);
 -- No insert/update/delete policies: only snapshot_event_leaderboard() writes.

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { geoAlbersUsa, geoContains, geoMercator, geoPath } from "d3-geo";
 import { feature } from "topojson-client";
 import type { Feature, FeatureCollection, Geometry } from "geojson";
@@ -6,7 +6,13 @@ import type { GeometryCollection, Topology } from "topojson-specification";
 import { Minus, Plus, RotateCcw } from "lucide-react";
 import statesUrl from "us-atlas/states-10m.json?url";
 import { Button } from "@/components/ui/button";
-import { getEventCoordinates, type EventCoordinates, type ScoutedEvent } from "@/lib/scoutingHistory";
+import {
+  getEventCoordinates,
+  getEventDisplayName,
+  withoutYear,
+  type EventCoordinates,
+  type ScoutedEvent,
+} from "@/lib/scoutingHistory";
 import { SEASON_GAME_PIECES } from "@/config/gamePieces";
 
 const WIDTH = 960;
@@ -15,9 +21,25 @@ const MIN_ZOOM = 1;
 const MAX_ZOOM = 12;
 const CALIFORNIA_ID = "06";
 const DOT_RADIUS = 5;
-/** Zoom step for the +/- buttons, and how strongly the scroll wheel zooms. */
+/** Zoom step for the +/- buttons. */
 const BUTTON_ZOOM_FACTOR = 2.5;
-const WHEEL_ZOOM_SPEED = 0.004;
+/**
+ * How strongly every zoom gesture zooms, relative to its natural rate, so scrolling and
+ * pinching feel the same: 1 = natural (pinch follows your fingers exactly), 2.5 = each
+ * gesture zooms 2.5× as far (in log scale).
+ */
+const ZOOM_SENSITIVITY = 2.5;
+// Natural rates: a mouse-wheel notch (~100px) zooms about 1.17×; a trackpad pinch arrives
+// as a ctrl+wheel whose natural scale is e^(-deltaY / 100) (what browsers use themselves).
+const NATURAL_WHEEL_RATE = 0.0016;
+const NATURAL_TRACKPAD_PINCH_RATE = 0.01;
+
+/** A wheel event's vertical scroll in pixels, whether the browser reports pixels, lines or pages. */
+function wheelPixels(e: WheelEvent): number {
+  if (e.deltaMode === WheelEvent.DOM_DELTA_LINE) return e.deltaY * 33;
+  if (e.deltaMode === WheelEvent.DOM_DELTA_PAGE) return e.deltaY * 800;
+  return e.deltaY;
+}
 
 type StateFeature = Feature<Geometry, { name: string }>;
 type Mode = "us" | "california";
@@ -63,18 +85,38 @@ function eventColor(event: ScoutedEvent): string {
   return (year && SEASON_GAME_PIECES[year]?.color) || "var(--primary)";
 }
 
-function scoutedSummary(event: ScoutedEvent): string {
+/** The tooltip's "N matches scouted" line; null when there's nothing to say (an added event with no count). */
+function scoutedSummary(event: ScoutedEvent): string | null {
   if (event.matchesScouted !== null) {
     return `${event.matchesScouted} match${event.matchesScouted === 1 ? "" : "es"} scouted`;
   }
+  if (event.addedByScouter) return null;
   // Rows saved before matches were tracked only know the total submissions
   return `${event.submissions} submission${event.submissions === 1 ? "" : "s"}`;
 }
 
+/** One dot on the map: every event held at (about) the same place, newest first. */
 interface PlacedDot {
-  event: ScoutedEvent;
+  key: string;
+  events: ScoutedEvent[];
   x: number;
   y: number;
+}
+
+/** Events closer together than this share one dot (same venue or city, e.g. a championship's divisions). */
+const SAME_PLACE_KM = 1;
+
+function distanceKm(a: EventCoordinates, b: EventCoordinates): number {
+  const kmPerDegree = 111.32;
+  const dLat = (a.lat - b.lat) * kmPerDegree;
+  const dLng = (a.lng - b.lng) * kmPerDegree * Math.cos(((a.lat + b.lat) / 2) * (Math.PI / 180));
+  return Math.hypot(dLat, dLng);
+}
+
+/** A pie slice from angle a0 to a1 (radians, 0 = up), for dots shared by several seasons. */
+function wedgePath(cx: number, cy: number, r: number, a0: number, a1: number): string {
+  const point = (a: number) => `${cx + r * Math.sin(a)},${cy - r * Math.cos(a)}`;
+  return `M${cx},${cy} L${point(a0)} A${r},${r} 0 ${a1 - a0 > Math.PI ? 1 : 0} 1 ${point(a1)} Z`;
 }
 
 /**
@@ -84,9 +126,14 @@ interface PlacedDot {
 export function ScoutingMap({ events }: { events: ScoutedEvent[] }) {
   const [states, setStates] = useState<FeatureCollection<Geometry, { name: string }> | null>(null);
   const [coords, setCoords] = useState<Map<string, EventCoordinates | null>>(new Map());
+  // Each event's name from TBA (by event code), without the year
+  const [names, setNames] = useState<Map<string, string>>(new Map());
   const [mode, setMode] = useState<Mode>("us");
   const [view, setView] = useState<View>(RESET_VIEW);
-  const [hovered, setHovered] = useState<{ event: ScoutedEvent; left: number; top: number; width: number } | null>(null);
+  // The dot whose tooltip is showing and where the pointer was (in the map box).
+  // `tapped`: opened by a tap, so the tooltip can be scrolled if it doesn't all fit.
+  const [hovered, setHovered] = useState<{ dot: PlacedDot; left: number; top: number; tapped: boolean } | null>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -107,6 +154,16 @@ export function ScoutingMap({ events }: { events: ScoutedEvent[] }) {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all(events.map(async (event) => [event.key, await getEventDisplayName(event)] as const)).then((entries) => {
+      if (!cancelled) setNames(new Map(entries));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [events]);
 
   // Where each event was held
   useEffect(() => {
@@ -150,35 +207,36 @@ export function ScoutingMap({ events }: { events: ScoutedEvent[] }) {
 
   const dots = useMemo(() => {
     if (!projection) return [];
-    const placed: PlacedDot[] = [];
+    // Group events held at about the same place: one dot each, so e.g. two seasons'
+    // championship divisions in Houston don't show up as separate nearby dots
+    const groups: Array<{ at: EventCoordinates; events: ScoutedEvent[]; points: Array<[number, number]> }> = [];
     for (const event of events) {
       const at = coords.get(event.key);
       if (!at) continue;
       if (mode === "california" && at.state !== "CA" && !(california && geoContains(california, [at.lng, at.lat]))) continue;
       const point = projection([at.lng, at.lat]);
-      if (point) placed.push({ event, x: point[0], y: point[1] });
+      if (!point) continue;
+      const group = groups.find((g) => distanceKm(g.at, at) <= SAME_PLACE_KM);
+      if (group) {
+        group.events.push(event);
+        group.points.push(point);
+      } else {
+        groups.push({ at, events: [event], points: [point] });
+      }
     }
-    // Events in the same city would sit on top of each other: fan them out in a small ring
-    const groups = new Map<string, PlacedDot[]>();
-    for (const dot of placed) {
-      const cell = `${Math.round(dot.x / 6)},${Math.round(dot.y / 6)}`;
-      groups.set(cell, [...(groups.get(cell) ?? []), dot]);
-    }
-    for (const group of groups.values()) {
-      if (group.length < 2) continue;
-      const ring = 7;
-      group.forEach((dot, i) => {
-        const angle = (i / group.length) * Math.PI * 2 - Math.PI / 2;
-        dot.x += Math.cos(angle) * ring;
-        dot.y += Math.sin(angle) * ring;
-      });
-    }
-    return placed;
+    return groups.map((group): PlacedDot => ({
+      key: group.events.map((event) => event.key).join("|"),
+      events: [...group.events].sort((a, b) => (b.startDate ?? "").localeCompare(a.startDate ?? "")),
+      x: group.points.reduce((sum, p) => sum + p[0], 0) / group.points.length,
+      y: group.points.reduce((sum, p) => sum + p[1], 0) / group.points.length,
+    }));
   }, [events, coords, projection, mode, california]);
+
+  const shownEvents = dots.reduce((sum, dot) => sum + dot.events.length, 0);
 
   // Events with no known location, and ones located but outside the map (abroad, or outside California)
   const unplaced = locating ? 0 : events.filter((event) => !coords.get(event.key)).length;
-  const offMap = locating ? 0 : events.length - unplaced - dots.length;
+  const offMap = locating ? 0 : events.length - unplaced - shownEvents;
 
   /** A point on screen, in the map's own (unzoomed) coordinates. */
   function toSvgPoint(clientX: number, clientY: number): { x: number; y: number } {
@@ -206,7 +264,9 @@ export function ScoutingMap({ events }: { events: ScoutedEvent[] }) {
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       const point = toSvgPoint(e.clientX, e.clientY);
-      zoomAt(Math.exp(-e.deltaY * WHEEL_ZOOM_SPEED), point.x, point.y);
+      // ctrlKey: a trackpad pinch (browsers send those as ctrl+wheel); otherwise a scroll
+      const rate = e.ctrlKey ? NATURAL_TRACKPAD_PINCH_RATE : NATURAL_WHEEL_RATE;
+      zoomAt(Math.exp(-wheelPixels(e) * rate * ZOOM_SENSITIVITY), point.x, point.y);
     };
     svg.addEventListener("wheel", onWheel, { passive: false });
     return () => svg.removeEventListener("wheel", onWheel);
@@ -227,7 +287,8 @@ export function ScoutingMap({ events }: { events: ScoutedEvent[] }) {
       const [other] = [...pointers.current.entries()].filter(([id]) => id !== e.pointerId).map(([, p]) => p);
       const before = Math.hypot(previous.x - other.x, previous.y - other.y);
       const after = Math.hypot(point.x - other.x, point.y - other.y);
-      if (before > 0) zoomAt(after / before, (point.x + other.x) / 2, (point.y + other.y) / 2);
+      // Touchscreen pinch: the change in finger spread, at the same sensitivity as scrolling
+      if (before > 0) zoomAt(Math.pow(after / before, ZOOM_SENSITIVITY), (point.x + other.x) / 2, (point.y + other.y) / 2);
     } else {
       const dx = point.x - previous.x;
       const dy = point.y - previous.y;
@@ -241,11 +302,38 @@ export function ScoutingMap({ events }: { events: ScoutedEvent[] }) {
     pointers.current.delete(e.pointerId);
   }
 
-  function showTooltip(event: ScoutedEvent, clientX: number, clientY: number) {
+  function showTooltip(dot: PlacedDot, clientX: number, clientY: number, tapped = false) {
     const box = containerRef.current?.getBoundingClientRect();
     if (!box) return;
-    setHovered({ event, left: clientX - box.left, top: clientY - box.top, width: box.width });
+    setHovered({ dot, left: clientX - box.left, top: clientY - box.top, tapped });
   }
+
+  // Keep the tooltip inside the part of the map that's on screen (a large map can run
+  // past the bottom of the window): beside the pointer, flipping to the left near the right
+  // edge, vertically centred on it, clamped to that area, and no taller than it.
+  // Measured after render, so it's placed directly on the element.
+  useLayoutEffect(() => {
+    const tip = tooltipRef.current;
+    const box = containerRef.current?.getBoundingClientRect();
+    if (!tip || !hovered || !box) return;
+    const gap = 12;
+    const margin = 4;
+    // Visible part of the map, in the map box's own coordinates
+    const visibleTop = Math.max(0, -box.top) + margin;
+    const visibleBottom = Math.min(box.height, window.innerHeight - box.top) - margin;
+    const visibleLeft = Math.max(0, -box.left) + margin;
+    const visibleRight = Math.min(box.width, window.innerWidth - box.left) - margin;
+
+    tip.style.maxHeight = `${Math.max(60, visibleBottom - visibleTop)}px`;
+    const { offsetWidth: w, offsetHeight: h } = tip;
+    let left = hovered.left + gap;
+    if (left + w > visibleRight) left = hovered.left - gap - w;
+    left = Math.max(visibleLeft, Math.min(left, visibleRight - w));
+    const top = Math.max(visibleTop, Math.min(hovered.top - h / 2, visibleBottom - h));
+    tip.style.left = `${left}px`;
+    tip.style.top = `${top}px`;
+    tip.style.visibility = "visible";
+  }, [hovered]);
 
   function switchMode(next: Mode) {
     setMode(next);
@@ -311,30 +399,46 @@ export function ScoutingMap({ events }: { events: ScoutedEvent[] }) {
                   vectorEffect="non-scaling-stroke"
                 />
               ))}
-              {dots.map(({ event, x, y }) => {
-                const active = hovered?.event.key === event.key;
+              {dots.map((dot) => {
+                const active = hovered?.dot.key === dot.key;
+                // Constant size on screen at any zoom
+                const r = ((active ? 1.5 : 1) * DOT_RADIUS) / view.k;
+                // A dot shared by several seasons is split into a slice per season's colour
+                const colors = [...new Set(dot.events.map(eventColor))];
+                const handlers = {
+                  onPointerEnter: (e: React.PointerEvent) => e.pointerType === "mouse" && showTooltip(dot, e.clientX, e.clientY),
+                  onPointerMove: (e: React.PointerEvent) => e.pointerType === "mouse" && showTooltip(dot, e.clientX, e.clientY),
+                  onPointerLeave: (e: React.PointerEvent) => e.pointerType === "mouse" && setHovered(null),
+                  onClick: (e: React.MouseEvent) => {
+                    // Taps (touch) toggle the tooltip; a click shouldn't also clear it
+                    e.stopPropagation();
+                    if (!dragged.current) showTooltip(dot, e.clientX, e.clientY, true);
+                  },
+                };
                 return (
-                  <circle
-                    key={event.key}
-                    cx={x}
-                    cy={y}
-                    // Constant size on screen at any zoom
-                    r={((active ? 1.5 : 1) * DOT_RADIUS) / view.k}
-                    fill={eventColor(event)}
-                    // Dark outline so light piece colours (e.g. white Coral) show on any theme
-                    stroke="rgba(0,0,0,0.65)"
-                    strokeWidth={1.25}
-                    vectorEffect="non-scaling-stroke"
-                    className="cursor-pointer"
-                    onPointerEnter={(e) => e.pointerType === "mouse" && showTooltip(event, e.clientX, e.clientY)}
-                    onPointerMove={(e) => e.pointerType === "mouse" && showTooltip(event, e.clientX, e.clientY)}
-                    onPointerLeave={(e) => e.pointerType === "mouse" && setHovered(null)}
-                    onClick={(e) => {
-                      // Taps (touch) toggle the tooltip; a click shouldn't also clear it
-                      e.stopPropagation();
-                      if (!dragged.current) showTooltip(event, e.clientX, e.clientY);
-                    }}
-                  />
+                  <g key={dot.key} className="cursor-pointer" {...handlers}>
+                    {colors.length === 1 ? (
+                      <circle cx={dot.x} cy={dot.y} r={r} fill={colors[0]} />
+                    ) : (
+                      colors.map((color, i) => (
+                        <path
+                          key={color}
+                          d={wedgePath(dot.x, dot.y, r, (i / colors.length) * Math.PI * 2, ((i + 1) / colors.length) * Math.PI * 2)}
+                          fill={color}
+                        />
+                      ))
+                    )}
+                    {/* Dark outline so light piece colours (e.g. yellow Fuel) show on any theme */}
+                    <circle
+                      cx={dot.x}
+                      cy={dot.y}
+                      r={r}
+                      fill="none"
+                      stroke="rgba(0,0,0,0.65)"
+                      strokeWidth={1.25}
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  </g>
                 );
               })}
             </g>
@@ -343,21 +447,36 @@ export function ScoutingMap({ events }: { events: ScoutedEvent[] }) {
 
         {hovered && (
           <div
-            className="pointer-events-none absolute z-10 max-w-[220px] rounded-md border border-border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md"
-            style={{
-              // Beside the cursor, but kept inside the map
-              left: Math.max(4, Math.min(hovered.left + 12, hovered.width - 230)),
-              top: Math.max(hovered.top - 70, 4),
-            }}
+            ref={tooltipRef}
+            className={`absolute z-10 w-max max-w-[220px] overflow-y-auto overscroll-contain rounded-md border border-border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md ${
+              hovered.tapped ? "" : "pointer-events-none"
+            }`}
+            // Placed by the layout effect above once its size is known
+            style={{ left: 0, top: 0, visibility: "hidden" }}
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
           >
-            <p className="font-semibold leading-snug">{hovered.event.name}</p>
-            <p className="text-muted-foreground">{formatEventDates(hovered.event.startDate, hovered.event.endDate)}</p>
-            {(() => {
-              const year = eventYear(hovered.event);
-              const season = year ? SEASON_GAME_PIECES[year] : undefined;
-              return season ? <p className="text-muted-foreground">{year} · {season.game}</p> : null;
-            })()}
-            <p className="mt-1 font-medium">{scoutedSummary(hovered.event)}</p>
+            {/* Every event at this spot, newest first */}
+            <div className="divide-y divide-border">
+              {hovered.dot.events.map((event) => {
+                const year = eventYear(event);
+                const season = year ? SEASON_GAME_PIECES[year] : undefined;
+                return (
+                  <div key={event.key} className="py-1.5 first:pt-0 last:pb-0">
+                    <p className="font-semibold leading-snug">{names.get(event.key) ?? withoutYear(event.name)}</p>
+                    <p className="text-muted-foreground">{formatEventDates(event.startDate, event.endDate)}</p>
+                    {/* In the season's game-piece colour, matching the dot */}
+                    {season && (
+                      <p className="font-medium" style={{ color: season.color }}>
+                        {year} · {season.game}
+                      </p>
+                    )}
+                    {scoutedSummary(event) && <p className="mt-1 font-medium">{scoutedSummary(event)}</p>}
+                    {event.scoutingManager && <p className="font-medium text-green-500">Scouting manager</p>}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>
@@ -384,7 +503,7 @@ export function ScoutingMap({ events }: { events: ScoutedEvent[] }) {
       <p className="text-xs text-muted-foreground">
         {locating
           ? "Finding event locations..."
-          : `${dots.length} event${dots.length === 1 ? "" : "s"} shown`}
+          : `${shownEvents} event${shownEvents === 1 ? "" : "s"} shown`}
         {offMap > 0 && ` · ${offMap} outside ${mode === "california" ? "California" : "the US"}`}
         {unplaced > 0 && ` · ${unplaced} with no known location`}
         {" · Scroll or pinch to zoom, drag to pan."}

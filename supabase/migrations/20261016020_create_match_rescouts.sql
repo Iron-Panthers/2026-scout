@@ -15,9 +15,11 @@ CREATE INDEX IF NOT EXISTS idx_match_rescouts_scouter ON match_rescouts(scouter_
 
 ALTER TABLE match_rescouts ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Authenticated users can view match rescouts" ON match_rescouts;
 CREATE POLICY "Authenticated users can view match rescouts"
   ON match_rescouts FOR SELECT USING (auth.uid() IS NOT NULL);
 
+DROP POLICY IF EXISTS "Managers can manage match rescouts" ON match_rescouts;
 CREATE POLICY "Managers can manage match rescouts"
   ON match_rescouts FOR ALL
   USING (EXISTS (SELECT 1 FROM profiles WHERE profiles.id = auth.uid() AND profiles.is_manager = true))
