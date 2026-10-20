@@ -16,6 +16,13 @@
         "description": "Receive reminders before your scheduled matches",
         "type": "switch",
         "defaultValue": false
+      },
+      {
+        "id": "message-notifications",
+        "label": "Messages",
+        "description": "Get notified when someone sends you a message",
+        "type": "switch",
+        "defaultValue": false
       }
     ]
   },

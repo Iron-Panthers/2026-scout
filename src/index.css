@@ -611,6 +611,42 @@ html {
   --sidebar-ring: hsl(40.6, 59.1%, 45.1%);
 }
 
+/* HYPERNOVA — near-black background, hot pink primary, cyan accent (#060709 / #ed4791 / #49c7f0) */
+[data-theme="hypernova"] {
+  --background: hsl(220, 20%, 3.1%);
+  --foreground: hsl(220, 15%, 95%);
+  --card: hsl(222, 18%, 7.5%);
+  --card-foreground: hsl(220, 15%, 95%);
+  --popover: hsl(222, 18%, 9%);
+  --popover-foreground: hsl(220, 15%, 95%);
+  --primary: hsl(332.6, 82%, 60.4%);
+  --primary-foreground: hsl(220, 20%, 3.1%);
+  --secondary: hsl(222, 16%, 13%);
+  --secondary-foreground: hsl(220, 15%, 95%);
+  --muted: hsl(222, 16%, 13%);
+  --muted-foreground: hsl(220, 10%, 66%);
+  --accent: hsl(194.8, 84.6%, 61.4%);
+  --accent-foreground: hsl(220, 20%, 3.1%);
+  --destructive: hsl(0, 84%, 60%);
+  --destructive-foreground: hsl(0, 0%, 98%);
+  --border: hsl(222, 14%, 18%);
+  --input: hsl(222, 14%, 18%);
+  --ring: hsl(332.6, 82%, 60.4%);
+  --chart-1: hsl(332.6, 82%, 60.4%);
+  --chart-2: hsl(194.8, 84.6%, 61.4%);
+  --chart-3: hsl(332.6, 60%, 75%);
+  --chart-4: hsl(194.8, 60%, 40%);
+  --chart-5: hsl(38, 92%, 50%);
+  --sidebar: hsl(220, 20%, 2%);
+  --sidebar-foreground: hsl(220, 15%, 95%);
+  --sidebar-primary: hsl(332.6, 82%, 60.4%);
+  --sidebar-primary-foreground: hsl(220, 20%, 3.1%);
+  --sidebar-accent: hsl(222, 16%, 13%);
+  --sidebar-accent-foreground: hsl(220, 15%, 95%);
+  --sidebar-border: hsl(222, 14%, 18%);
+  --sidebar-ring: hsl(332.6, 82%, 60.4%);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -661,4 +697,30 @@ html {
   transform-box: fill-box;
   transform-origin: left bottom;
   animation: game-lock-shackle-open 750ms ease-in-out forwards;
+}
+
+/* Shop: switching crate tiers slides the crates like a carousel (see CratesTab in Shop.tsx) */
+@keyframes crate-slide-out-left {
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(-160%); opacity: 0; }
+}
+@keyframes crate-slide-out-right {
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(160%); opacity: 0; }
+}
+@keyframes crate-slide-in-right {
+  from { transform: translateX(160%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+@keyframes crate-slide-in-left {
+  from { transform: translateX(-160%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+.crate-slide-out-left { animation: crate-slide-out-left 320ms cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+.crate-slide-out-right { animation: crate-slide-out-right 320ms cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+.crate-slide-in-right { animation: crate-slide-in-right 320ms cubic-bezier(0.4, 0, 0.2, 1) both; }
+.crate-slide-in-left { animation: crate-slide-in-left 320ms cubic-bezier(0.4, 0, 0.2, 1) both; }
+@media (prefers-reduced-motion: reduce) {
+  .crate-slide-out-left, .crate-slide-out-right { animation: none; display: none; }
+  .crate-slide-in-right, .crate-slide-in-left { animation: none; }
 }

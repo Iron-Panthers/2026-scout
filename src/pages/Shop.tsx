@@ -574,6 +574,16 @@ function CratesTab({ points, ownedCosmetics, tier, onPrevTier, onNextTier, onOpe
   const canAfford = points >= tier.cost;
   const tierIndex = CRATE_TIERS.findIndex((t) => t.id === tier.id);
   const [catalogOpen, setCatalogOpen] = useState(false);
+  // Switching crates slides them like a carousel: the old crate leaves one way while the
+  // new one comes in from the other ("next" → old goes left, new comes from the right)
+  const [leaving, setLeaving] = useState<{ tierId: CrateTier["id"]; direction: "next" | "prev"; key: number } | null>(null);
+  const [arrivalDirection, setArrivalDirection] = useState<"next" | "prev" | null>(null);
+  const switchTier = (direction: "next" | "prev") => {
+    setLeaving({ tierId: tier.id, direction, key: Date.now() });
+    setArrivalDirection(direction);
+    if (direction === "next") onNextTier();
+    else onPrevTier();
+  };
 
   const crateCategoryOrder: CosmeticCategory[] = ["hat", "decoration"];
   const cratePool = COSMETICS.filter(
@@ -593,7 +603,7 @@ function CratesTab({ points, ownedCosmetics, tier, onPrevTier, onNextTier, onOpe
       {/* Crate tier switcher */}
       <div className="flex items-center justify-center gap-3 w-full">
         <button
-          onClick={onPrevTier}
+          onClick={() => switchTier("prev")}
           aria-label="Previous crate"
           className="h-8 w-8 rounded-full flex items-center justify-center bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
         >
@@ -615,7 +625,7 @@ function CratesTab({ points, ownedCosmetics, tier, onPrevTier, onNextTier, onOpe
         </div>
 
         <button
-          onClick={onNextTier}
+          onClick={() => switchTier("next")}
           aria-label="Next crate"
           className="h-8 w-8 rounded-full flex items-center justify-center bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
         >
@@ -627,7 +637,25 @@ function CratesTab({ points, ownedCosmetics, tier, onPrevTier, onNextTier, onOpe
       <Card className="w-full border-border/50 overflow-hidden">
         <CardContent className="p-6 flex flex-col items-center gap-4">
           {/* Crate visual (static) — same crate the opening animation unlocks */}
-          <CrateVisual size={130} />
+          <div className="relative flex w-full justify-center overflow-hidden">
+            {/* The crate sliding out */}
+            {leaving && (
+              <div
+                key={`leaving-${leaving.key}`}
+                className={`pointer-events-none absolute ${leaving.direction === "next" ? "crate-slide-out-left" : "crate-slide-out-right"}`}
+                onAnimationEnd={() => setLeaving(null)}
+              >
+                <CrateVisual size={130} tier={leaving.tierId} />
+              </div>
+            )}
+            {/* The crate sliding in (or just sitting there) */}
+            <div
+              key={`crate-${tier.id}`}
+              className={arrivalDirection ? (arrivalDirection === "next" ? "crate-slide-in-right" : "crate-slide-in-left") : undefined}
+            >
+              <CrateVisual size={130} tier={tier.id} />
+            </div>
+          </div>
 
           <div className="text-center space-y-1">
             <p className="font-bold text-lg">{tier.name}</p>

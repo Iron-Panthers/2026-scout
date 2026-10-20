@@ -853,6 +853,17 @@ export const COSMETICS: CosmeticDefinition[] = [
     rarity: "uncommon",
     themeValue: "peddie",
   },
+  {
+    id: "theme_hypernova",
+    name: "HYPERNOVA",
+    description: "What drivetrain do you have again?",
+    category: "theme",
+    url: "/shop/theme_hypernova.jpg",
+    cost: 500,
+    // "Epic": the tier between Rare and Legendary
+    rarity: "ultra-rare",
+    themeValue: "hypernova",
+  },
 ];
 
 // Dev guard: catch duplicate IDs

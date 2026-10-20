@@ -10,7 +10,7 @@ export interface SeasonGamePiece {
 
 export const SEASON_GAME_PIECES: Record<number, SeasonGamePiece> = {
   2026: { game: "REBUILT", piece: "Fuel", color: "#facc15" },
-  2025: { game: "REEFSCAPE", piece: "Coral", color: "#f8fafc" },
+  2025: { game: "REEFSCAPE", piece: "Algae", color: "#2dd4bf" },
   2024: { game: "CRESCENDO", piece: "Note", color: "#f97316" },
   // Cones and cubes were both main pieces; the purple cube stands apart from the other years
   2023: { game: "CHARGED UP", piece: "Cube", color: "#8b5cf6" },

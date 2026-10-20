@@ -82,10 +82,13 @@ function LazyAvatarImage({ src }: { src: string }) {
   );
 }
 
+// decorationImage / decorationEmojiSize: how big a decoration is drawn (image width, emoji
+// text size). Small avatars (e.g. the manager assignment grid) get smaller decorations so
+// they don't swamp the picture.
 const sizeConfig = {
-  sm: { wrapperClass: "size-8", emojiHat: "text-sm", emojiDecoration: "text-xs", hatOffset: "-top-2.5", decorationOffset: "-bottom-1.5 -right-1.5" },
-  md: { wrapperClass: "size-10", emojiHat: "text-base", emojiDecoration: "text-sm", hatOffset: "-top-3", decorationOffset: "-bottom-2 -right-2" },
-  lg: { wrapperClass: "size-16", emojiHat: "text-3xl", emojiDecoration: "text-lg", hatOffset: "-top-5", decorationOffset: "-bottom-2 -right-2" },
+  sm: { wrapperClass: "size-8", emojiHat: "text-sm", emojiDecoration: "text-xs", hatOffset: "-top-2.5", decorationOffset: "-bottom-1.5 -right-1.5", decorationImage: "w-6", decorationEmojiSize: "text-sm" },
+  md: { wrapperClass: "size-10", emojiHat: "text-base", emojiDecoration: "text-sm", hatOffset: "-top-3", decorationOffset: "-bottom-2 -right-2", decorationImage: "w-7", decorationEmojiSize: "text-2xl" },
+  lg: { wrapperClass: "size-16", emojiHat: "text-3xl", emojiDecoration: "text-lg", hatOffset: "-top-5", decorationOffset: "-bottom-2 -right-2", decorationImage: "w-7", decorationEmojiSize: "text-2xl" },
 };
 
 function CosmeticAvatar({
@@ -156,7 +159,7 @@ function CosmeticAvatar({
         <span
           className={cn(
             "absolute leading-none select-none pointer-events-none",
-            decorationId.id === "decoration_six_seven" ? cfg.emojiDecoration : "text-2xl",
+            decorationId.id === "decoration_six_seven" ? cfg.emojiDecoration : cfg.decorationEmojiSize,
             cfg.decorationOffset
           )}
           aria-hidden
@@ -167,7 +170,8 @@ function CosmeticAvatar({
       {decorationURL && (
         <img
           className={cn(
-            "absolute leading-none select-none pointer-events-none w-7",
+            "absolute leading-none select-none pointer-events-none",
+            cfg.decorationImage,
             cfg.emojiDecoration,
             cfg.decorationOffset
           )}
