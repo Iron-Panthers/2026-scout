@@ -28,6 +28,9 @@ import NotificationNavigationListener from "./components/NotificationNavigationL
 import GuestDashboard from "./pages/GuestDashboard";
 import { DevModeProvider } from "./contexts/DevModeContext";
 import DevModeBanner from "./components/DevModeBanner";
+import { MessagesProvider } from "./contexts/MessagesContext";
+import Messages from "./pages/Messages";
+import BugReports from "./pages/BugReports";
 
 function App() {
   return (
@@ -36,6 +39,8 @@ function App() {
         <DevModeProvider>
         <BrowserRouter basename={import.meta.env.BASE_URL}>
           <DevModeBanner />
+          {/* Floating messages button, unread badge and in-app message notifications */}
+          <MessagesProvider>
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
@@ -71,6 +76,15 @@ function App() {
             />
             <Route
               path="/profile"
+              element={
+                <ProtectedRoute>
+                  <Profile />
+                </ProtectedRoute>
+              }
+            />
+            {/* Someone else's profile (read-only), e.g. opened from Messages */}
+            <Route
+              path="/profile/:userId"
               element={
                 <ProtectedRoute>
                   <Profile />
@@ -186,6 +200,24 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            {/* Messages between scouts and managers */}
+            <Route
+              path="/messages"
+              element={
+                <ProtectedRoute>
+                  <Messages />
+                </ProtectedRoute>
+              }
+            />
+            {/* Bug Reporting (the bug tab under the floating chat button) */}
+            <Route
+              path="/bug-reports"
+              element={
+                <ProtectedRoute>
+                  <BugReports />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="/betting/:match_id"
               element={
@@ -195,6 +227,7 @@ function App() {
               }
             />
           </Routes>
+          </MessagesProvider>
           <Toaster />
           <UpdateBanner />
           <NotificationNavigationListener />

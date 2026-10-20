@@ -103,7 +103,15 @@ self.addEventListener("push", (event) => {
   };
 
   event.waitUntil(
-    self.registration.showNotification(data.title || "2026 Scout", options)
+    (async () => {
+      // Messages: when the app is open and in front, it shows its own in-app
+      // notification instead, so don't double up with a system one
+      if (data.skipIfFocused) {
+        const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+        if (windows.some((client) => (client as WindowClient).focused || (client as WindowClient).visibilityState === "visible")) return;
+      }
+      await self.registration.showNotification(data.title || "2026 Scout", options);
+    })()
   );
 });
 

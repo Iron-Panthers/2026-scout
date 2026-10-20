@@ -130,7 +130,7 @@ function xpMultiplier(teamNumber: number): number {
   return DIGIT_MULTIPLIERS[String(teamNumber).length] ?? 1;
 }
 // Time each found team holds the spotlight before the next one appears (ms).
-const TEAM_REVEAL_MS = 2000;
+const TEAM_REVEAL_MS = 1500;
 
 /** Start index of every place this team number appears in the roll, left to right. */
 function teamOccurrenceStarts(spinNumber: string, teamNumber: number): number[] {

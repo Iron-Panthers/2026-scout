@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Coins, ShoppingBag, CheckCircle2, Package, ChevronLeft, ChevronRight, List } from "lucide-react";
@@ -28,7 +28,7 @@ import { getEventCurrencyLogo } from "@/config/eventCurrency";
 import CosmeticAvatar from "@/components/CosmeticAvatar";
 import { GameCard } from "@/components/GameCard";
 import { GamePlayer } from "@/components/GamePlayer";
-import { CrateOpeningAnimation } from "@/components/CrateOpeningAnimation";
+import { CrateOpeningAnimation, CrateVisual } from "@/components/CrateOpeningAnimation";
 import { useToast } from "@/hooks/use-toast";
 import { useRandomSubtitle } from "@/hooks/useRandomSubtitle";
 import { SHOP_SUBTITLES } from "@/config/headerSubtitles";
@@ -151,6 +151,9 @@ export default function Shop({
   const [crateOpen, setCrateOpen] = useState(false);
   const [crateTierIndex, setCrateTierIndex] = useState(0);
 
+  // The game just bought, so its card plays the unlock animation.
+  const [justUnlockedGameId, setJustUnlockedGameId] = useState<string | null>(null);
+
   const loadProfile = useCallback(async () => {
     if (!user?.id) return;
     const gp = await getGameProfile(user.id);
@@ -227,6 +230,7 @@ export default function Shop({
     setBuyingGame(false);
     if (result.success) {
       toast({ title: `Unlocked ${buyGameTarget.name}!`, description: `You have ${result.newPoints} pts remaining.` });
+      setJustUnlockedGameId(buyGameTarget.id);
       setBuyGameTarget(null);
       loadProfile();
     } else {
@@ -396,6 +400,7 @@ export default function Shop({
                         isPlayable={game.id === "frcdle"}
                         onBuy={() => setBuyGameTarget(game)}
                         onPlay={() => setPlayingGame(game)}
+                        playUnlockAnimation={justUnlockedGameId === game.id}
                       />
                     );
                   })}
@@ -569,6 +574,16 @@ function CratesTab({ points, ownedCosmetics, tier, onPrevTier, onNextTier, onOpe
   const canAfford = points >= tier.cost;
   const tierIndex = CRATE_TIERS.findIndex((t) => t.id === tier.id);
   const [catalogOpen, setCatalogOpen] = useState(false);
+  // Switching crates slides them like a carousel: the old crate leaves one way while the
+  // new one comes in from the other ("next" → old goes left, new comes from the right)
+  const [leaving, setLeaving] = useState<{ tierId: CrateTier["id"]; direction: "next" | "prev"; key: number } | null>(null);
+  const [arrivalDirection, setArrivalDirection] = useState<"next" | "prev" | null>(null);
+  const switchTier = (direction: "next" | "prev") => {
+    setLeaving({ tierId: tier.id, direction, key: Date.now() });
+    setArrivalDirection(direction);
+    if (direction === "next") onNextTier();
+    else onPrevTier();
+  };
 
   const crateCategoryOrder: CosmeticCategory[] = ["hat", "decoration"];
   const cratePool = COSMETICS.filter(
@@ -588,7 +603,7 @@ function CratesTab({ points, ownedCosmetics, tier, onPrevTier, onNextTier, onOpe
       {/* Crate tier switcher */}
       <div className="flex items-center justify-center gap-3 w-full">
         <button
-          onClick={onPrevTier}
+          onClick={() => switchTier("prev")}
           aria-label="Previous crate"
           className="h-8 w-8 rounded-full flex items-center justify-center bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
         >
@@ -610,7 +625,7 @@ function CratesTab({ points, ownedCosmetics, tier, onPrevTier, onNextTier, onOpe
         </div>
 
         <button
-          onClick={onNextTier}
+          onClick={() => switchTier("next")}
           aria-label="Next crate"
           className="h-8 w-8 rounded-full flex items-center justify-center bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
         >
@@ -621,40 +636,25 @@ function CratesTab({ points, ownedCosmetics, tier, onPrevTier, onNextTier, onOpe
       {/* Crate card */}
       <Card className="w-full border-border/50 overflow-hidden">
         <CardContent className="p-6 flex flex-col items-center gap-4">
-          {/* Crate visual (static) */}
-          <div
-            style={{
-              width: 130,
-              height: 130,
-              background: "linear-gradient(145deg, #c48940 0%, #8b5520 42%, #6a3e10 100%)",
-              border: "5px solid #3b2008",
-              borderRadius: 10,
-              position: "relative",
-              overflow: "hidden",
-              filter: "drop-shadow(0 8px 24px rgba(0,0,0,0.5))",
-            }}
-          >
-            {/* Lid band */}
-            <div style={{ position: "absolute", top: "28%", left: 0, right: 0, height: 4, background: "#2d1600" }} />
-            <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} preserveAspectRatio="none">
-              <line x1="0" y1="33%" x2="50%" y2="100%" stroke="#2d1600" strokeWidth="3" opacity="0.5" />
-              <line x1="100%" y1="33%" x2="50%" y2="100%" stroke="#2d1600" strokeWidth="3" opacity="0.5" />
-              <line x1="0" y1="0" x2="50%" y2="30%" stroke="#2d1600" strokeWidth="2.5" opacity="0.4" />
-              <line x1="100%" y1="0" x2="50%" y2="30%" stroke="#2d1600" strokeWidth="2.5" opacity="0.4" />
-            </svg>
-            {[{ top: 6, left: 6 }, { top: 6, right: 6 }, { bottom: 6, left: 6 }, { bottom: 6, right: 6 }].map((pos, i) => (
-              <div key={i} style={{
-                position: "absolute", width: 12, height: 12, borderRadius: "50%",
-                background: "radial-gradient(circle at 35% 35%, #e2e2e2 0%, #888 100%)",
-                border: "1.5px solid #555", boxShadow: "inset 0 1.5px 2.5px rgba(255,255,255,0.6)",
-                ...pos,
-              } as React.CSSProperties} />
-            ))}
-            <div style={{
-              position: "absolute", inset: 0, display: "flex", alignItems: "center",
-              justifyContent: "center", paddingTop: "20%", fontSize: 46, fontWeight: 900,
-              color: "rgba(255,220,100,0.16)", userSelect: "none",
-            }}>?</div>
+          {/* Crate visual (static) — same crate the opening animation unlocks */}
+          <div className="relative flex w-full justify-center overflow-hidden">
+            {/* The crate sliding out */}
+            {leaving && (
+              <div
+                key={`leaving-${leaving.key}`}
+                className={`pointer-events-none absolute ${leaving.direction === "next" ? "crate-slide-out-left" : "crate-slide-out-right"}`}
+                onAnimationEnd={() => setLeaving(null)}
+              >
+                <CrateVisual size={130} tier={leaving.tierId} />
+              </div>
+            )}
+            {/* The crate sliding in (or just sitting there) */}
+            <div
+              key={`crate-${tier.id}`}
+              className={arrivalDirection ? (arrivalDirection === "next" ? "crate-slide-in-right" : "crate-slide-in-left") : undefined}
+            >
+              <CrateVisual size={130} tier={tier.id} />
+            </div>
           </div>
 
           <div className="text-center space-y-1">

@@ -103,6 +103,51 @@ async function tbaFetch<T>(endpoint: string): Promise<T | null> {
   }
 }
 
+/** Where an event is held, from TBA (lat/lng are often missing for recent events). */
+export interface TBAEventLocation {
+  city: string | null;
+  state_prov: string | null;
+  country: string | null;
+  lat: number | null;
+  lng: number | null;
+}
+
+export async function getEventLocation(eventCode: string): Promise<TBAEventLocation | null> {
+  const event = await tbaFetch<TBAEventLocation>(`/event/${eventCode}`);
+  if (!event) return null;
+  return {
+    city: event.city ?? null,
+    state_prov: event.state_prov ?? null,
+    country: event.country ?? null,
+    lat: event.lat ?? null,
+    lng: event.lng ?? null,
+  };
+}
+
+/** An event's official name on TBA, e.g. "Silicon Valley Regional". */
+export async function getEventName(eventCode: string): Promise<string | null> {
+  const event = await tbaFetch<{ name?: string }>(`/event/${eventCode}/simple`);
+  return event?.name ?? null;
+}
+
+/** An event in TBA's season list. */
+export interface TBAEventSimple {
+  key: string;
+  name: string;
+  city: string | null;
+  state_prov: string | null;
+  country: string | null;
+  start_date: string;
+  end_date: string;
+  event_type: number;
+}
+
+/** Every event in a season, by start date. */
+export async function getEventsForYear(year: number): Promise<TBAEventSimple[]> {
+  const events = await tbaFetch<TBAEventSimple[]>(`/events/${year}/simple`);
+  return (events ?? []).sort((a, b) => a.start_date.localeCompare(b.start_date) || a.name.localeCompare(b.name));
+}
+
 export async function getMatchScores(
   eventCode: string,
   matchNumber: number

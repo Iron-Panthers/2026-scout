@@ -23,6 +23,10 @@ export interface Profile {
   avatar_url: string | null;
   clocked_in: boolean;
   clocked_in_at: string | null;
+  // Push notifications for new messages (Settings → Notifications → Messages)
+  message_notifications?: boolean;
+  // Seasons they were on the team (set on their profile page)
+  team_years?: number[];
   created_at: string;
   updated_at: string;
 }
