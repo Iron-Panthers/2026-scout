@@ -9,6 +9,7 @@ import { useDevMode } from "@/contexts/DevModeContext";
 import { CURRENT_YEAR, getTeamLogo } from "@/lib/blueAlliance";
 import { getDevFrcdleSpins, getOrCreateDevFrcdleSpin } from "@/lib/devMode";
 import { supabase } from "@/lib/supabase";
+import { unlockAchievement } from "@/lib/achievements";
 
 interface DailySpin {
   spin_day: string;
@@ -898,6 +899,25 @@ export function FrcdleGame() {
   // Only once the teams are final, so an unfinished or failed lookup isn't rated "There's Nothing.".
   const spinRarity = !isRevealingTeams && !isResolvingTeams && !error ? rollRarity(xpTotal) : null;
   const topSpinRarity = topSpin ? rollRarity(topSpin.xp) : null;
+
+  // Achievements from any roll they've finished (today's once its teams are final, plus
+  // every past one): a Mythic roll, 5026 anywhere in the number, and every on-season team
+  // rolled across all their rolls put together
+  const rollAchievements = useMemo(() => {
+    const rolls = historyRolls ?? [];
+    return {
+      mythic: rolls.some((roll) => rollRarity(roll.xp).rarity === "Mythic"),
+      has5026: rolls.some((roll) => roll.spinNumber.includes("5026")),
+      everyTeam: !!snapshot && snapshot.size > 0 && [...snapshot.keys()].every((teamNumber) => earnedTeams.has(teamNumber)),
+    };
+    // historyRolls and earnedTeams are rebuilt every render; these are what they're made from
+  }, [pastRollsByDay, todayCounted, spin?.spin_day, teams, xpTotal, snapshot]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (rollAchievements.mythic) void unlockAchievement(user?.id, "mythic");
+    if (rollAchievements.has5026) void unlockAchievement(user?.id, "frcdle_5026");
+    if (rollAchievements.everyTeam) void unlockAchievement(user?.id, "full_roll");
+  }, [rollAchievements, user?.id]);
 
   if (showHistory) {
     return <HistoryPage rolls={historyRolls} onBack={() => setShowHistory(false)} />;

@@ -36,6 +36,9 @@ import AnimatedContent from "@/components/AnimatedContent";
 import type { Match, Role } from "@/types";
 import { prettifyRole } from "@/lib/roleUtils";
 import { useRandomSubtitle } from "@/hooks/useRandomSubtitle";
+import { useUrlState } from "@/hooks/useUrlState";
+
+const DASHBOARD_PAGES = ["scout", "shop", "avatar", "betting", "leaderboard"] as const;
 import { SHOP_SUBTITLES, AVATAR_SUBTITLES, BETTING_SUBTITLES } from "@/config/headerSubtitles";
 export { prettifyRole };
 
@@ -59,18 +62,10 @@ export default function Dashboard() {
   const [pitAssignments, setPitAssignments] = useState<UserPitAssignment[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [clockingIn, setClocingIn] = useState(false);
-  const [searchParams] = useSearchParams();
-  // Lets a link like /dashboard?page=betting land directly on that tab —
-  // used by MatchBetting's back button, since Betting now lives here as a
-  // tab instead of at its old standalone /betting route.
-  const initialPage = searchParams.get("page");
-  const [dashboardPage, setDashboardPage] = useState<
-    "scout" | "shop" | "avatar" | "betting" | "leaderboard"
-  >(
-    initialPage === "shop" || initialPage === "avatar" || initialPage === "betting" || initialPage === "leaderboard"
-      ? initialPage
-      : "scout"
-  );
+  // The open tab lives in the address (?page=betting...), so reloading stays on it — and a
+  // link like /dashboard?page=betting lands straight on that tab (MatchBetting's back
+  // button uses that, since Betting lives here as a tab).
+  const [dashboardPage, setDashboardPage] = useUrlState("page", "scout", DASHBOARD_PAGES);
   const [headerActionsEl, setHeaderActionsEl] = useState<HTMLDivElement | null>(null);
   const shopSubtitle = useRandomSubtitle(SHOP_SUBTITLES, [dashboardPage === "shop"]);
   const avatarSubtitle = useRandomSubtitle(AVATAR_SUBTITLES, [dashboardPage === "avatar"]);

@@ -10,7 +10,7 @@
     "pwa": "npm run build:quick && vite preview",
     "lint": "eslint .",
     "preview": "vite preview",
-    "deploy": "npm run build:quick && gh-pages -d dist",
+    "deploy": "npm run build:quick && cp dist/index.html dist/404.html && gh-pages -d dist",
     "db:push": "supabase db push --include-all",
     "db:link": "supabase link --project-ref qwzsrlbhwigozonzthvx"
   },

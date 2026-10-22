@@ -48,9 +48,12 @@ interface LeaderboardRow {
  * (event_leaderboards). Those rows outlive the event, so deleted events stay on the map.
  * Events that still exist are re-counted first, so recent scouting shows up.
  */
-export async function getScoutedEvents(scouterId: string): Promise<ScoutedEvent[]> {
+export async function getScoutedEvents(scouterId: string, refresh: "all" | "active" = "all"): Promise<ScoutedEvent[]> {
+  // "active": just the event being scouted now (cheap enough to run often, e.g. for
+  // background achievement checks); "all": every event that still exists
   const liveEvents = await getEvents();
-  await Promise.all(liveEvents.map((event) => refreshEventLeaderboard(event.id)));
+  const toRefresh = refresh === "active" ? liveEvents.filter((event) => event.is_active) : liveEvents;
+  await Promise.all(toRefresh.map((event) => refreshEventLeaderboard(event.id)));
 
   const { data, error } = await supabase
     .from("event_leaderboards")

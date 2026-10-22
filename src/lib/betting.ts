@@ -341,7 +341,7 @@ export async function getUserBets(userId: string): Promise<BetWithMatch[]> {
   const { data, error } = await supabase
     .from("bets")
     .select(
-      `*, match:matches(id, name, match_number, winning_alliance, event_id)`
+      `*, match:matches(id, name, match_number, winning_alliance, event_id, match13_red_win_prob)`
     )
     .eq("user_id", userId)
     .order("created_at", { ascending: false });

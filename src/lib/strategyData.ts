@@ -2,6 +2,7 @@ import { supabase } from "@/lib/supabase";
 import { CURRENT_SCHEMA_VERSION, migrateScoutingData } from "@/lib/scoutingSchema";
 import { getDevFakeScouts, getDevMatches, getDevMatchTeams, getDevScoutingSubmissions, getDevTeams } from "@/lib/devMode";
 import { getEventMatches, getEventTeams } from "@/lib/blueAlliance";
+import { parseYouTubeLink, type YouTubeVideo } from "@/lib/youtube";
 import type { Event } from "@/types";
 
 // Rows for the Strategy Dashboard's Data tables: quantitative, qualitative and
@@ -462,6 +463,13 @@ export interface ScheduledMatch {
   winner: "red" | "blue" | "tie" | null;
   /** Each alliance's score breakdown once played; absent until TBA publishes one. */
   breakdown?: { red: AllianceBreakdown; blue: AllianceBreakdown };
+  /** YouTube videos of the match: a manager's pasted link first, then TBA's. */
+  videos: MatchVideo[];
+}
+
+export interface MatchVideo extends YouTubeVideo {
+  /** "link": pasted by a manager (qualifications only, stored on the match row). */
+  source: "tba" | "link";
 }
 
 /** The parts of an alliance's TBA score breakdown the dashboards show; null when TBA leaves a field out. */
@@ -475,6 +483,8 @@ export interface AllianceBreakdown {
 
 export interface QualScheduleMatch extends ScheduledMatch {
   matchNumber: number;
+  /** The YouTube link a manager pasted for the match, as typed; null when none. */
+  videoLink?: string | null;
 }
 
 export interface PlayoffScheduleMatch extends ScheduledMatch {
@@ -540,6 +550,12 @@ function scheduledMatch(match: TBAMatch, now: number): ScheduledMatch {
     redScore,
     blueScore,
     winner,
+    videos: (match.videos ?? [])
+      .filter((video) => video.type === "youtube" && video.key)
+      // TBA keys can carry a start time ("id?t=90"), so read them like a link.
+      .map((video) => parseYouTubeLink(video.key.includes("?") ? `youtu.be/${video.key}` : video.key))
+      .filter((video): video is YouTubeVideo => !!video)
+      .map((video) => ({ ...video, source: "tba" as const })),
     ...(status === "played" && match.score_breakdown && {
       breakdown: { red: allianceBreakdown(match.score_breakdown.red), blue: allianceBreakdown(match.score_breakdown.blue) },
     }),
@@ -578,7 +594,7 @@ export function getDevEventSchedule(userId: string, eventId: string): EventSched
   const matches = getDevMatches(userId, eventId)
     .map((match): QualScheduleMatch | null => {
       const teams = getDevMatchTeams(userId, match.match_number, eventId);
-      return teams && { matchNumber: match.match_number, red: teams.red, blue: teams.blue, status: "upcoming", redScore: null, blueScore: null, winner: null };
+      return teams && { matchNumber: match.match_number, red: teams.red, blue: teams.blue, status: "upcoming", redScore: null, blueScore: null, winner: null, videos: [] };
     })
     .filter((match): match is QualScheduleMatch => !!match)
     .sort((a, b) => a.matchNumber - b.matchNumber);
@@ -623,6 +639,8 @@ export interface TeamDashboard {
   totalPoints: MeanAndSpread | null;
   shooterType: string;
   terrain: string;
+  /** The pit scout's weight answer (with bumpers), pounds added when it's just a number. */
+  weight: string;
   /** Mean endgame tower level (0 = no climb … 3), over matches TBA has reported. */
   averageClimb: number | null;
   climbMatches: number;
@@ -645,6 +663,12 @@ function meanAndSpread(values: number[]): MeanAndSpread | null {
 }
 
 const byMatch = (a: TeamNote, b: TeamNote) => (a.matchNumber ?? Infinity) - (b.matchNumber ?? Infinity);
+
+/** "125" → "125 lb"; anything else (e.g. "125 lbs") is shown as the scout typed it. */
+function weightLabel(value: string | null): string {
+  const text = value?.trim() ?? "";
+  return /^\d+(\.\d+)?$/.test(text) ? `${text} lb` : text;
+}
 
 /** How many of a team's latest matches the team page's "last matches" filter keeps. */
 export const RECENT_MATCH_COUNT = 4;
@@ -728,6 +752,7 @@ export function buildTeamDashboard(
     totalPoints: meanAndSpread(matchAverages.map((match) => match.points)),
     shooterType: latestPit("shootingMechanism") ?? "",
     terrain: latestPit("terrain") ?? "",
+    weight: weightLabel(latestPit("weight")),
     averageClimb: climbLevels.length > 0 ? climbLevels.reduce((sum, level) => sum + level, 0) / climbLevels.length : null,
     climbMatches: climbLevels.length,
     errorRate: quant.length > 0 ? { problems: quant.filter((row) => row.robotProblems).length, submissions: quant.length } : null,
@@ -754,6 +779,25 @@ export interface EventData {
   pit: PitRow[];
 }
 
+/** How long a load is reused before the next request refetches it. */
+const EVENT_DATA_FRESH_MS = 30 * 1000;
+
+/**
+ * Each event's latest load (sandbox loads are local, so never cached), shared by the
+ * match dashboard, Teams page and team popup: moving between them reuses it instead
+ * of refetching, and `data` keeps the last result on screen while a newer load runs.
+ */
+const eventDataCache = new Map<string, { loading: Promise<EventData>; startedAt: number; data: EventData | null }>();
+
+/**
+ * The event's last loaded data, tagged with its event like the views' load state,
+ * so a view can start from it instead of a loading spinner while loadEventData refreshes it.
+ */
+export function cachedEventLoad(event: Event | undefined): { eventId: string; data: EventData; error: null } | null {
+  const data = event ? eventDataCache.get(event.id)?.data : null;
+  return event && data ? { eventId: event.id, data, error: null } : null;
+}
+
 /** Loads an event's schedule and scouting data; `sandbox` reads the dev-mode local store instead. */
 export async function loadEventData(event: Event, sandbox: { userId: string; userName: string | null } | null): Promise<EventData> {
   if (sandbox) {
@@ -766,11 +810,89 @@ export async function loadEventData(event: Event, sandbox: { userId: string; use
     };
   }
   if (!event.event_code) throw new Error("This event has no TBA event code, so its match schedule can't be loaded.");
-  const [schedule, quant, qual, pit] = await Promise.all([
-    getEventSchedule(event.event_code),
+
+  // A recent or in-flight load is shared rather than repeated.
+  const cached = eventDataCache.get(event.id);
+  if (cached && Date.now() - cached.startedAt < EVENT_DATA_FRESH_MS) return cached.loading;
+
+  const eventCode = event.event_code;
+  const loading = Promise.all([
+    getEventSchedule(eventCode),
+    getEventVideoLinks(event.id),
     getEventQuantRows(event.id),
     getEventQualRows(event.id),
     getEventPitRows(event.id),
-  ]);
-  return { schedule, quant, qual, pit };
+  ]).then(([schedule, videoLinks, quant, qual, pit]) => ({
+    schedule: {
+      ...schedule,
+      matches: schedule.matches.map((match) => withVideoLink(match, videoLinks.get(match.matchNumber) ?? null)),
+    },
+    quant,
+    qual,
+    pit,
+  }));
+  const entry = { loading, startedAt: Date.now(), data: cached?.data ?? null };
+  eventDataCache.set(event.id, entry);
+  loading.then(
+    (data) => { entry.data = data; },
+    // A failed load is retried on the next request; the last good data stays cached.
+    () => { entry.startedAt = 0; }
+  );
+  return loading;
+}
+
+/** Managers' pasted video links for the event's matches, by match number. */
+async function getEventVideoLinks(eventId: string): Promise<Map<number, string>> {
+  const { data, error } = await supabase
+    .from("matches")
+    .select("match_number, video_url")
+    .eq("event_id", eventId)
+    .not("video_url", "is", null);
+  // Pasted links are extras: without them (e.g. before the video_url migration) the schedule still loads.
+  if (error) {
+    console.warn("Could not load match video links:", error);
+    return new Map();
+  }
+  return new Map((data ?? []).map((row) => [row.match_number as number, row.video_url as string]));
+}
+
+/** The match with `link` (when it's a YouTube link) ahead of TBA's videos. */
+function withVideoLink(match: QualScheduleMatch, link: string | null): QualScheduleMatch {
+  const pasted = link ? parseYouTubeLink(link) : null;
+  return {
+    ...match,
+    videoLink: link,
+    videos: [...(pasted ? [{ ...pasted, source: "link" as const }] : []), ...match.videos.filter((video) => video.source === "tba")],
+  };
+}
+
+/**
+ * Saves (or, with null, removes) a manager's YouTube link for a qualification match and
+ * returns the event's data with it applied, for the view to show straight away.
+ */
+export async function setMatchVideoLink(event: Event, data: EventData, matchNumber: number, link: string | null): Promise<EventData> {
+  const { data: rows, error } = await supabase
+    .from("matches")
+    .update({ video_url: link })
+    .eq("event_id", event.id)
+    .eq("match_number", matchNumber)
+    .select("id");
+  if (error) throw new Error(error.message);
+  // No row: the match isn't in the database, or row security kept this user from changing it.
+  if (!rows?.length) throw new Error(`Quals ${matchNumber} couldn't be updated. Only managers can add match videos.`);
+
+  const updated: EventData = {
+    ...data,
+    schedule: {
+      ...data.schedule,
+      matches: data.schedule.matches.map((match) => match.matchNumber === matchNumber ? withVideoLink(match, link) : match),
+    },
+  };
+  // Other views pick up the change, and their next load refetches rather than reusing an older one.
+  const cached = eventDataCache.get(event.id);
+  if (cached) {
+    cached.data = updated;
+    cached.startedAt = 0;
+  }
+  return updated;
 }

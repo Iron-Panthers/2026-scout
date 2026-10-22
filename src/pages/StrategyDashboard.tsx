@@ -52,6 +52,8 @@ import { getEventTeams, type TBATeamSimple } from "@/lib/blueAlliance";
 import { getEventXpMap } from "@/lib/match13";
 import { getEventScoutingAverages } from "@/lib/scoutingSchema";
 import { getPicklist, upsertPicklist } from "@/lib/picklists";
+import { unlockAchievement } from "@/lib/achievements";
+import { useUrlState } from "@/hooks/useUrlState";
 import {
   getDevEvent,
   getDevEvents,
@@ -386,11 +388,14 @@ const STRATEGY_PAGES: Record<StrategyPage, { label: string; title: string; descr
     description: "All teams competing at the selected event.",
   },
 };
+const STRATEGY_PAGE_IDS = Object.keys(STRATEGY_PAGES) as StrategyPage[];
 
 export default function StrategyDashboard() {
   const { user, profile, getAvatarUrl } = useAuth();
   const { devMode } = useDevMode();
-  const [strategyPage, setStrategyPage] = useState<StrategyPage>("picklist");
+  // Opens on the match dashboard; the open page lives in the address (?page=...), so
+  // reloading stays on it
+  const [strategyPage, setStrategyPage] = useUrlState<StrategyPage>("page", "dashboard", STRATEGY_PAGE_IDS);
   const [scoutingDataType, setScoutingDataType] = useState<ScoutingDataType>("quantitative");
   // Where the Dashboard page puts its match picker, beside the event dropdown.
   const [toolbarSlot, setToolbarSlot] = useState<HTMLDivElement | null>(null);
@@ -665,6 +670,11 @@ export default function StrategyDashboard() {
     setPickedTeams(nextPicked);
     setDoNotPickTeams(nextDoNotPick);
 
+    // Strategist: a finished picklist, with every team at the event sorted out of the bank
+    if (nextBank.length === 0 && nextPicked.length + nextDoNotPick.length > 0) {
+      void unlockAchievement(user?.id, "picklist");
+    }
+
     // Keep the session cache in sync so switching away to another event and
     // back re-reads this edit immediately, without waiting on (or racing) a
     // save that may still be in flight.
@@ -816,10 +826,13 @@ export default function StrategyDashboard() {
         </div>
 
         <section>
-          {/* On the Data and Dashboard pages the event sits left and the data type /
-              match picker right, on one line; the other pages keep the event
-              dropdown on the right. */}
+          {/* On the Data page the event sits left and the data type right, on one line. On the
+              Dashboard page the match toolbar (All matches, compact mode) sits left and the
+              event right; the other pages keep the event dropdown on the right. */}
           <div className={`mb-4 flex gap-2 ${strategyPage === "data" || strategyPage === "dashboard" ? "justify-between" : "justify-end"}`}>
+            {strategyPage === "dashboard" && (
+              <div ref={setToolbarSlot} className="flex min-w-0 items-center" />
+            )}
             <Select value={selectedPicklistEventId} onValueChange={setSelectedPicklistEventId}>
               <SelectTrigger className="w-full min-w-0 flex-1 sm:w-64 sm:flex-none" aria-label="Picklist event">
                 <SelectValue placeholder="Select event" />
@@ -842,9 +855,6 @@ export default function StrategyDashboard() {
                 <RotateCcw className="h-4 w-4" />
                 Reset
               </Button>
-            )}
-            {strategyPage === "dashboard" && (
-              <div ref={setToolbarSlot} className="flex min-w-0 flex-1 justify-end sm:flex-none" />
             )}
             {strategyPage === "data" && (
               <Select
@@ -872,6 +882,7 @@ export default function StrategyDashboard() {
               userName={profile?.name ?? null}
               devMode={devMode}
               toolbarSlot={toolbarSlot}
+              canEditVideos={!!profile?.is_manager}
             />
           ) : strategyPage === "teams" ? (
             <TeamInfoPage

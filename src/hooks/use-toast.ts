@@ -2,11 +2,14 @@ import * as React from "react"
 
 import type { ToastActionElement, ToastProps } from "@/components/ui/toast"
 
+/** How many notifications show at once: one at a time; any more wait their turn. */
 const TOAST_LIMIT = 1
 const TOAST_REMOVE_DELAY = 1000000
 
 type ToasterToast = ToastProps & {
   id: string
+  /** Jumps ahead of other waiting notifications (e.g. achievements), behind any earlier priority ones. */
+  priority?: boolean
   title?: React.ReactNode
   description?: React.ReactNode
   action?: ToastActionElement
@@ -73,7 +76,8 @@ export const reducer = (state: State, action: Action): State => {
     case "ADD_TOAST":
       return {
         ...state,
-        toasts: [action.toast, ...state.toasts].slice(0, TOAST_LIMIT),
+        // Closed ones linger (for their exit animation) but never take a slot from an open one
+        toasts: [action.toast, ...state.toasts.filter((t) => t.open !== false)].slice(0, TOAST_LIMIT),
       }
 
     case "UPDATE_TOAST":
@@ -125,11 +129,65 @@ const listeners: Array<(state: State) => void> = []
 
 let memoryState: State = { toasts: [] }
 
-function dispatch(action: Action) {
+// Notifications play one at a time (TOAST_LIMIT). Any that arrive while one is showing wait
+// here and play in order as each closes, instead of replacing it (which used to drop, e.g.,
+// an achievement that popped up while "submitted successfully" was showing).
+let pendingToasts: ToasterToast[] = []
+// Gap between one closing and a waiting one taking its place, so the close animation can finish
+const NEXT_TOAST_DELAY = 350
+let nextToastTimer: ReturnType<typeof setTimeout> | undefined
+
+const stackFull = () => memoryState.toasts.filter((t) => t.open !== false).length >= TOAST_LIMIT
+
+function publish(action: Action) {
   memoryState = reducer(memoryState, action)
   listeners.forEach((listener) => {
     listener(memoryState)
   })
+}
+
+function showNextToastWhenFree() {
+  if (nextToastTimer || pendingToasts.length === 0 || stackFull()) return
+  nextToastTimer = setTimeout(() => {
+    nextToastTimer = undefined
+    const next = pendingToasts.shift()
+    // Its turn: shown directly, not sent back through dispatch() — that would see the
+    // others still waiting and put it back in line, and nothing would ever show again
+    if (next) publish({ type: "ADD_TOAST", toast: next })
+    showNextToastWhenFree()
+  }, NEXT_TOAST_DELAY)
+}
+
+function dispatch(action: Action) {
+  switch (action.type) {
+    case "ADD_TOAST":
+      // The stack is full (or a waiting one is about to join it): wait in line
+      if (stackFull() || nextToastTimer || pendingToasts.length > 0) {
+        if (action.toast.priority) {
+          const firstNormal = pendingToasts.findIndex((t) => !t.priority)
+          pendingToasts.splice(firstNormal === -1 ? pendingToasts.length : firstNormal, 0, action.toast)
+        } else {
+          pendingToasts.push(action.toast)
+        }
+        return
+      }
+      break
+    case "UPDATE_TOAST":
+      pendingToasts = pendingToasts.map((t) => (t.id === action.toast.id ? { ...t, ...action.toast } : t))
+      break
+    case "DISMISS_TOAST":
+      // Dismissing everything also clears the line; dismissing one still waiting just drops it
+      if (action.toastId === undefined) {
+        pendingToasts = []
+      } else if (pendingToasts.some((t) => t.id === action.toastId)) {
+        pendingToasts = pendingToasts.filter((t) => t.id !== action.toastId)
+        return
+      }
+      break
+  }
+
+  publish(action)
+  showNextToastWhenFree()
 }
 
 type Toast = Omit<ToasterToast, "id">

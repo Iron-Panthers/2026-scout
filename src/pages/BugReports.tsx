@@ -1,10 +1,11 @@
 import { useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import CosmeticAvatar from "@/components/CosmeticAvatar";
 import { BugReportInbox } from "@/components/BugReportInbox";
 import { useAuth } from "@/contexts/AuthContext";
+import { useGoBack } from "@/hooks/useGoBack";
 import { useMessages } from "@/contexts/MessagesContext";
 import { BUG_INBOX_KEY, bugReportIdFromKey, bugReportKey } from "@/lib/bugReports";
 import { initialsOf } from "@/lib/messages";
@@ -15,7 +16,7 @@ import { initialsOf } from "@/lib/messages";
  * opens a report.
  */
 export default function BugReports() {
-  const navigate = useNavigate();
+  const goBack = useGoBack();
   const { user, profile } = useAuth();
   const userId = user?.id ?? null;
   const isDeveloper = !!profile?.is_developer;
@@ -47,7 +48,7 @@ export default function BugReports() {
     <div className="min-h-screen bg-background my-5">
       <main className="container mx-auto flex h-[calc(100dvh-2.5rem)] max-w-3xl flex-col p-6">
         <div className="mb-4 flex items-center gap-2">
-          <Button variant="ghost" onClick={() => navigate("/dashboard")}>
+          <Button variant="ghost" onClick={goBack}>
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back
           </Button>
@@ -59,7 +60,7 @@ export default function BugReports() {
             <BugReportInbox
               openKey={openKey}
               onOpen={open}
-              onBack={() => navigate("/dashboard")}
+              onBack={goBack}
               userId={userId}
               isDeveloper={isDeveloper}
               nameOf={nameOf}

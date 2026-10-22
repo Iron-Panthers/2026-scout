@@ -13,7 +13,7 @@ import { AlertCircle, ChevronDown, Loader2, NotebookPen } from "lucide-react";
 import { TeamSummary } from "@/components/strategy/TeamInfoPage";
 import { isDevEventId } from "@/lib/devMode";
 import { getTeamNote, upsertTeamNote } from "@/lib/picklistNotes";
-import { buildTeamDashboard, loadEventData, type EventData } from "@/lib/strategyData";
+import { buildTeamDashboard, cachedEventLoad, loadEventData, type EventData } from "@/lib/strategyData";
 import { useToast } from "@/hooks/use-toast";
 import type { Event } from "@/types";
 
@@ -125,7 +125,7 @@ export function TeamInfoDialog({
   devMode,
 }: TeamInfoDialogProps) {
   // Tagged with the event it was loaded for, so switching events shows the loading state.
-  const [loaded, setLoaded] = useState<{ eventId: string; data: EventData | null; error: string | null } | null>(null);
+  const [loaded, setLoaded] = useState<{ eventId: string; data: EventData | null; error: string | null } | null>(() => cachedEventLoad(event));
   // A team clicked in the summary's match list, tagged with the team the dialog opened on.
   const [picked, setPicked] = useState<{ from: number | null; teamNumber: number } | null>(null);
   const viewedTeam = picked && picked.from === teamNumber ? picked.teamNumber : teamNumber;
@@ -142,8 +142,8 @@ export function TeamInfoDialog({
     contentRef.current?.scrollTo({ top: 0 });
   }, [viewedTeam]);
 
-  // Reloaded on every open so the summary is current; the previous load stays
-  // on screen meanwhile.
+  // Reloaded on every open (unless loaded in the last 30 seconds) so the summary
+  // is current; the previous load stays on screen meanwhile.
   useEffect(() => {
     if (!open || !event) return;
     let mounted = true;
