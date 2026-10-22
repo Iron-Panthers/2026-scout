@@ -60,6 +60,9 @@ import { ScoutingErrorDialog, type ScoutingErrorTarget } from "@/components/mana
 import { assignMatchRescout } from "@/lib/matchRescouts";
 import { RosterManagementTab } from "@/components/manager/RosterManagementTab";
 import { PitScoutingAssignmentsTab } from "@/components/manager/PitScoutingAssignmentsTab";
+import { useUrlState } from "@/hooks/useUrlState";
+
+const MANAGER_TABS = ["assignments", "rosters", "events", "create", "pit", "data", "points"] as const;
 import { ScoutingDataTab } from "@/components/manager/ScoutingDataTab";
 import CosmeticAvatar from "@/components/CosmeticAvatar";
 import { useToast } from "@/hooks/use-toast";
@@ -181,7 +184,9 @@ export default function ManagerDashboard() {
   const suppressReloadUntilRef = useRef(0);
 
   // Active tab state for mobile dropdown
-  const [activeTab, setActiveTab] = useState<string>("assignments");
+  // The open tab lives in the address (?tab=...), so reloading stays on it
+  const [activeTab, setActiveTabValue] = useUrlState("tab", "assignments", MANAGER_TABS);
+  const setActiveTab = (tab: string) => setActiveTabValue(tab as (typeof MANAGER_TABS)[number]);
   const mobileTabMenuRef = useRef<HTMLDivElement>(null);
   const [refreshing, setRefreshing] = useState(false);
 

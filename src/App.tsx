@@ -23,6 +23,7 @@ import MatchBetting from "./pages/MatchBetting";
 import Shop from "./pages/Shop";
 import AvatarPage from "./pages/Avatar";
 import { Toaster } from "./components/ui/toaster";
+import AchievementToaster from "./components/AchievementToaster";
 import UpdateBanner from "./components/UpdateBanner";
 import NotificationNavigationListener from "./components/NotificationNavigationListener";
 import GuestDashboard from "./pages/GuestDashboard";
@@ -31,6 +32,7 @@ import DevModeBanner from "./components/DevModeBanner";
 import { MessagesProvider } from "./contexts/MessagesContext";
 import Messages from "./pages/Messages";
 import BugReports from "./pages/BugReports";
+import Achievements from "./pages/Achievements";
 
 function App() {
   return (
@@ -209,6 +211,15 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            {/* Achievements: your own, or anyone's */}
+            <Route
+              path="/achievements/:userId?"
+              element={
+                <ProtectedRoute>
+                  <Achievements />
+                </ProtectedRoute>
+              }
+            />
             {/* Bug Reporting (the bug tab under the floating chat button) */}
             <Route
               path="/bug-reports"
@@ -229,6 +240,7 @@ function App() {
           </Routes>
           </MessagesProvider>
           <Toaster />
+          <AchievementToaster />
           <UpdateBanner />
           <NotificationNavigationListener />
         </BrowserRouter>

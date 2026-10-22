@@ -10,6 +10,7 @@ import { supabase } from "./supabase";
 import { awardPoints, awardEventPoints } from "./gameProfiles";
 import { POINTS_PER_MATCH, EVENT_POINTS_PER_MATCH } from "@/config/games";
 import { ALL_ROLE_COLUMNS } from "./roleUtils";
+import { requestAchievementCheck } from "./achievementEvents";
 
 /**
  * Current schema version - increment when scouting data structure changes
@@ -324,6 +325,8 @@ export async function submitScoutingData(
   if (scouterId && !alreadySubmitted) {
     void awardMatchPoints(matchId, scouterId);
   }
+  // New scouting can complete match/event achievements: check now, not on the next page
+  requestAchievementCheck({ refresh: "all" });
 
   return data as ScoutingSubmission;
 }
@@ -369,6 +372,7 @@ export async function submitQualScoutingData(
   if (scouterId && !alreadySubmitted) {
     void awardMatchPoints(matchId, scouterId);
   }
+  requestAchievementCheck({ refresh: "all" });
 
   return data as QualScoutingSubmission;
 }

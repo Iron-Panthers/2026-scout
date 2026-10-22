@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Mail, Calendar, CheckCircle2, Clock, Camera, MessageCircle, Pencil, Save, X } from "lucide-react";
+import { ArrowLeft, Mail, Calendar, CheckCircle2, ChevronRight, Camera, MessageCircle, Pencil, Save, Trophy, X } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect, useRef, useState } from "react";
@@ -12,6 +12,8 @@ import CosmeticAvatar from "@/components/CosmeticAvatar";
 import { ScoutingMap } from "@/components/ScoutingMap";
 import { TeamYears } from "@/components/TeamYears";
 import { AddEventsDialog } from "@/components/AddEventsDialog";
+import { AchievementIcon } from "@/components/AchievementIcon";
+import { useAchievements } from "@/hooks/useAchievements";
 import { getScoutedEvents, type ScoutedEvent } from "@/lib/scoutingHistory";
 import type { Match } from "@/types";
 
@@ -65,6 +67,13 @@ export default function Profile() {
       setEquippedCosmetics(other?.equipped_cosmetics ?? {});
     });
   }, [viewedId, isOwn]);
+
+  // Worked out from the same scouting history as the map (shared, not loaded twice)
+  const achievements = useAchievements(
+    isOwn || otherLoaded ? viewedId : null,
+    (isOwn ? profile?.team_years : otherProfile?.team_years) ?? [],
+    scoutedEvents
+  );
 
   const userName = isOwn
     ? profile?.name ||
@@ -135,8 +144,6 @@ export default function Profile() {
       })
     : "Recently";
 
-  const totalMatches = userMatches.length;
-  const uniqueEvents = new Set(userMatches.map((m) => m.event_id)).size;
 
   return (
     <div className="min-h-screen bg-background my-5">
@@ -257,21 +264,8 @@ export default function Profile() {
           </CardContent>
         </Card>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Assigned Matches
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold text-primary">
-                {loading ? "..." : totalMatches}
-              </p>
-            </CardContent>
-          </Card>
-
+        {/* Events and account status side by side */}
+        <div className="grid grid-cols-2 gap-4 mb-4">
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -280,7 +274,7 @@ export default function Profile() {
             </CardHeader>
             <CardContent>
               <p className="text-3xl font-bold text-primary">
-                {loading ? "..." : uniqueEvents}
+                {scoutedEvents === null ? "..." : scoutedEvents.length}
               </p>
             </CardContent>
           </Card>
@@ -298,23 +292,40 @@ export default function Profile() {
               </div>
             </CardContent>
           </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Next Match
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-2">
-                <Clock className="h-6 w-6 text-blue-500" />
-                <p className="text-lg font-semibold">
-                  {totalMatches > 0 ? "Upcoming" : "None"}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
         </div>
+
+        {/* Achievements: opens the full list (anyone can view anyone's) */}
+        <Card
+          className="mb-6 cursor-pointer transition-colors hover:bg-accent/40"
+          role="button"
+          tabIndex={0}
+          onClick={() => viewedId && navigate(`/achievements/${viewedId}`)}
+          onKeyDown={(e) => {
+            if ((e.key === "Enter" || e.key === " ") && viewedId) navigate(`/achievements/${viewedId}`);
+          }}
+        >
+          <CardContent className="flex items-center gap-4 py-4">
+            <Trophy className="h-8 w-8 shrink-0 text-primary" />
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold">Achievements</p>
+              <p className="text-sm text-muted-foreground">
+                {achievements
+                  ? `${achievements.filter((achievement) => achievement.earned).length}/${achievements.length} achievements`
+                  : "Loading..."}
+              </p>
+            </div>
+            {/* A few earned ones, as a preview */}
+            <div className="hidden items-center -space-x-2 sm:flex">
+              {achievements
+                ?.filter((achievement) => achievement.earned)
+                .slice(-5)
+                .map((achievement) => (
+                  <AchievementIcon key={achievement.id} icon={achievement.icon} earned size="sm" />
+                ))}
+            </div>
+            <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
+          </CardContent>
+        </Card>
 
         {/* Map of every event scouted at */}
         <Card className="mb-6">

@@ -19,6 +19,7 @@ import { useDevMode } from "@/contexts/DevModeContext";
 import { getGameProfile } from "@/lib/gameProfiles";
 import { purchaseCosmetic, openCrate } from "@/lib/shopService";
 import { purchaseGame } from "@/lib/gameProfiles";
+import { unlockAchievement } from "@/lib/achievements";
 import { getActiveEvent, isEventWithinWindow } from "@/lib/matches";
 import { getDevEvent } from "@/lib/devMode";
 import { COSMETICS, RARITY_CONFIG, RARITY_VALUE, type CosmeticDefinition, type CosmeticCategory, type CrateRarity } from "@/config/cosmetics";
@@ -160,6 +161,15 @@ export default function Shop({
     setGameProfile(gp);
     setLoading(false);
   }, [user?.id]);
+
+  // Collector: once they own every cosmetic there is (the free defaults don't count)
+  useEffect(() => {
+    if (!gameProfile) return;
+    const owned = new Set(gameProfile.owned_cosmetics ?? []);
+    if (COSMETICS.filter((cosmetic) => !cosmetic.default).every((cosmetic) => owned.has(cosmetic.id))) {
+      void unlockAchievement(user?.id, "collector");
+    }
+  }, [gameProfile, user?.id]);
 
   useEffect(() => {
     loadProfile();

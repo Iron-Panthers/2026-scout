@@ -47,5 +47,7 @@ export interface BetWithMatch extends Bet {
     match_number: number;
     winning_alliance?: string | null;
     event_id?: string | null;
+    /** The match's predicted chance of red winning (what bets settle by). */
+    match13_red_win_prob?: number | null;
   };
 }

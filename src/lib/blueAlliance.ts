@@ -41,6 +41,8 @@ interface TBAMatch {
     red: TBAScoreBreakdown;
     blue: TBAScoreBreakdown;
   };
+  /** Match videos the event has posted; "youtube" keys are YouTube video ids. */
+  videos?: Array<{ type: string; key: string }>;
 }
 
 interface TBAScoreBreakdown {

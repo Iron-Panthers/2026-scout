@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, ArrowLeft, ImageOff, Loader2, Search } from "lucide-react";
+import { AlertCircle, ArrowLeft, ImageOff, Loader2, Play, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,11 +8,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TeamLogo } from "@/components/TeamLogo";
+import { MatchVideoDialog } from "@/components/MatchVideoDialog";
 import { isDevEventId } from "@/lib/devMode";
 import {
   ORDINALS,
   RECENT_MATCH_COUNT,
   buildTeamDashboard,
+  cachedEventLoad,
   defenseEloDetail,
   formatElo,
   formatNumber,
@@ -196,7 +198,7 @@ function sharedMatch(match: ScheduledMatch, teamNumber: number, otherTeam: numbe
   return alliance.includes(otherTeam) ? "with" : opponents.includes(otherTeam) ? "against" : null;
 }
 
-function MatchRow({ label, match, teamNumber, otherTeam, faded, onSelectTeam }: {
+function MatchRow({ label, match, teamNumber, otherTeam, faded, onSelectTeam, onWatch }: {
   label: string;
   match: ScheduledMatch;
   teamNumber: number;
@@ -204,6 +206,8 @@ function MatchRow({ label, match, teamNumber, otherTeam, faded, onSelectTeam }: 
   /** Outside the team's last few matches, when the page is limited to them. */
   faded?: boolean;
   onSelectTeam: (teamNumber: number) => void;
+  /** Opens the match's video; absent when no match in the list has one (so no column is kept for it). */
+  onWatch?: () => void;
 }) {
   const result = matchResult(match, match.red.includes(teamNumber) ? "red" : "blue");
   const shared = sharedMatch(match, teamNumber, otherTeam);
@@ -226,16 +230,31 @@ function MatchRow({ label, match, teamNumber, otherTeam, faded, onSelectTeam }: 
         <AllianceStrip color="red" teams={match.red} score={match.redScore} won={match.winner === "red"} teamNumber={teamNumber} otherTeam={otherTeam} onSelectTeam={onSelectTeam} />
         <AllianceStrip color="blue" teams={match.blue} score={match.blueScore} won={match.winner === "blue"} teamNumber={teamNumber} otherTeam={otherTeam} onSelectTeam={onSelectTeam} />
       </div>
+      {onWatch && (match.videos.length > 0 ? (
+        <button
+          type="button"
+          onClick={onWatch}
+          title={`Watch ${label}`}
+          aria-label={`Watch ${label}`}
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        >
+          <Play className="h-3.5 w-3.5" />
+        </button>
+      ) : (
+        // Keeps rows without a video lined up with those that have one
+        <span className="w-6 shrink-0" />
+      ))}
     </li>
   );
 }
 
-function MatchGroup({ title, matches, teamNumber, otherTeam, onSelectTeam }: {
+function MatchGroup({ title, matches, teamNumber, otherTeam, onSelectTeam, onWatch }: {
   title: string;
   matches: Array<{ key: string; label: string; match: ScheduledMatch; faded: boolean }>;
   teamNumber: number;
   otherTeam?: number;
   onSelectTeam: (teamNumber: number) => void;
+  onWatch?: (label: string, match: ScheduledMatch) => void;
 }) {
   const results = matches
     .map(({ match }) => matchResult(match, match.red.includes(teamNumber) ? "red" : "blue"))
@@ -254,7 +273,16 @@ function MatchGroup({ title, matches, teamNumber, otherTeam, onSelectTeam }: {
       </div>
       <ul className="space-y-1.5">
         {matches.map(({ key, label, match, faded }) => (
-          <MatchRow key={key} label={label} match={match} teamNumber={teamNumber} otherTeam={otherTeam} faded={faded} onSelectTeam={onSelectTeam} />
+          <MatchRow
+            key={key}
+            label={label}
+            match={match}
+            teamNumber={teamNumber}
+            otherTeam={otherTeam}
+            faded={faded}
+            onSelectTeam={onSelectTeam}
+            onWatch={onWatch && (() => onWatch(label, match))}
+          />
         ))}
       </ul>
     </section>
@@ -284,6 +312,11 @@ function MatchList({ teamNumber, schedule, recentMatches, onSelectTeam, compareK
     .map((match) => ({ key: match.key, label: match.label, match, faded: !!recentMatches }));
   const bracket = playoffs.filter(({ match }) => !match.isFinal);
   const finals = playoffs.filter(({ match }) => match.isFinal);
+  const [watching, setWatching] = useState<{ label: string; match: ScheduledMatch } | null>(null);
+  const onWatch = [...quals, ...playoffs].some(({ match }) => match.videos.length > 0)
+    ? (label: string, match: ScheduledMatch) => setWatching({ label, match })
+    : undefined;
+  const groupProps = { teamNumber, otherTeam, onSelectTeam, onWatch };
 
   return (
     <Card className="@container gap-0 p-4 sm:p-5">
@@ -292,11 +325,17 @@ function MatchList({ teamNumber, schedule, recentMatches, onSelectTeam, compareK
         <p className="text-sm text-muted-foreground">Not in the published schedule.</p>
       ) : (
         <div className="space-y-4">
-          {quals.length > 0 && <MatchGroup title="Qualifications" matches={quals} teamNumber={teamNumber} otherTeam={otherTeam} onSelectTeam={onSelectTeam} />}
-          {bracket.length > 0 && <MatchGroup title="Playoffs" matches={bracket} teamNumber={teamNumber} otherTeam={otherTeam} onSelectTeam={onSelectTeam} />}
-          {finals.length > 0 && <MatchGroup title="Finals" matches={finals} teamNumber={teamNumber} otherTeam={otherTeam} onSelectTeam={onSelectTeam} />}
+          {quals.length > 0 && <MatchGroup title="Qualifications" matches={quals} {...groupProps} />}
+          {bracket.length > 0 && <MatchGroup title="Playoffs" matches={bracket} {...groupProps} />}
+          {finals.length > 0 && <MatchGroup title="Finals" matches={finals} {...groupProps} />}
         </div>
       )}
+      <MatchVideoDialog
+        open={watching !== null}
+        onOpenChange={(open) => { if (!open) setWatching(null); }}
+        title={watching ? watching.label.replace(/^Q(\d+)$/, "Quals $1") : ""}
+        videos={watching?.match.videos ?? []}
+      />
     </Card>
   );
 }
@@ -678,7 +717,7 @@ export function TeamInfoPage({ event, userId, userName, devMode }: {
   devMode: boolean;
 }) {
   // Tagged with the event it was loaded for, so switching events shows the loading state.
-  const [loaded, setLoaded] = useState<{ eventId: string; data: EventData | null; error: string | null } | null>(null);
+  const [loaded, setLoaded] = useState<{ eventId: string; data: EventData | null; error: string | null } | null>(() => cachedEventLoad(event));
   const [selected, setSelected] = useState<{ eventId: string; teamNumber: number } | null>(null);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<TeamSort>("number");

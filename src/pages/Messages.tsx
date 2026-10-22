@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import CosmeticAvatar from "@/components/CosmeticAvatar";
 import { useAuth } from "@/contexts/AuthContext";
+import { useGoBack } from "@/hooks/useGoBack";
 import { useMessages } from "@/contexts/MessagesContext";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
@@ -34,6 +35,7 @@ function formatTime(iso: string): string {
  */
 export default function Messages() {
   const navigate = useNavigate();
+  const goBack = useGoBack();
   const { user } = useAuth();
   const userId = user?.id ?? null;
   const { contacts, refreshUnread, setOpenConversation } = useMessages();
@@ -289,7 +291,7 @@ export default function Messages() {
     <div className="min-h-screen bg-background my-5">
       <main className="container mx-auto flex h-[calc(100dvh-2.5rem)] max-w-5xl flex-col p-6">
         <div className="mb-4 flex items-center gap-2">
-          <Button variant="ghost" onClick={() => navigate("/dashboard")}>
+          <Button variant="ghost" onClick={goBack}>
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back
           </Button>

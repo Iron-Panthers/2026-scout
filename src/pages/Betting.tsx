@@ -13,6 +13,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useDevMode } from "@/contexts/DevModeContext";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { getActiveEvent, isEventWithinWindow } from "@/lib/matches";
+import { unlockAchievement } from "@/lib/achievements";
 import { getGameProfile } from "@/lib/gameProfiles";
 import { getBulkMatchOdds, getUserBets, blendOddsRedPct, settleMatchBets } from "@/lib/betting";
 import { getMatchLabel, wasUpset } from "@/lib/match13";
@@ -935,6 +936,14 @@ export default function Betting({
     setEventPoints(activeEvent && isEventWithinWindow(activeEvent) ? gameProfile?.event_points ?? 0 : null);
     setMyBets(userBets);
     setEvent(activeEvent);
+
+    // Called It: won a bet on an alliance the prediction gave under a 20% chance
+    const calledUpset = userBets.some((bet) => {
+      const redChance = bet.match?.match13_red_win_prob;
+      if (bet.status !== "won" || redChance == null || bet.match?.winning_alliance !== bet.alliance) return false;
+      return (bet.alliance === "red" ? redChance : 1 - redChance) < 0.2;
+    });
+    if (calledUpset) void unlockAchievement(user.id, "upset");
 
     if (!activeEvent) { setLoading(false); return; }
 

@@ -1,22 +1,23 @@
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { AlertCircle, ImageOff, Loader2 } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { AlertCircle, ArrowLeft, ImageOff, Loader2, Play } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
+import { MatchVideoDialog } from "@/components/MatchVideoDialog";
 import { isDevEventId } from "@/lib/devMode";
+import { unlockAchievement } from "@/lib/achievements";
 import {
   ORDINALS,
   buildTeamDashboard,
+  cachedEventLoad,
   defenseEloDetail,
   formatElo,
   formatNumber,
   loadEventData,
-  type AllianceBreakdown,
+  setMatchVideoLink,
   type EventData,
-  type MatchStatus,
   type MeanAndSpread,
   type QualScheduleMatch,
   type TeamDashboard,
@@ -28,44 +29,6 @@ const ALLIANCES = [
   { key: "red", label: "Red alliance", heading: "text-red-500", border: "border-t-red-500" },
   { key: "blue", label: "Blue alliance", heading: "text-blue-500", border: "border-t-blue-500" },
 ] as const;
-
-const MATCH_STATUS_TEXT: Record<MatchStatus, string> = {
-  played: "text-green-600 dark:text-green-400",
-  current: "text-yellow-600 dark:text-yellow-400",
-  upcoming: "text-red-600 dark:text-red-400",
-};
-
-// Compact mode fits all six robots in one row, which only works on screens
-// wider than they are tall, so portrait screens never get the option.
-const LANDSCAPE_QUERY = "(orientation: landscape)";
-const COMPACT_STORAGE_KEY = "match-dashboard-compact";
-
-function useIsLandscape() {
-  return useSyncExternalStore(
-    (onChange) => {
-      const query = window.matchMedia(LANDSCAPE_QUERY);
-      query.addEventListener("change", onChange);
-      return () => query.removeEventListener("change", onChange);
-    },
-    () => window.matchMedia(LANDSCAPE_QUERY).matches
-  );
-}
-
-function readCompactPreference() {
-  try {
-    return localStorage.getItem(COMPACT_STORAGE_KEY) === "true";
-  } catch {
-    return false;
-  }
-}
-
-function saveCompactPreference(compact: boolean) {
-  try {
-    localStorage.setItem(COMPACT_STORAGE_KEY, String(compact));
-  } catch {
-    // Storage can be unavailable (private windows); the toggle still works for this visit.
-  }
-}
 
 // Cards size to their column, from ~110px (three across on a phone) up to
 // ~400px, so their spacing follows the card's own width (container queries).
@@ -105,21 +68,18 @@ function spreadStats(label: string, stats: MeanAndSpread | null) {
   ];
 }
 
-function NoteList({ title, notes, compact }: { title: string; notes: TeamNote[]; compact: boolean }) {
-  // Compact cards drop empty lists entirely instead of reserving space for them.
-  if (compact && notes.length === 0) return null;
+function NoteList({ title, notes }: { title: string; notes: TeamNote[] }) {
   return (
     <section className="py-3 first:pt-0 last:pb-0">
       <h4 className="mb-1 flex items-center gap-1.5 text-xs font-semibold">
         {title}
         <span className="rounded bg-muted px-1.5 text-[10px] font-medium tabular-nums text-muted-foreground">{notes.length}</span>
       </h4>
-      {/* Fixed height so every list lines up across the team cards, however many notes each has.
-          Compact cards hide empty lists, so they can't line up anyway and only cap the height. */}
+      {/* Fixed height so every list lines up across the team cards, however many notes each has. */}
       {notes.length === 0 ? (
         <p className="h-48 text-xs text-muted-foreground">None</p>
       ) : (
-        <ul className={`${compact ? "max-h-48" : "h-48"} space-y-1.5 overflow-y-auto pr-1`}>
+        <ul className="h-48 space-y-1.5 overflow-y-auto pr-1">
           {notes.map((note) => (
             <li key={note.id} className="rounded-md bg-muted/40 px-2 py-1.5 text-xs">
               <div className="text-[10px] text-muted-foreground">
@@ -138,11 +98,10 @@ function NoteList({ title, notes, compact }: { title: string; notes: TeamNote[];
   );
 }
 
-function TeamCard({ team, station, border, compact, selectedMatch, onSelectMatch, onOpenPhoto }: {
+function TeamCard({ team, station, border, selectedMatch, onSelectMatch, onOpenPhoto }: {
   team: TeamDashboard;
   station: string;
   border: string;
-  compact: boolean;
   selectedMatch: number;
   onSelectMatch: (matchNumber: number) => void;
   onOpenPhoto: (team: TeamDashboard) => void;
@@ -153,7 +112,6 @@ function TeamCard({ team, station, border, compact, selectedMatch, onSelectMatch
     { title: "Defense", notes: team.defense },
     { title: "Qualitative comments", notes: team.qualComments },
   ];
-  const showNotes = !compact || noteLists.some((list) => list.notes.length > 0);
 
   return (
     <Card className={`@container min-w-0 gap-0 overflow-hidden border-t-4 py-0 ${border}`}>
@@ -199,21 +157,19 @@ function TeamCard({ team, station, border, compact, selectedMatch, onSelectMatch
         <Stat label="DC ELO" value={formatElo(team.defenseElo.rating)} detail={defenseEloDetail(team.defenseElo)} />
         <Stat label="Shooter type" value={team.shooterType} />
         <Stat label="Height" value={team.terrain} />
+        <Stat label="Weight" value={team.weight} />
       </div>
       <p className={`pb-3 pt-2 text-[10px] text-muted-foreground ${CARD_PAD_X}`}>
         {team.matchesScouted} match{team.matchesScouted === 1 ? "" : "es"} scouted
       </p>
 
-      {showNotes && (
-        <div className={`divide-y divide-border border-t border-border py-3 ${CARD_PAD_X}`}>
-          {noteLists.map((list) => (
-            <NoteList key={list.title} title={list.title} notes={list.notes} compact={compact} />
-          ))}
-        </div>
-      )}
+      <div className={`divide-y divide-border border-t border-border py-3 ${CARD_PAD_X}`}>
+        {noteLists.map((list) => (
+          <NoteList key={list.title} title={list.title} notes={list.notes} />
+        ))}
+      </div>
 
-      {/* Pinned to the bottom, so it lines up across compact mode's equal-height cards. */}
-      <div className={`mt-auto border-t border-border py-3 ${CARD_PAD_X}`}>
+      <div className={`border-t border-border py-3 ${CARD_PAD_X}`}>
         <h4 className="mb-1.5 text-xs font-semibold">Qualification matches</h4>
         <div className="flex flex-wrap gap-1">
           {team.qualMatches.map((match) => (
@@ -255,60 +211,146 @@ function compareTone(mine: number | null, theirs: number | null): StatTone | nul
 /** Compares the totals as shown (rounded), so values that look equal never get colored. */
 const shownTone = (mine: string, theirs: string) => compareTone(mine ? Number(mine) : null, theirs ? Number(theirs) : null);
 
-const OUTCOME = {
-  red: { red: "Won", blue: "Lost" },
-  blue: { red: "Lost", blue: "Won" },
-  tie: { red: "Tied", blue: "Tied" },
+/** Our team: its matches are highlighted in the schedule. */
+const OUR_TEAM = 5026;
+
+// Schedule list colors, after The Blue Alliance's match tables: the winning alliance's teams
+// and score bright and bold, everything else (the loser, and unplayed matches) a dark shade.
+const SCHEDULE_CELL = {
+  red: { won: "bg-red-700 font-bold text-white", other: "bg-red-950/70 text-red-50" },
+  blue: { won: "bg-blue-600 font-bold text-white", other: "bg-blue-950/70 text-blue-50" },
 } as const;
 
-const OUTCOME_TONE = { Won: "better", Lost: "worse", Tied: "tied" } as const;
+/** One alliance's three teams, spread evenly across a colored block. */
+function ScheduleTeams({ color, teams, won, rounded }: { color: "red" | "blue"; teams: number[]; won: boolean; rounded: string }) {
+  return (
+    <div className={`grid grid-cols-3 items-center py-0 text-center font-mono text-xs leading-5 tabular-nums sm:text-sm sm:leading-none ${rounded} ${SCHEDULE_CELL[color][won ? "won" : "other"]}`}>
+      {teams.map((team) => <span key={team} className={team === OUR_TEAM ? "underline underline-offset-2" : undefined}>{team}</span>)}
+    </div>
+  );
+}
 
-/** What the alliance actually scored, from TBA, colored against the opponents' result. */
-function AllianceResult({ match, side }: { match: QualScheduleMatch; side: "red" | "blue" }) {
-  const other = side === "red" ? "blue" : "red";
-  const score = { red: match.redScore, blue: match.blueScore };
-  const outcome = match.winner && OUTCOME[match.winner][side];
-  const mine = match.breakdown?.[side];
-  const theirs = match.breakdown?.[other];
-  const stat = (label: string, pick: (breakdown: AllianceBreakdown) => number | null) => {
-    const value = mine ? pick(mine) : null;
-    return <Stat label={label} value={value != null ? String(value) : ""} tone={compareTone(value, theirs ? pick(theirs) : null)} />;
-  };
+/** A score cell: the real score in its alliance's color (bright and bold for the winner). */
+function ScoreCell({ color, value, won }: { color: "red" | "blue"; value: number | null; won: boolean }) {
+  return (
+    <div className={`flex items-center justify-center rounded-md font-mono text-xs tabular-nums sm:text-sm sm:leading-none ${SCHEDULE_CELL[color][won ? "won" : "other"]}`}>
+      {value ?? "—"}
+    </div>
+  );
+}
+
+// Predicted cells are outlined; the likely winner also gets a soft fill, quieter than the real scores'.
+const PREDICTED_CELL = {
+  red: { outline: "border-red-500/50 text-red-600 dark:text-red-300", higher: "bg-red-500/20" },
+  blue: { outline: "border-blue-500/50 text-blue-600 dark:text-blue-300", higher: "bg-blue-500/20" },
+} as const;
+
+/** A predicted-score cell: outlined in its alliance's color, the likely winner softly filled and in bold. */
+function PredictedCell({ color, value, higher }: { color: "red" | "blue"; value: string; higher: boolean }) {
+  return (
+    <div className={`flex items-center justify-center rounded-md border font-mono text-[11px] tabular-nums ${PREDICTED_CELL[color].outline} ${higher ? `font-bold ${PREDICTED_CELL[color].higher}` : ""}`}>
+      {value || "—"}
+    </div>
+  );
+}
+
+/**
+ * Every qualification match at the event, laid out like The Blue Alliance's match tables:
+ * both alliances' teams, scores predicted from scouting and, once played, the real scores,
+ * with the winner highlighted. Clicking a match opens it.
+ */
+function MatchSchedule({ matches, dashboards, onSelect }: {
+  matches: QualScheduleMatch[];
+  dashboards: Map<number, TeamDashboard>;
+  onSelect: (matchNumber: number) => void;
+}) {
+  const nextRef = useRef<HTMLLIElement>(null);
+  const nextMatch = matches.find((match) => match.status !== "played")?.matchNumber;
+  // Start scrolled to the next match to be played
+  useEffect(() => {
+    nextRef.current?.scrollIntoView({ block: "center" });
+  }, []);
+
+  // Sum of the robots' average total points from scouting ("" when none are scouted)
+  const predicted = (teams: number[]) =>
+    allianceTotal(teams.map((team) => dashboards.get(team)).filter((team): team is TeamDashboard => !!team), (team) => team.totalPoints);
+
+  // Match | teams | predicted | score. Each of the last three holds a red and a blue cell:
+  // side by side on wider screens (like TBA), stacked red over blue on phones.
+  const columns = "grid grid-cols-[2.5rem_minmax(0,1fr)_2.75rem_3rem] sm:grid-cols-[6rem_minmax(0,1fr)_7rem_8rem]";
+  const pair = "grid grid-rows-2 gap-0.5 sm:h-full sm:grid-cols-2 sm:grid-rows-1";
 
   return (
-    <div className="mt-3 border-t border-border pt-3">
-      <div className="mb-2 flex items-baseline justify-between gap-2">
-        <h3 className="text-xs font-semibold">Actual result</h3>
-        {outcome && (
-          <span className={`text-xs font-semibold ${STAT_TONE[OUTCOME_TONE[outcome]].className}`}>
-            {outcome} {score[side]}–{score[other]}
-          </span>
-        )}
+    // Bottom margin keeps the last rows clear of the floating page nav.
+    <div className="mb-20 overflow-hidden rounded-lg border border-border bg-card">
+      {/* Column headings */}
+      <div className={`${columns} items-end gap-x-0.5 border-b border-border px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:px-3`}>
+        <span className="text-center">Match</span>
+        <span className="text-center">Alliances</span>
+        <span className="text-center" title="Predicted scores: each alliance's robots' average total points from scouting">
+          <span className="sm:hidden">Pred</span>
+          <span className="hidden sm:inline">Predicted</span>
+        </span>
+        <span className="text-center">Score</span>
       </div>
-      <div className="grid grid-cols-3 gap-x-4 gap-y-2">
-        {stat("Auto fuel", (breakdown) => breakdown.autoFuel)}
-        {stat("Teleop fuel", (breakdown) => breakdown.teleopFuel)}
-        <Stat label="Total points" value={score[side] != null ? String(score[side]) : ""} tone={compareTone(score[side], score[other])} />
-        {stat("Tower points", (breakdown) => breakdown.towerPoints)}
-        {stat("Foul points", (breakdown) => breakdown.foulPoints)}
-        {stat("Ranking points", (breakdown) => breakdown.rankingPoints)}
-      </div>
+      <ul className="divide-y divide-border">
+        {matches.map((match) => {
+          const redPredicted = predicted(match.red);
+          const bluePredicted = predicted(match.blue);
+          const predictedTone = shownTone(redPredicted, bluePredicted);
+          const isNext = match.matchNumber === nextMatch;
+          const isOurs = match.red.includes(OUR_TEAM) || match.blue.includes(OUR_TEAM);
+          return (
+            <li key={match.matchNumber} ref={isNext ? nextRef : undefined}>
+              <button
+                type="button"
+                onClick={() => onSelect(match.matchNumber)}
+                // Exactly 25px tall on wider screens (phones stack red over blue, so need two lines)
+                className={`${columns} w-full gap-x-1 px-2 py-0.5 text-left sm:h-[25px] transition-colors hover:bg-accent/40 sm:gap-x-2 sm:px-3 ${
+                  isNext ? "bg-yellow-500/10" : ""
+                }`}
+              >
+                <span className="flex items-center justify-center text-xs font-medium">
+                  <span
+                    className={isOurs ? "font-bold text-primary" : undefined}
+                    title={isOurs ? `${OUR_TEAM} plays in this match` : undefined}
+                  >
+                    <span className="hidden sm:inline">Quals&nbsp;</span>
+                    <span className="sm:hidden">Q</span>
+                    {match.matchNumber}
+                  </span>
+                </span>
+                <div className={pair}>
+                  <ScheduleTeams color="red" teams={match.red} won={match.winner === "red"} rounded="rounded-t-md sm:rounded-none sm:rounded-l-md" />
+                  <ScheduleTeams color="blue" teams={match.blue} won={match.winner === "blue"} rounded="rounded-b-md sm:rounded-none sm:rounded-r-md" />
+                </div>
+                <div className={pair}>
+                  <PredictedCell color="red" value={redPredicted} higher={predictedTone === "better"} />
+                  <PredictedCell color="blue" value={bluePredicted} higher={predictedTone === "worse"} />
+                </div>
+                <div className={pair}>
+                  <ScoreCell color="red" value={match.redScore} won={match.winner === "red"} />
+                  <ScoreCell color="blue" value={match.blueScore} won={match.winner === "blue"} />
+                </div>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }
 
 /**
  * An alliance's expected output: each stat is the sum of its robots' event averages,
- * colored against the opponents'. Once the match is played, its actual result follows.
+ * colored against the opponents'.
  */
-function AllianceSummary({ label, heading, border, teams, opponents, match, side }: {
+function AllianceSummary({ label, heading, border, teams, opponents }: {
   label: string;
   heading: string;
   border: string;
   teams: TeamDashboard[];
   opponents: TeamDashboard[];
-  match: QualScheduleMatch;
-  side: "red" | "blue";
 }) {
   const stat = (statLabel: string, pick: SpreadPick) => {
     const value = allianceTotal(teams, pick);
@@ -330,7 +372,6 @@ function AllianceSummary({ label, heading, border, teams, opponents, match, side
         {stat("Avg teleop fuel", (team) => team.teleopFuel)}
         {stat("Avg total points", (team) => team.totalPoints)}
       </div>
-      {match.status === "played" && <AllianceResult match={match} side={side} />}
     </Card>
   );
 }
@@ -340,20 +381,22 @@ function AllianceSummary({ label, heading, border, teams, opponents, match, side
  * event dropdown) and, for the chosen qualification match, each alliance's
  * summed averages plus a card per team with its stats and notes from the whole event.
  */
-export function MatchDashboard({ event, userId, userName, devMode, toolbarSlot }: {
+export function MatchDashboard({ event, userId, userName, devMode, toolbarSlot, canEditVideos }: {
   event: Event | undefined;
   userId: string | undefined;
   userName: string | null;
   devMode: boolean;
   toolbarSlot: HTMLElement | null;
+  /** Managers can paste a YouTube link for a match. */
+  canEditVideos: boolean;
 }) {
   // Tagged with the event it was loaded for, so switching events shows the loading state.
-  const [loaded, setLoaded] = useState<{ eventId: string; data: EventData | null; error: string | null } | null>(null);
-  const [selected, setSelected] = useState<{ eventId: string; matchNumber: number } | null>(null);
+  const [loaded, setLoaded] = useState<{ eventId: string; data: EventData | null; error: string | null } | null>(() => cachedEventLoad(event));
+  // The open match lives in the address (?match=12): none means the list of every match
+  const [searchParams, setSearchParams] = useSearchParams();
+  const matchParam = Number(searchParams.get("match"));
   const [photoTeam, setPhotoTeam] = useState<TeamDashboard | null>(null);
-  const [compactPreference, setCompactPreference] = useState(readCompactPreference);
-  const isLandscape = useIsLandscape();
-  const compact = compactPreference && isLandscape;
+  const [videoOpen, setVideoOpen] = useState(false);
 
   useEffect(() => {
     if (!event) return;
@@ -371,11 +414,26 @@ export function MatchDashboard({ event, userId, userName, devMode, toolbarSlot }
   const current = loaded && loaded.eventId === event?.id ? loaded : null;
   const data = current?.data ?? null;
   const matches = data?.schedule.matches ?? [];
-  // Until a match is picked for this event, show the next one to be played.
-  const matchNumber = selected && selected.eventId === event?.id
-    ? selected.matchNumber
-    : (matches.find((match) => match.status !== "played") ?? matches[matches.length - 1])?.matchNumber;
-  const match = matches.find((item) => item.matchNumber === matchNumber);
+  // No (or an unknown) match picked: the list of every match
+  const match = matchParam ? matches.find((item) => item.matchNumber === matchParam) : undefined;
+
+  // Every team's scouting summary, for the list's predicted scores
+  const dashboards = useMemo(() => {
+    const byTeam = new Map<number, TeamDashboard>();
+    if (!data) return byTeam;
+    for (const item of data.schedule.matches) {
+      for (const teamNumber of [...item.red, ...item.blue]) {
+        if (!byTeam.has(teamNumber)) byTeam.set(teamNumber, buildTeamDashboard(teamNumber, data));
+      }
+    }
+    return byTeam;
+  }, [data]);
+
+  // Analyst: looking at a match here (in the sandbox it's recorded in the sandbox only)
+  const viewedMatch = match && event ? `${event.id}:${match.matchNumber}` : null;
+  useEffect(() => {
+    if (viewedMatch) void unlockAchievement(userId, "match_view");
+  }, [viewedMatch, userId]);
 
   const teams = useMemo(() => {
     if (!data || !match) return null;
@@ -385,40 +443,54 @@ export function MatchDashboard({ event, userId, userName, devMode, toolbarSlot }
     };
   }, [data, match]);
 
+  /**
+   * Opens a match. From the list it's a new step in history (so Back returns to the list);
+   * switching between matches replaces it.
+   */
   const selectMatch = (value: number) => {
-    if (event) setSelected({ eventId: event.id, matchNumber: value });
+    setSearchParams(
+      (current) => {
+        const params = new URLSearchParams(current);
+        params.set("match", String(value));
+        return params;
+      },
+      { replace: match !== undefined }
+    );
+  };
+  const showAllMatches = () => {
+    setSearchParams(
+      (current) => {
+        const params = new URLSearchParams(current);
+        params.delete("match");
+        return params;
+      },
+      { replace: true }
+    );
   };
 
-  const setCompact = (value: boolean) => {
-    setCompactPreference(value);
-    saveCompactPreference(value);
+  // Sandbox matches aren't in the database, so they have no link to change.
+  const editableVideos = canEditVideos && !!event && !isDevEventId(event.id);
+  const saveVideoLink = async (link: string | null) => {
+    if (!event || !data || !match) return;
+    const updated = await setMatchVideoLink(event, data, match.matchNumber, link);
+    setLoaded({ eventId: event.id, data: updated, error: null });
   };
 
-  const matchPicker = toolbarSlot && createPortal(
-    <div className="flex min-w-0 flex-1 items-center justify-end gap-3 sm:flex-none">
-      {isLandscape && (
-        <div className="flex shrink-0 items-center gap-2">
-          <Switch id="match-dashboard-compact" checked={compactPreference} onCheckedChange={setCompact} />
-          <Label htmlFor="match-dashboard-compact" className="whitespace-nowrap">Compact mode</Label>
-        </div>
+  // Toolbar (left of the event dropdown), only while a match is open: back to the list,
+  // and its video when there is one (managers can always open it to paste a link).
+  // Matches are picked from the list (or a team card's chips).
+  const matchToolbar = toolbarSlot && match && createPortal(
+    <div className="flex min-w-0 items-center gap-2">
+      <Button variant="outline" size="sm" className="shrink-0 gap-1.5" onClick={showAllMatches}>
+        <ArrowLeft className="h-4 w-4" />
+        All matches
+      </Button>
+      {(match.videos.length > 0 || editableVideos) && (
+        <Button variant="outline" size="sm" className="shrink-0 gap-1.5" onClick={() => setVideoOpen(true)}>
+          <Play className="h-4 w-4" />
+          {match.videos.length > 0 ? "Video" : "Add video"}
+        </Button>
       )}
-      <Select
-        value={matchNumber != null ? String(matchNumber) : undefined}
-        onValueChange={(value) => selectMatch(Number(value))}
-        disabled={matches.length === 0}
-      >
-        <SelectTrigger className="w-full min-w-0 flex-1 sm:w-64 sm:flex-none" aria-label="Match">
-          <SelectValue placeholder="Select match" />
-        </SelectTrigger>
-        <SelectContent>
-          {matches.map((item) => (
-            <SelectItem key={item.matchNumber} value={String(item.matchNumber)}>
-              {/* Colored inside the item text so the trigger shows the selected match's color too. */}
-              <span className={MATCH_STATUS_TEXT[item.status]}>Qualification {item.matchNumber}</span>
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
     </div>,
     toolbarSlot
   );
@@ -439,12 +511,14 @@ export function MatchDashboard({ event, userId, userName, devMode, toolbarSlot }
         <Loader2 className="h-4 w-4 animate-spin" />Loading event data...
       </p>
     );
-  } else if (!teams) {
+  } else if (matches.length === 0) {
     body = (
       <Card className="p-8 text-center">
         <p className="text-muted-foreground">No qualification schedule has been published for this event yet.</p>
       </Card>
     );
+  } else if (!teams) {
+    body = <MatchSchedule matches={matches} dashboards={dashboards} onSelect={selectMatch} />;
   } else {
     body = (
       // Bottom margin keeps the last cards clear of the floating page nav.
@@ -458,26 +532,22 @@ export function MatchDashboard({ event, userId, userName, devMode, toolbarSlot }
               border={alliance.border}
               teams={teams[alliance.key]}
               opponents={teams[alliance.key === "red" ? "blue" : "red"]}
-              match={match!}
-              side={alliance.key}
             />
           ))}
         </div>
-        {/* Each alliance's three robots sit side by side; red stacks above blue,
-            until wide screens (or compact mode) put both alliances (all six robots) in one row. */}
-        <div className={compact ? "grid grid-cols-2 gap-2 sm:gap-3" : "grid gap-6 xl:grid-cols-2 xl:gap-4"}>
+        {/* Each alliance's three robots sit side by side; red stacks above blue
+            until the screen is wide enough (lg) to put both alliances (all six robots) in one row. */}
+        <div className="grid gap-6 lg:grid-cols-2 lg:gap-4">
           {ALLIANCES.map((alliance) => (
-            <section key={alliance.key} className={compact ? "flex min-w-0 flex-col" : "min-w-0"}>
+            <section key={alliance.key} className="min-w-0">
               <h2 className={`mb-2 text-sm font-bold uppercase tracking-wide ${alliance.heading}`}>{alliance.label}</h2>
-              {/* Compact mode stretches every card to the tallest of all six; otherwise each keeps its own height. */}
-              <div className={`grid grid-cols-3 gap-2 ${compact ? "flex-1 items-stretch" : "items-start sm:gap-3"}`}>
+              <div className="grid grid-cols-3 items-start gap-2 sm:gap-3">
                 {teams[alliance.key].map((team, index) => (
                   <TeamCard
                     key={team.teamNumber}
                     team={team}
                     station={`${alliance.key === "red" ? "Red" : "Blue"} ${index + 1}`}
                     border={alliance.border}
-                    compact={compact}
                     selectedMatch={match!.matchNumber}
                     onSelectMatch={selectMatch}
                     onOpenPhoto={setPhotoTeam}
@@ -493,8 +563,18 @@ export function MatchDashboard({ event, userId, userName, devMode, toolbarSlot }
 
   return (
     <>
-      {matchPicker}
+      {matchToolbar}
       {body}
+      {match && (
+        <MatchVideoDialog
+          open={videoOpen}
+          onOpenChange={setVideoOpen}
+          title={`Quals ${match.matchNumber}`}
+          videos={match.videos}
+          videoLink={match.videoLink}
+          onSaveLink={editableVideos ? saveVideoLink : undefined}
+        />
+      )}
       <Dialog open={photoTeam !== null} onOpenChange={(open) => { if (!open) setPhotoTeam(null); }}>
         <DialogContent className="sm:max-w-2xl">
           {photoTeam && (

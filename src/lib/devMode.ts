@@ -2,6 +2,7 @@ import type { Event, Match, GameProfile, PitScoutingAssignment, Profile, Role, R
 import type { PitScoutingSubmission } from "@/types/pitScouting";
 import type { Bet, BetAlliance, BetCurrency, BetWithMatch } from "@/types/betting";
 import { ROLE_TO_COLUMN, ROLE_TO_COLUMN_2, roleColumn } from "./roleUtils";
+import { requestAchievementCheck } from "./achievementEvents";
 
 /**
  * Developer sandbox mode: a fake event + match schedule + infinite-money
@@ -61,6 +62,8 @@ interface DevData {
   sandboxPitAssignments?: Record<string, PitScoutingAssignment[]>;
   /** FRCdle daily rolls made in the sandbox, kept apart from the account's real rolls. */
   sandboxFrcdleSpins?: DevFrcdleSpin[];
+  /** Achievements earned in the sandbox (id → when), kept apart from the account's real ones. */
+  sandboxAchievements?: Record<string, string>;
   teams: Array<{ team_number: number; nickname: string }>;
   gameProfile: GameProfile;
   scoutingSubmissions: Array<{
@@ -633,6 +636,7 @@ export function getDevUserBets(userId: string, bettorId: string): BetWithMatch[]
           match_number: match.match_number,
           winning_alliance: match.winning_alliance,
           event_id: match.event_id,
+          match13_red_win_prob: match.match13_red_win_prob,
         } : undefined,
       };
     });
@@ -698,6 +702,44 @@ export function updateDevBetSettlement(
   return true;
 }
 
+export function getDevAchievements(userId: string): Set<string> {
+  return new Set(Object.keys(getDevData(userId).sandboxAchievements ?? {}));
+}
+
+/**
+ * Records a sandbox achievement and pays its points into the sandbox's points balance.
+ * Returns false if it was already earned (nothing paid again).
+ */
+export function addDevAchievement(userId: string, achievementId: string, points: number): boolean {
+  const data = getDevData(userId);
+  const earned = (data.sandboxAchievements ??= {});
+  if (earned[achievementId]) return false;
+  earned[achievementId] = new Date().toISOString();
+  data.gameProfile = { ...data.gameProfile, points: data.gameProfile.points + points, updated_at: new Date().toISOString() };
+  saveDevData(userId, data);
+  return true;
+}
+
+/** Sandbox scouting history in the shape the achievements use: one entry per sandbox event they submitted at. */
+export function getDevScoutedEventSummaries(userId: string): Array<{ eventId: string; name: string; eventCode: string | null; matches: number }> {
+  const data = getDevData(userId);
+  const matchById = new Map(getAllDevMatches(userId).map((match) => [match.id, match]));
+  const events = new Map(getDevEvents(userId).map((event) => [event.id, event]));
+  const matchesByEvent = new Map<string, Set<string>>();
+  for (const submission of data.scoutingSubmissions) {
+    if (submission.scouter_id !== userId) continue;
+    const eventId = matchById.get(submission.match_id)?.event_id;
+    if (!eventId) continue;
+    matchesByEvent.set(eventId, (matchesByEvent.get(eventId) ?? new Set()).add(submission.match_id));
+  }
+  return [...matchesByEvent.entries()].map(([eventId, matches]) => ({
+    eventId,
+    name: events.get(eventId)?.name ?? "Sandbox Event",
+    eventCode: events.get(eventId)?.event_code ?? null,
+    matches: matches.size,
+  }));
+}
+
 export function updateDevGameProfile(
   userId: string,
   updates: Partial<GameProfile>
@@ -737,6 +779,7 @@ export function submitDevScoutingData(
     created_at: new Date().toISOString(),
   });
   saveDevData(userId, data);
+  requestAchievementCheck();
 }
 
 // ---------------------------------------------------------------------------

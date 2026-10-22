@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Bug, MessageCircle } from "lucide-react";
+import { Bug, ChevronLeft, MessageCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -148,6 +148,26 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
   const visibleUnread = userId ? unreadCount : 0;
   const visibleContacts = userId ? contacts : [];
   const showButton = !!userId && !HIDE_BUTTON_ON.some((path) => location.pathname.startsWith(path));
+  const hasActivity = visibleUnread > 0 || bugReports.newCount > 0;
+
+  // The chat and bug buttons stay tucked off the right edge until the tab pulls them out
+  const [trayOpen, setTrayOpen] = useState(false);
+  const trayRef = useRef<HTMLDivElement>(null);
+
+  // Clicking anywhere else tucks them back in
+  useEffect(() => {
+    if (!trayOpen) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (!trayRef.current?.contains(e.target as Node)) setTrayOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [trayOpen]);
+
+  const openFromTray = (path: string) => {
+    setTrayOpen(false);
+    navigate(path);
+  };
 
   return (
     <MessagesContext.Provider
@@ -155,34 +175,56 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
     >
       {children}
       {showButton && (
-        // Chat button on the right edge, with a smaller Bug Reporting tab hanging under it
-        <div className="fixed right-0 top-1/2 z-40 flex -translate-y-1/2 flex-col items-end">
+        // A tab on the right edge; clicking it slides out the chat and Bug Reporting buttons
+        <div
+          ref={trayRef}
+          className={`fixed right-0 top-1/2 z-40 flex -translate-y-1/2 items-center transition-transform duration-200 ease-out ${
+            trayOpen ? "translate-x-0" : "translate-x-10.5"
+          }`}
+        >
           <button
             type="button"
-            onClick={() => navigate("/messages")}
-            aria-label={visibleUnread > 0 ? `Messages, ${visibleUnread} unread` : "Messages"}
-            className="relative flex h-12 w-12 items-center justify-center rounded-tl-xl border border-r-0 border-border bg-card text-foreground shadow-lg transition-colors hover:bg-accent"
+            onClick={() => setTrayOpen((open) => !open)}
+            aria-expanded={trayOpen}
+            aria-label={trayOpen ? "Hide messages and bug reporting" : hasActivity ? "Show messages and bug reporting, new activity" : "Show messages and bug reporting"}
+            className="relative flex h-14 w-5 items-center justify-center rounded-l-lg border border-r-0 border-border bg-card text-muted-foreground shadow-lg transition-colors hover:bg-accent hover:text-foreground"
           >
-            <MessageCircle className="h-6 w-6" />
-            {visibleUnread > 0 && (
-              <span className="absolute -left-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[11px] font-bold leading-none text-white ring-2 ring-background">
-                {visibleUnread > 99 ? "99+" : visibleUnread}
-              </span>
+            <ChevronLeft className={`h-4 w-4 transition-transform duration-200 ${trayOpen ? "rotate-180" : ""}`} />
+            {!trayOpen && hasActivity && (
+              <span className="absolute -left-1 -top-1 h-2.5 w-2.5 rounded-full bg-red-600 ring-2 ring-background" />
             )}
           </button>
-          <button
-            type="button"
-            onClick={() => navigate("/bug-reports")}
-            aria-label={bugReports.newCount > 0 ? `Bug Reporting, ${bugReports.newCount} with new activity` : "Bug Reporting"}
-            className="relative flex h-7 w-7 items-center justify-center rounded-bl-lg border border-r-0 border-t-0 border-border bg-card text-red-400 shadow-lg transition-colors hover:bg-accent"
+          <div
+            inert={!trayOpen}
+            className={`flex flex-col transition-opacity duration-200 ${trayOpen ? "opacity-100" : "opacity-0"}`}
           >
-            <Bug className="h-3.5 w-3.5" />
-            {bugReports.newCount > 0 && (
-              <span className="absolute -left-1.5 top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-red-600 px-0.5 text-[9px] font-bold leading-none text-white ring-2 ring-background">
-                {bugReports.newCount > 99 ? "99+" : bugReports.newCount}
-              </span>
-            )}
-          </button>
+            <button
+              type="button"
+              onClick={() => openFromTray("/messages")}
+              aria-label={visibleUnread > 0 ? `Messages, ${visibleUnread} unread` : "Messages"}
+              className="relative flex h-10.5 w-10.5 items-center justify-center rounded-tl-xl border border-r-0 border-border bg-card text-foreground shadow-lg transition-colors hover:bg-accent"
+            >
+              <MessageCircle className="h-6 w-6" strokeWidth={1.5} />
+              {visibleUnread > 0 && (
+                <span className="absolute -left-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[11px] font-bold leading-none text-white ring-2 ring-background">
+                  {visibleUnread > 99 ? "99+" : visibleUnread}
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => openFromTray("/bug-reports")}
+              aria-label={bugReports.newCount > 0 ? `Bug Reporting, ${bugReports.newCount} with new activity` : "Bug Reporting"}
+              className="relative flex h-10.5 w-10.5 items-center justify-center rounded-bl-lg border border-r-0 border-t-0 border-border bg-card text-red-400 shadow-lg transition-colors hover:bg-accent"
+            >
+              <Bug className="h-6 w-6" strokeWidth={1.5} />
+              {bugReports.newCount > 0 && (
+                <span className="absolute -left-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[11px] font-bold leading-none text-white ring-2 ring-background">
+                  {bugReports.newCount > 99 ? "99+" : bugReports.newCount}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
       )}
     </MessagesContext.Provider>
