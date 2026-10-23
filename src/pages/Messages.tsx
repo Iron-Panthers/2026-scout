@@ -210,7 +210,7 @@ export default function Messages() {
   );
 
   const threadPanel = openContact ? (
-    <div className="flex min-h-0 flex-col">
+    <div className="flex min-h-0 min-w-0 flex-col">
       <div className="flex items-center gap-3 border-b border-border pb-3">
         <Button variant="ghost" size="icon" className="md:hidden" onClick={() => open(null)} aria-label="Back to conversations">
           <ArrowLeft className="h-4 w-4" />
@@ -243,7 +243,8 @@ export default function Messages() {
                   mine ? "rounded-br-sm bg-primary text-primary-foreground" : "rounded-bl-sm bg-muted text-foreground"
                 }`}
               >
-                <p className="whitespace-pre-wrap break-words">{message.body}</p>
+                {/* wrap-anywhere (not break-words) so one long word breaks instead of widening the bubble and panel */}
+                <p className="whitespace-pre-wrap wrap-anywhere">{message.body}</p>
                 <p className={`mt-1 text-[10px] ${mine ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
                   {formatTime(message.created_at)}
                   {mine && message.read_at ? " · Read" : ""}
@@ -301,10 +302,10 @@ export default function Messages() {
         {loading ? (
           <p className="py-10 text-center text-muted-foreground">Loading messages...</p>
         ) : (
-          <div className="grid min-h-0 flex-1 gap-4 rounded-lg border border-border bg-card p-3 md:grid-cols-[300px_1fr] md:divide-x md:divide-border">
+          <div className="grid min-h-0 flex-1 gap-4 rounded-lg border border-border bg-card p-3 md:grid-cols-[300px_minmax(0,1fr)] md:divide-x md:divide-border">
             {/* On phones, show the list or the open conversation, not both */}
-            <div className={`${openKey ? "hidden md:flex" : "flex"} min-h-0 flex-col`}>{listPanel}</div>
-            <div className={`${openKey ? "flex" : "hidden md:flex"} min-h-0 flex-col md:pl-4 [&>*]:flex-1`}>{threadPanel}</div>
+            <div className={`${openKey ? "hidden md:flex" : "flex"} min-h-0 min-w-0 flex-col`}>{listPanel}</div>
+            <div className={`${openKey ? "flex" : "hidden md:flex"} min-h-0 min-w-0 flex-col md:pl-4 [&>*]:flex-1`}>{threadPanel}</div>
           </div>
         )}
       </main>

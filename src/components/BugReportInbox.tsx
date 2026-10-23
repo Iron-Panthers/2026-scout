@@ -118,7 +118,7 @@ export function BugReportInbox({ openKey, onOpen, onBack, userId, isDeveloper, n
   }
 
   async function postComment() {
-    if (!reportId || !comment.trim() || busy) return;
+    if (!reportId || !comment.trim() || busy || report?.status === "fixed") return;
     setBusy(true);
     const added = await addBugReportComment(reportId, userId, comment);
     setBusy(false);
@@ -262,30 +262,38 @@ export function BugReportInbox({ openKey, onOpen, onBack, userId, isDeveloper, n
           <div ref={commentsEndRef} />
         </div>
 
-        <form
-          className="flex items-end gap-2 border-t border-border pt-3"
-          onSubmit={(e) => {
-            e.preventDefault();
-            postComment();
-          }}
-        >
-          <Textarea
-            value={comment}
-            onChange={(e) => setComment(e.target.value.slice(0, MAX_BUG_COMMENT_LENGTH))}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                postComment();
-              }
+        {/* A fixed report is closed to comments until a developer reopens it */}
+        {report.status === "fixed" ? (
+          <p className="flex items-center justify-center gap-1.5 border-t border-border pt-3 text-center text-xs text-muted-foreground">
+            <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-green-500" />
+            This report is fixed.
+          </p>
+        ) : (
+          <form
+            className="flex items-end gap-2 border-t border-border pt-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              postComment();
             }}
-            placeholder="Add a comment"
-            rows={1}
-            className="max-h-32 min-h-10 resize-none"
-          />
-          <Button type="submit" size="icon" disabled={!comment.trim() || busy} aria-label="Post comment">
-            <Send className="h-4 w-4" />
-          </Button>
-        </form>
+          >
+            <Textarea
+              value={comment}
+              onChange={(e) => setComment(e.target.value.slice(0, MAX_BUG_COMMENT_LENGTH))}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  postComment();
+                }
+              }}
+              placeholder="Add a comment"
+              rows={1}
+              className="max-h-32 min-h-10 resize-none"
+            />
+            <Button type="submit" size="icon" disabled={!comment.trim() || busy} aria-label="Post comment">
+              <Send className="h-4 w-4" />
+            </Button>
+          </form>
+        )}
       </div>
     );
   }

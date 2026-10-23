@@ -1,7 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { CURRENT_SCHEMA_VERSION, migrateScoutingData } from "@/lib/scoutingSchema";
 import { getDevFakeScouts, getDevMatches, getDevMatchTeams, getDevScoutingSubmissions, getDevTeams } from "@/lib/devMode";
-import { getEventMatches, getEventTeams } from "@/lib/blueAlliance";
+import { getEventAlliances, getEventMatches, getEventTeams } from "@/lib/blueAlliance";
 import { parseYouTubeLink, type YouTubeVideo } from "@/lib/youtube";
 import type { Event } from "@/types";
 
@@ -495,9 +495,25 @@ export interface PlayoffScheduleMatch extends ScheduledMatch {
   label: string;
 }
 
+/** A playoff alliance from alliance selection. */
+export interface PlayoffAlliance {
+  /** Seed, 1 first. */
+  seed: number;
+  /** The captain first, then picks in order. */
+  teams: number[];
+  /** A backup robot called in, and the pick it replaced. */
+  backup: { in: number; out: number } | null;
+  /** Null until the alliance plays a playoff match. */
+  status: "won" | "eliminated" | "playing" | null;
+  /** The last playoff round it reached (where it was knocked out, if it was); null until it plays. */
+  round: { name: string; short: string } | null;
+}
+
 export interface EventSchedule {
   /** Qualification matches, in order. */
   matches: QualScheduleMatch[];
+  /** Playoff alliances in seed order; empty until alliance selection is published. */
+  alliances: PlayoffAlliance[];
   /** Playoff matches, in bracket order. */
   playoffs: PlayoffScheduleMatch[];
   teamNames: Map<number, string>;
@@ -572,9 +588,23 @@ function playoffLabel(match: TBAMatch): string {
   return `${match.comp_level.toUpperCase()}${match.set_number}-${match.match_number}`;
 }
 
+// Rounds of the older bracket formats, by TBA comp level.
+const PLAYOFF_ROUNDS: Record<string, { name: string; short: string }> = {
+  ef: { name: "Eighthfinals", short: "EF" },
+  qf: { name: "Quarterfinals", short: "QF" },
+  sf: { name: "Semifinals", short: "SF" },
+  f: { name: "Finals", short: "F" },
+};
+
+/** An alliance's last playoff round: double elimination's "Round 3" (R3) or "Finals", else the bracket level. */
+function playoffRound(doubleElimRound: string | null | undefined, level: string | undefined) {
+  if (doubleElimRound) return { name: doubleElimRound, short: doubleElimRound.replace(/^Round /, "R").replace(/^Finals$/, "F") };
+  return (level && PLAYOFF_ROUNDS[level]) || null;
+}
+
 /** Qualification and playoff schedules and team names for an event, from TBA. */
 export async function getEventSchedule(eventCode: string): Promise<EventSchedule> {
-  const [tbaMatches, teams] = await Promise.all([getEventMatches(eventCode), getEventTeams(eventCode)]);
+  const [tbaMatches, teams, tbaAlliances] = await Promise.all([getEventMatches(eventCode), getEventTeams(eventCode), getEventAlliances(eventCode)]);
   const now = Date.now();
   const matches = (tbaMatches ?? [])
     .filter((match) => match.comp_level === "qm")
@@ -586,7 +616,17 @@ export async function getEventSchedule(eventCode: string): Promise<EventSchedule
       || a.set_number - b.set_number
       || a.match_number - b.match_number)
     .map((match) => ({ key: match.key, isFinal: match.comp_level === "f", label: playoffLabel(match), ...scheduledMatch(match, now) }));
-  return { matches, playoffs, teamNames: new Map(teams.map((team) => [team.team_number, team.nickname])) };
+  const alliances = (tbaAlliances ?? []).map((alliance, index): PlayoffAlliance => {
+    const status = alliance.status?.status;
+    return {
+      seed: index + 1,
+      teams: alliance.picks.map(teamNumberFromKey),
+      backup: alliance.backup ? { in: teamNumberFromKey(alliance.backup.in), out: teamNumberFromKey(alliance.backup.out) } : null,
+      status: status === "won" || status === "eliminated" || status === "playing" ? status : null,
+      round: playoffRound(alliance.status?.double_elim_round, alliance.status?.level),
+    };
+  });
+  return { matches, alliances, playoffs, teamNames: new Map(teams.map((team) => [team.team_number, team.nickname])) };
 }
 
 /** Sandbox stand-in for getEventSchedule. Sandbox matches are never played. */
@@ -598,7 +638,7 @@ export function getDevEventSchedule(userId: string, eventId: string): EventSched
     })
     .filter((match): match is QualScheduleMatch => !!match)
     .sort((a, b) => a.matchNumber - b.matchNumber);
-  return { matches, playoffs: [], teamNames: new Map(getDevTeams(userId).map((team) => [team.team_number, team.nickname])) };
+  return { matches, alliances: [], playoffs: [], teamNames: new Map(getDevTeams(userId).map((team) => [team.team_number, team.nickname])) };
 }
 
 /** A scout's note about a team, tagged with where it came from. */

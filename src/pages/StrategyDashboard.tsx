@@ -397,8 +397,10 @@ export default function StrategyDashboard() {
   // reloading stays on it
   const [strategyPage, setStrategyPage] = useUrlState<StrategyPage>("page", "dashboard", STRATEGY_PAGE_IDS);
   const [scoutingDataType, setScoutingDataType] = useState<ScoutingDataType>("quantitative");
-  // Where the Dashboard page puts its match picker, beside the event dropdown.
+  // Where the Dashboard page puts its match toolbar, in place of the event dropdown.
   const [toolbarSlot, setToolbarSlot] = useState<HTMLDivElement | null>(null);
+  // Whether the Dashboard page has a match open (the event dropdown hides then).
+  const [matchOpen, setMatchOpen] = useState(false);
   // Per-event snapshot of the picklist columns, kept for the life of this
   // page. Switching events re-reads from here instead of the server when
   // we've already loaded (and possibly locally edited) that event this
@@ -827,24 +829,26 @@ export default function StrategyDashboard() {
 
         <section>
           {/* On the Data page the event sits left and the data type right, on one line. On the
-              Dashboard page the match toolbar (All matches, compact mode) sits left and the
-              event right; the other pages keep the event dropdown on the right. */}
-          <div className={`mb-4 flex gap-2 ${strategyPage === "data" || strategyPage === "dashboard" ? "justify-between" : "justify-end"}`}>
+              Dashboard page the event sits left, and while a match is open the match toolbar
+              (All matches, video) takes its place; the other pages keep the event dropdown on the right. */}
+          <div className={`mb-4 flex gap-2 ${strategyPage === "data" ? "justify-between" : strategyPage === "dashboard" ? "justify-start" : "justify-end"}`}>
+            {!(strategyPage === "dashboard" && matchOpen) && (
+              <Select value={selectedPicklistEventId} onValueChange={setSelectedPicklistEventId}>
+                <SelectTrigger className="w-full min-w-0 flex-1 sm:w-64 sm:flex-none" aria-label="Picklist event">
+                  <SelectValue placeholder="Select event" />
+                </SelectTrigger>
+                <SelectContent>
+                  {picklistEvents.map((event) => (
+                    <SelectItem key={event.id} value={event.id}>
+                      {event.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
             {strategyPage === "dashboard" && (
               <div ref={setToolbarSlot} className="flex min-w-0 items-center" />
             )}
-            <Select value={selectedPicklistEventId} onValueChange={setSelectedPicklistEventId}>
-              <SelectTrigger className="w-full min-w-0 flex-1 sm:w-64 sm:flex-none" aria-label="Picklist event">
-                <SelectValue placeholder="Select event" />
-              </SelectTrigger>
-              <SelectContent>
-                {picklistEvents.map((event) => (
-                  <SelectItem key={event.id} value={event.id}>
-                    {event.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
             {strategyPage === "picklist" && (
               <Button
                 variant="outline"
@@ -882,6 +886,7 @@ export default function StrategyDashboard() {
               userName={profile?.name ?? null}
               devMode={devMode}
               toolbarSlot={toolbarSlot}
+              onMatchOpenChange={setMatchOpen}
               canEditVideos={!!profile?.is_manager}
             />
           ) : strategyPage === "teams" ? (

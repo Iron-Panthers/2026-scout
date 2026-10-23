@@ -4,7 +4,6 @@ import { Bug, ChevronLeft, MessageCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { ToastAction } from "@/components/ui/toast";
 import { getMessageContacts, getUnreadMessageCount, type Message, type MessageContact } from "@/lib/messages";
 import { bugReportIdFromKey, bugReportKey, isBugReportParticipant, type BugReport, type BugReportComment } from "@/lib/bugReports";
 import { useBugReports } from "@/hooks/useBugReports";
@@ -35,7 +34,7 @@ export function useMessages(): MessagesContextValue {
 // Pages where the floating messages button would get in the way (or there's no user)
 const HIDE_BUTTON_ON = ["/login", "/guest", "/review", "/scouting", "/qual-scouting", "/messages", "/bug-reports"];
 
-/** Where a notification's "Open" goes: a conversation, or a bug report. */
+/** Where tapping a notification goes: a conversation, or a bug report. */
 function pathFor(key: string): string {
   const reportId = bugReportIdFromKey(key);
   return reportId ? `/bug-reports?report=${reportId}` : `/messages?with=${encodeURIComponent(key)}`;
@@ -85,14 +84,17 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
     const nameOf = (id: string | null) => contactsRef.current.find((contact) => contact.id === id)?.name ?? "Someone";
     const notify = (key: string, title: string, description: string) => {
       if (openConversation.current === key) return; // already on screen
-      toast({
+      const { dismiss } = toast({
         title,
         description: preview(description),
-        action: (
-          <ToastAction altText="Open" onClick={() => navigate(pathFor(key))}>
-            Open
-          </ToastAction>
-        ),
+        className: "cursor-pointer",
+        // Tapping it opens the conversation or report, except on the close button or at the
+        // end of a swipe away (Radix cancels that click)
+        onClick: (event) => {
+          if (event.defaultPrevented || (event.target as HTMLElement).closest("[toast-close]")) return;
+          dismiss();
+          navigate(pathFor(key));
+        },
       });
     };
 

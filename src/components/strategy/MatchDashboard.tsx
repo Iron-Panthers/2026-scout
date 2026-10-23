@@ -19,7 +19,10 @@ import {
   setMatchVideoLink,
   type EventData,
   type MeanAndSpread,
+  type PlayoffAlliance,
+  type PlayoffScheduleMatch,
   type QualScheduleMatch,
+  type ScheduledMatch,
   type TeamDashboard,
   type TeamNote,
 } from "@/lib/strategyData";
@@ -224,7 +227,7 @@ const SCHEDULE_CELL = {
 /** One alliance's three teams, spread evenly across a colored block. */
 function ScheduleTeams({ color, teams, won, rounded }: { color: "red" | "blue"; teams: number[]; won: boolean; rounded: string }) {
   return (
-    <div className={`grid grid-cols-3 items-center py-0 text-center font-mono text-xs leading-5 tabular-nums sm:text-sm sm:leading-none ${rounded} ${SCHEDULE_CELL[color][won ? "won" : "other"]}`}>
+    <div className={`grid grid-cols-3 items-center py-0 text-center font-mono text-[9px] leading-5 tabular-nums sm:text-[11px] sm:leading-none ${rounded} ${SCHEDULE_CELL[color][won ? "won" : "other"]}`}>
       {teams.map((team) => <span key={team} className={team === OUR_TEAM ? "underline underline-offset-2" : undefined}>{team}</span>)}
     </div>
   );
@@ -233,75 +236,52 @@ function ScheduleTeams({ color, teams, won, rounded }: { color: "red" | "blue"; 
 /** A score cell: the real score in its alliance's color (bright and bold for the winner). */
 function ScoreCell({ color, value, won }: { color: "red" | "blue"; value: number | null; won: boolean }) {
   return (
-    <div className={`flex items-center justify-center rounded-md font-mono text-xs tabular-nums sm:text-sm sm:leading-none ${SCHEDULE_CELL[color][won ? "won" : "other"]}`}>
+    <div className={`flex items-center justify-center rounded-md font-mono text-[9px] tabular-nums sm:text-[11px] sm:leading-none ${SCHEDULE_CELL[color][won ? "won" : "other"]}`}>
       {value ?? "—"}
-    </div>
-  );
-}
-
-// Predicted cells are outlined; the likely winner also gets a soft fill, quieter than the real scores'.
-const PREDICTED_CELL = {
-  red: { outline: "border-red-500/50 text-red-600 dark:text-red-300", higher: "bg-red-500/20" },
-  blue: { outline: "border-blue-500/50 text-blue-600 dark:text-blue-300", higher: "bg-blue-500/20" },
-} as const;
-
-/** A predicted-score cell: outlined in its alliance's color, the likely winner softly filled and in bold. */
-function PredictedCell({ color, value, higher }: { color: "red" | "blue"; value: string; higher: boolean }) {
-  return (
-    <div className={`flex items-center justify-center rounded-md border font-mono text-[11px] tabular-nums ${PREDICTED_CELL[color].outline} ${higher ? `font-bold ${PREDICTED_CELL[color].higher}` : ""}`}>
-      {value || "—"}
     </div>
   );
 }
 
 /**
  * Every qualification match at the event, laid out like The Blue Alliance's match tables:
- * both alliances' teams, scores predicted from scouting and, once played, the real scores,
- * with the winner highlighted. Clicking a match opens it.
+ * both alliances' teams and, once played, the scores, with the winner highlighted. Clicking a match opens it.
  */
-function MatchSchedule({ matches, dashboards, onSelect }: {
+function MatchSchedule({ matches, onSelect }: {
   matches: QualScheduleMatch[];
-  dashboards: Map<number, TeamDashboard>;
   onSelect: (matchNumber: number) => void;
 }) {
   const nextRef = useRef<HTMLLIElement>(null);
   const nextMatch = matches.find((match) => match.status !== "played")?.matchNumber;
+  const [watching, setWatching] = useState<QualScheduleMatch | null>(null);
+  // The video column only appears once TBA has a video for some match.
+  const showVideos = matches.some(hasTbaVideo);
   // Start scrolled to the next match to be played
   useEffect(() => {
     nextRef.current?.scrollIntoView({ block: "center" });
   }, []);
 
-  // Sum of the robots' average total points from scouting ("" when none are scouted)
-  const predicted = (teams: number[]) =>
-    allianceTotal(teams.map((team) => dashboards.get(team)).filter((team): team is TeamDashboard => !!team), (team) => team.totalPoints);
-
-  // Match | teams | predicted | score. Each of the last three holds a red and a blue cell:
+  // [video] | match | teams | score. Each of the last two holds a red and a blue cell:
   // side by side on wider screens (like TBA), stacked red over blue on phones.
-  const columns = "grid grid-cols-[2.5rem_minmax(0,1fr)_2.75rem_3rem] sm:grid-cols-[6rem_minmax(0,1fr)_7rem_8rem]";
+  const columns = showVideos
+    ? "grid grid-cols-[1.25rem_2.5rem_minmax(0,1fr)_3rem] sm:grid-cols-[1.25rem_6rem_minmax(0,1fr)_8rem]"
+    : "grid grid-cols-[2.5rem_minmax(0,1fr)_3rem] sm:grid-cols-[6rem_minmax(0,1fr)_8rem]";
   const pair = "grid grid-rows-2 gap-0.5 sm:h-full sm:grid-cols-2 sm:grid-rows-1";
 
   return (
-    // Bottom margin keeps the last rows clear of the floating page nav.
-    <div className="mb-20 overflow-hidden rounded-lg border border-border bg-card">
+    <div className="w-full max-w-[600px] overflow-hidden rounded-lg border border-border bg-card lg:min-w-0 lg:max-w-none lg:flex-1 lg:basis-0">
       {/* Column headings */}
       <div className={`${columns} items-end gap-x-0.5 border-b border-border px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:px-3`}>
+        {showVideos && <span />}
         <span className="text-center">Match</span>
         <span className="text-center">Alliances</span>
-        <span className="text-center" title="Predicted scores: each alliance's robots' average total points from scouting">
-          <span className="sm:hidden">Pred</span>
-          <span className="hidden sm:inline">Predicted</span>
-        </span>
         <span className="text-center">Score</span>
       </div>
       <ul className="divide-y divide-border">
         {matches.map((match) => {
-          const redPredicted = predicted(match.red);
-          const bluePredicted = predicted(match.blue);
-          const predictedTone = shownTone(redPredicted, bluePredicted);
           const isNext = match.matchNumber === nextMatch;
           const isOurs = match.red.includes(OUR_TEAM) || match.blue.includes(OUR_TEAM);
           return (
-            <li key={match.matchNumber} ref={isNext ? nextRef : undefined}>
+            <li key={match.matchNumber} ref={isNext ? nextRef : undefined} className="relative">
               <button
                 type="button"
                 onClick={() => onSelect(match.matchNumber)}
@@ -310,7 +290,9 @@ function MatchSchedule({ matches, dashboards, onSelect }: {
                   isNext ? "bg-yellow-500/10" : ""
                 }`}
               >
-                <span className="flex items-center justify-center text-xs font-medium">
+                {/* Room for the video button, which sits over it (a button can't go inside this one) */}
+                {showVideos && <span />}
+                <span className="flex items-center justify-center text-[11px] font-medium">
                   <span
                     className={isOurs ? "font-bold text-primary" : undefined}
                     title={isOurs ? `${OUR_TEAM} plays in this match` : undefined}
@@ -325,18 +307,207 @@ function MatchSchedule({ matches, dashboards, onSelect }: {
                   <ScheduleTeams color="blue" teams={match.blue} won={match.winner === "blue"} rounded="rounded-b-md sm:rounded-none sm:rounded-r-md" />
                 </div>
                 <div className={pair}>
-                  <PredictedCell color="red" value={redPredicted} higher={predictedTone === "better"} />
-                  <PredictedCell color="blue" value={bluePredicted} higher={predictedTone === "worse"} />
-                </div>
-                <div className={pair}>
                   <ScoreCell color="red" value={match.redScore} won={match.winner === "red"} />
                   <ScoreCell color="blue" value={match.blueScore} won={match.winner === "blue"} />
                 </div>
               </button>
+              {hasTbaVideo(match) && <VideoButton title={`Quals ${match.matchNumber}`} onClick={() => setWatching(match)} />}
             </li>
           );
         })}
       </ul>
+      <MatchVideoDialog
+        open={watching !== null}
+        onOpenChange={(open) => { if (!open) setWatching(null); }}
+        title={watching ? `Quals ${watching.matchNumber}` : ""}
+        videos={watching?.videos ?? []}
+      />
+    </div>
+  );
+}
+
+/** Whether The Blue Alliance has posted a video of the match. */
+const hasTbaVideo = (match: ScheduledMatch) => match.videos.some((video) => video.source === "tba");
+
+/**
+ * Plays a match's video. It sits over a row's first (video) column, beside the row's
+ * own button rather than inside it, so the row's `<li>` must be `relative`.
+ */
+function VideoButton({ title, onClick }: { title: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={`Watch ${title}`}
+      aria-label={`Watch ${title}`}
+      className="absolute left-2 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground sm:left-3"
+    >
+      <Play className="h-3 w-3" />
+    </button>
+  );
+}
+
+/** An alliance's playoff result: won the event, the round it was knocked out in, or the round it's playing now. */
+function AllianceResult({ alliance }: { alliance: PlayoffAlliance }) {
+  const { status, round } = alliance;
+  if (status === "won") return <span className="font-bold text-green-600 dark:text-green-400">Won</span>;
+  if (!round) return <span className="text-muted-foreground">—</span>;
+  const lost = status === "eliminated";
+  return (
+    <span className={lost ? "text-muted-foreground" : "text-yellow-600 dark:text-yellow-400"} title={`${lost ? "Knocked out in" : "Playing in"} ${round.name}`}>
+      {lost && "Lost "}
+      <span className="sm:hidden">{round.short}</span>
+      <span className="hidden sm:inline">{round.name}</span>
+    </span>
+  );
+}
+
+/**
+ * The playoff alliances from alliance selection: each seed's captain and picks (and any
+ * backup robot called in), with the playoff round each was knocked out in.
+ */
+function AllianceSelection({ alliances, teamNames }: { alliances: PlayoffAlliance[]; teamNames: Map<number, string> }) {
+  // Seed | teams | result, sized like the playoff list's columns below it.
+  const columns = "grid grid-cols-[2.5rem_minmax(0,1fr)_3rem] sm:grid-cols-[4rem_minmax(0,1fr)_7rem]";
+  // Room for every alliance's teams, backups included (3 at regionals, 4 at championships).
+  const slots = Math.max(...alliances.map((alliance) => alliance.teams.length + (alliance.backup ? 1 : 0)));
+  const teamName = (team: number) => teamNames.get(team) ?? `Team ${team}`;
+
+  return (
+    <div className="overflow-hidden rounded-lg border border-border bg-card">
+      <div className={`${columns} items-end gap-x-0.5 border-b border-border px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:px-3`}>
+        <span className="text-center">Seed</span>
+        <span className="text-center">Alliances</span>
+        <span className="text-center">Result</span>
+      </div>
+      {alliances.length === 0 ? (
+        <p className="px-3 py-6 text-center text-sm text-muted-foreground">Alliance selection hasn't happened yet.</p>
+      ) : (
+        <ul className="divide-y divide-border">
+          {alliances.map((alliance) => {
+            const isOurs = alliance.teams.includes(OUR_TEAM) || alliance.backup?.in === OUR_TEAM;
+            return (
+              <li
+                key={alliance.seed}
+                className={`${columns} gap-x-1 px-2 py-0.5 sm:h-[25px] sm:gap-x-2 sm:px-3 ${alliance.status === "eliminated" ? "opacity-60" : ""}`}
+              >
+                <span
+                  className={`flex items-center justify-center text-[11px] font-medium ${isOurs ? "font-bold text-primary" : ""}`}
+                  title={isOurs ? `${OUR_TEAM} is on this alliance` : undefined}
+                >
+                  {alliance.seed}
+                </span>
+                <div
+                  className="grid items-center rounded-md bg-muted text-center font-mono text-[9px] leading-5 tabular-nums sm:text-[11px] sm:leading-none"
+                  style={{ gridTemplateColumns: `repeat(${slots}, minmax(0, 1fr))` }}
+                >
+                  {alliance.teams.map((team, index) => {
+                    const replaced = alliance.backup?.out === team;
+                    return (
+                      <span
+                        key={team}
+                        title={`${teamName(team)}: ${index === 0 ? "captain" : `pick ${index}`}${replaced ? `, replaced by ${alliance.backup!.in}` : ""}`}
+                        className={`${index === 0 ? "font-bold" : ""} ${team === OUR_TEAM ? "underline underline-offset-2" : ""} ${replaced ? "text-muted-foreground line-through" : ""}`}
+                      >
+                        {team}
+                      </span>
+                    );
+                  })}
+                  {alliance.backup && (
+                    <span
+                      title={`${teamName(alliance.backup.in)}: backup for ${alliance.backup.out}`}
+                      className={`italic ${alliance.backup.in === OUR_TEAM ? "underline underline-offset-2" : ""}`}
+                    >
+                      {alliance.backup.in}
+                    </span>
+                  )}
+                </div>
+                <span className="flex items-center justify-center whitespace-nowrap text-[9px] sm:text-[11px]">
+                  <AllianceResult alliance={alliance} />
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/** "M7" → "Match 7", "F2" → "Finals 2"; older formats' labels (e.g. "QF1-2") as they are. */
+const playoffTitle = (label: string) => label.replace(/^M(\d+)$/, "Match $1").replace(/^F(\d+)$/, "Finals $1");
+
+/**
+ * The event's playoff bracket and finals matches, laid out like the qualification list:
+ * both alliances' teams and, once played, the scores.
+ */
+function PlayoffSchedule({ playoffs }: { playoffs: PlayoffScheduleMatch[] }) {
+  const [watching, setWatching] = useState<PlayoffScheduleMatch | null>(null);
+  const showVideos = playoffs.some(hasTbaVideo);
+  const groups = [
+    { title: "Playoffs", matches: playoffs.filter((match) => !match.isFinal) },
+    { title: "Finals", matches: playoffs.filter((match) => match.isFinal) },
+  ].filter((group) => group.matches.length > 0);
+
+  // [video] | match | teams | score, each of the last two red over blue on phones and side by side above.
+  const columns = showVideos
+    ? "grid grid-cols-[1.25rem_2.5rem_minmax(0,1fr)_3rem] sm:grid-cols-[1.25rem_4rem_minmax(0,1fr)_7rem]"
+    : "grid grid-cols-[2.5rem_minmax(0,1fr)_3rem] sm:grid-cols-[4rem_minmax(0,1fr)_7rem]";
+  const pair = "grid grid-rows-2 gap-0.5 sm:h-full sm:grid-cols-2 sm:grid-rows-1";
+
+  return (
+    <div className="overflow-hidden rounded-lg border border-border bg-card">
+      {groups.length === 0 ? (
+        <>
+          <h2 className="border-b border-border px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Playoffs</h2>
+          <p className="px-3 py-6 text-center text-sm text-muted-foreground">The playoff bracket hasn't been published yet.</p>
+        </>
+      ) : groups.map((group) => (
+        <section key={group.title} className="border-b border-border last:border-b-0">
+          {/* Group name in the match column's heading */}
+          <div className={`${columns} items-end gap-x-0.5 border-b border-border px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:px-3`}>
+            {showVideos && <span />}
+            <span className="text-center">{group.title}</span>
+            <span className="text-center">Alliances</span>
+            <span className="text-center">Score</span>
+          </div>
+          <ul className="divide-y divide-border">
+            {group.matches.map((match) => {
+              const isOurs = match.red.includes(OUR_TEAM) || match.blue.includes(OUR_TEAM);
+              return (
+                <li key={match.key} className="relative">
+                  <div
+                    className={`${columns} gap-x-1 px-2 py-0.5 sm:h-[25px] sm:gap-x-2 sm:px-3 ${match.status === "current" ? "bg-yellow-500/10" : ""}`}
+                  >
+                    {showVideos && <span />}
+                    <span
+                      className={`flex items-center justify-center text-[11px] font-medium ${isOurs ? "font-bold text-primary" : ""}`}
+                      title={isOurs ? `${OUR_TEAM} plays in this match` : undefined}
+                    >
+                      {match.label}
+                    </span>
+                    <div className={pair}>
+                      <ScheduleTeams color="red" teams={match.red} won={match.winner === "red"} rounded="rounded-t-md sm:rounded-none sm:rounded-l-md" />
+                      <ScheduleTeams color="blue" teams={match.blue} won={match.winner === "blue"} rounded="rounded-b-md sm:rounded-none sm:rounded-r-md" />
+                    </div>
+                    <div className={pair}>
+                      <ScoreCell color="red" value={match.redScore} won={match.winner === "red"} />
+                      <ScoreCell color="blue" value={match.blueScore} won={match.winner === "blue"} />
+                    </div>
+                  </div>
+                  {hasTbaVideo(match) && <VideoButton title={playoffTitle(match.label)} onClick={() => setWatching(match)} />}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ))}
+      <MatchVideoDialog
+        open={watching !== null}
+        onOpenChange={(open) => { if (!open) setWatching(null); }}
+        title={watching ? playoffTitle(watching.label) : ""}
+        videos={watching?.videos ?? []}
+      />
     </div>
   );
 }
@@ -377,16 +548,18 @@ function AllianceSummary({ label, heading, border, teams, opponents }: {
 }
 
 /**
- * The selected event's match picker (rendered into `toolbarSlot`, beside the
+ * The selected event's match picker (rendered into `toolbarSlot`, in place of the
  * event dropdown) and, for the chosen qualification match, each alliance's
  * summed averages plus a card per team with its stats and notes from the whole event.
  */
-export function MatchDashboard({ event, userId, userName, devMode, toolbarSlot, canEditVideos }: {
+export function MatchDashboard({ event, userId, userName, devMode, toolbarSlot, onMatchOpenChange, canEditVideos }: {
   event: Event | undefined;
   userId: string | undefined;
   userName: string | null;
   devMode: boolean;
   toolbarSlot: HTMLElement | null;
+  /** Told whether a match is open, so the page can hide the event dropdown meanwhile. */
+  onMatchOpenChange: (open: boolean) => void;
   /** Managers can paste a YouTube link for a match. */
   canEditVideos: boolean;
 }) {
@@ -417,17 +590,11 @@ export function MatchDashboard({ event, userId, userName, devMode, toolbarSlot, 
   // No (or an unknown) match picked: the list of every match
   const match = matchParam ? matches.find((item) => item.matchNumber === matchParam) : undefined;
 
-  // Every team's scouting summary, for the list's predicted scores
-  const dashboards = useMemo(() => {
-    const byTeam = new Map<number, TeamDashboard>();
-    if (!data) return byTeam;
-    for (const item of data.schedule.matches) {
-      for (const teamNumber of [...item.red, ...item.blue]) {
-        if (!byTeam.has(teamNumber)) byTeam.set(teamNumber, buildTeamDashboard(teamNumber, data));
-      }
-    }
-    return byTeam;
-  }, [data]);
+  const matchOpen = match !== undefined;
+  useEffect(() => {
+    onMatchOpenChange(matchOpen);
+    return () => onMatchOpenChange(false);
+  }, [matchOpen, onMatchOpenChange]);
 
   // Analyst: looking at a match here (in the sandbox it's recorded in the sandbox only)
   const viewedMatch = match && event ? `${event.id}:${match.matchNumber}` : null;
@@ -476,7 +643,7 @@ export function MatchDashboard({ event, userId, userName, devMode, toolbarSlot, 
     setLoaded({ eventId: event.id, data: updated, error: null });
   };
 
-  // Toolbar (left of the event dropdown), only while a match is open: back to the list,
+  // Toolbar (in place of the event dropdown), only while a match is open: back to the list,
   // and its video when there is one (managers can always open it to paste a link).
   // Matches are picked from the list (or a team card's chips).
   const matchToolbar = toolbarSlot && match && createPortal(
@@ -518,7 +685,17 @@ export function MatchDashboard({ event, userId, userName, devMode, toolbarSlot, 
       </Card>
     );
   } else if (!teams) {
-    body = <MatchSchedule matches={matches} dashboards={dashboards} onSelect={selectMatch} />;
+    body = (
+      // Qualifications on the left and alliances over playoffs on the right, half the width each; stacked
+      // (600px wide) below lg, where there isn't room side by side. Bottom margin keeps the last rows clear of the floating page nav.
+      <div className="mb-20 flex flex-col gap-4 lg:flex-row lg:items-start">
+        <MatchSchedule matches={matches} onSelect={selectMatch} />
+        <div className="flex w-full max-w-[600px] flex-col gap-4 lg:min-w-0 lg:max-w-none lg:flex-1 lg:basis-0">
+          <AllianceSelection alliances={data.schedule.alliances} teamNames={data.schedule.teamNames} />
+          <PlayoffSchedule playoffs={data.schedule.playoffs} />
+        </div>
+      </div>
+    );
   } else {
     body = (
       // Bottom margin keeps the last cards clear of the floating page nav.

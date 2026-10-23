@@ -378,6 +378,29 @@ export async function getEventMatches(eventCode: string) {
   return data;
 }
 
+/** A playoff alliance from TBA's alliance selection, in seed order. */
+export interface TBAEventAlliance {
+  /** e.g. "Alliance 1"; missing for some older events. */
+  name?: string | null;
+  /** Team keys: the captain first, then picks in order. */
+  picks: string[];
+  /** A backup robot called in to replace one of the picks. */
+  backup?: { in: string; out: string } | null;
+  status?: {
+    /** "won", "eliminated" or "playing". */
+    status?: string;
+    /** The last playoff level reached: "ef", "qf", "sf" or "f". */
+    level?: string;
+    /** Double-elimination events: the last round reached, e.g. "Round 3" or "Finals". */
+    double_elim_round?: string | null;
+  } | null;
+}
+
+/** The event's playoff alliances; null until alliance selection is published. */
+export async function getEventAlliances(eventCode: string) {
+  return tbaFetch<TBAEventAlliance[]>(`/event/${eventCode}/alliances`);
+}
+
 /**
  * Returns cached TBA event matches without making a network request.
  * Returns null if nothing is cached or cache is stale.

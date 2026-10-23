@@ -14,7 +14,11 @@ import {
 export function useBugReports(userId: string | null) {
   const [reports, setReports] = useState<BugReportWithCount[]>([]);
   const [loading, setLoading] = useState(true);
-  const [seen, setSeen] = useState<Record<string, string>>(() => (userId ? getSeenBugReports(userId) : {}));
+  const [seenState, setSeenState] = useState(() => ({ userId, seen: userId ? getSeenBugReports(userId) : {} }));
+  // The user is often still loading on the first render (e.g. after a reload), so read
+  // their seen reports again once they're known rather than treating everything as new.
+  if (seenState.userId !== userId) setSeenState({ userId, seen: userId ? getSeenBugReports(userId) : {} });
+  const seen = seenState.seen;
 
   const reload = useCallback(async () => {
     setReports(await getBugReports());
@@ -45,7 +49,7 @@ export function useBugReports(userId: string | null) {
     (reportId: string) => {
       if (!userId) return;
       markBugReportSeen(userId, reportId);
-      setSeen(getSeenBugReports(userId));
+      setSeenState({ userId, seen: getSeenBugReports(userId) });
     },
     [userId]
   );
