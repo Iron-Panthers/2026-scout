@@ -1,4 +1,5 @@
 import { createContext, memo, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { AlertCircle, ArrowDown, ArrowUp, ArrowUpDown, Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -66,7 +67,38 @@ interface DataColumn<Row> {
   popupTitle?: (row: Row) => string;
   /** Makes the column sortable by clicking its header; empty values (null / "") always sort last. */
   sortValue?: (row: Row) => string | number | null;
+  /** A number checked against the same team's other rows (the table's `outlierGroup`); outliers turn the cell red. */
+  outlierValue?: (row: Row) => number | null;
 }
+
+// A team needs this many submissions before its quartiles mean anything.
+const MIN_OUTLIER_SAMPLE = 4;
+// Deeper red on hover (important, so the clickable cells' hover color doesn't replace it)
+const SUSPICIOUS_CELL = "bg-red-600/25 hover:bg-red-600/40! font-semibold text-red-700 dark:text-red-300";
+
+/** Linear-interpolated quantile of an ascending list. */
+function quantile(sorted: number[], q: number): number {
+  const position = (sorted.length - 1) * q;
+  const below = Math.floor(position);
+  const above = Math.ceil(position);
+  return sorted[below] + (sorted[above] - sorted[below]) * (position - below);
+}
+
+/** Tukey's fences: values below Q1 − 1.5×IQR or above Q3 + 1.5×IQR are outliers. */
+function tukeyFences(values: number[]): [number, number] {
+  const sorted = [...values].sort((a, b) => a - b);
+  const q1 = quantile(sorted, 0.25);
+  const q3 = quantile(sorted, 0.75);
+  const iqr = q3 - q1;
+  return [q1 - 1.5 * iqr, q3 + 1.5 * iqr];
+}
+
+const formatFence = (value: number) => String(Number(Math.max(0, value).toFixed(1)));
+
+// Fixed, equal-width, centered columns with a vertical rule between each (none after the
+// last). Rows stay one line tall: values that don't fit are cut off with an ellipsis and
+// open in full on click.
+const TABLE_CLASSES = "table-fixed text-center [&_th]:text-center [&_td]:border-r [&_td]:border-border [&_td]:truncate [&_td:last-child]:border-r-0 [&_th]:h-auto [&_th]:border-r [&_th]:border-border [&_th]:py-2 [&_th[aria-sort]]:p-0 [&_th]:leading-tight [&_th]:whitespace-normal [&_th:last-child]:border-r-0";
 
 type SortDirection = "asc" | "desc";
 
@@ -99,12 +131,18 @@ const CLICKABLE_CELL = "relative cursor-pointer hover:bg-accent/60";
 // An empty button laid over the whole cell: the click target, while the text underneath stays put.
 const CELL_BUTTON = "absolute inset-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring";
 
-/** A plain text cell that becomes clickable only when its text doesn't fit. */
-function TextCell({ text, content, className, onOpen, getLabel }: {
+/** Shows or hides the table's hover tooltip for a cell (null hides it). */
+type ShowHint = (text: string | null, cell?: Element) => void;
+
+/** A plain text cell that becomes clickable when its text doesn't fit, or when it has a hint to show. */
+function TextCell({ text, content, className, hint, onHint, onOpen, getLabel }: {
   text: string;
   /** What to show; defaults to `text`. */
   content?: ReactNode;
   className: string;
+  /** Tooltip text on hover (e.g. why the value is flagged); also makes the cell open its popup. */
+  hint?: string;
+  onHint: ShowHint;
   onOpen: () => void;
   /** Built only once the cell is cut off and actually gets a button. */
   getLabel: () => string;
@@ -119,9 +157,13 @@ function TextCell({ text, content, className, onOpen, getLabel }: {
   }, [observe, text]);
 
   return (
-    <TableCell className={`${truncated ? CLICKABLE_CELL : ""} ${className}`}>
+    <TableCell
+      className={`${truncated || hint ? CLICKABLE_CELL : ""} ${className}`}
+      onMouseEnter={hint ? (event) => onHint(hint, event.currentTarget) : undefined}
+      onMouseLeave={hint ? () => onHint(null) : undefined}
+    >
       <span ref={ref} className="block truncate">{content ?? text}</span>
-      {truncated && <button type="button" onClick={onOpen} className={CELL_BUTTON} aria-label={getLabel()} />}
+      {(truncated || hint) && <button type="button" onClick={onOpen} className={CELL_BUTTON} aria-label={getLabel()} />}
     </TableCell>
   );
 }
@@ -131,6 +173,9 @@ interface DataRowProps<Row> {
   columns: DataColumn<Row>[];
   describeRow: (row: Row) => string;
   onOpen: (row: Row, column: DataColumn<Row>) => void;
+  onHint: ShowHint;
+  /** Column header → why that cell's value is an outlier, for this row's flagged cells. */
+  suspicious?: ReadonlyMap<string, string>;
 }
 
 /**
@@ -138,12 +183,13 @@ interface DataRowProps<Row> {
  * no rows and re-sorting only reorders them — re-rendering every cell of a few
  * hundred rows on each click is what made these clicks feel slow.
  */
-const DataRow = memo(function DataRow<Row extends { id: string }>({ row, columns, describeRow, onOpen }: DataRowProps<Row>) {
+const DataRow = memo(function DataRow<Row extends { id: string }>({ row, columns, describeRow, onOpen, onHint, suspicious }: DataRowProps<Row>) {
   return (
     <TableRow>
       {columns.map((column) => {
         const value = column.value(row);
-        const className = column.className?.(row) ?? "";
+        const suspiciousReason = suspicious?.get(column.header);
+        const className = `${column.className?.(row) ?? ""} ${suspiciousReason ? SUSPICIOUS_CELL : ""}`;
         const getLabel = () => `Open ${(column.popupTitle?.(row) ?? column.header).toLowerCase()}: ${describeRow(row)}`;
         if (column.kind === "comment" || column.kind === "photo") {
           return (
@@ -165,6 +211,8 @@ const DataRow = memo(function DataRow<Row extends { id: string }>({ row, columns
             text={value}
             content={column.render?.(row)}
             className={className}
+            hint={suspiciousReason}
+            onHint={onHint}
             onOpen={() => onOpen(row, column)}
             getLabel={getLabel}
           />
@@ -174,11 +222,13 @@ const DataRow = memo(function DataRow<Row extends { id: string }>({ row, columns
   );
 }) as <Row extends { id: string }>(props: DataRowProps<Row>) => ReactNode;
 
-function DataTable<Row extends { id: string }>({ rows, columns, describeRow }: {
+function DataTable<Row extends { id: string }>({ rows, columns, describeRow, outlierGroup }: {
   rows: Row[];
   columns: DataColumn<Row>[];
   /** Context line under a popup's title, e.g. "Team 254 · Match 12 · Scouted by Sam". */
   describeRow: (row: Row) => string;
+  /** Which robot a row is about (its team), for the `outlierValue` columns. */
+  outlierGroup?: (row: Row) => number | null;
 }) {
   const [popup, setPopup] = useState<Popup | null>(null);
   // Clicking a sortable header sorts ascending, then descending, then back to the default order.
@@ -195,6 +245,39 @@ function DataTable<Row extends { id: string }>({ rows, columns, describeRow }: {
       ? [...rows].sort((a, b) => compareSortValues(sortValue(a), sortValue(b), sort.direction))
       : rows;
   }, [rows, columns, sort]);
+
+  // Row id → its flagged cells: a value outside its own team's 1.5×IQR range for that column.
+  // Teams with too few submissions are skipped.
+  const suspiciousByRow = useMemo(() => {
+    const result = new Map<string, Map<string, string>>();
+    const outlierColumns = columns.filter((column) => column.outlierValue);
+    if (!outlierGroup || outlierColumns.length === 0) return result;
+    const byTeam = new Map<number, Row[]>();
+    for (const row of rows) {
+      const team = outlierGroup(row);
+      if (team === null) continue;
+      const teamRows = byTeam.get(team);
+      if (teamRows) teamRows.push(row);
+      else byTeam.set(team, [row]);
+    }
+    for (const [team, teamRows] of byTeam) {
+      for (const column of outlierColumns) {
+        const valued = teamRows.flatMap((row) => {
+          const value = column.outlierValue!(row);
+          return value === null ? [] : [{ row, value }];
+        });
+        if (valued.length < MIN_OUTLIER_SAMPLE) continue;
+        const [low, high] = tukeyFences(valued.map(({ value }) => value));
+        for (const { row, value } of valued) {
+          if (value >= low && value <= high) continue;
+          const flagged = result.get(row.id) ?? new Map<string, string>();
+          flagged.set(column.header, `Suspicious: outside team ${team}'s usual ${column.header.toLowerCase()} (${formatFence(low)}–${formatFence(high)})`);
+          result.set(row.id, flagged);
+        }
+      }
+    }
+    return result;
+  }, [rows, columns, outlierGroup]);
 
   // One ResizeObserver for the whole table, so text cells can tell when they're cut off.
   const [truncation] = useState(() => {
@@ -214,59 +297,104 @@ function DataTable<Row extends { id: string }>({ rows, columns, describeRow }: {
   });
   useEffect(() => truncation.disconnect, [truncation]);
 
-  // Stable (describeRow is a module constant), so the memoized rows don't re-render.
+  // Stable while the rows are (describeRow is a module constant), so the memoized rows don't re-render.
+  // A flagged cell's popup also says why, for touch screens that can't hover.
   const openPopup = useCallback((row: Row, column: DataColumn<Row>) => {
     const value = column.value(row);
+    const reason = suspiciousByRow.get(row.id)?.get(column.header);
+    const content = column.render?.(row) ?? value;
     setPopup({
       title: column.popupTitle?.(row) ?? column.header,
       description: describeRow(row),
-      ...(column.kind === "photo" ? { imageUrl: value } : { content: column.render?.(row) ?? value }),
+      ...(column.kind === "photo"
+        ? { imageUrl: value }
+        : { content: reason ? <>{content}<p className="mt-2 text-red-600 dark:text-red-400">{reason}</p></> : content }),
     });
-  }, [describeRow]);
+  }, [describeRow, suspiciousByRow]);
+
+  // The hover tooltip, drawn above the cell in a portal so the table's clipping doesn't cut it off
+  const [hint, setHint] = useState<{ text: string; x: number; y: number } | null>(null);
+  const showHint = useCallback<ShowHint>((text, cell) => {
+    if (!text || !cell) return setHint(null);
+    const rect = cell.getBoundingClientRect();
+    setHint({ text, x: rect.left + rect.width / 2, y: rect.top });
+  }, []);
+  // Scrolling moves the cell out from under it
+  useEffect(() => {
+    if (!hint) return;
+    const hide = () => setHint(null);
+    window.addEventListener("scroll", hide, true);
+    return () => window.removeEventListener("scroll", hide, true);
+  }, [hint]);
+
+  // Header and body are separate tables with the same fixed column widths, so they line up.
+  const tableStyle = { width: columns.length * COLUMN_WIDTH_PX };
+  const colgroup = (
+    <colgroup>
+      {columns.map((column) => <col key={column.header} style={{ width: COLUMN_WIDTH_PX }} />)}
+    </colgroup>
+  );
 
   return (
     // Bottom margin keeps the last rows clear of the floating page nav.
     <Card className="mb-20 gap-0 overflow-hidden py-0">
-      {/* Fixed, equal-width, centered columns with a vertical rule between each
-          (none after the last). Rows stay one line tall: values that don't fit
-          are cut off with an ellipsis and open in full on click. */}
-      <Table style={{ width: columns.length * COLUMN_WIDTH_PX }} className="table-fixed text-center [&_th]:text-center [&_td]:border-r [&_td]:border-border [&_td]:truncate [&_td:last-child]:border-r-0 [&_th]:h-auto [&_th]:border-r [&_th]:border-border [&_th]:py-2 [&_th[aria-sort]]:p-0 [&_th]:leading-tight [&_th]:whitespace-normal [&_th:last-child]:border-r-0">
-        <colgroup>
-          {columns.map((column) => <col key={column.header} style={{ width: COLUMN_WIDTH_PX }} />)}
-        </colgroup>
-        <TableHeader className="bg-muted/50">
-          <TableRow>
-            {columns.map((column) => {
-              if (!column.sortValue) return <TableHead key={column.header}>{column.header}</TableHead>;
-              const direction = sort?.header === column.header ? sort.direction : null;
-              const SortIcon = direction === "asc" ? ArrowUp : direction === "desc" ? ArrowDown : ArrowUpDown;
-              return (
-                <TableHead
-                  key={column.header}
-                  aria-sort={direction === "asc" ? "ascending" : direction === "desc" ? "descending" : "none"}
-                >
-                  <button
-                    type="button"
-                    onClick={() => cycleSort(column.header)}
-                    className="flex h-full w-full cursor-pointer items-center justify-center gap-1 px-2 py-2 hover:bg-accent/60 focus-visible:bg-accent/60 focus-visible:outline-none"
-                    title="Sort"
-                  >
-                    {column.header}
-                    <SortIcon className={`h-3.5 w-3.5 shrink-0 ${direction ? "text-foreground" : "text-muted-foreground/60"}`} />
-                  </button>
-                </TableHead>
-              );
-            })}
-          </TableRow>
-        </TableHeader>
-        <TruncationContext.Provider value={truncation.observe}>
-          <TableBody>
-            {sortedRows.map((row) => (
-              <DataRow key={row.id} row={row} columns={columns} describeRow={describeRow} onOpen={openPopup} />
-            ))}
-          </TableBody>
-        </TruncationContext.Provider>
-      </Table>
+      {/* One box scrolls the table both ways, sized to fit on screen (clear of the floating
+          nav), with the header strip stuck to its top. Header and body move in the same scroll,
+          so sideways they stay in step natively. */}
+      <div className="max-h-[calc(100dvh-6rem)] overflow-auto">
+        <div className="sticky top-0 z-10 w-max bg-card">
+          <Table noWrapper style={tableStyle} className={TABLE_CLASSES}>
+            {colgroup}
+            <TableHeader className="bg-muted/50">
+              <TableRow>
+                {columns.map((column) => {
+                  if (!column.sortValue) return <TableHead key={column.header}>{column.header}</TableHead>;
+                  const direction = sort?.header === column.header ? sort.direction : null;
+                  const SortIcon = direction === "asc" ? ArrowUp : direction === "desc" ? ArrowDown : ArrowUpDown;
+                  return (
+                    <TableHead
+                      key={column.header}
+                      aria-sort={direction === "asc" ? "ascending" : direction === "desc" ? "descending" : "none"}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => cycleSort(column.header)}
+                        className="flex h-full w-full cursor-pointer items-center justify-center gap-1 px-2 py-2 hover:bg-accent/60 focus-visible:bg-accent/60 focus-visible:outline-none"
+                        title="Sort"
+                      >
+                        {column.header}
+                        <SortIcon className={`h-3.5 w-3.5 shrink-0 ${direction ? "text-foreground" : "text-muted-foreground/60"}`} />
+                      </button>
+                    </TableHead>
+                  );
+                })}
+              </TableRow>
+            </TableHeader>
+          </Table>
+        </div>
+
+          <Table noWrapper style={tableStyle} className={TABLE_CLASSES}>
+            {colgroup}
+            <TruncationContext.Provider value={truncation.observe}>
+              <TableBody>
+                {sortedRows.map((row) => (
+                  <DataRow key={row.id} row={row} columns={columns} describeRow={describeRow} onOpen={openPopup} onHint={showHint} suspicious={suspiciousByRow.get(row.id)} />
+                ))}
+              </TableBody>
+            </TruncationContext.Provider>
+          </Table>
+      </div>
+
+      {hint && createPortal(
+        <div
+          role="tooltip"
+          className="pointer-events-none fixed z-50 max-w-64 -translate-x-1/2 -translate-y-full rounded-md border bg-popover px-2 py-1 text-center text-xs text-popover-foreground shadow-md"
+          style={{ left: hint.x, top: hint.y - 6 }}
+        >
+          {hint.text}
+        </div>,
+        document.body
+      )}
 
       <Dialog open={popup !== null} onOpenChange={(open) => { if (!open) setPopup(null); }}>
         <DialogContent className={popup?.imageUrl ? "sm:max-w-2xl" : "sm:max-w-lg"}>
@@ -321,11 +449,11 @@ const QUANT_COLUMNS: DataColumn<QuantRow>[] = [
   },
   { header: "Team", value: (row) => String(row.teamNumber ?? ""), className: () => "font-semibold tabular-nums", sortValue: (row) => row.teamNumber },
   { header: "Match type", value: (row) => capitalize(row.matchType) },
-  { header: "Auto shots", value: (row) => String(row.autoShots), className: () => "tabular-nums", sortValue: (row) => row.autoShots },
-  { header: "Teleop shots", value: (row) => String(row.teleopShots), className: () => "tabular-nums", sortValue: (row) => row.teleopShots },
+  { header: "Auto shots", value: (row) => String(row.autoShots), className: () => "tabular-nums", sortValue: (row) => row.autoShots, outlierValue: (row) => row.autoShots },
+  { header: "Teleop shots", value: (row) => String(row.teleopShots), className: () => "tabular-nums", sortValue: (row) => row.teleopShots, outlierValue: (row) => row.teleopShots },
   { header: "Auto climb", value: (row) => formatClimb(row.autoClimb) },
   { header: "Endgame climb", value: (row) => formatClimb(row.endgameClimb) },
-  { header: "Total points", value: (row) => String(row.totalPoints), className: () => "font-semibold tabular-nums", sortValue: (row) => row.totalPoints },
+  { header: "Total points", value: (row) => String(row.totalPoints), className: () => "font-semibold tabular-nums", sortValue: (row) => row.totalPoints, outlierValue: (row) => row.totalPoints },
   { header: "Comments", value: (row) => row.comments, kind: "comment" },
   { header: "Robot problems", value: (row) => row.robotProblems, kind: "comment" },
   { header: "Errors", value: (row) => row.errors, kind: "comment" },
@@ -391,6 +519,8 @@ const PIT_COLUMNS: DataColumn<PitRow>[] = [
 ];
 
 const joinContext = (parts: Array<string | number | false | null | undefined>) => parts.filter(Boolean).join(" · ");
+
+const quantTeam = (row: QuantRow) => row.teamNumber;
 
 const describeQuantRow = (row: QuantRow) => joinContext([
   row.teamNumber && `Team ${row.teamNumber}`,
@@ -493,7 +623,7 @@ export function ScoutingDataTable({ eventId, dataType, userId, userName, devMode
   // Keyed by type so each table keeps its own popup and truncation state.
   switch (data.type) {
     case "quantitative":
-      return <DataTable key="quantitative" rows={data.rows} columns={QUANT_COLUMNS} describeRow={describeQuantRow} />;
+      return <DataTable key="quantitative" rows={data.rows} columns={QUANT_COLUMNS} describeRow={describeQuantRow} outlierGroup={quantTeam} />;
     case "qualitative":
       return <DataTable key="qualitative" rows={data.rows} columns={QUAL_COLUMNS} describeRow={describeQualRow} />;
     case "pit":

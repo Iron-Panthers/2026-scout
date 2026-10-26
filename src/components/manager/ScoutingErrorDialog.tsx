@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { getSubmissionDetails, type SubmissionDetails } from "@/lib/matchRescouts";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScoutPickerList } from "@/components/manager/ScoutAssignmentDialog";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -22,6 +22,10 @@ interface ScoutingErrorDialogProps {
   availableScouts: Profile[];
   cosmeticsMap?: Record<string, Record<string, string>>;
   onAssignRescout: (profile: Profile) => Promise<void>;
+  /** A manager already checked this error and found the data correct. */
+  validated: boolean;
+  /** Marks the data correct (no rescout needed), or undoes that. */
+  onSetValidated: (validated: boolean) => Promise<void>;
 }
 
 function DataLine({ label, value }: { label: string; value: string | number | null | undefined }) {
@@ -34,7 +38,7 @@ function DataLine({ label, value }: { label: string; value: string | number | nu
 }
 
 /** Shows the scouting error a scouter reported on a submission and lets a manager hand it to someone else to rescout. */
-export function ScoutingErrorDialog({ target, onOpenChange, availableScouts, cosmeticsMap, onAssignRescout }: ScoutingErrorDialogProps) {
+export function ScoutingErrorDialog({ target, onOpenChange, availableScouts, cosmeticsMap, onAssignRescout, validated, onSetValidated }: ScoutingErrorDialogProps) {
   const [picked, setPicked] = useState<Profile | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -63,6 +67,12 @@ export function ScoutingErrorDialog({ target, onOpenChange, availableScouts, cos
     return () => { cancelled = true; };
   }, [target]);
 
+  const setValidated = async (next: boolean) => {
+    setSaving(true);
+    await onSetValidated(next);
+    setSaving(false);
+  };
+
   const confirm = async () => {
     if (!picked) return;
     setSaving(true);
@@ -87,6 +97,28 @@ export function ScoutingErrorDialog({ target, onOpenChange, availableScouts, cos
             <p className="whitespace-pre-wrap break-words rounded-lg border border-red-700/50 bg-red-900/20 p-3 text-sm">
               {target?.comment}
             </p>
+
+            {/* The scouter flagged it, but the data checks out: keep it, no rescout */}
+            {validated ? (
+              <div className="flex items-center gap-2 rounded-lg border border-emerald-600/50 bg-emerald-600/15 p-3 text-sm">
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
+                <span className="min-w-0 flex-1">Checked: the data is correct.</span>
+                <Button variant="outline" size="sm" className="shrink-0 gap-1.5" onClick={() => setValidated(false)} disabled={saving}>
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  Undo
+                </Button>
+              </div>
+            ) : (
+              <Button
+                variant="outline"
+                className="w-full gap-1.5 border-emerald-600/50 text-emerald-500 hover:bg-emerald-600/15 hover:text-emerald-400"
+                onClick={() => setValidated(true)}
+                disabled={saving}
+              >
+                <CheckCircle2 className="h-4 w-4" />
+                Mark data as correct
+              </Button>
+            )}
 
             <h3 className="pt-2 text-sm font-semibold">Scouting data</h3>
             {loadingDetails ? (

@@ -64,9 +64,10 @@ export function RescoutConfig({ teamNumber, submission, onCancel, onContinue }: 
               onCheckedChange={(checked) => toggle(row.id, checked === true)}
               className="mt-1"
             />
-            <Label htmlFor={`rescout-${row.id}`} className="flex-1 cursor-pointer space-y-1 font-normal">
-              <span className="block font-medium">{row.label}</span>
-              <span className="block text-sm text-muted-foreground break-words">Current: {row.current}</span>
+            {/* min-w-0 + wrap-anywhere: a long answer (even one unbroken word) wraps inside the box */}
+            <Label htmlFor={`rescout-${row.id}`} className="min-w-0 flex-1 cursor-pointer flex-col items-stretch gap-1 font-normal">
+              <span className="block font-medium wrap-anywhere">{row.label}</span>
+              <span className="block whitespace-pre-wrap text-sm leading-normal text-muted-foreground wrap-anywhere">Current: {row.current}</span>
             </Label>
           </div>
         ))}

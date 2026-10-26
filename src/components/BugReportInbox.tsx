@@ -178,6 +178,21 @@ export function BugReportInbox({ openKey, onOpen, onBack, userId, isDeveloper, n
         </div>
       );
     }
+    // Developers only; it sits beside Mark as fixed, or beside Reopen once fixed
+    const deleteButton = (
+      <Button
+        size="icon"
+        variant="ghost"
+        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+        onClick={() => setConfirmingDelete(true)}
+        disabled={busy}
+        aria-label="Delete this bug report"
+        title="Delete this bug report"
+      >
+        <Trash2 className="h-4 w-4" />
+      </Button>
+    );
+
     return (
       <div className="flex min-h-0 flex-col">
         <div className="flex items-start gap-2 border-b border-border pb-3">
@@ -193,24 +208,24 @@ export function BugReportInbox({ openKey, onOpen, onBack, userId, isDeveloper, n
               Reported by {nameOf(report.author_id)} · {formatWhen(report.created_at)}
               {report.status === "fixed" && report.fixed_at && ` · Fixed by ${nameOf(report.fixed_by)} ${formatWhen(report.fixed_at)}`}
             </p>
+            {/* A fixed report's Reopen and delete sit at the bottom of the bar, under who fixed it */}
+            {isDeveloper && report.status === "fixed" && (
+              <div className="mt-2 flex items-center gap-1">
+                <Button size="sm" variant="outline" onClick={toggleFixed} disabled={busy} className="gap-1.5">
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  Reopen
+                </Button>
+                {deleteButton}
+              </div>
+            )}
           </div>
-          {isDeveloper && (
+          {isDeveloper && report.status !== "fixed" && (
             <div className="flex shrink-0 items-center gap-1">
-              <Button size="sm" variant={report.status === "fixed" ? "outline" : "default"} onClick={toggleFixed} disabled={busy} className="gap-1.5">
-                {report.status === "fixed" ? <RotateCcw className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
-                {report.status === "fixed" ? "Reopen" : "Mark as fixed"}
+              <Button size="sm" onClick={toggleFixed} disabled={busy} className="gap-1.5">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                Mark as fixed
               </Button>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                onClick={() => setConfirmingDelete(true)}
-                disabled={busy}
-                aria-label="Delete this bug report"
-                title="Delete this bug report"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
+              {deleteButton}
             </div>
           )}
         </div>
@@ -310,7 +325,6 @@ export function BugReportInbox({ openKey, onOpen, onBack, userId, isDeveloper, n
         </div>
         <div className="min-w-0 flex-1">
           <p className="font-semibold">Bug Reporting</p>
-          <p className="text-xs text-muted-foreground">Everyone can see reports and comment; developers mark them fixed</p>
         </div>
         {!composing && (
           <Button size="sm" className="shrink-0 gap-1.5" onClick={() => setComposing(true)}>

@@ -57,7 +57,7 @@ import { EventInformationTab } from "@/components/manager/EventInformationTab";
 import { CreateEventTab } from "@/components/manager/CreateEventTab";
 import { ScoutAssignmentDialog } from "@/components/manager/ScoutAssignmentDialog";
 import { ScoutingErrorDialog, type ScoutingErrorTarget } from "@/components/manager/ScoutingErrorDialog";
-import { assignMatchRescout } from "@/lib/matchRescouts";
+import { assignMatchRescout, getValidatedScoutingErrors, setScoutingErrorValidated } from "@/lib/matchRescouts";
 import { RosterManagementTab } from "@/components/manager/RosterManagementTab";
 import { PitScoutingAssignmentsTab } from "@/components/manager/PitScoutingAssignmentsTab";
 import { useUrlState } from "@/hooks/useUrlState";
@@ -148,6 +148,8 @@ export default function ManagerDashboard() {
   ); // Map of "matchId:role" -> scouter_id
   // "matchId:role:scouterId" -> the scouting error comment the scouter left on their submission
   const [scoutingErrors, setScoutingErrors] = useState<Map<string, string>>(new Map());
+  // "matchId:role:scouterId" of scouting errors a manager checked and marked correct
+  const [validatedErrors, setValidatedErrors] = useState<Set<string>>(new Set());
   const [errorCell, setErrorCell] = useState<
     (ScoutingErrorTarget & { role: Role; slot: 1 | 2; scouterId: string }) | null
   >(null);
@@ -475,6 +477,7 @@ export default function ManagerDashboard() {
       setCompletedSubmissions(new Set());
       setActualScouters(new Map());
       setScoutingErrors(new Map());
+      setValidatedErrors(new Set());
       return;
     }
 
@@ -493,6 +496,7 @@ export default function ManagerDashboard() {
       setCompletedSubmissions(completedSet);
       setActualScouters(scoutersMap);
       setScoutingErrors(errorMap);
+      setValidatedErrors(await getValidatedScoutingErrors([], devState.user.id));
       return;
     }
 
@@ -510,6 +514,7 @@ export default function ManagerDashboard() {
 
       if (error) throw error;
       if (qualError) throw qualError;
+      const validated = await getValidatedScoutingErrors(matchIds);
 
       // Keyed by "matchId:role:scouterId" (not just "matchId:role") so that
       // when a role has two scouts (primary + co-scout), each one's
@@ -541,6 +546,7 @@ export default function ManagerDashboard() {
       setCompletedSubmissions(completedSet);
       setActualScouters(scoutersMap);
       setScoutingErrors(errorMap);
+      setValidatedErrors(validated);
     } catch (error) {
       console.error("Error loading submission status:", error);
     }
@@ -728,6 +734,36 @@ export default function ManagerDashboard() {
       toast({ title: "Rescout Assigned", description: `${profile.name || "Scout"} will rescout this match.` });
     },
     [errorCell, matches, toast]
+  );
+
+  // The open scouting error's data is right after all (or undo that): no rescout needed
+  const handleSetErrorValidated = useCallback(
+    async (validated: boolean) => {
+      if (!errorCell) return;
+      const success = await setScoutingErrorValidated({
+        matchId: errorCell.matchId,
+        role: errorCell.role,
+        scouterId: errorCell.scouterId,
+        validated,
+        devUserId: devModeStateRef.current.user?.id,
+      });
+      if (!success) {
+        toast({ title: "Couldn't update the scouting error", variant: "destructive" });
+        return;
+      }
+      const key = `${errorCell.matchId}:${errorCell.role}:${errorCell.scouterId}`;
+      setValidatedErrors((prev) => {
+        const next = new Set(prev);
+        if (validated) next.add(key);
+        else next.delete(key);
+        return next;
+      });
+      if (validated) {
+        setErrorCell(null);
+        toast({ title: "Marked as correct", description: `Q${errorCell.matchNumber} ${errorCell.role.toUpperCase()} keeps its data.` });
+      }
+    },
+    [errorCell, toast]
   );
 
   const openAssignmentDialog = useCallback(
@@ -1390,6 +1426,7 @@ export default function ManagerDashboard() {
                         onClearAssignment={handleClearAssignment}
                         completedSubmissions={completedSubmissions}
                         scoutingErrors={scoutingErrors}
+                        validatedErrors={validatedErrors}
                         onOpenScoutingError={openScoutingError}
                         actualScouters={actualScouters}
                         availableScouts={availableScouts}
@@ -1589,6 +1626,8 @@ export default function ManagerDashboard() {
           availableScouts={availableScouts}
           cosmeticsMap={cosmeticsMap}
           onAssignRescout={handleAssignRescout}
+          validated={!!errorCell && validatedErrors.has(`${errorCell.matchId}:${errorCell.role}:${errorCell.scouterId}`)}
+          onSetValidated={handleSetErrorValidated}
         />
 
         {/* Assignment Dialog */}

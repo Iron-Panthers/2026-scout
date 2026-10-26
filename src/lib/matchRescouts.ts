@@ -3,7 +3,9 @@ import { updateMatchAssignment } from "@/lib/matches";
 import {
   addDevMatchRescout,
   deleteDevScoutingSubmission,
+  getDevValidatedErrors,
   isDevMatchId,
+  setDevErrorValidated,
   setDevMatchAssignment,
 } from "@/lib/devMode";
 import { toQuantRow, type QuantRow } from "@/lib/strategyData";
@@ -61,6 +63,58 @@ export async function assignMatchRescout(params: {
   }
 
   return updateMatchAssignment(matchId, role, newScouterId, slot);
+}
+
+/**
+ * The "matchId:role:scouterId" keys of submissions whose scouting error a manager checked
+ * and marked correct (the data stands; no rescout needed).
+ */
+export async function getValidatedScoutingErrors(matchIds: string[], devUserId?: string): Promise<Set<string>> {
+  if (devUserId) return new Set(getDevValidatedErrors(devUserId));
+  if (matchIds.length === 0) return new Set();
+  const { data, error } = await supabase
+    .from("scouting_error_validations")
+    .select("match_id, role, scouter_id")
+    .in("match_id", matchIds);
+  if (error) {
+    console.error("Error loading validated scouting errors:", error);
+    return new Set();
+  }
+  return new Set((data ?? []).map((row) => `${row.match_id}:${row.role}:${row.scouter_id}`));
+}
+
+/** Marks a submission's scouting error as checked and correct, or undoes that. */
+export async function setScoutingErrorValidated(params: {
+  matchId: string;
+  role: Role;
+  scouterId: string;
+  validated: boolean;
+  /** The signed-in user's id, needed to reach the sandbox dataset. */
+  devUserId?: string;
+}): Promise<boolean> {
+  const { matchId, role, scouterId, validated, devUserId } = params;
+
+  if (isDevMatchId(matchId)) {
+    if (!devUserId) return false;
+    setDevErrorValidated(devUserId, `${matchId}:${role}:${scouterId}`, validated);
+    return true;
+  }
+
+  const { error } = validated
+    ? await supabase
+        .from("scouting_error_validations")
+        .upsert({ match_id: matchId, role, scouter_id: scouterId }, { onConflict: "match_id,role,scouter_id" })
+    : await supabase
+        .from("scouting_error_validations")
+        .delete()
+        .eq("match_id", matchId)
+        .eq("role", role)
+        .eq("scouter_id", scouterId);
+  if (error) {
+    console.error("Error updating scouting error validation:", error);
+    return false;
+  }
+  return true;
 }
 
 /** The rescouts assigned to a scouter, for their dashboard cards. */

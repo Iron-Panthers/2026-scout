@@ -57,6 +57,8 @@ interface DevData {
   sandboxPicklists?: Record<string, { picked_team_numbers: number[]; do_not_pick_team_numbers: number[] }>;
   sandboxBets?: Bet[];
   sandboxMatchRescouts?: Array<{ match_id: string; role: string; scouter_id: string; reason: string }>;
+  /** "matchId:role:scouterId" of sandbox scouting errors a manager marked correct. */
+  sandboxValidatedErrors?: string[];
   sandboxPitSubmissions?: PitScoutingSubmission[];
   /** Pit scouting assignments per sandbox event id; seeded from the fake team pool on first read. */
   sandboxPitAssignments?: Record<string, PitScoutingAssignment[]>;
@@ -959,6 +961,17 @@ export function addDevMatchRescout(
     (r) => !(r.match_id === rescout.match_id && r.role === rescout.role && r.scouter_id === rescout.scouter_id)
   );
   data.sandboxMatchRescouts = [...others, rescout];
+  saveDevData(userId, data);
+}
+
+export function getDevValidatedErrors(userId: string): string[] {
+  return getDevData(userId).sandboxValidatedErrors ?? [];
+}
+
+export function setDevErrorValidated(userId: string, key: string, validated: boolean): void {
+  const data = getDevData(userId);
+  const others = (data.sandboxValidatedErrors ?? []).filter((k) => k !== key);
+  data.sandboxValidatedErrors = validated ? [...others, key] : others;
   saveDevData(userId, data);
 }
 

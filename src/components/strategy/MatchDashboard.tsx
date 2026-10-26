@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { AlertCircle, ArrowLeft, ImageOff, Loader2, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -120,7 +120,15 @@ function TeamCard({ team, station, border, selectedMatch, onSelectMatch, onOpenP
     <Card className={`@container min-w-0 gap-0 overflow-hidden border-t-4 py-0 ${border}`}>
       <div className={`flex flex-col-reverse gap-x-2 pt-2 @[12rem]:flex-row @[12rem]:items-baseline @[12rem]:justify-between @[16rem]:pt-3 ${CARD_PAD_X}`}>
         <div className="min-w-0">
-          <div className="font-mono text-lg font-black tabular-nums @[12rem]:text-xl @[16rem]:text-2xl">{team.teamNumber}</div>
+          {/* Opens the team's page on the Teams tab (Back, or its "Match" button, returns to this match) */}
+          <Link
+            to={`?page=teams&team=${team.teamNumber}`}
+            state={{ fromMatch: selectedMatch }}
+            className="block w-fit font-mono text-lg font-black tabular-nums hover:underline @[12rem]:text-xl @[16rem]:text-2xl"
+            title={`View team ${team.teamNumber} on the Teams page`}
+          >
+            {team.teamNumber}
+          </Link>
           <div className="truncate text-xs text-muted-foreground @[16rem]:text-sm" title={team.name ?? undefined}>{team.name ?? "Unknown team"}</div>
         </div>
         <span className="shrink-0 text-[10px] font-medium text-muted-foreground @[16rem]:text-xs">{station}</span>

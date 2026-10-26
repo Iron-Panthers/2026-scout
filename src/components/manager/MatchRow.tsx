@@ -16,6 +16,8 @@ const getRoleCellBackground = (role: Role) =>
 
 const SUBMITTED_BACKGROUND = "bg-green-900/40";
 const ERROR_BACKGROUND = "bg-red-600/60";
+// A scouting error a manager checked and found correct: green, but a brighter shade than submitted
+const VALIDATED_BACKGROUND = "bg-emerald-600/45";
 
 interface MatchRowProps {
   match: MatchAssignment;
@@ -24,6 +26,7 @@ interface MatchRowProps {
   onClearAssignment: (matchNumber: number, role: Role, slot?: 1 | 2) => void;
   completedSubmissions: Set<string>; // Set of "matchId:role:scouterId" — per-scouter, not per-role
   scoutingErrors?: Map<string, string>; // "matchId:role:scouterId" -> scouting error comment
+  validatedErrors?: Set<string>; // "matchId:role:scouterId" of scouting errors a manager marked correct
   onOpenScoutingError?: (matchNumber: number, role: Role, slot: 1 | 2, scouterId: string, comment: string) => void;
   actualScouters: Map<string, string>; // Map of "matchId:role" -> scouter_id
   availableScouts: Profile[]; // All profiles to look up names
@@ -42,6 +45,7 @@ export const MatchRow = memo(
     onClearAssignment,
     completedSubmissions,
     scoutingErrors,
+    validatedErrors,
     onOpenScoutingError,
     actualScouters,
     availableScouts,
@@ -100,9 +104,13 @@ export const MatchRow = memo(
           // leave bands of the cell uncovered.
           const errorOf = (assignment: typeof assignment1) =>
             match.matchId && assignment ? scoutingErrors?.get(`${match.matchId}:${role}:${assignment.id}`) : undefined;
+          const isValidated = (assignment: typeof assignment1) =>
+            !!(match.matchId && assignment && validatedErrors?.has(`${match.matchId}:${role}:${assignment.id}`));
+          // A submitted slot's color: red for a scouting error, its own green once a manager marks it correct
+          const submittedBackground = (assignment: typeof assignment1) =>
+            !errorOf(assignment) ? SUBMITTED_BACKGROUND : isValidated(assignment) ? VALIDATED_BACKGROUND : ERROR_BACKGROUND;
           const singleSlotSubmitted = scoutersPerRobot === 1 && isCompleted1;
-          const singleSlotError = scoutersPerRobot === 1 && isCompleted1 && !!errorOf(assignment1);
-          const cellColorClass = `${getRoleCellBorder(role)} ${singleSlotError ? ERROR_BACKGROUND : singleSlotSubmitted ? SUBMITTED_BACKGROUND : getRoleCellBackground(role)}`;
+          const cellColorClass = `${getRoleCellBorder(role)} ${singleSlotSubmitted ? submittedBackground(assignment1) : getRoleCellBackground(role)}`;
 
           const renderSlot = (slot: 1 | 2) => {
             const assignment = slot === 2 ? assignment2 : assignment1;
@@ -117,12 +125,12 @@ export const MatchRow = memo(
             const statusTitle = [
               assignment?.name,
               isDifferentScouter && actualScouter ? `Scouted by ${actualScouter.name || "another scout"}` : isCompleted ? "Submitted" : null,
-              errorComment ? "Scouting error — click to review" : null,
+              errorComment ? (isValidated(assignment) ? "Scouting error checked — data is correct" : "Scouting error — click to review") : null,
               assignment && !assignment.registered ? "Not registered for event" : null,
             ].filter(Boolean).join(" · ");
 
             return assignment ? (
-              <div className={`relative group flex-1 min-w-0 p-1.5 md:p-2 ${isCompleted && scoutersPerRobot === 2 ? (errorComment ? ERROR_BACKGROUND : SUBMITTED_BACKGROUND) : ""}`}>
+              <div className={`relative group flex-1 min-w-0 p-1.5 md:p-2 ${isCompleted && scoutersPerRobot === 2 ? submittedBackground(assignment) : ""}`}>
                 <button
                   onClick={() =>
                     errorComment && assignment && onOpenScoutingError

@@ -46,8 +46,8 @@ const preview = (text: string) => (text.length > 120 ? `${text.slice(0, 120)}…
  * Tracks the signed-in user's unread messages: the count for the floating speech button's
  * badge, and an in-app notification whenever a new message arrives (outside the app, the
  * service worker shows a push notification instead). Also notifies about Bug Reporting
- * activity that concerns you: new reports (developers), and comments on or fixes to
- * reports you wrote or commented on.
+ * activity that concerns you: comments on or fixes to reports you wrote or commented on
+ * (new reports don't notify anyone).
  */
 export function MessagesProvider({ children }: { children: ReactNode }) {
   const { user, profile } = useAuth();
@@ -118,13 +118,8 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
           getUnreadMessageCount(userId).then((count) => !cancelled && setUnreadCount(count));
         }
       )
-      // Bug Reporting: new reports go to developers
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "bug_reports" }, (payload) => {
-        const report = payload.new as BugReport;
-        if (!isDeveloper || report.author_id === userId) return;
-        notify(bugReportKey(report.id), `New bug report from ${nameOf(report.author_id)}`, report.title);
-      })
-      // ...comments go to the report's author, everyone who commented, and developers
+      // Bug Reporting (new reports don't notify anyone): comments go to the report's author,
+      // everyone who commented, and developers
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "bug_report_comments" }, async (payload) => {
         const comment = payload.new as BugReportComment;
         if (comment.author_id === userId) return;

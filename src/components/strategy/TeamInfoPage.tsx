@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { AlertCircle, ArrowLeft, ImageOff, Loader2, Play, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -718,7 +719,24 @@ export function TeamInfoPage({ event, userId, userName, devMode }: {
 }) {
   // Tagged with the event it was loaded for, so switching events shows the loading state.
   const [loaded, setLoaded] = useState<{ eventId: string; data: EventData | null; error: string | null } | null>(() => cachedEventLoad(event));
-  const [selected, setSelected] = useState<{ eventId: string; teamNumber: number } | null>(null);
+  // The viewed team lives in the address (?team=254), so the match dashboard can link to it
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedNumber = Number(searchParams.get("team")) || null;
+  // Opened from a match on the dashboard: its back button returns there. Picking another
+  // team (or anything else that rewrites the address) drops this.
+  const navigate = useNavigate();
+  const fromMatch = (useLocation().state as { fromMatch?: number } | null)?.fromMatch;
+  const setSelected = (teamNumber: number | null) => {
+    setSearchParams(
+      (current) => {
+        const params = new URLSearchParams(current);
+        if (teamNumber == null) params.delete("team");
+        else params.set("team", String(teamNumber));
+        return params;
+      },
+      { replace: true }
+    );
+  };
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<TeamSort>("number");
   const [compare, setCompare] = useState(false);
@@ -762,9 +780,7 @@ export function TeamInfoPage({ event, userId, userName, devMode }: {
       : a.teamNumber - b.teamNumber);
   }, [teams, query, sort]);
 
-  const selectedTeam = selected && selected.eventId === event?.id
-    ? teams.find((team) => team.teamNumber === selected.teamNumber) ?? null
-    : null;
+  const selectedTeam = teams.find((team) => team.teamNumber === selectedNumber) ?? null;
 
   const slots: [number | null, number | null] = compared && compared.eventId === event?.id ? compared.slots : [null, null];
   const comparedTeams = slots.map((teamNumber) => teams.find((team) => team.teamNumber === teamNumber) ?? null);
@@ -813,7 +829,7 @@ export function TeamInfoPage({ event, userId, userName, devMode }: {
       setSlots([selectedTeam?.teamNumber ?? null, null]);
     } else {
       const keep = slots[0] ?? slots[1];
-      setSelected(keep != null ? { eventId: event.id, teamNumber: keep } : null);
+      setSelected(keep);
     }
   };
 
@@ -886,7 +902,7 @@ export function TeamInfoPage({ event, userId, userName, devMode }: {
                   key={team.teamNumber}
                   team={team}
                   selected={team.teamNumber === selectedTeam?.teamNumber}
-                  onSelect={() => setSelected({ eventId: event.id, teamNumber: team.teamNumber })}
+                  onSelect={() => setSelected(team.teamNumber)}
                 />
               );
             })
@@ -897,10 +913,17 @@ export function TeamInfoPage({ event, userId, userName, devMode }: {
       <div ref={detailRef} className={`min-h-0 md:overflow-y-auto ${showDetail ? "block" : "hidden md:block"}`}>
         {showDetail && (
           <div className="mb-2 flex items-center gap-2">
-            {/* Back to the list keeps the first compared team picked. */}
-            <Button variant="ghost" size="sm" className="md:hidden" onClick={() => (compare ? setSlots([slots[0], null]) : setSelected(null))}>
-              <ArrowLeft className="h-4 w-4" />All teams
-            </Button>
+            {fromMatch && !compare ? (
+              // Back through history, so the dashboard reopens that match as it was
+              <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
+                <ArrowLeft className="h-4 w-4" />Match {fromMatch}
+              </Button>
+            ) : (
+              // Back to the list keeps the first compared team picked.
+              <Button variant="ghost" size="sm" className="md:hidden" onClick={() => (compare ? setSlots([slots[0], null]) : setSelected(null))}>
+                <ArrowLeft className="h-4 w-4" />All teams
+              </Button>
+            )}
             <div className="ml-auto flex items-center gap-2">
               <Label htmlFor="recent-matches" className="text-xs">Last {RECENT_MATCH_COUNT} matches only</Label>
               <Switch id="recent-matches" checked={recentOnly} onCheckedChange={setRecentOnly} />
@@ -930,7 +953,7 @@ export function TeamInfoPage({ event, userId, userName, devMode }: {
             data={data}
             // Events from before the setting existed are double scouted.
             scoutersPerRobot={event.scouters_per_robot ?? 2}
-            onSelectTeam={(teamNumber) => setSelected({ eventId: event.id, teamNumber })}
+            onSelectTeam={setSelected}
           />
         ) : (
           <Card className="flex h-full items-center justify-center p-8 text-center">

@@ -343,11 +343,13 @@ export default function Dashboard() {
     return "bg-blue-300/25 border-blue-300/60";
   };
 
+  // Light themes get a pale pill with dark text, which stands out from the tinted card;
+  // dark themes keep the translucent pill with light text.
   const getRoleBadgeColor = (role: string) => {
     if (role.startsWith("red") || role === "qualRed") {
-      return "bg-red-600/20 text-red-400 border-red-600/30";
+      return "bg-red-50 text-red-800 border-red-700/40 dark:bg-red-600/20 dark:text-red-400 dark:border-red-600/30";
     }
-    return "bg-blue-600/20 text-blue-400 border-blue-600/30";
+    return "bg-blue-50 text-blue-800 border-blue-700/40 dark:bg-blue-600/20 dark:text-blue-400 dark:border-blue-600/30";
   };
 
   const handleClockIn = async () => {
@@ -548,12 +550,13 @@ export default function Dashboard() {
                     >
                       <CardHeader className="pb-2">
                         <div className="flex items-center justify-between mb-1 gap-2">
+                          {/* Same as the match cards' role pill: pale with dark text on light themes */}
                           <Badge
                             variant="outline"
-                            className={`text-xs ${
+                            className={`text-xs bg-green-50 text-green-800 border-green-700/40 ${
                               assignment.isRescout
-                                ? "bg-green-300/30 text-green-300 border-green-300/50"
-                                : "bg-green-600/20 text-green-400 border-green-600/30"
+                                ? "dark:bg-green-300/30 dark:text-green-300 dark:border-green-300/50"
+                                : "dark:bg-green-600/20 dark:text-green-400 dark:border-green-600/30"
                             }`}
                           >
                             {assignment.isRescout ? "Rescout" : "Pit Scout"}
@@ -645,10 +648,19 @@ export default function Dashboard() {
                       onClick={() => handleMatchClick(userMatch)}
                     >
                       <CardHeader className="pb-2">
+                        {/* Role pill at the top left, like the pit scouting cards */}
                         <div className="flex items-center justify-between mb-1 gap-2">
-                          <span className="font-mono text-2xl font-bold">
-                            {userMatch.matchNumber}
-                          </span>
+                          <Badge
+                            variant="outline"
+                            className={`${getRoleBadgeColor(
+                              userMatch.role
+                            )} max-w-full whitespace-normal break-words text-xs`}
+                          >
+                            {rescouts.has(`${userMatch.match.id}:${userMatch.role}`) ? "RESCOUT · " : ""}{userMatch.role.toUpperCase()}
+                          </Badge>
+                        </div>
+                        <div className="font-mono text-2xl font-bold">
+                          {userMatch.matchNumber}
                         </div>
                         <CardTitle className="text-lg">
                           Match #{userMatch.match.match_number}
@@ -660,14 +672,6 @@ export default function Dashboard() {
                             <div className="font-semibold text-foreground mb-1">
                               {userName}
                             </div>
-                            <Badge
-                              variant="outline"
-                              className={`${getRoleBadgeColor(
-                                userMatch.role
-                              )} max-w-full whitespace-normal break-words text-xs`}
-                            >
-                              {rescouts.has(`${userMatch.match.id}:${userMatch.role}`) ? "RESCOUT · " : ""}{userMatch.role.toUpperCase()}
-                            </Badge>
                             {teamNumbers[
                               `${userMatch.match.id}-${userMatch.role}`
                             ] && (
