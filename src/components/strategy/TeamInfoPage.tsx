@@ -199,7 +199,16 @@ function sharedMatch(match: ScheduledMatch, teamNumber: number, otherTeam: numbe
   return alliance.includes(otherTeam) ? "with" : opponents.includes(otherTeam) ? "against" : null;
 }
 
-function MatchRow({ label, match, teamNumber, otherTeam, faded, onSelectTeam, onWatch }: {
+/**
+ * Opens a qualification match on the dashboard, remembering the team it was opened from
+ * so the dashboard's back button returns to its page.
+ */
+function useOpenMatch() {
+  const navigate = useNavigate();
+  return (matchNumber: number, teamNumber: number) => navigate(`?match=${matchNumber}`, { state: { fromTeam: teamNumber } });
+}
+
+function MatchRow({ label, match, teamNumber, otherTeam, faded, onSelectTeam, onWatch, onOpen }: {
   label: string;
   match: ScheduledMatch;
   teamNumber: number;
@@ -209,6 +218,8 @@ function MatchRow({ label, match, teamNumber, otherTeam, faded, onSelectTeam, on
   onSelectTeam: (teamNumber: number) => void;
   /** Opens the match's video; absent when no match in the list has one (so no column is kept for it). */
   onWatch?: () => void;
+  /** Opens the match on the dashboard (qualifications only; it has no playoff matches). */
+  onOpen?: () => void;
 }) {
   const result = matchResult(match, match.red.includes(teamNumber) ? "red" : "blue");
   const shared = sharedMatch(match, teamNumber, otherTeam);
@@ -219,7 +230,18 @@ function MatchRow({ label, match, teamNumber, otherTeam, faded, onSelectTeam, on
       title={shared ? SHARED_MATCH[shared].title(otherTeam!) : undefined}
     >
       <div className="flex w-16 shrink-0 items-center gap-1.5">
-        <span className="font-mono text-xs font-semibold tabular-nums">{label}</span>
+        {onOpen ? (
+          <button
+            type="button"
+            onClick={onOpen}
+            title={`Open ${label} on the dashboard`}
+            className="font-mono text-xs font-semibold tabular-nums underline-offset-2 hover:underline"
+          >
+            {label}
+          </button>
+        ) : (
+          <span className="font-mono text-xs font-semibold tabular-nums">{label}</span>
+        )}
         {result ? (
           <span className={`rounded px-1 text-[10px] font-bold ${RESULT_BADGE[result].className}`}>{RESULT_BADGE[result].label}</span>
         ) : match.status === "current" ? (
@@ -251,7 +273,7 @@ function MatchRow({ label, match, teamNumber, otherTeam, faded, onSelectTeam, on
 
 function MatchGroup({ title, matches, teamNumber, otherTeam, onSelectTeam, onWatch }: {
   title: string;
-  matches: Array<{ key: string; label: string; match: ScheduledMatch; faded: boolean }>;
+  matches: Array<{ key: string; label: string; match: ScheduledMatch; faded: boolean; onOpen?: () => void }>;
   teamNumber: number;
   otherTeam?: number;
   onSelectTeam: (teamNumber: number) => void;
@@ -273,7 +295,7 @@ function MatchGroup({ title, matches, teamNumber, otherTeam, onSelectTeam, onWat
         )}
       </div>
       <ul className="space-y-1.5">
-        {matches.map(({ key, label, match, faded }) => (
+        {matches.map(({ key, label, match, faded, onOpen }) => (
           <MatchRow
             key={key}
             label={label}
@@ -283,6 +305,7 @@ function MatchGroup({ title, matches, teamNumber, otherTeam, onSelectTeam, onWat
             faded={faded}
             onSelectTeam={onSelectTeam}
             onWatch={onWatch && (() => onWatch(label, match))}
+            onOpen={onOpen}
           />
         ))}
       </ul>
@@ -302,11 +325,13 @@ function MatchList({ teamNumber, schedule, recentMatches, onSelectTeam, compareK
   otherTeam?: number;
 }) {
   const plays = (match: ScheduledMatch) => match.red.includes(teamNumber) || match.blue.includes(teamNumber);
+  const openMatch = useOpenMatch();
   const quals = schedule.matches.filter(plays).map((match) => ({
     key: `qm${match.matchNumber}`,
     label: `Q${match.matchNumber}`,
     match,
     faded: !!recentMatches && !recentMatches.includes(match.matchNumber),
+    onOpen: () => openMatch(match.matchNumber, teamNumber),
   }));
   // Scouting only covers qualifications, so the window never reaches playoffs.
   const playoffs = schedule.playoffs.filter(plays)
@@ -473,27 +498,30 @@ const ZOOM_HINT = " Pinch or ctrl+scroll a chart to zoom, then drag to pan; doub
 
 /** Auto and teleop fuel curves: one team's alone, or compared teams' overlaid. */
 function FuelCard({ entries }: { entries: Array<{ team: TeamDashboard; color: string }> }) {
+  // A dot opens its match on the dashboard, whose back button then returns to that team
+  const openMatch = useOpenMatch();
+  const onSelectMatch = (matchNumber: number, team: string) => openMatch(matchNumber, Number(team));
   const series = (pick: (match: TeamDashboard["matchFuel"][number]) => number, stats: (team: TeamDashboard) => MeanAndSpread | null) =>
     entries.map(({ team, color }) => ({
       name: String(team.teamNumber),
       color,
       stats: stats(team),
-      matches: team.matchFuel.map((match) => ({ label: matchLabel(match.matchNumber), value: pick(match) })),
+      matches: team.matchFuel.map((match) => ({ label: matchLabel(match.matchNumber), value: pick(match), matchNumber: match.matchNumber })),
     }));
 
   return (
     <Card className="@container gap-0 p-4 sm:p-5">
       <SectionTitle>Fuel distribution</SectionTitle>
       <div className="grid gap-6 @xl:grid-cols-2">
-        <FuelDistributionChart title="Auto fuel" series={series((match) => match.auto, (team) => team.autoFuel)} />
-        <FuelDistributionChart title="Teleop fuel" series={series((match) => match.teleop, (team) => team.teleopFuel)} />
+        <FuelDistributionChart title="Auto fuel" series={series((match) => match.auto, (team) => team.autoFuel)} onSelectMatch={onSelectMatch} />
+        <FuelDistributionChart title="Teleop fuel" series={series((match) => match.teleop, (team) => team.teleopFuel)} onSelectMatch={onSelectMatch} />
       </div>
       <p className="mt-3 text-[10px] text-muted-foreground">
         {entries.length === 1
           ? "Normal curve from the scouted average and standard deviation; the darker band is ±1 SD. Dots are individual scouted matches."
           : "Each team's normal curve from its scouted average and standard deviation, on a shared scale. Dots are individual scouted matches."}
         {entries.some(({ team }) => team.recentMatches) && ` Only each team's last ${RECENT_MATCH_COUNT} scouted matches count.`}
-        {ZOOM_HINT}
+        {ZOOM_HINT} Click a dot to open that match.
       </p>
     </Card>
   );
@@ -508,6 +536,8 @@ const FUEL_LINE_COLORS = [
 /** Auto and teleop fuel per qualification match: one team's, or compared teams' on a shared match axis. */
 function FuelByMatchCard({ teams }: { teams: TeamDashboard[] }) {
   const [alignPreference, setAlignPreference] = useState(false);
+  // A dot opens its match on the dashboard, whose back button then returns to that team
+  const openMatch = useOpenMatch();
   // Aligning only helps line up compared teams; a single team keeps the qualification axis.
   const comparing = teams.length > 1;
   const alignByTeamMatch = comparing && alignPreference;
@@ -537,12 +567,12 @@ function FuelByMatchCard({ teams }: { teams: TeamDashboard[] }) {
           </div>
         )}
       </div>
-      <FuelByMatchChart series={series} alignByTeamMatch={alignByTeamMatch} />
+      <FuelByMatchChart series={series} alignByTeamMatch={alignByTeamMatch} onSelectMatch={(matchNumber, team) => openMatch(matchNumber, Number(team))} />
       <p className="mt-3 text-[10px] text-muted-foreground">
         Co-scouted matches are averaged. Dotted lines bridge played matches with no scouting, following the trend between the scouted matches on either side.
         {alignByTeamMatch && " Aligned: #1 is each team's first played qualification match, #2 its second, and so on."}
         {teams.some((team) => team.recentMatches) && ` Matches before each team's last ${RECENT_MATCH_COUNT} scouted are faded.`}
-        {ZOOM_HINT}
+        {ZOOM_HINT} Click a dot to open that match.
       </p>
     </Card>
   );
@@ -603,11 +633,11 @@ function MatchByMatchCard({ team, data, compareKey }: { team: TeamDashboard; dat
             <TableRow>
               <TableHead>Match</TableHead>
               <TableHead>Scout</TableHead>
-              <TableHead className="text-right">Auto</TableHead>
-              <TableHead className="text-right">Teleop</TableHead>
-              <TableHead>Auto climb</TableHead>
-              <TableHead>Endgame climb</TableHead>
-              <TableHead className="text-right">Points</TableHead>
+              <TableHead className="text-center">Auto</TableHead>
+              <TableHead className="text-center">Teleop</TableHead>
+              <TableHead className="text-center">Auto climb</TableHead>
+              <TableHead className="text-center">Endgame climb</TableHead>
+              <TableHead className="text-center">Points</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -615,11 +645,11 @@ function MatchByMatchCard({ team, data, compareKey }: { team: TeamDashboard; dat
               <TableRow key={row.id}>
                 <TableCell className="font-mono tabular-nums">{row.matchNumber != null ? `Q${row.matchNumber}` : "—"}</TableCell>
                 <TableCell className="max-w-32 truncate">{row.scouterName ?? "—"}</TableCell>
-                <TableCell className="text-right tabular-nums">{row.autoShots}</TableCell>
-                <TableCell className="text-right tabular-nums">{row.teleopShots}</TableCell>
-                <TableCell>{climbLabel(row.autoClimb)}</TableCell>
-                <TableCell>{climbLabel(row.endgameClimb)}</TableCell>
-                <TableCell className="text-right font-semibold tabular-nums">{row.totalPoints}</TableCell>
+                <TableCell className="text-center tabular-nums">{row.autoShots}</TableCell>
+                <TableCell className="text-center tabular-nums">{row.teleopShots}</TableCell>
+                <TableCell className="text-center">{climbLabel(row.autoClimb)}</TableCell>
+                <TableCell className="text-center">{climbLabel(row.endgameClimb)}</TableCell>
+                <TableCell className="text-center font-semibold tabular-nums">{row.totalPoints}</TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -632,7 +662,7 @@ function MatchByMatchCard({ team, data, compareKey }: { team: TeamDashboard; dat
 function NotesCard({ team, compareKey }: { team: TeamDashboard; compareKey?: CompareKey }) {
   return (
     <Card className="@container gap-0 p-4 sm:p-5">
-      <SectionTitle compareKey={compareKey}>Scout notes</SectionTitle>
+      <SectionTitle compareKey={compareKey}>Comments</SectionTitle>
       <div className="grid gap-5 @xl:grid-cols-2">
         <NoteSection title="Comments" notes={team.comments} />
         <NoteSection title="Robot problems" notes={team.robotProblems} />

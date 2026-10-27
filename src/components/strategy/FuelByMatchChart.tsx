@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { ZoomOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatNumber } from "@/lib/strategyData";
@@ -15,6 +15,10 @@ const MIN_ZOOM_MATCHES = 2;
 const FADED_OPACITY = 0.2;
 /** Narrowest zoom, in fuel. */
 const MIN_ZOOM_FUEL = 4;
+/** How close (px) a click has to land to a dot to open its match. */
+const DOT_HIT_RADIUS = 8;
+/** A press that moves further than this (px) was a pan, not a click. */
+const CLICK_SLOP = 4;
 
 const METRICS = [
   { key: "auto", label: "Auto" },
@@ -65,11 +69,19 @@ function LegendKey({ color, dotted }: { color: string; dotted?: boolean }) {
  * with a dotted line along the trend. With `alignByTeamMatch`, the axis is each
  * team's own 1st, 2nd, 3rd… played match instead, so compared teams line up.
  * Pinch (or ctrl+scroll) to zoom into a run of matches and range of fuel,
- * then drag to pan.
+ * then drag to pan. With `onSelectMatch`, clicking a scouted match's dot opens it.
  */
-export function FuelByMatchChart({ series, alignByTeamMatch = false }: { series: FuelByMatchSeries[]; alignByTeamMatch?: boolean }) {
+export function FuelByMatchChart({ series, alignByTeamMatch = false, onSelectMatch }: {
+  series: FuelByMatchSeries[];
+  alignByTeamMatch?: boolean;
+  /** Called with the qualification match of a clicked dot and its series' name (the team). */
+  onSelectMatch?: (matchNumber: number, seriesName: string) => void;
+}) {
   const [containerRef, width] = useWidth<HTMLDivElement>();
   const [tooltip, setTooltip] = useState<Tooltip | null>(null);
+  const [overDot, setOverDot] = useState(false);
+  // Where the last press started, so a pan that ends on a dot doesn't count as a click.
+  const pressStart = useRef<{ x: number; y: number } | null>(null);
   const single = series.length === 1;
   // Switching teams or the axis changes what the matches are, so it starts unzoomed.
   const zoom = useChartZoom(`${alignByTeamMatch}|${series.map((item) => item.name).join()}`);
@@ -147,8 +159,26 @@ export function FuelByMatchChart({ series, alignByTeamMatch = false }: { series:
   const xLabel = (x: number) => (alignByTeamMatch ? `#${x}` : `Q${x}`);
   const xTicks = niceTicks(Math.ceil(viewLo), Math.floor(viewHi), Math.max(2, Math.floor(plotWidth / 50))).filter(Number.isInteger);
 
+  /** The visible scouted dot nearest a point in the chart, if one is close enough. */
+  const dotAt = (px: number, py: number): { matchNumber: number; name: string } | null => {
+    let best: { matchNumber: number; name: string; distance: number } | null = null;
+    for (const team of teams) {
+      for (const point of team.points) {
+        if (point.x < viewLo || point.x > viewHi) continue;
+        for (const { key } of METRICS) {
+          if (point[key] < yViewLo || point[key] > yViewHi) continue;
+          const distance = Math.hypot(xScale(point.x) - px, yScale(point[key]) - py);
+          if (distance <= DOT_HIT_RADIUS && (!best || distance < best.distance)) best = { matchNumber: point.matchNumber, name: team.name, distance };
+        }
+      }
+    }
+    return best;
+  };
+
   const handlePointerMove = (event: React.PointerEvent<SVGSVGElement>) => {
-    const px = event.clientX - event.currentTarget.getBoundingClientRect().left;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const px = event.clientX - rect.left;
+    setOverDot(!!onSelectMatch && dotAt(px, event.clientY - rect.top) !== null);
     const visible = xs.filter((x) => x >= viewLo && x <= viewHi);
     if (visible.length === 0) {
       setTooltip(null);
@@ -181,6 +211,26 @@ export function FuelByMatchChart({ series, alignByTeamMatch = false }: { series:
     setTooltip({ x: xScale(nearest), title: alignByTeamMatch ? `Match #${nearest}` : `Q${nearest}`, rows });
   };
 
+  const zoomProps = zoom.bind({
+    plotLeft: MARGIN.left,
+    plotWidth,
+    minSpan: Math.min(1, MIN_ZOOM_MATCHES / (xHi - xLo)),
+    y: { plotTop: MARGIN.top, plotHeight: baseline - MARGIN.top, minSpan: Math.min(1, MIN_ZOOM_FUEL / yHi) },
+    onHover: handlePointerMove,
+    onLeave: () => {
+      setTooltip(null);
+      setOverDot(false);
+    },
+  });
+
+  const handleClick = (event: React.MouseEvent<SVGSVGElement>) => {
+    const start = pressStart.current;
+    if (!onSelectMatch || (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) > CLICK_SLOP)) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const dot = dotAt(event.clientX - rect.left, event.clientY - rect.top);
+    if (dot) onSelectMatch(dot.matchNumber, dot.name);
+  };
+
   const description = teams
     .map((team) => `${team.name}: ${team.points.map((point) => `Q${point.matchNumber} auto ${formatNumber(point.auto)}, teleop ${formatNumber(point.teleop)}`).join("; ") || "no scouted matches"}`)
     .join(". ");
@@ -203,15 +253,13 @@ export function FuelByMatchChart({ series, alignByTeamMatch = false }: { series:
             height={HEIGHT}
             role="img"
             aria-label={`Fuel by match. ${description}`}
-            className={`block touch-none select-none ${zoom.cursor}`}
-            {...zoom.bind({
-              plotLeft: MARGIN.left,
-              plotWidth,
-              minSpan: Math.min(1, MIN_ZOOM_MATCHES / (xHi - xLo)),
-              y: { plotTop: MARGIN.top, plotHeight: baseline - MARGIN.top, minSpan: Math.min(1, MIN_ZOOM_FUEL / yHi) },
-              onHover: handlePointerMove,
-              onLeave: () => setTooltip(null),
-            })}
+            className={`block touch-none select-none ${overDot ? "cursor-pointer" : zoom.cursor}`}
+            {...zoomProps}
+            onPointerDown={(event) => {
+              pressStart.current = { x: event.clientX, y: event.clientY };
+              zoomProps.onPointerDown(event);
+            }}
+            onClick={handleClick}
           >
             <defs>
               <clipPath id={clipId}>

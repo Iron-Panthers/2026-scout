@@ -341,6 +341,7 @@ export async function updateEvent(
     scouting_map_url?: string;
     users?: [];
     scouters_per_robot?: 1 | 2;
+    picklist_host_id?: string | null;
   }
 ): Promise<boolean> {
   const { error } = await supabase

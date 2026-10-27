@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import { ArrowLeft, Bug, CheckCircle2, CircleDot, MessageSquare, Plus, RotateCcw, Send, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -178,6 +178,21 @@ export function BugReportInbox({ openKey, onOpen, onBack, userId, isDeveloper, n
         </div>
       );
     }
+    // When it was marked fixed, as a line in the thread among the comments around that time
+    // (only the latest fix is recorded). fixedAt is how many comments come before it.
+    const fixedTime = report.status === "fixed" && report.fixed_at ? Date.parse(report.fixed_at) : null;
+    const fixedAt = fixedTime === null ? -1 : comments.filter((c) => Date.parse(c.created_at) <= fixedTime).length;
+    const fixedNote = fixedTime !== null && (
+      <div className="flex items-center gap-2 py-1 text-xs text-muted-foreground">
+        <span className="h-px flex-1 bg-border" />
+        <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-green-500" />
+        <span>
+          Marked fixed by <span className="font-semibold text-foreground">{nameOf(report.fixed_by)}</span> · {formatWhen(report.fixed_at!)}
+        </span>
+        <span className="h-px flex-1 bg-border" />
+      </div>
+    );
+
     // Developers only; it sits beside Mark as fixed, or beside Reopen once fixed
     const deleteButton = (
       <Button
@@ -204,11 +219,7 @@ export function BugReportInbox({ openKey, onOpen, onBack, userId, isDeveloper, n
               <p className="font-semibold break-words">{report.title}</p>
               {statusBadge(report.status)}
             </div>
-            <p className="text-xs text-muted-foreground">
-              Reported by {nameOf(report.author_id)} · {formatWhen(report.created_at)}
-              {report.status === "fixed" && report.fixed_at && ` · Fixed by ${nameOf(report.fixed_by)} ${formatWhen(report.fixed_at)}`}
-            </p>
-            {/* A fixed report's Reopen and delete sit at the bottom of the bar, under who fixed it */}
+            {/* A fixed report's Reopen and delete sit at the bottom of the bar, under the title */}
             {isDeveloper && report.status === "fixed" && (
               <div className="mt-2 flex items-center gap-1">
                 <Button size="sm" variant="outline" onClick={toggleFixed} disabled={busy} className="gap-1.5">
@@ -257,23 +268,28 @@ export function BugReportInbox({ openKey, onOpen, onBack, userId, isDeveloper, n
             <div className="mb-1.5 flex items-center gap-2">
               {avatarOf(report.author_id)}
               <span className="text-sm font-semibold">{nameOf(report.author_id)}</span>
+              <span className="text-xs text-muted-foreground">{formatWhen(report.created_at)}</span>
             </div>
             <p className="whitespace-pre-wrap break-words text-sm">{report.description}</p>
           </div>
 
           {comments.length === 0 && <p className="py-4 text-center text-xs text-muted-foreground">No comments yet.</p>}
-          {comments.map((c) => (
-            <div key={c.id} className="flex gap-2">
-              {avatarOf(c.author_id)}
-              <div className="min-w-0 flex-1">
-                <p className="text-xs">
-                  <span className="font-semibold">{nameOf(c.author_id)}</span>
-                  <span className="ml-2 text-muted-foreground">{formatWhen(c.created_at)}</span>
-                </p>
-                <p className="whitespace-pre-wrap break-words text-sm">{c.body}</p>
+          {comments.map((c, index) => (
+            <Fragment key={c.id}>
+              {index === fixedAt && fixedNote}
+              <div className="flex gap-2">
+                {avatarOf(c.author_id)}
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs">
+                    <span className="font-semibold">{nameOf(c.author_id)}</span>
+                    <span className="ml-2 text-muted-foreground">{formatWhen(c.created_at)}</span>
+                  </p>
+                  <p className="whitespace-pre-wrap break-words text-sm">{c.body}</p>
+                </div>
               </div>
-            </div>
+            </Fragment>
           ))}
+          {fixedAt === comments.length && fixedNote}
           <div ref={commentsEndRef} />
         </div>
 

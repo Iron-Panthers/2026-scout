@@ -44,6 +44,8 @@ export interface Event {
   // Scouters assigned per robot each match: 2 = primary + co-scout, 1 = primary only.
   // Missing on sandbox events created before the setting existed; treat that as 2.
   scouters_per_robot?: 1 | 2;
+  // The scouter who runs the live picklist for this event (set on the Event Information tab).
+  picklist_host_id?: string | null;
   created_at: string;
   updated_at: string;
   users: string[];

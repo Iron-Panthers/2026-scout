@@ -441,7 +441,7 @@ export function createDevEvent(
 export function updateDevEvent(
   userId: string,
   eventId: string,
-  updates: Partial<Pick<Event, "name" | "event_code" | "location" | "start_date" | "end_date" | "scouting_map_url" | "users" | "scouters_per_robot">>
+  updates: Partial<Pick<Event, "name" | "event_code" | "location" | "start_date" | "end_date" | "scouting_map_url" | "users" | "scouters_per_robot" | "picklist_host_id">>
 ): boolean {
   const data = getDevData(userId);
   const event = [data.event, ...(data.additionalEvents ?? [])].find((item) => item.id === eventId);

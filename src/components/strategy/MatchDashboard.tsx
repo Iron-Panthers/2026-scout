@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { AlertCircle, ArrowLeft, ImageOff, Loader2, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -577,6 +577,10 @@ export function MatchDashboard({ event, userId, userName, devMode, toolbarSlot, 
   const [searchParams, setSearchParams] = useSearchParams();
   const matchParam = Number(searchParams.get("match"));
   const [photoTeam, setPhotoTeam] = useState<TeamDashboard | null>(null);
+  // Opened from a team's page (its match list or fuel chart): the back button returns there.
+  // Switching matches here rewrites the address, which drops this.
+  const navigate = useNavigate();
+  const fromTeam = (useLocation().state as { fromTeam?: number } | null)?.fromTeam;
   const [videoOpen, setVideoOpen] = useState(false);
 
   useEffect(() => {
@@ -656,10 +660,18 @@ export function MatchDashboard({ event, userId, userName, devMode, toolbarSlot, 
   // Matches are picked from the list (or a team card's chips).
   const matchToolbar = toolbarSlot && match && createPortal(
     <div className="flex min-w-0 items-center gap-2">
-      <Button variant="outline" size="sm" className="shrink-0 gap-1.5" onClick={showAllMatches}>
-        <ArrowLeft className="h-4 w-4" />
-        All matches
-      </Button>
+      {fromTeam ? (
+        // Back through history, so the team's page comes back as it was
+        <Button variant="outline" size="sm" className="shrink-0 gap-1.5" onClick={() => navigate(-1)}>
+          <ArrowLeft className="h-4 w-4" />
+          Team {fromTeam}
+        </Button>
+      ) : (
+        <Button variant="outline" size="sm" className="shrink-0 gap-1.5" onClick={showAllMatches}>
+          <ArrowLeft className="h-4 w-4" />
+          All matches
+        </Button>
+      )}
       {(match.videos.length > 0 || editableVideos) && (
         <Button variant="outline" size="sm" className="shrink-0 gap-1.5" onClick={() => setVideoOpen(true)}>
           <Play className="h-4 w-4" />

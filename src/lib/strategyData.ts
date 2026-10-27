@@ -94,6 +94,16 @@ function towerLevel(value: string | null): number {
 }
 
 /** Free text, or "" when the scout left it empty. Lists (checkbox answers) are joined. */
+// Older submissions start robot problems with a category the scout picked ("Lost Connection-...");
+// only the description is shown. A category with no description (e.g. "Not Present-") keeps its name.
+const ROBOT_PROBLEM_CATEGORY = /^(Lost Connection|Heavy Browning|Something Broke|Not Present)-/;
+function robotProblemText(value: unknown): string {
+  const raw = text(value);
+  const match = raw.match(ROBOT_PROBLEM_CATEGORY);
+  if (!match) return raw;
+  return raw.slice(match[0].length).trim() || match[1];
+}
+
 function text(value: unknown): string {
   if (Array.isArray(value)) return value.filter((item) => typeof item === "string" && item.trim()).join(", ");
   if (typeof value === "number") return String(value);
@@ -210,7 +220,7 @@ export function toQuantRow(raw: RawQuantSubmission, names: Map<string, string | 
     autoClimb,
     endgameClimb,
     comments: text(data.comments),
-    robotProblems: text(data.robot_problems),
+    robotProblems: robotProblemText(data.robot_problems),
     errors: text(data.errors),
     defense: text(data.defenseDescription),
     totalPoints,

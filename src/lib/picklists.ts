@@ -51,3 +51,34 @@ export async function upsertPicklist(
 
   return true;
 }
+
+/**
+ * Every saved picklist at an event, for the live picklist. Only the event's picklist
+ * host can read other people's picklists; anyone else just gets their own.
+ */
+export async function getEventPicklists(eventId: string): Promise<PicklistRow[]> {
+  const { data, error } = await supabase
+    .from("picklists")
+    .select("*")
+    .eq("event_id", eventId);
+
+  if (error) {
+    console.error("Error fetching event picklists:", error);
+    return [];
+  }
+
+  return data ?? [];
+}
+
+/** Names for the people behind a set of picklists, by user id. */
+export async function getPicklistOwnerNames(userIds: string[]): Promise<Map<string, string>> {
+  if (userIds.length === 0) return new Map();
+  const { data, error } = await supabase.from("profiles").select("id, name").in("id", userIds);
+
+  if (error) {
+    console.error("Error fetching picklist owner names:", error);
+    return new Map();
+  }
+
+  return new Map((data ?? []).map((profile) => [profile.id as string, (profile.name as string | null) ?? "Unknown"]));
+}

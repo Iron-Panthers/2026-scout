@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { ZoomOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatNumber, type MeanAndSpread } from "@/lib/strategyData";
@@ -14,6 +14,10 @@ const DOT_SPACING = 2 * DOT_RADIUS + 2;
 const SAMPLES = 120;
 /** Narrowest zoom, in fuel. */
 const MIN_ZOOM_FUEL = 1;
+/** How close (px) the pointer has to be to a dot to hover or click it; wider than the dot. */
+const DOT_HIT_RADIUS = DOT_RADIUS + 5;
+/** A press that moves further than this (px) was a pan, not a click. */
+const CLICK_SLOP = 4;
 
 const pdf = (x: number, mean: number, sd: number) =>
   Math.exp(-0.5 * ((x - mean) / sd) ** 2) / (sd * Math.sqrt(2 * Math.PI));
@@ -34,7 +38,8 @@ export interface FuelSeries {
   /** Any CSS color, e.g. "var(--compare-a)". */
   color: string;
   stats: MeanAndSpread | null;
-  matches: Array<{ label: string; value: number }>;
+  /** `matchNumber` (a qualification match) makes the dot clickable when the chart has `onSelectMatch`. */
+  matches: Array<{ label: string; value: number; matchNumber?: number | null }>;
 }
 
 type Tooltip = { x: number; y: number; value: string; rows: Array<{ color?: string; text: string }> };
@@ -48,11 +53,20 @@ const sdText = (z: number) => `${z >= 0 ? "+" : "−"}${formatNumber(Math.abs(z)
  * Normal curves from scouted means and standard deviations, with each scouted
  * match as a dot on the baseline. One series also shades its ±1 SD band; two
  * or more are overlaid with a legend so they can be compared. Pinch (or
- * ctrl+scroll) to zoom into a range of fuel counts, then drag to pan.
+ * ctrl+scroll) to zoom into a range of fuel counts, then drag to pan. With
+ * `onSelectMatch`, clicking a match's dot opens it.
  */
-export function FuelDistributionChart({ title, series }: { title: string; series: FuelSeries[] }) {
+export function FuelDistributionChart({ title, series, onSelectMatch }: {
+  title: string;
+  series: FuelSeries[];
+  /** Called with a clicked dot's qualification match and its series' name (the team). */
+  onSelectMatch?: (matchNumber: number, seriesName: string) => void;
+}) {
   const [containerRef, width] = useWidth<HTMLDivElement>();
   const [tooltip, setTooltip] = useState<Tooltip | null>(null);
+  const [overDot, setOverDot] = useState(false);
+  // Where the last press started, so a pan that ends on a dot doesn't count as a click.
+  const pressStart = useRef<{ x: number; y: number } | null>(null);
   const single = series.length === 1;
   const zoom = useChartZoom(series.map((item) => item.name).join());
   const clipId = `fuel-distribution-${useId().replace(/[^\w-]/g, "")}`;
@@ -187,12 +201,15 @@ export function FuelDistributionChart({ title, series }: { title: string; series
   const band = curves[0] && { from: Math.max(viewLo, curves[0].mean - curves[0].sd), to: Math.min(viewHi, curves[0].mean + curves[0].sd) };
   const showBand = band && band.from < band.to;
 
+  const dotAt = (px: number, py: number) => dots.find((d) => Math.hypot(d.cx - px, d.cy - py) <= DOT_HIT_RADIUS);
+
   const handlePointerMove = (event: React.PointerEvent<SVGSVGElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     const px = event.clientX - rect.left;
     const py = event.clientY - rect.top;
     // A dot under the pointer wins over the curve readout; hit area is wider than the dot.
-    const dot = dots.find((d) => Math.hypot(d.cx - px, d.cy - py) <= DOT_RADIUS + 5);
+    const dot = dotAt(px, py);
+    setOverDot(!!onSelectMatch && dot?.matchNumber != null);
     if (dot) {
       setTooltip({
         x: dot.cx,
@@ -219,6 +236,25 @@ export function FuelDistributionChart({ title, series }: { title: string; series
     });
   };
 
+  const zoomProps = zoom.bind({
+    plotLeft: MARGIN.left,
+    plotWidth,
+    minSpan,
+    onHover: handlePointerMove,
+    onLeave: () => {
+      setTooltip(null);
+      setOverDot(false);
+    },
+  });
+
+  const handleClick = (event: React.MouseEvent<SVGSVGElement>) => {
+    const start = pressStart.current;
+    if (!onSelectMatch || (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) > CLICK_SLOP)) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const dot = dotAt(event.clientX - rect.left, event.clientY - rect.top);
+    if (dot?.matchNumber != null) onSelectMatch(dot.matchNumber, dot.name);
+  };
+
   const description = plotted
     .map((item) => `${item.name} average ${formatNumber(item.stats.mean)}${item.stats.sd != null ? `, standard deviation ${formatNumber(item.stats.sd)}` : ""}, ${item.matches.length} scouted matches`)
     .join("; ");
@@ -233,8 +269,13 @@ export function FuelDistributionChart({ title, series }: { title: string; series
             height={HEIGHT}
             role="img"
             aria-label={`${title} normal curves: ${description}`}
-            className={`block touch-none select-none ${zoom.cursor}`}
-            {...zoom.bind({ plotLeft: MARGIN.left, plotWidth, minSpan, onHover: handlePointerMove, onLeave: () => setTooltip(null) })}
+            className={`block touch-none select-none ${overDot ? "cursor-pointer" : zoom.cursor}`}
+            {...zoomProps}
+            onPointerDown={(event) => {
+              pressStart.current = { x: event.clientX, y: event.clientY };
+              zoomProps.onPointerDown(event);
+            }}
+            onClick={handleClick}
           >
             <defs>
               <clipPath id={clipId}>

@@ -5,6 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Popover,
@@ -81,6 +88,7 @@ export function EventInformationTab({
   const [isSettingActive, setIsSettingActive] = useState(false);
   const [uploadingMap, setUploadingMap] = useState(false);
   const [isSavingScoutersPerRobot, setIsSavingScoutersPerRobot] = useState(false);
+  const [isSavingPicklistHost, setIsSavingPicklistHost] = useState(false);
   const [editedEvent, setEditedEvent] = useState<Partial<Event>>({
     name: currentEvent?.name || "",
     event_code: currentEvent?.event_code || "",
@@ -265,6 +273,21 @@ export function EventInformationTab({
       onEventUpdate?.();
     } else {
       toast({ title: "Could not update scouters per robot", variant: "destructive" });
+    }
+  };
+
+  // Saves right away too. The host is the one scouter who can start the live picklist.
+  const handleSetPicklistHost = async (hostId: string | null) => {
+    if (!currentEvent || isAllEvents) return;
+    setIsSavingPicklistHost(true);
+    const success = devUserId && isDevEventId(currentEvent.id)
+      ? updateDevEvent(devUserId, currentEvent.id, { picklist_host_id: hostId })
+      : await updateEvent(currentEvent.id, { picklist_host_id: hostId });
+    setIsSavingPicklistHost(false);
+    if (success) {
+      onEventUpdate?.();
+    } else {
+      toast({ title: "Could not update the picklist host", variant: "destructive" });
     }
   };
 
@@ -639,6 +662,43 @@ export function EventInformationTab({
                     {(currentEvent.scouters_per_robot ?? 2) === 2 ? "Two scouters" : "One scouter"}
                   </span>
                 </div>
+              </div>
+            )}
+
+            {!isAllEvents && currentEvent && (
+              <div>
+                <Label htmlFor="picklist-host" className="text-sm font-medium text-muted-foreground">
+                  Picklist Host
+                </Label>
+                <Select
+                  value={currentEvent.picklist_host_id ?? "none"}
+                  onValueChange={(value) => void handleSetPicklistHost(value === "none" ? null : value)}
+                  disabled={isSavingPicklistHost}
+                >
+                  <SelectTrigger id="picklist-host" className="mt-1 w-full sm:w-64">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No host</SelectItem>
+                    {/* Keeps a host who has since left the event's scout list selectable. */}
+                    {currentEvent.picklist_host_id &&
+                      !availableScouts.some((scout) => scout.id === currentEvent.picklist_host_id) && (
+                        <SelectItem value={currentEvent.picklist_host_id}>
+                          {allScouts.find((scout) => scout.id === currentEvent.picklist_host_id)?.name ?? "Unknown scouter"}
+                        </SelectItem>
+                      )}
+                    {[...availableScouts]
+                      .sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""))
+                      .map((scout) => (
+                        <SelectItem key={scout.id} value={scout.id}>
+                          {scout.name || "Unknown"}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  The host can start a live picklist from the Picklist tab of the Strategy Dashboard.
+                </p>
               </div>
             )}
 

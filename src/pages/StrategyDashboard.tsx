@@ -21,7 +21,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -44,7 +44,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ListOrdered, ArrowUpDown, Loader2, RotateCcw } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ListOrdered, ArrowUpDown, Loader2, RotateCcw, Radio, Info } from "lucide-react";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDevMode } from "@/contexts/DevModeContext";
 import { getEvents } from "@/lib/matches";
@@ -63,11 +65,12 @@ import {
   saveDevPicklist,
 } from "@/lib/devMode";
 import UserProfileMenu from "@/components/UserProfileMenu";
-import { TeamLogo } from "@/components/TeamLogo";
 import { TeamInfoDialog } from "@/components/TeamInfoDialog";
 import { ScoutingDataTable } from "@/components/strategy/ScoutingDataTable";
 import { MatchDashboard } from "@/components/strategy/MatchDashboard";
 import { TeamInfoPage } from "@/components/strategy/TeamInfoPage";
+import { PicklistCardContent } from "@/components/strategy/PicklistCardContent";
+import { LivePicklist } from "@/components/strategy/LivePicklist";
 import { SCOUTING_DATA_TYPES, type ScoutingDataType } from "@/lib/strategyData";
 import type { Event } from "@/types";
 
@@ -179,36 +182,6 @@ const picklistCollisionDetection: CollisionDetection = (args) => {
   if (pointerCollisions.length > 0) return pointerCollisions;
   return closestCenter(args);
 };
-
-function PicklistCardContent({
-  team,
-  showRank,
-  index,
-}: {
-  team: TBATeamSimple;
-  showRank?: boolean;
-  index?: number;
-}) {
-  return (
-    <CardContent className="flex items-center gap-2.5 px-3 py-2">
-      {showRank && (
-        <span className="w-5 shrink-0 text-center text-xs font-bold text-muted-foreground">
-          {(index ?? 0) + 1}
-        </span>
-      )}
-      <TeamLogo
-        teamNumber={team.team_number}
-        className="h-11 w-11 shrink-0 rounded-md border bg-muted object-contain"
-      />
-      <div className="flex min-w-0 flex-col justify-center">
-        <p className="font-mono text-sm font-bold">{team.team_number}</p>
-        <p className="truncate text-xs text-muted-foreground">
-          {team.nickname || "Unknown team"}
-        </p>
-      </div>
-    </CardContent>
-  );
-}
 
 interface SortablePicklistCardProps {
   team: TBATeamSimple;
@@ -396,6 +369,11 @@ export default function StrategyDashboard() {
   // Opens on the match dashboard; the open page lives in the address (?page=...), so
   // reloading stays on it
   const [strategyPage, setStrategyPage] = useUrlState<StrategyPage>("page", "dashboard", STRATEGY_PAGE_IDS);
+  // The live picklist opens over the Picklist page as ?live=1, so Back closes it.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const liveOpen = strategyPage === "picklist" && searchParams.get("live") === "1";
   const [scoutingDataType, setScoutingDataType] = useState<ScoutingDataType>("quantitative");
   // Where the Dashboard page puts its match toolbar, in place of the event dropdown.
   const [toolbarSlot, setToolbarSlot] = useState<HTMLDivElement | null>(null);
@@ -809,19 +787,47 @@ export default function StrategyDashboard() {
   const selectedPicklistEvent = picklistEvents.find(
     (event) => event.id === selectedPicklistEventId
   );
+  const isPicklistHost = !!user?.id && selectedPicklistEvent?.picklist_host_id === user.id;
+
+  const openLivePicklist = () =>
+    setSearchParams(
+      (current) => {
+        const params = new URLSearchParams(current);
+        params.set("live", "1");
+        return params;
+      },
+      { state: { fromPicklist: true } }
+    );
+  const closeLivePicklist = () => {
+    if ((location.state as { fromPicklist?: boolean } | null)?.fromPicklist) {
+      navigate(-1);
+      return;
+    }
+    setSearchParams(
+      (current) => {
+        const params = new URLSearchParams(current);
+        params.delete("live");
+        return params;
+      },
+      { replace: true }
+    );
+  };
+  const pageInfo = liveOpen
+    ? { title: "Live Picklist", description: "Everyone's picklists, averaged and updated live." }
+    : STRATEGY_PAGES[strategyPage];
 
   return (
     <div className="min-h-screen bg-background my-5">
       {/* The dashboard uses the full width so all six robots fit in a row on wide
           screens, and less padding so three fit across a phone. */}
-      <main className={`mx-auto ${strategyPage === "dashboard" ? "w-full p-3 sm:p-6" : "container p-6 max-w-7xl"}`}>
+      <main className={`mx-auto ${strategyPage === "dashboard" || liveOpen ? "w-full p-3 sm:p-6" : "container p-6 max-w-7xl"}`}>
         {/* Header Section */}
         <div className="flex items-start justify-between mb-8">
           <div className="flex items-center gap-3">
             <ListOrdered className="h-7 w-7 text-primary" />
             <div>
-              <h1 className="text-2xl font-bold">{STRATEGY_PAGES[strategyPage].title}</h1>
-              <p className="text-sm text-muted-foreground">{STRATEGY_PAGES[strategyPage].description}</p>
+              <h1 className="text-2xl font-bold">{pageInfo.title}</h1>
+              <p className="text-sm text-muted-foreground">{pageInfo.description}</p>
             </div>
           </div>
           <UserProfileMenu userName={userName} userInitials={userInitials} avatarUrl={avatarUrl} />
@@ -831,7 +837,32 @@ export default function StrategyDashboard() {
           {/* On the Data page the event sits left and the data type right, on one line. On the
               Dashboard page the event sits left, and while a match is open the match toolbar
               (All matches, video) takes its place; the other pages keep the event dropdown on the right. */}
-          <div className={`mb-4 flex gap-2 ${strategyPage === "data" ? "justify-between" : strategyPage === "dashboard" ? "justify-start" : "justify-end"}`}>
+          <div className={`mb-4 flex gap-2 ${liveOpen ? "hidden" : ""} ${strategyPage === "data" ? "justify-between" : strategyPage === "dashboard" ? "justify-start" : "justify-end"}`}>
+            {strategyPage === "picklist" && (
+              <div className="mr-auto flex shrink-0 items-center gap-0.5">
+                <Button
+                  variant={isPicklistHost ? "default" : "outline"}
+                  className="gap-1.5"
+                  disabled={!isPicklistHost}
+                  onClick={openLivePicklist}
+                >
+                  <Radio className="h-4 w-4" />
+                  {isPicklistHost ? "Start picklist" : "Live picklist"}
+                </Button>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" aria-label="About the live picklist">
+                      <Info className="h-4 w-4" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="start" className="w-72 text-sm">
+                    {isPicklistHost
+                      ? "You have been selected to be the picklist host! The day before playoff matches, initiate a picklist by pressing this button and share your screen to a TV. Your screen will receive live updates from everyone."
+                      : "Only this event's picklist host can start the live picklist. A manager chooses the host on the Event Information tab."}
+                  </PopoverContent>
+                </Popover>
+              </div>
+            )}
             {!(strategyPage === "dashboard" && matchOpen) && (
               <Select value={selectedPicklistEventId} onValueChange={setSelectedPicklistEventId}>
                 <SelectTrigger className="w-full min-w-0 flex-1 sm:w-64 sm:flex-none" aria-label="Picklist event">
@@ -904,6 +935,29 @@ export default function StrategyDashboard() {
               userName={profile?.name ?? null}
               devMode={devMode}
             />
+          ) : liveOpen ? (
+            !selectedPicklistEvent || picklistLoading ? (
+              <p className="text-muted-foreground">Loading event teams...</p>
+            ) : !isPicklistHost || !user ? (
+              <Card className="p-8 text-center">
+                <p className="text-muted-foreground">
+                  Only the picklist host for {selectedPicklistEvent.name} can run the live picklist.
+                </p>
+              </Card>
+            ) : (
+              <LivePicklist
+                key={selectedPicklistEvent.id}
+                event={selectedPicklistEvent}
+                teams={allEventTeams}
+                userId={user.id}
+                devMode={devMode}
+                onExit={closeLivePicklist}
+                onTeamClick={(team) => {
+                  setTeamInfoTeam(team);
+                  setTeamInfoOpen(true);
+                }}
+              />
+            )
           ) : strategyPage === "picklist" ? (
             <>
               <div className="mb-4 flex items-center gap-1 rounded-lg border p-1">
@@ -1094,7 +1148,7 @@ export default function StrategyDashboard() {
           </Dialog>
         </section>
 
-        <nav className="fixed inset-x-4 bottom-4 z-30 mx-auto mt-8 flex max-w-xl items-center justify-center gap-1 rounded-xl border-2 border-border bg-card p-1 shadow-xl backdrop-blur">
+        <nav className={`${liveOpen ? "hidden" : "flex"} fixed inset-x-4 bottom-4 z-30 mx-auto mt-8 max-w-xl items-center justify-center gap-1 rounded-xl border-2 border-border bg-card p-1 shadow-xl backdrop-blur`}>
           {(Object.keys(STRATEGY_PAGES) as StrategyPage[]).map((page) => (
             <Button
               key={page}
