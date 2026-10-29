@@ -21,6 +21,7 @@ import {
   formatNumber,
   loadEventData,
   type EventData,
+  type MatchFuel,
   type MeanAndSpread,
   type PitRow,
   type EventSchedule,
@@ -36,15 +37,17 @@ import type { Event } from "@/types";
 type TeamSort = "number" | "points";
 
 // Pit scouting answers shown in the summary, in form order (src/config/pitScoutingConfig.ts).
-const PIT_FIELDS: Array<{ key: keyof PitRow; label: string }> = [
+// `optional` ones only show when answered (the raised hopper space is only asked of modular robots).
+const PIT_FIELDS: Array<{ key: keyof PitRow; label: string; optional?: boolean }> = [
   { key: "dimensions", label: "Dimensions" },
   { key: "weight", label: "Weight" },
   { key: "drivetrain", label: "Drivetrain" },
+  { key: "terrain", label: "Height" },
   { key: "hopperCapacity", label: "Hopper capacity" },
+  { key: "hopperCapacityRaised", label: "Hopper capacity (raised)", optional: true },
   { key: "shootingSpeed", label: "Shooting / intake speed" },
   { key: "shootingMechanism", label: "Shooter type" },
   { key: "climb", label: "Climb" },
-  { key: "terrain", label: "Height" },
   { key: "driverExperience", label: "Driver experience" },
 ];
 
@@ -423,7 +426,7 @@ function compareTone(stat: keyof typeof COMPARED_STATS, team: TeamDashboard, oth
   return (mine > theirs) !== lowerIsBetter ? "better" : "worse";
 }
 
-function TeamHeaderCard({ team, data, scoutersPerRobot, color, other }: {
+function TeamHeaderCard({ team, data, scoutersPerRobot, color, other, action }: {
   team: TeamDashboard;
   data: EventData;
   scoutersPerRobot: 1 | 2;
@@ -431,6 +434,8 @@ function TeamHeaderCard({ team, data, scoutersPerRobot, color, other }: {
   color?: string;
   /** Compare mode: the other team, whose stats this card's are colored against. */
   other?: TeamDashboard;
+  /** Shown at the top right (e.g. the live picklist host's DNP button). */
+  action?: React.ReactNode;
 }) {
   const { quant } = teamRows(data, team);
   const tone = (stat: keyof typeof COMPARED_STATS) => compareTone(stat, team, other);
@@ -442,13 +447,14 @@ function TeamHeaderCard({ team, data, scoutersPerRobot, color, other }: {
     <Card className="@container gap-0 p-4 sm:p-5">
       <div className="flex items-center gap-3">
         <TeamLogo teamNumber={team.teamNumber} className="h-14 w-14 shrink-0 rounded-md border bg-muted object-contain" />
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <h2 className="flex items-center gap-2 font-mono text-3xl font-black tabular-nums" style={color ? { color } : undefined}>
             {color && <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: color }} />}
             {team.teamNumber}
           </h2>
           <p className="truncate text-sm text-muted-foreground">{team.name ?? "Unknown team"}</p>
         </div>
+        {action && <div className="shrink-0 self-start">{action}</div>}
       </div>
 
       <div className="mt-4 grid gap-4 @xl:grid-cols-2">
@@ -501,25 +507,42 @@ function FuelCard({ entries }: { entries: Array<{ team: TeamDashboard; color: st
   // A dot opens its match on the dashboard, whose back button then returns to that team
   const openMatch = useOpenMatch();
   const onSelectMatch = (matchNumber: number, team: string) => openMatch(matchNumber, Number(team));
-  const series = (pick: (match: TeamDashboard["matchFuel"][number]) => number, stats: (team: TeamDashboard) => MeanAndSpread | null) =>
+  const series = (
+    pick: (match: MatchFuel) => number,
+    suspicious: (match: MatchFuel) => boolean,
+    stats: (team: TeamDashboard) => MeanAndSpread | null
+  ) =>
     entries.map(({ team, color }) => ({
       name: String(team.teamNumber),
       color,
       stats: stats(team),
-      matches: team.matchFuel.map((match) => ({ label: matchLabel(match.matchNumber), value: pick(match), matchNumber: match.matchNumber })),
+      matches: team.matchFuel.map((match) => ({
+        label: matchLabel(match.matchNumber),
+        value: pick(match),
+        matchNumber: match.matchNumber,
+        suspicious: suspicious(match),
+      })),
     }));
 
   return (
     <Card className="@container gap-0 p-4 sm:p-5">
       <SectionTitle>Fuel distribution</SectionTitle>
       <div className="grid gap-6 @xl:grid-cols-2">
-        <FuelDistributionChart title="Auto fuel" series={series((match) => match.auto, (team) => team.autoFuel)} onSelectMatch={onSelectMatch} />
-        <FuelDistributionChart title="Teleop fuel" series={series((match) => match.teleop, (team) => team.teleopFuel)} onSelectMatch={onSelectMatch} />
+        <FuelDistributionChart
+          title="Auto fuel"
+          series={series((match) => match.auto, (match) => match.autoSuspicious, (team) => team.autoFuel)}
+          onSelectMatch={onSelectMatch}
+        />
+        <FuelDistributionChart
+          title="Teleop fuel"
+          series={series((match) => match.teleop, (match) => match.teleopSuspicious, (team) => team.teleopFuel)}
+          onSelectMatch={onSelectMatch}
+        />
       </div>
       <p className="mt-3 text-[10px] text-muted-foreground">
         {entries.length === 1
-          ? "Normal curve from the scouted average and standard deviation; the darker band is ±1 SD. Dots are individual scouted matches."
-          : "Each team's normal curve from its scouted average and standard deviation, on a shared scale. Dots are individual scouted matches."}
+          ? "Normal curve from the scouted average and standard deviation; the darker band is ±1 SD. Dots are individual scouted matches; red ones are suspicious."
+          : "Each team's normal curve from its scouted average and standard deviation, on a shared scale. Dots are individual scouted matches; red ones are suspicious."}
         {entries.some(({ team }) => team.recentMatches) && ` Only each team's last ${RECENT_MATCH_COUNT} scouted matches count.`}
         {ZOOM_HINT} Click a dot to open that match.
       </p>
@@ -592,7 +615,7 @@ function PitCard({ team, data, compareKey }: { team: TeamDashboard; data: EventD
       ) : (
         <>
           <div className="grid grid-cols-2 gap-x-4 gap-y-3 @md:grid-cols-3">
-            {PIT_FIELDS.map((field) => (
+            {PIT_FIELDS.filter((field) => !field.optional || pitValue(field.key)).map((field) => (
               <Stat key={field.key} label={field.label} value={pitValue(field.key)} />
             ))}
           </div>
@@ -674,15 +697,17 @@ function NotesCard({ team, compareKey }: { team: TeamDashboard; compareKey?: Com
 }
 
 /** Everything the event's scouting data says about one team. */
-export function TeamSummary({ team, data, scoutersPerRobot, onSelectTeam }: {
+export function TeamSummary({ team, data, scoutersPerRobot, onSelectTeam, headerAction }: {
   team: TeamDashboard;
   data: EventData;
   scoutersPerRobot: 1 | 2;
   onSelectTeam: (teamNumber: number) => void;
+  /** Shown at the top right of the team's header card. */
+  headerAction?: React.ReactNode;
 }) {
   return (
     <div className="space-y-4">
-      <TeamHeaderCard team={team} data={data} scoutersPerRobot={scoutersPerRobot} />
+      <TeamHeaderCard team={team} data={data} scoutersPerRobot={scoutersPerRobot} action={headerAction} />
       <FuelCard entries={[{ team, color: "var(--compare-a)" }]} />
       <FuelByMatchCard teams={[team]} />
       <MatchList teamNumber={team.teamNumber} schedule={data.schedule} recentMatches={team.recentMatches} onSelectTeam={onSelectTeam} />

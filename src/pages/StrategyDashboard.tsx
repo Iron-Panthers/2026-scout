@@ -45,7 +45,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ListOrdered, ArrowUpDown, Loader2, RotateCcw, Radio, Info } from "lucide-react";
+import { ListOrdered, ArrowUpDown, Loader2, RotateCcw, Radio, Info, Tag } from "lucide-react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDevMode } from "@/contexts/DevModeContext";
@@ -70,7 +70,11 @@ import { ScoutingDataTable } from "@/components/strategy/ScoutingDataTable";
 import { MatchDashboard } from "@/components/strategy/MatchDashboard";
 import { TeamInfoPage } from "@/components/strategy/TeamInfoPage";
 import { PicklistCardContent } from "@/components/strategy/PicklistCardContent";
-import { LivePicklist } from "@/components/strategy/LivePicklist";
+import { LivePicklist, LivePicklistViewer } from "@/components/strategy/LivePicklist";
+import { useLivePicklist } from "@/hooks/useLivePicklist";
+import { endLivePicklist, entryTags, type LivePicklistTag } from "@/lib/livePicklists";
+import { TeamTags } from "@/components/strategy/TeamTag";
+import { LiveTeamNote } from "@/components/strategy/LiveTeamNote";
 import { SCOUTING_DATA_TYPES, type ScoutingDataType } from "@/lib/strategyData";
 import type { Event } from "@/types";
 
@@ -188,6 +192,8 @@ interface SortablePicklistCardProps {
   column: PicklistColumnKey;
   index: number;
   showRank: boolean;
+  /** The live picklist host's tags on this team. */
+  tags?: LivePicklistTag[];
   onCardClick: (team: TBATeamSimple) => void;
   /** Screen position (viewport coords) this card was dropped at, if it just
    * landed in this column from a different one — used to animate it flying
@@ -204,6 +210,7 @@ function SortablePicklistCard({
   column,
   index,
   showRank,
+  tags,
   onCardClick,
   flyFrom,
   onFlyDone,
@@ -259,7 +266,12 @@ function SortablePicklistCard({
           isDragging ? "opacity-50" : ""
         }`}
       >
-        <PicklistCardContent team={team} showRank={showRank} index={index} />
+        <PicklistCardContent
+          team={team}
+          showRank={showRank}
+          index={index}
+          below={tags && <TeamTags tags={tags} dots />}
+        />
       </Card>
     </div>
   );
@@ -272,6 +284,7 @@ interface PicklistColumnProps {
   teams: TBATeamSimple[];
   emptyMessage: string;
   showRank: boolean;
+  tags: Map<number, LivePicklistTag[]>;
   onCardClick: (team: TBATeamSimple) => void;
   flyingTeam?: { teamNumber: number; rect: { top: number; left: number } } | null;
   onFlyDone?: () => void;
@@ -284,6 +297,7 @@ function PicklistColumn({
   teams,
   emptyMessage,
   showRank,
+  tags,
   onCardClick,
   flyingTeam,
   onFlyDone,
@@ -321,6 +335,7 @@ function PicklistColumn({
               column={columnKey}
               index={index}
               showRank={showRank}
+              tags={tags.get(team.team_number)}
               onCardClick={onCardClick}
               flyFrom={flyingTeam?.teamNumber === team.team_number ? flyingTeam.rect : null}
               onFlyDone={flyingTeam?.teamNumber === team.team_number ? onFlyDone : undefined}
@@ -353,7 +368,7 @@ const STRATEGY_PAGES: Record<StrategyPage, { label: string; title: string; descr
   picklist: {
     label: "Picklist",
     title: "Picklist",
-    description: "Sort teams however you want! This list is only visible for you.",
+    description: "Sort teams however you want! This is your personal list and will be used in the live picklist.",
   },
   event: {
     label: "Event",
@@ -788,6 +803,37 @@ export default function StrategyDashboard() {
     (event) => event.id === selectedPicklistEventId
   );
   const isPicklistHost = !!user?.id && selectedPicklistEvent?.picklist_host_id === user.id;
+  // The host's shared live picklist (sandbox events have none: only the host's own screen).
+  const livePicklist = useLivePicklist(
+    selectedPicklistEventId && !(devMode && isDevEventId(selectedPicklistEventId)) ? selectedPicklistEventId : undefined
+  );
+  const picklistIsLive = !!livePicklist.row?.is_live;
+
+  // Picklister: opening the live picklist, as its host or watching it run
+  useEffect(() => {
+    if (liveOpen && (isPicklistHost || picklistIsLive)) void unlockAchievement(user?.id, "live_picklist");
+  }, [liveOpen, isPicklistHost, picklistIsLive, user?.id]);
+  // Tags the host put on teams in the live picklist, shown on everyone's picklist cards
+  // (kept after the live picklist ends).
+  const liveTags = useMemo(
+    () =>
+      new Map(
+        (livePicklist.row?.entries ?? [])
+          .map((entry) => [entry.teamNumber, entryTags(entry)] as const)
+          .filter(([, tags]) => tags.length > 0)
+      ),
+    [livePicklist.row]
+  );
+  // The host's live picklist notes on teams, shown in the team popup (also kept after it ends).
+  const liveNotes = useMemo(
+    () =>
+      new Map(
+        (livePicklist.row?.entries ?? [])
+          .filter((entry) => entry.note?.trim())
+          .map((entry) => [entry.teamNumber, entry.note!] as const)
+      ),
+    [livePicklist.row]
+  );
 
   const openLivePicklist = () =>
     setSearchParams(
@@ -812,22 +858,34 @@ export default function StrategyDashboard() {
       { replace: true }
     );
   };
+  const handleEndLivePicklist = async () => {
+    if (selectedPicklistEvent && !(devMode && isDevEventId(selectedPicklistEvent.id))) {
+      await endLivePicklist(selectedPicklistEvent.id);
+    }
+    closeLivePicklist();
+  };
   const pageInfo = liveOpen
-    ? { title: "Live Picklist", description: "Everyone's picklists, averaged and updated live." }
+    ? { title: "Live Picklist", description: null }
     : STRATEGY_PAGES[strategyPage];
 
   return (
     <div className="min-h-screen bg-background my-5">
       {/* The dashboard uses the full width so all six robots fit in a row on wide
-          screens, and less padding so three fit across a phone. */}
-      <main className={`mx-auto ${strategyPage === "dashboard" || liveOpen ? "w-full p-3 sm:p-6" : "container p-6 max-w-7xl"}`}>
+          screens, and less padding so three fit across a phone. The live picklist is full
+          width too, with the same padding at every size so its toolbar doesn't wrap and
+          unwrap as the padding jumps. */}
+      <main
+        className={`mx-auto ${
+          strategyPage === "dashboard" ? "w-full p-3 sm:p-6" : liveOpen ? "w-full p-6" : "container p-6 max-w-7xl"
+        }`}
+      >
         {/* Header Section */}
         <div className="flex items-start justify-between mb-8">
           <div className="flex items-center gap-3">
             <ListOrdered className="h-7 w-7 text-primary" />
             <div>
               <h1 className="text-2xl font-bold">{pageInfo.title}</h1>
-              <p className="text-sm text-muted-foreground">{pageInfo.description}</p>
+              {pageInfo.description && <p className="text-sm text-muted-foreground">{pageInfo.description}</p>}
             </div>
           </div>
           <UserProfileMenu userName={userName} userInitials={userInitials} avatarUrl={avatarUrl} />
@@ -841,13 +899,20 @@ export default function StrategyDashboard() {
             {strategyPage === "picklist" && (
               <div className="mr-auto flex shrink-0 items-center gap-0.5">
                 <Button
-                  variant={isPicklistHost ? "default" : "outline"}
+                  variant={isPicklistHost || picklistIsLive ? "default" : "outline"}
                   className="gap-1.5"
-                  disabled={!isPicklistHost}
+                  disabled={!isPicklistHost && !picklistIsLive}
                   onClick={openLivePicklist}
                 >
-                  <Radio className="h-4 w-4" />
-                  {isPicklistHost ? "Start picklist" : "Live picklist"}
+                  {picklistIsLive ? (
+                    <span className="relative flex h-2 w-2">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
+                      <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
+                    </span>
+                  ) : (
+                    <Radio className="h-4 w-4" />
+                  )}
+                  {isPicklistHost ? (picklistIsLive ? "Open picklist" : "Start picklist") : "Live picklist"}
                 </Button>
                 <Popover>
                   <PopoverTrigger asChild>
@@ -858,7 +923,9 @@ export default function StrategyDashboard() {
                   <PopoverContent align="start" className="w-72 text-sm">
                     {isPicklistHost
                       ? "You have been selected to be the picklist host! The day before playoff matches, initiate a picklist by pressing this button and share your screen to a TV. Your screen will receive live updates from everyone."
-                      : "Only this event's picklist host can start the live picklist. A manager chooses the host on the Event Information tab."}
+                      : picklistIsLive
+                        ? "The live picklist is running! Open it to watch the host's list update live and suggest moving teams up or down."
+                        : "Once the picklist host starts the live picklist, you can watch it here and suggest moving teams up or down."}
                   </PopoverContent>
                 </Popover>
               </div>
@@ -938,19 +1005,34 @@ export default function StrategyDashboard() {
           ) : liveOpen ? (
             !selectedPicklistEvent || picklistLoading ? (
               <p className="text-muted-foreground">Loading event teams...</p>
-            ) : !isPicklistHost || !user ? (
-              <Card className="p-8 text-center">
-                <p className="text-muted-foreground">
-                  Only the picklist host for {selectedPicklistEvent.name} can run the live picklist.
-                </p>
-              </Card>
-            ) : (
+            ) : isPicklistHost && user ? (
               <LivePicklist
                 key={selectedPicklistEvent.id}
                 event={selectedPicklistEvent}
                 teams={allEventTeams}
                 userId={user.id}
+                userName={profile?.name ?? null}
                 devMode={devMode}
+                onExit={closeLivePicklist}
+                onEnd={() => void handleEndLivePicklist()}
+              />
+            ) : !livePicklist.loaded && !(devMode && isDevEventId(selectedPicklistEvent.id)) ? (
+              <p className="text-muted-foreground">Loading the live picklist...</p>
+            ) : !picklistIsLive || !livePicklist.row ? (
+              <Card className="p-8 text-center">
+                <p className="text-muted-foreground">
+                  The live picklist for {selectedPicklistEvent.name} isn't running right now.
+                </p>
+                <Button variant="outline" className="mx-auto mt-4 w-fit" onClick={closeLivePicklist}>
+                  Back to your picklist
+                </Button>
+              </Card>
+            ) : (
+              <LivePicklistViewer
+                event={selectedPicklistEvent}
+                userId={user?.id}
+                teams={allEventTeams}
+                live={livePicklist.row}
                 onExit={closeLivePicklist}
                 onTeamClick={(team) => {
                   setTeamInfoTeam(team);
@@ -1007,6 +1089,7 @@ export default function StrategyDashboard() {
                         teams={pickedTeams}
                         emptyMessage="Picklist goes here I think"
                         showRank
+                        tags={liveTags}
                         onCardClick={(team) => {
                           setTeamInfoTeam(team);
                           setTeamInfoOpen(true);
@@ -1023,6 +1106,7 @@ export default function StrategyDashboard() {
                         teams={doNotPickTeams}
                         emptyMessage="Skibidi"
                         showRank
+                        tags={liveTags}
                         onCardClick={(team) => {
                           setTeamInfoTeam(team);
                           setTeamInfoOpen(true);
@@ -1074,6 +1158,7 @@ export default function StrategyDashboard() {
                       teams={sortedBankTeams}
                       emptyMessage="All teams have been picked."
                       showRank={false}
+                      tags={liveTags}
                       onCardClick={(team) => {
                         setTeamInfoTeam(team);
                         setTeamInfoOpen(true);
@@ -1086,7 +1171,12 @@ export default function StrategyDashboard() {
                   <DragOverlay dropAnimation={null}>
                     {activeDragTeam ? (
                       <Card className="cursor-grabbing gap-0 py-0 shadow-lg">
-                        <PicklistCardContent team={activeDragTeam} />
+                        <PicklistCardContent
+                          team={activeDragTeam}
+                          below={liveTags.get(activeDragTeam.team_number) && (
+                            <TeamTags tags={liveTags.get(activeDragTeam.team_number)!} dots />
+                          )}
+                        />
                       </Card>
                     ) : null}
                   </DragOverlay>
@@ -1124,6 +1214,20 @@ export default function StrategyDashboard() {
             userId={user?.id}
             userName={profile?.name ?? null}
             devMode={devMode}
+            renderExtra={(teamNumber) => (
+              <>
+                {liveTags.has(teamNumber) && (
+                  <div className="space-y-2 rounded-lg border p-3">
+                    <div className="flex items-center gap-2">
+                      <Tag className="h-4 w-4 text-muted-foreground" />
+                      <p className="text-sm font-semibold">Tags</p>
+                    </div>
+                    <TeamTags tags={liveTags.get(teamNumber)!} />
+                  </div>
+                )}
+                {liveNotes.has(teamNumber) && <LiveTeamNote note={liveNotes.get(teamNumber)!} />}
+              </>
+            )}
           />
 
           <Dialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>

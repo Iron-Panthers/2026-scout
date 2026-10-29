@@ -28,7 +28,13 @@ import { useDevMode } from "@/contexts/DevModeContext";
 import { useToast } from "@/hooks/use-toast";
 import { getActiveEvent } from "@/lib/matches";
 import { getDevEvent, getDevPitAssignments, isDevEventId, removeDevPitAssignment } from "@/lib/devMode";
-import { PIT_PHOTO_FIELD, pitScoutingQuestions } from "@/config/pitScoutingConfig";
+import {
+  PIT_PHOTO_FIELD,
+  isQuestionAsked,
+  pitScoutingQuestions,
+  questionLabel,
+  withoutUnaskedAnswers,
+} from "@/config/pitScoutingConfig";
 import type { PitScoutingQuestion } from "@/config/pitScoutingConfig";
 import type { Event } from "@/types";
 import type { PitScoutingSubmission } from "@/types/pitScouting";
@@ -182,16 +188,16 @@ export default function PitScouting() {
     }
 
     for (const question of pitScoutingQuestions) {
-      if (!question.required) continue;
+      if (!question.required || !isQuestionAsked(question, formData)) continue;
       if (question.type === "checkbox") {
         const selected = formData[question.id];
         if (!selected || selected.length === 0) {
-          toast({ title: "Required field", description: `Please select at least one option for: "${question.label}"`, variant: "destructive" });
+          toast({ title: "Required field", description: `Please select at least one option for: "${questionLabel(question, formData)}"`, variant: "destructive" });
           return;
         }
       } else if (question.type === "radio") {
         if (!formData[question.id]) {
-          toast({ title: "Required field", description: `Please select an option for: "${question.label}"`, variant: "destructive" });
+          toast({ title: "Required field", description: `Please select an option for: "${questionLabel(question, formData)}"`, variant: "destructive" });
           return;
         }
       }
@@ -212,7 +218,7 @@ export default function PitScouting() {
         photoUrl = publicUrl;
       }
 
-      await submitPitScouting(Number(teamNumber), activeEvent.id, user?.id || "", scouterName, formData, photoUrl);
+      await submitPitScouting(Number(teamNumber), activeEvent.id, user?.id || "", scouterName, withoutUnaskedAnswers(formData), photoUrl);
       toast({ title: "Success", description: "Pit scouting submitted successfully" });
       navigate("/dashboard");
     } catch (error) {
@@ -245,9 +251,14 @@ export default function PitScouting() {
       }
 
       await updatePitScouting(existingSubmission.id, {
-        pit_data: rescoutFields
-          ? { ...existingSubmission.pit_data, ...Object.fromEntries(rescoutFields.filter((id) => id !== PIT_PHOTO_FIELD).map((id) => [id, formData[id]])) }
-          : pitDataEdit,
+        pit_data: withoutUnaskedAnswers(
+          rescoutFields
+            ? {
+                ...existingSubmission.pit_data,
+                ...Object.fromEntries(rescoutedIds.filter((id) => id !== PIT_PHOTO_FIELD).map((id) => [id, formData[id]])),
+              }
+            : pitDataEdit
+        ),
         photo_url: photoUrl,
         scouter_name: scouterName,
       }, user?.id);
@@ -277,13 +288,24 @@ export default function PitScouting() {
     handleInputChange(id, updated);
   };
 
+  // A rescout of a question also covers the ones it decides whether to ask (the height
+  // question brings in the raised hopper space for modular robots).
+  const rescoutedIds = rescoutFields
+    ? [
+        ...rescoutFields,
+        ...pitScoutingQuestions
+          .filter((q) => q.askIf && rescoutFields.includes(q.askIf.questionId) && !rescoutFields.includes(q.id))
+          .map((q) => q.id),
+      ]
+    : [];
+
   const renderQuestion = (question: PitScoutingQuestion) => {
     switch (question.type) {
       case "text":
         return (
           <div key={question.id} className="space-y-2">
             <Label htmlFor={question.id}>
-              {question.label}
+              {questionLabel(question, formData)}
               {question.required && <span className="text-destructive ml-1">*</span>}
             </Label>
             <Input
@@ -301,7 +323,7 @@ export default function PitScouting() {
         return (
           <div key={question.id} className="space-y-2">
             <Label htmlFor={question.id}>
-              {question.label}
+              {questionLabel(question, formData)}
               {question.required && <span className="text-destructive ml-1">*</span>}
             </Label>
             <Textarea
@@ -320,7 +342,7 @@ export default function PitScouting() {
         return (
           <div key={question.id} className="space-y-3">
             <Label>
-              {question.label}
+              {questionLabel(question, formData)}
               {question.required && <span className="text-destructive ml-1">*</span>}
             </Label>
             <RadioGroup
@@ -345,7 +367,7 @@ export default function PitScouting() {
         return (
           <div key={question.id} className="space-y-3">
             <Label>
-              {question.label}
+              {questionLabel(question, formData)}
               {question.required && <span className="text-destructive ml-1">*</span>}
             </Label>
             <div className="space-y-2">
@@ -370,7 +392,7 @@ export default function PitScouting() {
         return (
           <div key={question.id} className="space-y-2">
             <Label htmlFor={question.id}>
-              {question.label}
+              {questionLabel(question, formData)}
               {question.required && <span className="text-destructive ml-1">*</span>}
             </Label>
             <Select
@@ -489,7 +511,7 @@ export default function PitScouting() {
                 {!existingSubmission ? (
                   <p className="text-muted-foreground text-sm">No existing submission found for team {teamNumber}.</p>
                 ) : (
-                  pitScoutingQuestions.filter((q) => rescoutFields.includes(q.id)).map(renderQuestion)
+                  pitScoutingQuestions.filter((q) => rescoutedIds.includes(q.id) && isQuestionAsked(q, formData)).map(renderQuestion)
                 )}
               </CardContent>
             </Card>
@@ -703,7 +725,7 @@ export default function PitScouting() {
                 <CardTitle>Robot & Team Information</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-                {pitScoutingQuestions.map(renderQuestion)}
+                {pitScoutingQuestions.filter((q) => isQuestionAsked(q, formData)).map(renderQuestion)}
               </CardContent>
             </Card>
 

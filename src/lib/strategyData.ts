@@ -3,6 +3,8 @@ import { CURRENT_SCHEMA_VERSION, migrateScoutingData } from "@/lib/scoutingSchem
 import { getDevFakeScouts, getDevMatches, getDevMatchTeams, getDevScoutingSubmissions, getDevTeams } from "@/lib/devMode";
 import { getEventAlliances, getEventMatches, getEventTeams } from "@/lib/blueAlliance";
 import { parseYouTubeLink, type YouTubeVideo } from "@/lib/youtube";
+import { isOutlier, outlierFences } from "@/lib/outliers";
+import { AUTO_SHOTS_END } from "@/lib/useMatchTimer";
 import type { Event } from "@/types";
 
 // Rows for the Strategy Dashboard's Data tables: quantitative, qualitative and
@@ -67,6 +69,8 @@ export interface PitRow {
   weight: string;
   drivetrain: string;
   hopperCapacity: string;
+  /** Modular robots only: hopper capacity raised (`hopperCapacity` is lowered). */
+  hopperCapacityRaised: string;
   shootingSpeed: string;
   climb: string;
   terrain: string;
@@ -77,9 +81,6 @@ export interface PitRow {
   notes: string;
 }
 
-// Shots are stored as seconds since the scout pressed start; auto is the first
-// 20s (see AUTO_END_TIME in useMatchTimer.ts).
-const AUTO_END_SECONDS = 20;
 
 // 2026 REBUILT point values. Every logged shot counts as one scored FUEL —
 // scouts don't record misses or whether the HUB was active.
@@ -198,7 +199,8 @@ export function toQuantRow(raw: RawQuantSubmission, names: Map<string, string | 
     ? migrateScoutingData(raw.scouting_data ?? {}, version)
     : raw.scouting_data ?? {};
   const shots = (Array.isArray(data.shots) ? data.shots : []).filter((t: unknown): t is number => typeof t === "number");
-  const autoShots = shots.filter((t) => t < AUTO_END_SECONDS).length;
+  // Auto is the first 23s: auto plus the handoff pause (see AUTO_SHOTS_END)
+  const autoShots = shots.filter((t) => t < AUTO_SHOTS_END).length;
   const teleopShots = shots.length - autoShots;
 
   const autoClimb = raw.tba_data?.autoClimb ?? null;
@@ -429,6 +431,7 @@ function toPitRow(raw: RawPitSubmission): PitRow {
     weight: text(data.weight),
     drivetrain: text(data.drivetrain),
     hopperCapacity: text(data["hopper-space"]),
+    hopperCapacityRaised: text(data["hopper-space-raised"]),
     shootingSpeed: text(data["shooting-intake-speed"]),
     climb: text(data["climb-levels"]),
     terrain: terrain(data["terrain-capability"]),
@@ -667,6 +670,14 @@ export interface MeanAndSpread {
   sd: number | null;
 }
 
+export interface MatchFuel {
+  matchNumber: number | null;
+  auto: number;
+  teleop: number;
+  autoSuspicious: boolean;
+  teleopSuspicious: boolean;
+}
+
 export interface TeamDashboard {
   teamNumber: number;
   name: string | null;
@@ -679,10 +690,13 @@ export interface TeamDashboard {
   recentMatches: number[] | null;
   /** Distinct matches with quantitative scouting. */
   matchesScouted: number;
-  /** Fuel per scouted match (co-scouted matches averaged), in match order. */
-  matchFuel: Array<{ matchNumber: number | null; auto: number; teleop: number }>;
+  /**
+   * Fuel per scouted match (co-scouted matches averaged), in match order. A match is
+   * suspicious when one of its entries is outside the team's usual range (see outliers.ts).
+   */
+  matchFuel: MatchFuel[];
   /** `matchFuel` for every scouted match, ignoring `recentMatches`. */
-  allMatchFuel: Array<{ matchNumber: number | null; auto: number; teleop: number }>;
+  allMatchFuel: MatchFuel[];
   autoFuel: MeanAndSpread | null;
   teleopFuel: MeanAndSpread | null;
   /** Fuel plus TBA-reported tower points, per match. */
@@ -691,6 +705,11 @@ export interface TeamDashboard {
   terrain: string;
   /** The pit scout's weight answer (with bumpers), pounds added when it's just a number. */
   weight: string;
+  /** The pit scout's hopper capacity and shooting speed answers, as typed. */
+  hopperCapacity: string;
+  /** Modular robots only: the hopper capacity raised, from the same submission as `hopperCapacity`. */
+  hopperCapacityRaised: string;
+  shootingSpeed: string;
   /** Mean endgame tower level (0 = no climb … 3), over matches TBA has reported. */
   averageClimb: number | null;
   climbMatches: number;
@@ -750,6 +769,11 @@ export function buildTeamDashboard(
   const allQuant = data.quant.filter((row) => row.teamNumber === teamNumber);
   const quant = allQuant.filter((row) => inWindow(row.matchNumber));
 
+  // Suspicious entries, flagged against all of the team's submissions at the event, the same
+  // way the data table does
+  const autoFences = outlierFences(allQuant.map((row) => row.autoShots));
+  const teleopFences = outlierFences(allQuant.map((row) => row.teleopShots));
+
   // Co-scouted matches have two submissions; average each match first so they
   // don't count twice toward the event averages.
   const perMatch = new Map<number | string, QuantRow[]>();
@@ -761,13 +785,15 @@ export function buildTeamDashboard(
     matchNumber: rows[0].matchNumber,
     auto: rows.reduce((sum, row) => sum + row.autoShots, 0) / rows.length,
     teleop: rows.reduce((sum, row) => sum + row.teleopShots, 0) / rows.length,
+    autoSuspicious: rows.some((row) => isOutlier(row.autoShots, autoFences)),
+    teleopSuspicious: rows.some((row) => isOutlier(row.teleopShots, teleopFences)),
     points: rows.reduce((sum, row) => sum + row.totalPoints, 0) / rows.length,
     // TBA reports the same climb for every submission in a match; take the first known one.
     climb: rows.find((row) => row.endgameClimb && !/unknown/i.test(row.endgameClimb))?.endgameClimb ?? null,
   }));
   const matchAverages = allMatchAverages.filter((match) => inWindow(match.matchNumber));
   const fuelByMatch = (matches: typeof allMatchAverages) => matches
-    .map(({ matchNumber, auto, teleop }) => ({ matchNumber, auto, teleop }))
+    .map(({ matchNumber, auto, teleop, autoSuspicious, teleopSuspicious }) => ({ matchNumber, auto, teleop, autoSuspicious, teleopSuspicious }))
     .sort((a, b) => (a.matchNumber ?? Infinity) - (b.matchNumber ?? Infinity));
   const climbLevels = matchAverages
     .filter((match) => match.climb !== null)
@@ -778,6 +804,9 @@ export function buildTeamDashboard(
     .filter((row) => row.teamNumber === teamNumber)
     .sort((a, b) => b.scoutedAt.localeCompare(a.scoutedAt));
   const latestPit = <K extends keyof PitRow>(key: K) => pit.find((row) => row[key])?.[key] ?? null;
+  // Both hopper answers from one submission, so a modular robot's raised capacity never pairs
+  // with a later submission's (non-modular) one
+  const hopperPit = pit.find((row) => row.hopperCapacity);
 
   const notes = (pick: (row: QuantRow) => string) => quant
     .filter((row) => pick(row))
@@ -803,6 +832,9 @@ export function buildTeamDashboard(
     shooterType: latestPit("shootingMechanism") ?? "",
     terrain: latestPit("terrain") ?? "",
     weight: weightLabel(latestPit("weight")),
+    hopperCapacity: hopperPit?.hopperCapacity ?? "",
+    hopperCapacityRaised: hopperPit?.hopperCapacityRaised ?? "",
+    shootingSpeed: latestPit("shootingSpeed") ?? "",
     averageClimb: climbLevels.length > 0 ? climbLevels.reduce((sum, level) => sum + level, 0) / climbLevels.length : null,
     climbMatches: climbLevels.length,
     errorRate: quant.length > 0 ? { problems: quant.filter((row) => row.robotProblems).length, submissions: quant.length } : null,

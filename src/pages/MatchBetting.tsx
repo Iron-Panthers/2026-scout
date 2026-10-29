@@ -16,7 +16,7 @@ import {
   getMatchBets, getMatchUserBet, placeBet, cancelBet,
   computeOddsFromBets, estimatePayout, settleMatchBets,
   cacheMatchOdds, getCachedMatchOdds, blendOddsRedPct,
-  computeTimeDecayFactor, FULL_VALUE_MS,
+  computeTimeDecayFactor, FULL_VALUE_MS, MAX_BET,
 } from "@/lib/betting";
 import { getMatchLabel, wasUpset } from "@/lib/match13";
 import { getEventMatches, getEventTeams, getMatchScores } from "@/lib/blueAlliance";
@@ -1265,9 +1265,10 @@ export default function MatchBetting() {
 
               <div>
                 <label className="text-sm text-muted-foreground mb-2 block">
-                  Amount (you have {currentBalance} {betCurrency === "event" ? "event pts" : "pts"})
+                  Amount (you have {currentBalance} {betCurrency === "event" ? "event pts" : "pts"}; max{" "}
+                  {MAX_BET.toLocaleString()} per match)
                 </label>
-                <AmountPicker value={betAmount} onChange={setBetAmount} max={currentBalance} />
+                <AmountPicker value={betAmount} onChange={setBetAmount} max={Math.min(currentBalance, MAX_BET)} />
               </div>
 
               {selectedAlliance && estPayout !== null && (
@@ -1291,7 +1292,7 @@ export default function MatchBetting() {
               )}
 
               <Button className="w-full" size="lg"
-                disabled={!selectedAlliance || betAmount <= 0 || betAmount > currentBalance || placing}
+                disabled={!selectedAlliance || betAmount <= 0 || betAmount > currentBalance || betAmount > MAX_BET || placing}
                 onClick={handlePlaceBet}>
                 {placing && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                 {selectedAlliance

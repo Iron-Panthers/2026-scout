@@ -232,11 +232,21 @@ const SCHEDULE_CELL = {
   blue: { won: "bg-blue-600 font-bold text-white", other: "bg-blue-950/70 text-blue-50" },
 } as const;
 
-/** One alliance's three teams, spread evenly across a colored block. */
+/** One alliance's three teams, spread evenly across a colored block. Each opens its page on the Teams tab. */
 function ScheduleTeams({ color, teams, won, rounded }: { color: "red" | "blue"; teams: number[]; won: boolean; rounded: string }) {
   return (
-    <div className={`grid grid-cols-3 items-center py-0 text-center font-mono text-[9px] leading-5 tabular-nums sm:text-[11px] sm:leading-none ${rounded} ${SCHEDULE_CELL[color][won ? "won" : "other"]}`}>
-      {teams.map((team) => <span key={team} className={team === OUR_TEAM ? "underline underline-offset-2" : undefined}>{team}</span>)}
+    // Clipped so a team's hover highlight takes the block's own rounded corners
+    <div className={`grid h-full grid-cols-3 items-stretch overflow-hidden py-0 text-center font-mono text-[9px] leading-5 tabular-nums sm:text-[11px] sm:leading-none ${rounded} ${SCHEDULE_CELL[color][won ? "won" : "other"]}`}>
+      {teams.map((team) => (
+        <Link
+          key={team}
+          to={`?page=teams&team=${team}`}
+          title={`View team ${team} on the Teams page`}
+          className={`flex items-center justify-center transition-colors hover:bg-white/20 ${team === OUR_TEAM ? "underline underline-offset-2" : ""}`}
+        >
+          {team}
+        </Link>
+      ))}
     </div>
   );
 }
@@ -252,7 +262,8 @@ function ScoreCell({ color, value, won }: { color: "red" | "blue"; value: number
 
 /**
  * Every qualification match at the event, laid out like The Blue Alliance's match tables:
- * both alliances' teams and, once played, the scores, with the winner highlighted. Clicking a match opens it.
+ * both alliances' teams and, once played, the scores, with the winner highlighted. Clicking a
+ * match number opens the match; clicking a team opens its page.
  */
 function MatchSchedule({ matches, onSelect }: {
   matches: QualScheduleMatch[];
@@ -290,26 +301,24 @@ function MatchSchedule({ matches, onSelect }: {
           const isOurs = match.red.includes(OUR_TEAM) || match.blue.includes(OUR_TEAM);
           return (
             <li key={match.matchNumber} ref={isNext ? nextRef : undefined} className="relative">
-              <button
-                type="button"
-                onClick={() => onSelect(match.matchNumber)}
+              <div
                 // Exactly 25px tall on wider screens (phones stack red over blue, so need two lines)
-                className={`${columns} w-full gap-x-1 px-2 py-0.5 text-left sm:h-[25px] transition-colors hover:bg-accent/40 sm:gap-x-2 sm:px-3 ${
-                  isNext ? "bg-yellow-500/10" : ""
-                }`}
+                className={`${columns} w-full gap-x-1 px-2 py-0.5 sm:h-[25px] sm:gap-x-2 sm:px-3 ${isNext ? "bg-yellow-500/10" : ""}`}
               >
-                {/* Room for the video button, which sits over it (a button can't go inside this one) */}
+                {/* Room for the video button, which sits over it */}
                 {showVideos && <span />}
-                <span className="flex items-center justify-center text-[11px] font-medium">
-                  <span
-                    className={isOurs ? "font-bold text-primary" : undefined}
-                    title={isOurs ? `${OUR_TEAM} plays in this match` : undefined}
-                  >
+                <button
+                  type="button"
+                  onClick={() => onSelect(match.matchNumber)}
+                  className="flex cursor-pointer items-center justify-center rounded text-[11px] font-medium transition-colors hover:bg-accent hover:underline"
+                  title={`Open Quals ${match.matchNumber}${isOurs ? ` (${OUR_TEAM} plays in this match)` : ""}`}
+                >
+                  <span className={isOurs ? "font-bold text-primary" : undefined}>
                     <span className="hidden sm:inline">Quals&nbsp;</span>
                     <span className="sm:hidden">Q</span>
                     {match.matchNumber}
                   </span>
-                </span>
+                </button>
                 <div className={pair}>
                   <ScheduleTeams color="red" teams={match.red} won={match.winner === "red"} rounded="rounded-t-md sm:rounded-none sm:rounded-l-md" />
                   <ScheduleTeams color="blue" teams={match.blue} won={match.winner === "blue"} rounded="rounded-b-md sm:rounded-none sm:rounded-r-md" />
@@ -318,7 +327,7 @@ function MatchSchedule({ matches, onSelect }: {
                   <ScoreCell color="red" value={match.redScore} won={match.winner === "red"} />
                   <ScoreCell color="blue" value={match.blueScore} won={match.winner === "blue"} />
                 </div>
-              </button>
+              </div>
               {hasTbaVideo(match) && <VideoButton title={`Quals ${match.matchNumber}`} onClick={() => setWatching(match)} />}
             </li>
           );

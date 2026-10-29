@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { isDevEventId } from "@/lib/devMode";
+import { isOutlier, outlierFences } from "@/lib/outliers";
 import {
   getDevEventQualRows,
   getDevEventQuantRows,
@@ -71,27 +72,8 @@ interface DataColumn<Row> {
   outlierValue?: (row: Row) => number | null;
 }
 
-// A team needs this many submissions before its quartiles mean anything.
-const MIN_OUTLIER_SAMPLE = 4;
 // Deeper red on hover (important, so the clickable cells' hover color doesn't replace it)
 const SUSPICIOUS_CELL = "bg-red-600/25 hover:bg-red-600/40! font-semibold text-red-700 dark:text-red-300";
-
-/** Linear-interpolated quantile of an ascending list. */
-function quantile(sorted: number[], q: number): number {
-  const position = (sorted.length - 1) * q;
-  const below = Math.floor(position);
-  const above = Math.ceil(position);
-  return sorted[below] + (sorted[above] - sorted[below]) * (position - below);
-}
-
-/** Tukey's fences: values below Q1 − 1.5×IQR or above Q3 + 1.5×IQR are outliers. */
-function tukeyFences(values: number[]): [number, number] {
-  const sorted = [...values].sort((a, b) => a - b);
-  const q1 = quantile(sorted, 0.25);
-  const q3 = quantile(sorted, 0.75);
-  const iqr = q3 - q1;
-  return [q1 - 1.5 * iqr, q3 + 1.5 * iqr];
-}
 
 const formatFence = (value: number) => String(Number(Math.max(0, value).toFixed(1)));
 
@@ -266,10 +248,11 @@ function DataTable<Row extends { id: string }>({ rows, columns, describeRow, out
           const value = column.outlierValue!(row);
           return value === null ? [] : [{ row, value }];
         });
-        if (valued.length < MIN_OUTLIER_SAMPLE) continue;
-        const [low, high] = tukeyFences(valued.map(({ value }) => value));
+        const fences = outlierFences(valued.map(({ value }) => value));
+        if (!fences) continue;
+        const [low, high] = fences;
         for (const { row, value } of valued) {
-          if (value >= low && value <= high) continue;
+          if (!isOutlier(value, fences)) continue;
           const flagged = result.get(row.id) ?? new Map<string, string>();
           flagged.set(column.header, `Suspicious: outside team ${team}'s usual ${column.header.toLowerCase()} (${formatFence(low)}–${formatFence(high)})`);
           result.set(row.id, flagged);
@@ -508,6 +491,7 @@ const PIT_COLUMNS: DataColumn<PitRow>[] = [
   { header: "Robot weight", value: (row) => row.weight },
   { header: "Drivetrain", value: (row) => row.drivetrain },
   { header: "Hopper capacity", value: (row) => row.hopperCapacity },
+  { header: "Hopper capacity (raised)", value: (row) => row.hopperCapacityRaised },
   { header: "Shooting speed", value: (row) => row.shootingSpeed },
   { header: "Climb", value: (row) => row.climb },
   { header: "Terrain capabilities", value: (row) => row.terrain },

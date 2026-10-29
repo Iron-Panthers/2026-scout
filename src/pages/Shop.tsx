@@ -22,11 +22,23 @@ import { purchaseGame } from "@/lib/gameProfiles";
 import { unlockAchievement } from "@/lib/achievements";
 import { getActiveEvent, isEventWithinWindow } from "@/lib/matches";
 import { getDevEvent } from "@/lib/devMode";
-import { COSMETICS, RARITY_CONFIG, RARITY_VALUE, type CosmeticDefinition, type CosmeticCategory, type CrateRarity } from "@/config/cosmetics";
+import {
+  COSMETICS,
+  RARITY_CONFIG,
+  RARITY_VALUE,
+  THEME_BACKGROUNDS_SETTING,
+  themeValueFor,
+  type CosmeticDefinition,
+  type CosmeticCategory,
+  type CrateRarity,
+  type ThemeBackground,
+} from "@/config/cosmetics";
 import { CRATE_TIERS, type CrateTier } from "@/config/crates";
 import { GAMES } from "@/config/games";
 import { getEventCurrencyLogo } from "@/config/eventCurrency";
 import CosmeticAvatar from "@/components/CosmeticAvatar";
+import { ThemeBackgroundToggle } from "@/components/ThemeBackgroundToggle";
+import { useSettings } from "@/contexts/SettingsContext";
 import { GameCard } from "@/components/GameCard";
 import { GamePlayer } from "@/components/GamePlayer";
 import { CrateOpeningAnimation, CrateVisual } from "@/components/CrateOpeningAnimation";
@@ -139,7 +151,10 @@ export default function Shop({
   const { user, profile, getAvatarUrl } = useAuth();
   const { devMode } = useDevMode();
   const { toast } = useToast();
+  const { settings, updateSetting } = useSettings();
   const subtitle = useRandomSubtitle(SHOP_SUBTITLES);
+  // Each theme's chosen background (for themes with a Light/Dark choice); shared with the Avatar page
+  const themeBackgrounds: Record<string, ThemeBackground> = settings[THEME_BACKGROUNDS_SETTING] ?? {};
 
   const [gameProfile, setGameProfile] = useState<GameProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -162,11 +177,13 @@ export default function Shop({
     setLoading(false);
   }, [user?.id]);
 
-  // Collector: once they own every cosmetic there is (the free defaults don't count)
+  // Collector: once they own every cosmetic they can always get. The free defaults don't
+  // count, and neither do event items, which are only sold while an event is on.
   useEffect(() => {
     if (!gameProfile) return;
     const owned = new Set(gameProfile.owned_cosmetics ?? []);
-    if (COSMETICS.filter((cosmetic) => !cosmetic.default).every((cosmetic) => owned.has(cosmetic.id))) {
+    const collectible = COSMETICS.filter((cosmetic) => !cosmetic.default && cosmetic.currency !== "event");
+    if (collectible.every((cosmetic) => owned.has(cosmetic.id))) {
       void unlockAchievement(user?.id, "collector");
     }
   }, [gameProfile, user?.id]);
@@ -455,12 +472,25 @@ export default function Shop({
           {buyTarget?.category === "theme" && buyTarget.themeValue && (
             // bg-neutral-900 is a theme-independent fallback behind the preview,
             // so it looks the same whatever theme is currently equipped.
-            <div data-theme={buyTarget.themeValue} className="rounded-lg border border-border overflow-hidden bg-neutral-900">
+            <div
+              data-theme={themeValueFor(buyTarget, themeBackgrounds[buyTarget.id])}
+              className="rounded-lg border border-border overflow-hidden bg-neutral-900"
+            >
               <div className="bg-background p-4 flex flex-col items-center gap-3">
                 <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Preview</span>
                 <span data-slot="button" className="px-4 py-2 rounded-md text-sm font-semibold bg-primary text-primary-foreground">
                   Sample Button
                 </span>
+                {/* The choice carries over to when it's equipped */}
+                {buyTarget.lightThemeValue && (
+                  <ThemeBackgroundToggle
+                    className="w-40"
+                    value={themeBackgrounds[buyTarget.id] ?? "dark"}
+                    onChange={(background) =>
+                      updateSetting(THEME_BACKGROUNDS_SETTING, { ...themeBackgrounds, [buyTarget.id]: background })
+                    }
+                  />
+                )}
               </div>
             </div>
           )}

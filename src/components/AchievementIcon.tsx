@@ -11,6 +11,8 @@ import {
   House,
   ListChecks,
   MapPin,
+  MessageCircle,
+  Radio,
   Shirt,
   Sparkles,
   Star,
@@ -39,6 +41,8 @@ const ICONS: Record<AchievementIconName, LucideIcon> = {
   list: ListChecks,
   eye: Eye,
   trending: TrendingUp,
+  radio: Radio,
+  message: MessageCircle,
 };
 
 /** An achievement's badge: coloured when earned, greyed out when not. */
