@@ -753,9 +753,6 @@ export default function ScoutingReview() {
                     )}
                   </button>
                 </CollapsibleTrigger>
-                <span className="text-xs font-semibold text-muted-foreground">
-                  Edit Raw Data
-                </span>
               </div>
               <button
                 className={`ml-2 text-xs font-medium px-3 py-1 rounded border border-border transition-colors ${

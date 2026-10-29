@@ -17,6 +17,8 @@ export interface PitScoutingFormData {
   drivetrain?: string;
   event_code?: string;
   "hopper-space"?: string;
+  /** Only for modular robots, whose "hopper-space" is when lowered. */
+  "hopper-space-raised"?: string;
   "shooting-intake-speed"?: string;
   "shooting-method"?: string[];
   "climb-levels"?: string[];

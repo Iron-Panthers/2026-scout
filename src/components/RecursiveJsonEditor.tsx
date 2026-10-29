@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { ChevronDown, ChevronRight, Trash2 } from "lucide-react";
+import { AUTO_SHOTS_END } from "@/lib/useMatchTimer";
 
 const PHASE_KEYS = new Set([
   "auto",
@@ -12,6 +13,66 @@ const PHASE_KEYS = new Set([
 ]);
 
 const isPhaseKey = (k: string) => PHASE_KEYS.has(k);
+
+// Auto shots are the first 23s (auto plus the handoff pause, see AUTO_SHOTS_END); everything
+// after is teleop, which ends at 2:40.
+const MATCH_END = 160;
+
+const INPUT_CLASS =
+  "flex-1 min-w-0 bg-background border border-border rounded px-3 py-1.5 text-foreground font-mono text-sm focus:outline-none focus:ring-2 focus:ring-primary/80";
+
+/** The scouting data's top-level `shots` list of times. */
+const isShotTimes = (key: string, value: unknown, path: (string | number)[]): value is number[] =>
+  path.length === 0 && key === "shots" && Array.isArray(value) && value.every((item) => typeof item === "number");
+
+/** A whole-number count, which can be cleared while typing a new one. */
+function CountInput({ label, count, onChange }: { label: string; count: number; onChange: (count: number) => void }) {
+  const [draft, setDraft] = useState<string | null>(null);
+  return (
+    <label className="flex items-center gap-3">
+      <span className="font-mono text-xs text-muted-foreground min-w-[140px] shrink-0 select-none">{label}</span>
+      <input
+        type="number"
+        min={0}
+        step={1}
+        inputMode="numeric"
+        className={INPUT_CLASS}
+        value={draft ?? String(count)}
+        onChange={(e) => {
+          setDraft(e.target.value);
+          if (/^\d+$/.test(e.target.value)) onChange(Number(e.target.value));
+        }}
+        onBlur={() => setDraft(null)}
+      />
+    </label>
+  );
+}
+
+/**
+ * Shot times as two counts, auto and teleop. Fewer auto shots drops the earliest ones and
+ * fewer teleop shots the latest; more adds them at the start of the match or at 2:40.
+ */
+function ShotsEditor({ value, onChange }: { value: number[]; onChange: (newValue: number[]) => void }) {
+  const sorted = [...value].sort((a, b) => a - b);
+  const auto = sorted.filter((time) => time < AUTO_SHOTS_END);
+  const teleop = sorted.filter((time) => time >= AUTO_SHOTS_END);
+
+  const setAuto = (count: number) => {
+    const next = count <= auto.length ? auto.slice(auto.length - count) : [...Array(count - auto.length).fill(0), ...auto];
+    onChange([...next, ...teleop]);
+  };
+  const setTeleop = (count: number) => {
+    const next = count <= teleop.length ? teleop.slice(0, count) : [...teleop, ...Array(count - teleop.length).fill(MATCH_END)];
+    onChange([...auto, ...next]);
+  };
+
+  return (
+    <div className="space-y-3 pl-4 border-l-2 border-border">
+      <CountInput label="auto shots" count={auto.length} onChange={setAuto} />
+      <CountInput label="teleop shots" count={teleop.length} onChange={setTeleop} />
+    </div>
+  );
+}
 
 interface RecursiveJsonEditorProps {
   value: unknown;
@@ -197,6 +258,17 @@ export function RecursiveJsonEditor({
             const isPrimitive =
               val === null || ["string", "number", "boolean"].includes(typeof val);
             const isObjOrArr = typeof val === "object" && val !== null;
+            if (isShotTimes(key, val, path)) {
+              return (
+                <div key={key} className="space-y-1">
+                  <div className="font-mono text-xs font-medium text-muted-foreground select-none pt-1">{key}</div>
+                  <ShotsEditor
+                    value={val}
+                    onChange={(newVal) => onChange({ ...(value as Record<string, unknown>), [key]: newVal })}
+                  />
+                </div>
+              );
+            }
             return (
               <div key={key} className={isObjOrArr ? "space-y-1" : "flex items-center gap-3"}>
                 {isPhaseKey(key) && idx !== 0 && (

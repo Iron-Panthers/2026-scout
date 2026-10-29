@@ -3,11 +3,21 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSettings } from "@/contexts/SettingsContext";
 import { getGameProfile } from "@/lib/gameProfiles";
 import { equipCosmetic, unequipCosmetic } from "@/lib/shopService";
-import { COSMETICS, RARITY_CONFIG, RARITY_VALUE, type CosmeticDefinition } from "@/config/cosmetics";
+import {
+  COSMETICS,
+  RARITY_CONFIG,
+  RARITY_VALUE,
+  THEME_BACKGROUNDS_SETTING,
+  themeValueFor,
+  type CosmeticDefinition,
+  type ThemeBackground,
+} from "@/config/cosmetics";
+import { ThemeBackgroundToggle } from "@/components/ThemeBackgroundToggle";
 import CosmeticAvatar from "@/components/CosmeticAvatar";
 import { useToast } from "@/hooks/use-toast";
 import { useRandomSubtitle } from "@/hooks/useRandomSubtitle";
@@ -21,11 +31,12 @@ export default function AvatarPage({
   const navigate = useNavigate();
   const { user, profile, getAvatarUrl } = useAuth();
   const { toast } = useToast();
-  const { updateSetting } = useSettings();
+  const { settings, updateSetting } = useSettings();
   const subtitle = useRandomSubtitle(AVATAR_SUBTITLES);
 
   const [gameProfile, setGameProfile] = useState<GameProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [category, setCategory] = useState<"hats" | "decorations" | "themes">("hats");
 
   const loadProfile = useCallback(async () => {
     if (!user?.id) return;
@@ -41,6 +52,8 @@ export default function AvatarPage({
   const owned = gameProfile?.owned_cosmetics ?? [];
   const equipped = gameProfile?.equipped_cosmetics ?? {};
   const eventCosmeticSources = gameProfile?.event_cosmetic_sources ?? {};
+  // Each theme's chosen background (for themes with a Light/Dark choice), kept in this browser's settings
+  const themeBackgrounds: Record<string, ThemeBackground> = settings[THEME_BACKGROUNDS_SETTING] ?? {};
 
   const userName =
     profile?.name ||
@@ -69,7 +82,7 @@ export default function AvatarPage({
         : prev
     );
     if (item.category === "theme" && item.themeValue) {
-      updateSetting("theme", item.themeValue);
+      updateSetting("theme", themeValueFor(item, themeBackgrounds[item.id]));
     }
     const result = await equipCosmetic(user.id, item.category, item.id);
     if (result.success) {
@@ -77,6 +90,14 @@ export default function AvatarPage({
     } else {
       toast({ title: "Failed to equip", description: result.error, variant: "destructive" });
       loadProfile();
+    }
+  }
+
+  // Switches the theme live when it's the one equipped
+  function handleSetBackground(item: CosmeticDefinition, background: ThemeBackground) {
+    updateSetting(THEME_BACKGROUNDS_SETTING, { ...themeBackgrounds, [item.id]: background });
+    if (equipped[item.category] === item.id) {
+      updateSetting("theme", themeValueFor(item, background));
     }
   }
 
@@ -108,11 +129,19 @@ export default function AvatarPage({
   const decorations = ownedItems.filter((c) => c.category === "decoration").sort(rarityCompare);
   const themes = ownedItems.filter((c) => c.category === "theme").sort(rarityCompare);
 
-  function renderSection(title: string, items: CosmeticDefinition[]) {
-    if (items.length === 0) return null;
+  function renderSection(items: CosmeticDefinition[], emptyMessage: string) {
+    if (items.length === 0) {
+      return (
+        <div className="text-center py-10 space-y-3">
+          <p className="text-muted-foreground">{emptyMessage}</p>
+          <Button onClick={() => (onVisitShop ? onVisitShop() : navigate("/shop"))}>
+            Visit the Shop
+          </Button>
+        </div>
+      );
+    }
     return (
       <div className="space-y-2">
-        <h2 className="text-sm font-semibold text-muted-foreground">{title}</h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
           {items.map((item) => {
             const isEquipped = equipped[item.category] === item.id;
@@ -142,6 +171,13 @@ export default function AvatarPage({
                       <p className="text-xs text-muted-foreground leading-snug">{item.description}</p>
                     </div>
                   </div>
+                  {item.lightThemeValue && (
+                    <ThemeBackgroundToggle
+                      className="mb-2"
+                      value={themeBackgrounds[item.id] ?? "dark"}
+                      onChange={(background) => handleSetBackground(item, background)}
+                    />
+                  )}
                   {isEquipped ? (
                     <Button
                       size="sm"
@@ -233,10 +269,25 @@ export default function AvatarPage({
                 </Button>
               </div>
             ) : (
-              <div className="space-y-6">
-                {renderSection("Hats", hats)}
-                {renderSection("Decorations", decorations)}
-                {renderSection("Themes", themes)}
+              <div className="space-y-4">
+                <Tabs value={category} onValueChange={(value) => setCategory(value as typeof category)}>
+                  <TabsList className="w-full">
+                    <TabsTrigger value="hats" className="flex-1">
+                      Hats
+                    </TabsTrigger>
+                    <TabsTrigger value="decorations" className="flex-1">
+                      Decorations
+                    </TabsTrigger>
+                    <TabsTrigger value="themes" className="flex-1">
+                      Themes
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+                {category === "hats"
+                  ? renderSection(hats, "You don't own any hats yet.")
+                  : category === "decorations"
+                  ? renderSection(decorations, "You don't own any decorations yet.")
+                  : renderSection(themes, "You don't own any themes yet.")}
               </div>
             )}
           </div>

@@ -4,7 +4,7 @@ import { useAuth } from "./AuthContext";
 import settingsConfig from "@/config/settings.json";
 import { getActiveEvent } from "@/lib/matches";
 import { getGameProfile } from "@/lib/gameProfiles";
-import { COSMETICS } from "@/config/cosmetics";
+import { COSMETICS, THEME_BACKGROUNDS_SETTING, themeValueFor } from "@/config/cosmetics";
 
 interface SettingsContextType {
   settings: Record<string, any>;
@@ -69,11 +69,13 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
           // fetch was in flight — their live action wins, don't overwrite it.
           if (userChangedThemeRef.current) return;
           const equippedThemeId = gameProfile?.equipped_cosmetics?.["theme"];
-          const themeValue = equippedThemeId
-            ? COSMETICS.find((c) => c.id === equippedThemeId)?.themeValue
+          const equippedTheme = equippedThemeId
+            ? COSMETICS.find((c) => c.id === equippedThemeId)
             : undefined;
-          if (themeValue) {
+          if (equippedTheme?.themeValue) {
             setSettings((prev) => {
+              // Keeps the background (light/dark) this browser picked for the theme, if it has a choice
+              const themeValue = themeValueFor(equippedTheme, prev[THEME_BACKGROUNDS_SETTING]?.[equippedTheme.id]);
               const updated = { ...prev, theme: themeValue };
               localStorage.setItem(`settings_${user.id}`, JSON.stringify(updated));
               return updated;
@@ -87,7 +89,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   // Apply theme class/data-attribute whenever theme setting changes
   useEffect(() => {
     const theme = settings["theme"] ?? "dark";
-    const isLightTheme = theme === "light" || COSMETICS.some((c) => c.themeValue === theme && c.isLight);
+    const isLightTheme =
+      theme === "light" ||
+      COSMETICS.some((c) => (c.themeValue === theme && c.isLight) || c.lightThemeValue === theme);
     const html = document.documentElement;
     html.classList.toggle("dark", !isLightTheme);
     html.setAttribute("data-theme", theme);
@@ -96,11 +100,14 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   const updateSetting = (key: string, value: any) => {
     if (key === "theme") userChangedThemeRef.current = true;
-    const newSettings = { ...settings, [key]: value };
-    setSettings(newSettings);
-    if (user?.id) {
-      localStorage.setItem(`settings_${user.id}`, JSON.stringify(newSettings));
-    }
+    // Built from the latest settings, so two updates in a row both stick
+    setSettings((prev) => {
+      const newSettings = { ...prev, [key]: value };
+      if (user?.id) {
+        localStorage.setItem(`settings_${user.id}`, JSON.stringify(newSettings));
+      }
+      return newSettings;
+    });
   };
 
   return (

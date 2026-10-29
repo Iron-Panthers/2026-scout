@@ -70,13 +70,13 @@ export async function getEventPicklists(eventId: string): Promise<PicklistRow[]>
   return data ?? [];
 }
 
-/** Names for the people behind a set of picklists, by user id. */
-export async function getPicklistOwnerNames(userIds: string[]): Promise<Map<string, string>> {
+/** Names for a set of users (picklist owners, suggesters), by user id. */
+export async function getProfileNames(userIds: string[]): Promise<Map<string, string>> {
   if (userIds.length === 0) return new Map();
   const { data, error } = await supabase.from("profiles").select("id, name").in("id", userIds);
 
   if (error) {
-    console.error("Error fetching picklist owner names:", error);
+    console.error("Error fetching profile names:", error);
     return new Map();
   }
 

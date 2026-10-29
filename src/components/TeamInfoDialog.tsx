@@ -66,7 +66,7 @@ function MyNotes({ userId, eventId, teamNumber }: {
 
   return (
     // Right margin leaves room for the dialog's close button.
-    <Collapsible open={open} onOpenChange={setOpen} className="mr-8">
+    <Collapsible open={open} onOpenChange={setOpen}>
       <CollapsibleTrigger asChild>
         <Button variant="outline" size="sm" className="w-full justify-between gap-1.5" disabled={!canLoad}>
           <span className="flex items-center gap-1.5">
@@ -109,6 +109,12 @@ interface TeamInfoDialogProps {
   userId?: string | null;
   userName: string | null;
   devMode: boolean;
+  /** Extra controls for the team being viewed, shown above the notes (e.g. the live picklist's tag editor). */
+  renderExtra?: (teamNumber: number) => React.ReactNode;
+  /** Show the viewer's own picklist notes (on by default). */
+  showMyNotes?: boolean;
+  /** A control for the team being viewed, at the top right of its summary (e.g. the live picklist's DNP button). */
+  renderHeaderAction?: (teamNumber: number) => React.ReactNode;
 }
 
 /**
@@ -123,6 +129,9 @@ export function TeamInfoDialog({
   userId,
   userName,
   devMode,
+  renderExtra,
+  showMyNotes = true,
+  renderHeaderAction,
 }: TeamInfoDialogProps) {
   // Tagged with the event it was loaded for, so switching events shows the loading state.
   const [loaded, setLoaded] = useState<{ eventId: string; data: EventData | null; error: string | null } | null>(() => cachedEventLoad(event));
@@ -189,6 +198,7 @@ export function TeamInfoDialog({
         // Events from before the setting existed are double scouted.
         scoutersPerRobot={event.scouters_per_robot ?? 2}
         onSelectTeam={(next) => setPicked({ from: teamNumber, teamNumber: next })}
+        headerAction={renderHeaderAction?.(viewedTeam)}
       />
     );
   }
@@ -206,13 +216,17 @@ export function TeamInfoDialog({
         </DialogHeader>
 
         <div className="min-w-0 space-y-4">
+          {renderExtra?.(viewedTeam)}
+
           {/* Keyed so each team's notes start closed and never show another team's text. */}
-          <MyNotes
-            key={`${eventId}:${viewedTeam}`}
-            userId={userId}
-            eventId={eventId}
-            teamNumber={viewedTeam}
-          />
+          {showMyNotes && (
+            <MyNotes
+              key={`${eventId}:${viewedTeam}`}
+              userId={userId}
+              eventId={eventId}
+              teamNumber={viewedTeam}
+            />
+          )}
 
           {body}
         </div>

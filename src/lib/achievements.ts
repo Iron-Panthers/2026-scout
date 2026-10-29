@@ -28,7 +28,9 @@ export type AchievementIcon =
   | "dice"
   | "list"
   | "eye"
-  | "trending";
+  | "trending"
+  | "radio"
+  | "message";
 
 export interface AchievementDefinition {
   id: string;
@@ -99,6 +101,15 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
   // Strategy
   { id: "picklist", name: "Strategist", description: "Complete a picklist (sort every team)", icon: "list", measure: unlocked("picklist"), goal: 1 },
   { id: "match_view", name: "Analyst", description: "View a match in the match dashboard", icon: "eye", measure: unlocked("match_view"), goal: 1 },
+  { id: "live_picklist", name: "Picklister", description: "Open the live picklist", icon: "radio", measure: unlocked("live_picklist"), goal: 1 },
+  {
+    id: "picklist_suggestion",
+    name: "Erm... ackshually...",
+    description: "Suggest a move in the live picklist",
+    icon: "message",
+    measure: unlocked("picklist_suggestion"),
+    goal: 1,
+  },
   // Betting
   {
     id: "upset",
@@ -133,12 +144,22 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
   { id: "collector", name: "Collector", description: "Own every cosmetic item", icon: "shirt", measure: unlocked("collector"), goal: 1 },
 ];
 
-export type UnlockableAchievement = "picklist" | "match_view" | "upset" | "mythic" | "frcdle_5026" | "full_roll" | "collector";
+export type UnlockableAchievement =
+  | "picklist"
+  | "match_view"
+  | "live_picklist"
+  | "picklist_suggestion"
+  | "upset"
+  | "mythic"
+  | "frcdle_5026"
+  | "full_roll"
+  | "collector";
 
 /**
  * Points each achievement pays (once, when it's earned). The database pays them from its
- * own copy: keep these in sync with achievement_rewards
- * (supabase/migrations/20261020030_add_achievement_points.sql).
+ * own copy: keep these in sync with achievement_rewards (latest amounts in
+ * supabase/migrations/20261027030_match_achievement_points_to_app.sql and
+ * supabase/migrations/20261027050_add_live_picklist_achievements.sql).
  */
 export const ACHIEVEMENT_POINTS: Record<string, number> = {
   first_match: 10,
@@ -155,6 +176,8 @@ export const ACHIEVEMENT_POINTS: Record<string, number> = {
   top_scout: 500,
   picklist: 100,
   match_view: 10,
+  live_picklist: 10,
+  picklist_suggestion: 25,
   upset: 150,
   mythic: 200,
   frcdle_5026: 200,

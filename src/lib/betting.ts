@@ -399,6 +399,9 @@ export async function getBulkMatchOdds(
 // Mutations
 // ---------------------------------------------------------------------------
 
+/** The most a scouter can stake on a single match. */
+export const MAX_BET = 10_000;
+
 export async function placeBet(
   userId: string,
   matchId: string,
@@ -406,6 +409,10 @@ export async function placeBet(
   amount: number,
   currency: BetCurrency = "points"
 ): Promise<{ success: boolean; error?: string }> {
+  if (amount > MAX_BET) {
+    return { success: false, error: `Bets are capped at ${MAX_BET.toLocaleString()} per match.` };
+  }
+
   if (isDevModeActive() && isDevMatchId(matchId)) {
     const profile = await getGameProfile(userId);
     if (!profile) return { success: false, error: "Could not load your game profile." };

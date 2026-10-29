@@ -20,6 +20,22 @@ export interface CosmeticDefinition {
   default?: boolean;
   /** For category "theme": true if the theme has a light background (skips the global `.dark` class). */
   isLight?: boolean;
+  /**
+   * For category "theme": the `data-theme` value of a light-background version. Themes with
+   * one get a Light/Dark toggle (on the Avatar page and in the Shop preview); `themeValue`
+   * is the dark version.
+   */
+  lightThemeValue?: string;
+}
+
+export type ThemeBackground = "light" | "dark";
+
+/** Setting holding each theme's chosen background, by cosmetic id. */
+export const THEME_BACKGROUNDS_SETTING = "theme-backgrounds";
+
+/** The `data-theme` value to apply for a theme, given its chosen background (dark by default). */
+export function themeValueFor(item: CosmeticDefinition, background?: ThemeBackground): string | undefined {
+  return background === "light" && item.lightThemeValue ? item.lightThemeValue : item.themeValue;
 }
 
 export const RARITY_VALUE: Record<CrateRarity, number> = {
@@ -863,6 +879,17 @@ export const COSMETICS: CosmeticDefinition[] = [
     // "Epic": the tier between Rare and Legendary
     rarity: "ultra-rare",
     themeValue: "hypernova",
+  },
+  {
+    id: "theme_robonauts",
+    name: "Robonauts",
+    description: "weeeee",
+    category: "theme",
+    url: "/shop/theme_robonauts.png",
+    cost: 250,
+    rarity: "rare",
+    themeValue: "robonauts",
+    lightThemeValue: "robonauts_light",
   },
 ];
 

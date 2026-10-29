@@ -5,10 +5,18 @@ export interface PitScoutingQuestion {
   placeholder?: string;
   required?: boolean;
   options?: string[];
+  /** Only asked when an earlier question's answer passes `test` (e.g. only for modular robots). */
+  askIf?: { questionId: string; test: (answer: unknown) => boolean };
+  /** Asked as `label` instead when an earlier question's answer passes `test`. */
+  labelIf?: { questionId: string; test: (answer: unknown) => boolean; label: string };
 }
 
 /** Pseudo-field id for the robot photo in a targeted rescout. */
 export const PIT_PHOTO_FIELD = "photo";
+
+const MODULAR_HEIGHT = "Modular (mechanism can change height)";
+// The height question; older submissions saved it as a list
+const isModular = (answer: unknown) => [answer].flat().includes(MODULAR_HEIGHT);
 
 export const pitScoutingQuestions: PitScoutingQuestion[] = [
   // Robot Specifications
@@ -34,11 +42,32 @@ export const pitScoutingQuestions: PitScoutingQuestion[] = [
     options: ["Swerve", "Mecanum", "Tank", "Other"],
   },
   {
+    id: "terrain-capability",
+    type: "radio",
+    label: "Is your robot:",
+    required: true,
+    options: [
+      "Short (can go under trench)",
+      "Tall (can only go over bump)",
+      MODULAR_HEIGHT,
+      "Have a stretchy net (Has a net that can stretch above the height of the trench)",
+    ],
+  },
+  {
     id: "hopper-space",
     type: "text",
     label: "What is their hopper space?",
     placeholder: "Describe hopper capacity/space",
     required: true,
+    labelIf: { questionId: "terrain-capability", test: isModular, label: "What is their hopper space when lowered?" },
+  },
+  {
+    id: "hopper-space-raised",
+    type: "text",
+    label: "What is their hopper space when raised?",
+    placeholder: "Describe hopper capacity/space",
+    required: true,
+    askIf: { questionId: "terrain-capability", test: isModular },
   },
   {
     id: "shooting-intake-speed",
@@ -72,18 +101,6 @@ export const pitScoutingQuestions: PitScoutingQuestion[] = [
       "Cannot climb",
     ],
   },
-  {
-    id: "terrain-capability",
-    type: "radio",
-    label: "Is your robot:",
-    required: true,
-    options: [
-      "Short (can go under trench)",
-      "Tall (can only go over bump)",
-      "Modular (mechanism can change height)",
-      "Have a stretchy net (Has a net that can stretch above the height of the trench)",
-    ],
-  },
 
   // Team Information
   {
@@ -112,3 +129,20 @@ export const pitScoutingQuestions: PitScoutingQuestion[] = [
     required: false,
   },
 ];
+
+/** Whether a question is asked, given the answers so far. */
+export const isQuestionAsked = (question: PitScoutingQuestion, answers: Record<string, unknown>) =>
+  !question.askIf || question.askIf.test(answers[question.askIf.questionId]);
+
+/** A question's wording, given the answers so far. */
+export const questionLabel = (question: PitScoutingQuestion, answers: Record<string, unknown>) =>
+  question.labelIf?.test(answers[question.labelIf.questionId]) ? question.labelIf.label : question.label;
+
+/** The answers without any to questions that aren't asked any more (say, after the robot stopped being modular). */
+export function withoutUnaskedAnswers<T extends Record<string, unknown>>(answers: T): T {
+  const result: Record<string, unknown> = { ...answers };
+  for (const question of pitScoutingQuestions) {
+    if (!isQuestionAsked(question, answers)) delete result[question.id];
+  }
+  return result as T;
+}

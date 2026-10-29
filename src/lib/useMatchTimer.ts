@@ -50,6 +50,11 @@ export const PHASE_DURATIONS: Record<Phase, number> = {
 export const TOTAL_MATCH_DURATION = 160; // seconds; display countdown starts at 2:40
 const AUTO_END_TIME = 20;
 const TRANSITION_PAUSE_MS = 3000;
+/**
+ * Shots are stored as seconds since the scout pressed start, which keeps counting through
+ * the handoff pause. Shots before this count as auto (auto plus the pause); later ones are teleop.
+ */
+export const AUTO_SHOTS_END = AUTO_END_TIME + TRANSITION_PAUSE_MS / 1000;
 
 export interface MatchTimerState {
   /** Total elapsed time in the match (0-160 seconds) */

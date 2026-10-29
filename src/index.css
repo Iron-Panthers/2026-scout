@@ -647,6 +647,78 @@ html {
   --sidebar-ring: hsl(332.6, 82%, 60.4%);
 }
 
+/* Robonauts — black background, gold primary, red accent (#000000 / #edab19 / #c8212a).
+   Has a light version (white background, same gold and red) picked with the Light/Dark toggle. */
+[data-theme="robonauts"] {
+  --background: hsl(0, 0%, 0%);
+  --foreground: hsl(0, 0%, 96%);
+  --card: hsl(0, 0%, 6%);
+  --card-foreground: hsl(0, 0%, 96%);
+  --popover: hsl(0, 0%, 8%);
+  --popover-foreground: hsl(0, 0%, 96%);
+  --primary: hsl(41.3, 85.4%, 51.4%);
+  --primary-foreground: hsl(0, 0%, 0%);
+  --secondary: hsl(0, 0%, 12%);
+  --secondary-foreground: hsl(0, 0%, 96%);
+  --muted: hsl(0, 0%, 12%);
+  --muted-foreground: hsl(0, 0%, 66%);
+  --accent: hsl(356.8, 71.7%, 45.7%);
+  --accent-foreground: hsl(0, 0%, 98%);
+  --destructive: hsl(356.8, 80%, 55%);
+  --destructive-foreground: hsl(0, 0%, 98%);
+  --border: hsl(41.3, 20%, 18%);
+  --input: hsl(41.3, 20%, 18%);
+  --ring: hsl(41.3, 85.4%, 51.4%);
+  --chart-1: hsl(41.3, 85.4%, 51.4%);
+  --chart-2: hsl(356.8, 71.7%, 55%);
+  --chart-3: hsl(41.3, 70%, 72%);
+  --chart-4: hsl(356.8, 55%, 35%);
+  --chart-5: hsl(0, 0%, 60%);
+  --sidebar: hsl(0, 0%, 3%);
+  --sidebar-foreground: hsl(0, 0%, 96%);
+  --sidebar-primary: hsl(41.3, 85.4%, 51.4%);
+  --sidebar-primary-foreground: hsl(0, 0%, 0%);
+  --sidebar-accent: hsl(0, 0%, 12%);
+  --sidebar-accent-foreground: hsl(0, 0%, 96%);
+  --sidebar-border: hsl(41.3, 20%, 18%);
+  --sidebar-ring: hsl(41.3, 85.4%, 51.4%);
+}
+
+[data-theme="robonauts_light"] {
+  --background: hsl(0, 0%, 100%);
+  --foreground: hsl(0, 0%, 6%);
+  --card: hsl(0, 0%, 100%);
+  --card-foreground: hsl(0, 0%, 6%);
+  --popover: hsl(0, 0%, 100%);
+  --popover-foreground: hsl(0, 0%, 6%);
+  --primary: hsl(41.3, 85.4%, 51.4%);
+  --primary-foreground: hsl(0, 0%, 0%);
+  --secondary: hsl(41.3, 40%, 95%);
+  --secondary-foreground: hsl(0, 0%, 6%);
+  --muted: hsl(41.3, 40%, 95%);
+  --muted-foreground: hsl(0, 0%, 40%);
+  --accent: hsl(356.8, 71.7%, 45.7%);
+  --accent-foreground: hsl(0, 0%, 98%);
+  --destructive: hsl(356.8, 71.7%, 45.7%);
+  --destructive-foreground: hsl(0, 0%, 98%);
+  --border: hsl(41.3, 30%, 85%);
+  --input: hsl(41.3, 30%, 85%);
+  --ring: hsl(41.3, 85.4%, 51.4%);
+  --chart-1: hsl(41.3, 85.4%, 45%);
+  --chart-2: hsl(356.8, 71.7%, 45.7%);
+  --chart-3: hsl(41.3, 60%, 30%);
+  --chart-4: hsl(356.8, 55%, 65%);
+  --chart-5: hsl(0, 0%, 35%);
+  --sidebar: hsl(41.3, 30%, 97%);
+  --sidebar-foreground: hsl(0, 0%, 6%);
+  --sidebar-primary: hsl(41.3, 85.4%, 51.4%);
+  --sidebar-primary-foreground: hsl(0, 0%, 0%);
+  --sidebar-accent: hsl(41.3, 40%, 93%);
+  --sidebar-accent-foreground: hsl(0, 0%, 6%);
+  --sidebar-border: hsl(41.3, 30%, 85%);
+  --sidebar-ring: hsl(41.3, 85.4%, 51.4%);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
