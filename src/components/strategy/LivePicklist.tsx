@@ -12,7 +12,8 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, useSortable, arrayMove, rectSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { ArrowDown, ArrowLeft, ArrowUp, ArrowUpDown, Check, ChevronDown, Loader2, MessageCircle, Square, Undo2, Users, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, ArrowUpDown, Check, ChevronDown, Equal, Loader2, MessageCircle, Send, Square, Undo2, Users, X } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -94,8 +95,9 @@ interface LiveMenuItem {
   onSelect: () => void;
 }
 
-/** Columns at each window width, matching the Event page's grid (Tailwind's sm, md and lg). */
-const columnsForWidth = (width: number) => (width >= 1024 ? 5 : width >= 768 ? 4 : width >= 640 ? 3 : 2);
+/** Columns at each window width: the Event page's grid (Tailwind's sm, md and lg), then 6 from xl up. */
+const columnsForWidth = (width: number) =>
+  width >= 1280 ? 6 : width >= 1024 ? 5 : width >= 768 ? 4 : width >= 640 ? 3 : 2;
 
 const storageKey = (eventId: string) => `live_picklist:${eventId}`;
 
@@ -152,6 +154,31 @@ const isTie = (a: LivePicklistEntry, b: LivePicklistEntry) =>
   b.averageRank != null &&
   Math.abs(a.averageRank - b.averageRank) < 1e-9;
 
+/** `entries` with a team moved to where another is, out of any tie it was in; null if it can't move. */
+function movedEntries(entries: LivePicklistEntry[], teamNumber: number, overTeamNumber: number): LivePicklistEntry[] | null {
+  const from = entries.findIndex((entry) => entry.teamNumber === teamNumber);
+  const to = entries.findIndex((entry) => entry.teamNumber === overTeamNumber);
+  if (from < 0 || to < 0 || from === to) return null;
+  // Moved by hand, so it no longer ties on its average either
+  return arrayMove(entries, from, to).map((entry, index) => (index === to ? { ...entry, moved: true, tieGroup: undefined } : entry));
+}
+
+/** `entries` with two teams tied, joining any tie either is already in. They should be next to each other. */
+function tiedEntries(entries: LivePicklistEntry[], teamNumber: number, otherTeamNumber: number): LivePicklistEntry[] {
+  const self = entries.find((entry) => entry.teamNumber === teamNumber);
+  const other = entries.find((entry) => entry.teamNumber === otherTeamNumber);
+  if (!self || !other) return entries;
+  const id = other.tieGroup ?? self.tieGroup ?? Math.max(0, ...entries.map((entry) => entry.tieGroup ?? 0)) + 1;
+  const merging = [self.tieGroup, other.tieGroup].filter((group): group is number => group != null);
+  return entries.map((entry) =>
+    entry.teamNumber === teamNumber ||
+    entry.teamNumber === otherTeamNumber ||
+    (entry.tieGroup != null && merging.includes(entry.tieGroup))
+      ? { ...entry, tieGroup: id }
+      : entry
+  );
+}
+
 /** Two teams next to each other share a place: the same average, or tied by the host. */
 const tiedWith = (a: LivePicklistEntry, b: LivePicklistEntry) =>
   (a.tieGroup != null && a.tieGroup === b.tieGroup) || isTie(a, b);
@@ -175,8 +202,11 @@ const formatRank = (rank: number) => String(Math.round(rank * 100) / 100);
 
 const isDnpMove = (direction: SuggestionDirection) => direction === "to_dnp" || direction === "from_dnp";
 
-/** "move 254 up 3 spots", "move 254 up" when no number was given, or "move 254 to DNP Teams". */
-const describeMove = (suggestion: Pick<LivePicklistSuggestion, "team_number" | "direction" | "spots">) => {
+/** "move 254 up 3 spots", "move 254 up" when no number was given, "move 254 to DNP Teams" or "tie 254 with 1678". */
+const describeMove = (
+  suggestion: Pick<LivePicklistSuggestion, "team_number" | "direction" | "spots"> & { tie_team_number?: number | null }
+) => {
+  if (suggestion.direction === "tie") return `tie ${suggestion.team_number} with ${suggestion.tie_team_number}`;
   if (suggestion.direction === "to_dnp") return `move ${suggestion.team_number} to DNP Teams`;
   if (suggestion.direction === "from_dnp") return `move ${suggestion.team_number} out of DNP Teams`;
   return `move ${suggestion.team_number} ${suggestion.direction}${
@@ -193,6 +223,7 @@ function SuggestionIcon({ direction }: { direction: SuggestionDirection }) {
   if (direction === "up") return <ArrowUp className="h-4 w-4 shrink-0 text-emerald-600" />;
   if (direction === "down") return <ArrowDown className="h-4 w-4 shrink-0 text-red-600" />;
   if (direction === "to_dnp") return <DnpMark className="text-[10px] leading-4 text-red-600" />;
+  if (direction === "tie") return <Equal className="h-4 w-4 shrink-0 text-amber-500" />;
   return <Undo2 className="h-4 w-4 shrink-0 text-emerald-600" />;
 }
 
@@ -251,7 +282,7 @@ function DnpToggle({ checked, onChange, count }: { checked: boolean; onChange: (
   return (
     <label className="flex cursor-pointer items-center gap-2 rounded-md border px-2.5 py-1.5 text-sm font-medium">
       <Switch checked={checked} onCheckedChange={onChange} />
-      DNP Teams
+      DNP
       <span className="text-xs text-muted-foreground tabular-nums">({count})</span>
     </label>
   );
@@ -497,6 +528,8 @@ interface LivePicklistProps {
   userId: string;
   userName: string | null;
   devMode: boolean;
+  /** Whether the shared picklist is live; null until known (and in the sandbox). */
+  live: boolean | null;
   onExit: () => void;
   onEnd: () => void;
 }
@@ -505,7 +538,7 @@ interface LivePicklistProps {
  * The picklist host's live picklist, averaged from the picklists the host picks and updated
  * as people change them. Everything the host does is shared so others can watch and suggest.
  */
-export function LivePicklist({ event, teams, userId, userName, devMode, onExit, onEnd }: LivePicklistProps) {
+export function LivePicklist({ event, teams, userId, userName, devMode, live, onExit, onEnd }: LivePicklistProps) {
   const isSandbox = devMode && isDevEventId(event.id);
   const { toast } = useToast();
   const [saved] = useState(() => loadSavedState(event.id));
@@ -540,6 +573,10 @@ export function LivePicklist({ event, teams, userId, userName, devMode, onExit, 
   const publishRef = useRef<Promise<unknown>>(Promise.resolve());
   // Set once the host ends the picklist, so a late share can't switch it back on.
   const endedRef = useRef(false);
+  // Whether this copy has shared yet (its first share starts the picklist), and whether it
+  // has seen the picklist live since (so it can tell when it's ended somewhere else)
+  const startedRef = useRef(false);
+  const sawLiveRef = useRef(false);
 
   // The sandbox only has this user's own picklist.
   const sandboxPicklists = useMemo(() => {
@@ -696,12 +733,25 @@ export function LivePicklist({ event, teams, userId, userName, devMode, onExit, 
         ...(tags[entry.teamNumber] ? { tags: tags[entry.teamNumber] } : {}),
         ...(notes[entry.teamNumber] ? { note: notes[entry.teamNumber] } : {}),
       }));
+      const start = !startedRef.current;
+      startedRef.current = true;
       publishRef.current = publishRef.current.then(() =>
-        publishLivePicklist(event.id, userId, shared, compiledCount)
+        publishLivePicklist(event.id, userId, shared, compiledCount, start)
       );
     }, 250);
     return () => window.clearTimeout(timer);
   }, [isSandbox, event.id, userId, entries, dnpTeams, tags, notes, compiledCount]);
+
+  // Ended from another tab or device: stop sharing (so this copy can't restart it) and leave.
+  useEffect(() => {
+    if (live) {
+      sawLiveRef.current = true;
+    } else if (live === false && sawLiveRef.current && !endedRef.current) {
+      endedRef.current = true;
+      toast({ title: "The live picklist was ended", description: "It was ended from another window or device." });
+      onExit();
+    }
+  }, [live, toast, onExit]);
 
   const suggestionCounts = useMemo(() => {
     const counts = new Map<number, number>();
@@ -722,31 +772,27 @@ export function LivePicklist({ event, teams, userId, userName, devMode, onExit, 
   // Moves a team to where another one is. Both are in the same list (main or DNP), so the
   // teams in the other list keep their places.
   const reorder = (teamNumber: number, overTeamNumber: number) => {
-    const from = entries.findIndex((entry) => entry.teamNumber === teamNumber);
-    const to = entries.findIndex((entry) => entry.teamNumber === overTeamNumber);
-    if (from < 0 || to < 0 || from === to) return;
-    // Dragged out of any tie it was in, like teams tied on their average
-    const next = arrayMove(entries, from, to).map((entry, index) =>
-      index === to ? { ...entry, moved: true, tieGroup: undefined } : entry
-    );
-    setManual({ entries: next, signature: manual?.signature ?? compiledSignature });
+    const next = movedEntries(entries, teamNumber, overTeamNumber);
+    if (next) setManual({ entries: next, signature: manual?.signature ?? compiledSignature });
   };
 
-  // Ties a team with the one above or below it in its list (main or DNP), joining any tie
-  // either is already in.
-  const tieWith = (teamNumber: number, neighbor: LivePicklistEntry) => {
-    const self = entries.find((entry) => entry.teamNumber === teamNumber);
-    if (!self) return;
-    const id = neighbor.tieGroup ?? self.tieGroup ?? Math.max(0, ...entries.map((entry) => entry.tieGroup ?? 0)) + 1;
-    const merging = [self.tieGroup, neighbor.tieGroup].filter((group): group is number => group != null);
-    const next = entries.map((entry) =>
-      entry.teamNumber === teamNumber ||
-      entry.teamNumber === neighbor.teamNumber ||
-      (entry.tieGroup != null && merging.includes(entry.tieGroup))
-        ? { ...entry, tieGroup: id }
-        : entry
+  // Ties a team with the one above or below it in its list (main or DNP).
+  const tieWith = (teamNumber: number, neighbor: LivePicklistEntry) =>
+    setManual({ entries: tiedEntries(entries, teamNumber, neighbor.teamNumber), signature: manual?.signature ?? compiledSignature });
+
+  // A tie suggestion: moves the team next to the other one (unless it already is), then ties
+  // them. Only teams in the same list (main or DNP) can tie.
+  const tieSuggested = (teamNumber: number, otherTeamNumber: number) => {
+    if (dnpTeams.has(teamNumber) !== dnpTeams.has(otherTeamNumber)) {
+      toast({ title: "Can't tie those teams", description: "One is in DNP Teams and the other isn't.", variant: "destructive" });
+      return;
+    }
+    const group = groupOf(teamNumber);
+    const gap = Math.abs(
+      group.findIndex((entry) => entry.teamNumber === teamNumber) - group.findIndex((entry) => entry.teamNumber === otherTeamNumber)
     );
-    setManual({ entries: next, signature: manual?.signature ?? compiledSignature });
+    const placed = gap === 1 ? entries : movedEntries(entries, teamNumber, otherTeamNumber) ?? entries;
+    setManual({ entries: tiedEntries(placed, teamNumber, otherTeamNumber), signature: manual?.signature ?? compiledSignature });
   };
 
   const untie = (teamNumber: number) =>
@@ -777,7 +823,9 @@ export function LivePicklist({ event, teams, userId, userName, devMode, onExit, 
   };
 
   const handleResolve = async (suggestion: LivePicklistSuggestion, accept: boolean) => {
-    if (accept && isDnpMove(suggestion.direction)) {
+    if (accept && suggestion.direction === "tie") {
+      if (suggestion.tie_team_number != null) tieSuggested(suggestion.team_number, suggestion.tie_team_number);
+    } else if (accept && isDnpMove(suggestion.direction)) {
       setDnp(suggestion.team_number, suggestion.direction === "to_dnp");
     } else if (accept) {
       // Spots count within the team's own list (main or DNP), the one the suggester saw it in
@@ -863,7 +911,7 @@ export function LivePicklist({ event, teams, userId, userName, devMode, onExit, 
                         variant="ghost"
                         className="h-8 w-8 shrink-0 text-emerald-600"
                         aria-label="Apply suggestion"
-                        title={suggestion.spots || isDnpMove(suggestion.direction) ? "Apply" : "Apply (moves it one spot)"}
+                        title={suggestion.spots || isDnpMove(suggestion.direction) || suggestion.direction === "tie" ? "Apply" : "Apply (moves it one spot)"}
                         onClick={() => void handleResolve(suggestion, true)}
                       >
                         <Check className="h-4 w-4" />
@@ -1068,6 +1116,152 @@ export function LivePicklist({ event, teams, userId, userName, devMode, onExit, 
   );
 }
 
+/**
+ * For viewers: a "Suggest" button opening a form with three parts, like the filter: the team,
+ * what to do with it (move up, move down or tie with), then how many places, or which team
+ * to tie with.
+ */
+function SuggestButton({
+  entries,
+  onSend,
+}: {
+  /** The host's shared list, both main and DNP. */
+  entries: LivePicklistEntry[];
+  onSend: (teamNumber: number, direction: SuggestionDirection, spots: number | null, tieTeamNumber: number | null) => Promise<boolean>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [team, setTeam] = useState("");
+  const [action, setAction] = useState<"up" | "down" | "tie">("up");
+  const [places, setPlaces] = useState("");
+  const [tieTeam, setTieTeam] = useState("");
+  const [sending, setSending] = useState(false);
+
+  const byNumber = useMemo(() => [...entries].sort((a, b) => a.teamNumber - b.teamNumber), [entries]);
+  const chosen = entries.find((entry) => String(entry.teamNumber) === team);
+  // Teams can only tie within their own list (main or DNP)
+  const tieChoices = chosen ? byNumber.filter((entry) => entry.teamNumber !== chosen.teamNumber && !!entry.dnp === !!chosen.dnp) : [];
+  const placeCount = places === "" ? null : Number(places);
+  const placesValid = placeCount === null || (Number.isInteger(placeCount) && placeCount > 0);
+  const ready = !!chosen && (action === "tie" ? tieChoices.some((entry) => String(entry.teamNumber) === tieTeam) : placesValid);
+
+  const openForm = () => {
+    setTeam("");
+    setAction("up");
+    setPlaces("");
+    setTieTeam("");
+    setOpen(true);
+  };
+
+  const send = async () => {
+    if (!ready || !chosen) return;
+    setSending(true);
+    const sent = await onSend(
+      chosen.teamNumber,
+      action,
+      action === "tie" ? null : placeCount,
+      action === "tie" ? Number(tieTeam) : null
+    );
+    setSending(false);
+    if (sent) setOpen(false);
+  };
+
+  return (
+    <>
+      <Button variant="outline" className="gap-1.5" onClick={openForm}>
+        <Send className="h-4 w-4" />
+        Suggest
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Suggest a change</DialogTitle>
+            <DialogDescription>The picklist host decides whether to make the change.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]">
+            <Select
+              value={team}
+              onValueChange={(value) => {
+                setTeam(value);
+                if (value === tieTeam) setTieTeam("");
+              }}
+            >
+              <SelectTrigger className="w-full" aria-label="Team">
+                <SelectValue placeholder="Team" />
+              </SelectTrigger>
+              <SelectContent>
+                {byNumber.map((entry) => (
+                  <SelectItem key={entry.teamNumber} value={String(entry.teamNumber)}>
+                    {entry.teamNumber}
+                    {entry.dnp && <span className="text-muted-foreground"> (DNP)</span>}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={action} onValueChange={(value) => setAction(value as "up" | "down" | "tie")}>
+              <SelectTrigger className="w-full" aria-label="Change">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="up">Move up</SelectItem>
+                <SelectItem value="down">Move down</SelectItem>
+                <SelectItem value="tie">Tie with</SelectItem>
+              </SelectContent>
+            </Select>
+            {action === "tie" ? (
+              <Select value={tieTeam} onValueChange={setTieTeam} disabled={!chosen}>
+                <SelectTrigger className="w-full" aria-label="Team to tie with">
+                  <SelectValue placeholder={chosen ? "Team" : "Pick a team first"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {tieChoices.map((entry) => (
+                    <SelectItem key={entry.teamNumber} value={String(entry.teamNumber)}>
+                      {entry.teamNumber}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <Input
+                aria-label="Places"
+                inputMode="numeric"
+                placeholder="Places (optional)"
+                value={places}
+                onChange={(changeEvent) => {
+                  if (/^\d*$/.test(changeEvent.target.value)) setPlaces(changeEvent.target.value);
+                }}
+                onKeyDown={(keyEvent) => {
+                  if (keyEvent.key === "Enter") void send();
+                }}
+              />
+            )}
+          </div>
+          {chosen && ready && (
+            <p className="text-sm text-muted-foreground">
+              “
+              {describeMove({
+                team_number: chosen.teamNumber,
+                direction: action,
+                spots: action === "tie" ? null : placeCount,
+                tie_team_number: action === "tie" ? Number(tieTeam) : null,
+              })}
+              ”
+            </p>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <Button disabled={!ready || sending} onClick={() => void send()}>
+              {sending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Send suggestion
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 interface LivePicklistViewerProps {
   event: Event;
   /** Every team at the event. */
@@ -1120,21 +1314,37 @@ export function LivePicklistViewer({ event, teams, live, userId, onExit, onTeamC
     setSpots("");
   };
 
-  const handleSend = async () => {
-    if (!suggestTeam || !spotsValid) return;
-    setSending(true);
-    const sent = await suggestMove(event.id, suggestTeam.team_number, direction, spotCount);
-    setSending(false);
+  // Sends a suggestion to the host; whether it went through.
+  const sendSuggestion = async (
+    teamNumber: number,
+    suggestedDirection: SuggestionDirection,
+    suggestedSpots: number | null,
+    tieTeamNumber: number | null = null
+  ) => {
+    const sent = await suggestMove(event.id, teamNumber, suggestedDirection, suggestedSpots, tieTeamNumber);
     if (sent) {
       void unlockAchievement(userId, "picklist_suggestion");
       toast({
         title: "Suggestion sent",
-        description: `You suggested to ${describeMove({ team_number: suggestTeam.team_number, direction, spots: spotCount })}.`,
+        description: `You suggested to ${describeMove({
+          team_number: teamNumber,
+          direction: suggestedDirection,
+          spots: suggestedSpots,
+          tie_team_number: tieTeamNumber,
+        })}.`,
       });
-      setSuggestTeam(null);
     } else {
       toast({ title: "Could not send your suggestion", variant: "destructive" });
     }
+    return sent;
+  };
+
+  const handleSend = async () => {
+    if (!suggestTeam || !spotsValid) return;
+    setSending(true);
+    const sent = await sendSuggestion(suggestTeam.team_number, direction, spotCount);
+    setSending(false);
+    if (sent) setSuggestTeam(null);
   };
 
   return (
@@ -1152,7 +1362,10 @@ export function LivePicklistViewer({ event, teams, live, userId, onExit, onTeamC
 
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <DnpToggle checked={showDnp} onChange={setShowDnp} count={dnpCount} />
-        <StatFilterButton filter={statFilter} onChange={setStatFilter} loading={!teamStats} />
+        <div className="flex flex-wrap items-center gap-2">
+          <SuggestButton entries={live.entries} onSend={sendSuggestion} />
+          <StatFilterButton filter={statFilter} onChange={setStatFilter} loading={!teamStats} />
+        </div>
       </div>
 
       <LiveGrid

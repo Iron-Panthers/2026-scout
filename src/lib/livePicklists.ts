@@ -66,15 +66,17 @@ export interface LivePicklistRow {
   updated_at: string;
 }
 
-/** Up or down the team's list, or into or out of DNP Teams. */
-export type SuggestionDirection = "up" | "down" | "to_dnp" | "from_dnp";
+/** Up or down the team's list, into or out of DNP Teams, or tied with another team. */
+export type SuggestionDirection = "up" | "down" | "to_dnp" | "from_dnp" | "tie";
 
 export interface LivePicklistSuggestion {
   id: string;
   event_id: string;
   team_number: number;
   direction: SuggestionDirection;
-  /** How many spots to move; null when the suggester didn't say, and for DNP moves. */
+  /** The team to tie with, for a "tie" suggestion; null otherwise. */
+  tie_team_number: number | null;
+  /** How many spots to move; null when the suggester didn't say, and for DNP moves and ties. */
   spots: number | null;
   author_id: string;
   status: "pending" | "accepted" | "dismissed";
@@ -96,12 +98,17 @@ export async function getLivePicklist(eventId: string): Promise<LivePicklistRow 
   return data;
 }
 
-/** The host shares the list as it stands, which also marks the picklist as live. */
+/**
+ * The host shares the list as it stands. `start` also marks the picklist as live (the host
+ * opening it); later shares leave that alone, so a host's copy left open somewhere can't
+ * switch an ended picklist back on.
+ */
 export async function publishLivePicklist(
   eventId: string,
   hostId: string,
   entries: LivePicklistEntry[],
-  compiledCount: number
+  compiledCount: number,
+  start = false
 ): Promise<boolean> {
   const { error } = await supabase.from("live_picklists").upsert(
     {
@@ -109,7 +116,8 @@ export async function publishLivePicklist(
       host_id: hostId,
       entries,
       compiled_count: compiledCount,
-      is_live: true,
+      // Left out, a new row still starts live (the column defaults to true)
+      ...(start ? { is_live: true } : {}),
       updated_at: new Date().toISOString(),
     },
     { onConflict: "event_id" }
@@ -157,11 +165,18 @@ export async function suggestMove(
   eventId: string,
   teamNumber: number,
   direction: SuggestionDirection,
-  spots: number | null
+  spots: number | null,
+  tieTeamNumber: number | null = null
 ): Promise<boolean> {
   const { error } = await supabase
     .from("live_picklist_suggestions")
-    .insert({ event_id: eventId, team_number: teamNumber, direction, spots });
+    .insert({
+      event_id: eventId,
+      team_number: teamNumber,
+      direction,
+      spots,
+      ...(direction === "tie" ? { tie_team_number: tieTeamNumber } : {}),
+    });
 
   if (error) {
     console.error("Error sending picklist suggestion:", error);

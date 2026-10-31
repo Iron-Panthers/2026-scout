@@ -72,9 +72,10 @@ import { TeamInfoPage } from "@/components/strategy/TeamInfoPage";
 import { PicklistCardContent } from "@/components/strategy/PicklistCardContent";
 import { LivePicklist, LivePicklistViewer } from "@/components/strategy/LivePicklist";
 import { useLivePicklist } from "@/hooks/useLivePicklist";
-import { endLivePicklist, entryTags, type LivePicklistTag } from "@/lib/livePicklists";
+import { endLivePicklist, entryTags } from "@/lib/livePicklists";
 import { TeamTags } from "@/components/strategy/TeamTag";
 import { LiveTeamNote } from "@/components/strategy/LiveTeamNote";
+import { MyPicklistTab } from "@/components/strategy/MyPicklistTab";
 import { SCOUTING_DATA_TYPES, type ScoutingDataType } from "@/lib/strategyData";
 import type { Event } from "@/types";
 
@@ -192,8 +193,6 @@ interface SortablePicklistCardProps {
   column: PicklistColumnKey;
   index: number;
   showRank: boolean;
-  /** The live picklist host's tags on this team. */
-  tags?: LivePicklistTag[];
   onCardClick: (team: TBATeamSimple) => void;
   /** Screen position (viewport coords) this card was dropped at, if it just
    * landed in this column from a different one — used to animate it flying
@@ -210,7 +209,6 @@ function SortablePicklistCard({
   column,
   index,
   showRank,
-  tags,
   onCardClick,
   flyFrom,
   onFlyDone,
@@ -270,7 +268,6 @@ function SortablePicklistCard({
           team={team}
           showRank={showRank}
           index={index}
-          below={tags && <TeamTags tags={tags} dots />}
         />
       </Card>
     </div>
@@ -284,7 +281,6 @@ interface PicklistColumnProps {
   teams: TBATeamSimple[];
   emptyMessage: string;
   showRank: boolean;
-  tags: Map<number, LivePicklistTag[]>;
   onCardClick: (team: TBATeamSimple) => void;
   flyingTeam?: { teamNumber: number; rect: { top: number; left: number } } | null;
   onFlyDone?: () => void;
@@ -297,7 +293,6 @@ function PicklistColumn({
   teams,
   emptyMessage,
   showRank,
-  tags,
   onCardClick,
   flyingTeam,
   onFlyDone,
@@ -335,7 +330,6 @@ function PicklistColumn({
               column={columnKey}
               index={index}
               showRank={showRank}
-              tags={tags.get(team.team_number)}
               onCardClick={onCardClick}
               flyFrom={flyingTeam?.teamNumber === team.team_number ? flyingTeam.rect : null}
               onFlyDone={flyingTeam?.teamNumber === team.team_number ? onFlyDone : undefined}
@@ -813,8 +807,7 @@ export default function StrategyDashboard() {
   useEffect(() => {
     if (liveOpen && (isPicklistHost || picklistIsLive)) void unlockAchievement(user?.id, "live_picklist");
   }, [liveOpen, isPicklistHost, picklistIsLive, user?.id]);
-  // Tags the host put on teams in the live picklist, shown on everyone's picklist cards
-  // (kept after the live picklist ends).
+  // Tags the host put on teams in the live picklist, shown in team popups opened from it.
   const liveTags = useMemo(
     () =>
       new Map(
@@ -824,7 +817,7 @@ export default function StrategyDashboard() {
       ),
     [livePicklist.row]
   );
-  // The host's live picklist notes on teams, shown in the team popup (also kept after it ends).
+  // The host's live picklist notes on teams, shown in team popups opened from it.
   const liveNotes = useMemo(
     () =>
       new Map(
@@ -876,9 +869,14 @@ export default function StrategyDashboard() {
           unwrap as the padding jumps. */}
       <main
         className={`mx-auto ${
-          strategyPage === "dashboard" ? "w-full p-3 sm:p-6" : liveOpen ? "w-full p-6" : "container p-6 max-w-7xl"
+          strategyPage === "dashboard" ? "w-full p-3 sm:p-6" : liveOpen ? "w-full p-6 pl-10" : "container p-6 max-w-7xl"
         }`}
       >
+        {/* Your own picklist beside the live one, for the host and everyone watching */}
+        {liveOpen && selectedPicklistEvent && !picklistLoading && (isPicklistHost || (picklistIsLive && livePicklist.row)) && (
+          <MyPicklistTab picked={pickedTeams} doNotPick={doNotPickTeams} />
+        )}
+
         {/* Header Section */}
         <div className="flex items-start justify-between mb-8">
           <div className="flex items-center gap-3">
@@ -1013,6 +1011,7 @@ export default function StrategyDashboard() {
                 userId={user.id}
                 userName={profile?.name ?? null}
                 devMode={devMode}
+                live={livePicklist.loaded ? picklistIsLive : null}
                 onExit={closeLivePicklist}
                 onEnd={() => void handleEndLivePicklist()}
               />
@@ -1089,7 +1088,6 @@ export default function StrategyDashboard() {
                         teams={pickedTeams}
                         emptyMessage="Picklist goes here I think"
                         showRank
-                        tags={liveTags}
                         onCardClick={(team) => {
                           setTeamInfoTeam(team);
                           setTeamInfoOpen(true);
@@ -1106,7 +1104,6 @@ export default function StrategyDashboard() {
                         teams={doNotPickTeams}
                         emptyMessage="Skibidi"
                         showRank
-                        tags={liveTags}
                         onCardClick={(team) => {
                           setTeamInfoTeam(team);
                           setTeamInfoOpen(true);
@@ -1158,7 +1155,6 @@ export default function StrategyDashboard() {
                       teams={sortedBankTeams}
                       emptyMessage="All teams have been picked."
                       showRank={false}
-                      tags={liveTags}
                       onCardClick={(team) => {
                         setTeamInfoTeam(team);
                         setTeamInfoOpen(true);
@@ -1171,12 +1167,7 @@ export default function StrategyDashboard() {
                   <DragOverlay dropAnimation={null}>
                     {activeDragTeam ? (
                       <Card className="cursor-grabbing gap-0 py-0 shadow-lg">
-                        <PicklistCardContent
-                          team={activeDragTeam}
-                          below={liveTags.get(activeDragTeam.team_number) && (
-                            <TeamTags tags={liveTags.get(activeDragTeam.team_number)!} dots />
-                          )}
-                        />
+                        <PicklistCardContent team={activeDragTeam} />
                       </Card>
                     ) : null}
                   </DragOverlay>
@@ -1216,7 +1207,8 @@ export default function StrategyDashboard() {
             devMode={devMode}
             renderExtra={(teamNumber) => (
               <>
-                {liveTags.has(teamNumber) && (
+                {/* Tags and the host's notes only show on the live picklist */}
+                {liveOpen && liveTags.has(teamNumber) && (
                   <div className="space-y-2 rounded-lg border p-3">
                     <div className="flex items-center gap-2">
                       <Tag className="h-4 w-4 text-muted-foreground" />
@@ -1225,7 +1217,7 @@ export default function StrategyDashboard() {
                     <TeamTags tags={liveTags.get(teamNumber)!} />
                   </div>
                 )}
-                {liveNotes.has(teamNumber) && <LiveTeamNote note={liveNotes.get(teamNumber)!} />}
+                {liveOpen && liveNotes.has(teamNumber) && <LiveTeamNote note={liveNotes.get(teamNumber)!} />}
               </>
             )}
           />

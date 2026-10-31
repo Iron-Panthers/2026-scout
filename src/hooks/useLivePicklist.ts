@@ -24,10 +24,24 @@ export function useLivePicklist(eventId: string | undefined) {
         { event: "*", schema: "public", table: "live_picklists", filter: `event_id=eq.${eventId}` },
         () => void load()
       )
-      .subscribe();
+      // Changes made while the connection was down (a phone in the background) never arrive,
+      // so check again whenever it reconnects
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") void load();
+      });
+    // ...and whenever the app comes back to the front
+    const reloadIfVisible = () => {
+      if (document.visibilityState === "visible") void load();
+    };
+    document.addEventListener("visibilitychange", reloadIfVisible);
+    window.addEventListener("focus", reloadIfVisible);
+    window.addEventListener("online", reloadIfVisible);
     return () => {
       cancelled = true;
       supabase.removeChannel(channel);
+      document.removeEventListener("visibilitychange", reloadIfVisible);
+      window.removeEventListener("focus", reloadIfVisible);
+      window.removeEventListener("online", reloadIfVisible);
     };
   }, [eventId]);
 
