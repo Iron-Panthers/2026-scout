@@ -118,6 +118,31 @@ export async function purchaseCosmetic(
 }
 
 /**
+ * Give someone cosmetics for free (a seasonal event's items), skipping any they already own.
+ * Returns the ids actually given.
+ */
+export async function grantCosmetics(userId: string, cosmeticIds: string[]): Promise<string[]> {
+  const profile = await getGameProfile(userId);
+  if (!profile) return [];
+  const owned = profile.owned_cosmetics ?? [];
+  const given = cosmeticIds.filter((id) => !owned.includes(id));
+  if (given.length === 0) return [];
+  const newOwned = [...owned, ...given];
+
+  if (isDevModeActive()) {
+    updateDevGameProfile(userId, { owned_cosmetics: newOwned });
+    return given;
+  }
+
+  const { error } = await supabase.from("game_profiles").update({ owned_cosmetics: newOwned }).eq("user_id", userId);
+  if (error) {
+    console.error("[shopService] grantCosmetics error:", error);
+    return [];
+  }
+  return given;
+}
+
+/**
  * Equip a cosmetic to its slot.
  * slot is the category ("hat" or "cosmetic").
  */

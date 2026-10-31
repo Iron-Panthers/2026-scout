@@ -26,7 +26,18 @@ export interface CosmeticDefinition {
    * is the dark version.
    */
   lightThemeValue?: string;
+  /**
+   * The id of the seasonal event (src/config/seasonalEvents.ts) whose item this is: awarded
+   * free to everyone who opens the app during it, and only shown in that event's shop tab.
+   */
+  seasonalEvent?: string;
 }
+
+/**
+ * Only available for a limited time (competition event items and seasonal event items), so
+ * they're kept out of the Themes tab and crates, and the Collector achievement doesn't need them.
+ */
+export const isLimitedCosmetic = (item: CosmeticDefinition) => item.currency === "event" || !!item.seasonalEvent;
 
 export type ThemeBackground = "light" | "dark";
 
@@ -890,6 +901,29 @@ export const COSMETICS: CosmeticDefinition[] = [
     rarity: "rare",
     themeValue: "robonauts",
     lightThemeValue: "robonauts_light",
+  },
+
+  // Halloween 2026 (seasonal event): awarded free for opening the app during it
+  {
+    id: "decoration_jack_o_lantern",
+    name: "Jack-o-lantern",
+    description: "Spooky!",
+    category: "decoration",
+    emoji: "🎃",
+    cost: 0,
+    rarity: "rare",
+    seasonalEvent: "halloween_2026",
+  },
+  {
+    id: "theme_pumpkin_bots",
+    name: "Pumpkin Bots",
+    description: "Pumpkin!",
+    category: "theme",
+    url: "/shop/theme_pumpkin_bots.jpg",
+    cost: 0,
+    rarity: "ultra-rare",
+    themeValue: "pumpkin_bots",
+    seasonalEvent: "halloween_2026",
   },
 ];
 

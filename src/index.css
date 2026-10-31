@@ -719,6 +719,42 @@ html {
   --sidebar-ring: hsl(41.3, 85.4%, 51.4%);
 }
 
+/* Pumpkin Bots (Halloween 2026): orange #ef7c22 with green #81a84a, on a warm near-black */
+[data-theme="pumpkin_bots"] {
+  --background: hsl(26, 25%, 5%);
+  --foreground: hsl(30, 20%, 95%);
+  --card: hsl(26, 20%, 8%);
+  --card-foreground: hsl(30, 20%, 95%);
+  --popover: hsl(26, 20%, 10%);
+  --popover-foreground: hsl(30, 20%, 95%);
+  --primary: hsl(26.3, 86.5%, 53.5%);
+  --primary-foreground: hsl(0, 0%, 0%);
+  --secondary: hsl(26, 15%, 14%);
+  --secondary-foreground: hsl(30, 20%, 95%);
+  --muted: hsl(26, 15%, 14%);
+  --muted-foreground: hsl(30, 10%, 66%);
+  --accent: hsl(84.9, 38.8%, 47.5%);
+  --accent-foreground: hsl(0, 0%, 0%);
+  --destructive: hsl(0, 75%, 55%);
+  --destructive-foreground: hsl(0, 0%, 98%);
+  --border: hsl(26.3, 25%, 18%);
+  --input: hsl(26.3, 25%, 18%);
+  --ring: hsl(26.3, 86.5%, 53.5%);
+  --chart-1: hsl(26.3, 86.5%, 53.5%);
+  --chart-2: hsl(84.9, 38.8%, 47.5%);
+  --chart-3: hsl(26.3, 80%, 72%);
+  --chart-4: hsl(84.9, 40%, 32%);
+  --chart-5: hsl(30, 10%, 60%);
+  --sidebar: hsl(26, 25%, 3%);
+  --sidebar-foreground: hsl(30, 20%, 95%);
+  --sidebar-primary: hsl(26.3, 86.5%, 53.5%);
+  --sidebar-primary-foreground: hsl(0, 0%, 0%);
+  --sidebar-accent: hsl(84.9, 38.8%, 47.5%);
+  --sidebar-accent-foreground: hsl(0, 0%, 0%);
+  --sidebar-border: hsl(26.3, 25%, 18%);
+  --sidebar-ring: hsl(26.3, 86.5%, 53.5%);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -795,4 +831,34 @@ html {
 @media (prefers-reduced-motion: reduce) {
   .crate-slide-out-left, .crate-slide-out-right { animation: none; display: none; }
   .crate-slide-in-right, .crate-slide-in-left { animation: none; }
+}
+
+/* Seasonal event rewards: each item pops in over a burst of light and slowly turning rays,
+   with a few sparks flying out (SeasonalEventAwards.tsx) */
+@keyframes seasonal-reward-pop {
+  0% { transform: scale(0.2) rotate(-12deg); opacity: 0; }
+  60% { transform: scale(1.15) rotate(4deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+@keyframes seasonal-reward-burst {
+  0% { transform: scale(0.3); opacity: 0.9; }
+  100% { transform: scale(2.4); opacity: 0; }
+}
+@keyframes seasonal-reward-rays {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes seasonal-reward-spark {
+  0% { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(var(--spark-x), var(--spark-y)) scale(0.3); opacity: 0; }
+}
+@keyframes seasonal-reward-fade-up {
+  from { transform: translateY(8px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .seasonal-reward,
+  .seasonal-reward * {
+    animation: none !important;
+  }
 }

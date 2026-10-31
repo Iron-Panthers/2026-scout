@@ -333,11 +333,19 @@ function saveDevData(userId: string, data: DevData): void {
   } catch { /* ignore quota errors */ }
 }
 
-/** Wipes this user's sandbox, generating a brand new event/schedule next time it's read. */
+/** Sent on `window` after the sandbox is reset, so anything showing its data can start over. */
+export const DEV_DATA_RESET_EVENT = "dev-sandbox-reset";
+
+/**
+ * Wipes this user's sandbox, generating a brand new event/schedule next time it's read. The
+ * sandbox then counts as never having opened the app, so seasonal event items (and their
+ * welcome) are awarded again.
+ */
 export function resetDevData(userId: string): void {
   try {
     localStorage.removeItem(dataKey(userId));
   } catch { /* ignore */ }
+  window.dispatchEvent(new Event(DEV_DATA_RESET_EVENT));
 }
 
 // ---------------------------------------------------------------------------

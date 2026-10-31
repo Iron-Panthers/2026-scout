@@ -27,6 +27,7 @@ import {
   RARITY_CONFIG,
   RARITY_VALUE,
   THEME_BACKGROUNDS_SETTING,
+  isLimitedCosmetic,
   themeValueFor,
   type CosmeticDefinition,
   type CosmeticCategory,
@@ -35,6 +36,13 @@ import {
 } from "@/config/cosmetics";
 import { CRATE_TIERS, type CrateTier } from "@/config/crates";
 import { GAMES } from "@/config/games";
+import {
+  COSMETICS_GRANTED_EVENT,
+  SEASONAL_ITEM_COLOR,
+  activeSeasonalEvents,
+  seasonalEventDates,
+  seasonalEventName,
+} from "@/config/seasonalEvents";
 import { getEventCurrencyLogo } from "@/config/eventCurrency";
 import CosmeticAvatar from "@/components/CosmeticAvatar";
 import { ThemeBackgroundToggle } from "@/components/ThemeBackgroundToggle";
@@ -63,21 +71,25 @@ interface CosmeticCardProps {
 }
 
 function CosmeticCard({ item, owned, equipped, canAfford, eventName, eventCode, onBuy }: CosmeticCardProps) {
+  // Seasonal items are awarded, never bought, and have their own card color
+  const awarded = !!item.seasonalEvent;
+  const cardColor = awarded ? SEASONAL_ITEM_COLOR : RARITY_CONFIG[item.rarity].color;
   return (
     <Card
       className={`relative overflow-hidden transition-all border pt-0 ${
-        canAfford || owned ? "" : "opacity-45 grayscale-[60%]"
+        canAfford || owned || awarded ? "" : "opacity-45 grayscale-[60%]"
       }`}
       style={
         {
-          borderColor: RARITY_CONFIG[item.rarity].color,
-          backgroundColor: `${RARITY_CONFIG[item.rarity].color}0D`,
+          borderColor: cardColor,
+          // A 10% tint of the card's color
+          backgroundColor: `${cardColor}1A`,
           // boxShadow: `0 0 6px 0px ${item.rarity !== 'common' && item.rarity !== 'uncommon' ? RARITY_CONFIG[item.rarity].color : 'transparent'}`
         }
       }
     >
       {equipped && (
-        <div className={`absolute right-2 ${item.currency === "event" && eventName ? "top-8" : "top-2"}`}>
+        <div className={`absolute right-2 ${eventName ? "top-8" : "top-2"}`}>
           <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/40 text-xs gap-1">
             <CheckCircle2 className="h-3 w-3" />
             Equipped
@@ -86,8 +98,13 @@ function CosmeticCard({ item, owned, equipped, canAfford, eventName, eventCode, 
       )}
 
       <CardContent className="h-50 p-4 flex flex-col pb-0">
-        {item.currency === "event" && eventName && (
-          <div className="-mx-4 -mt-4 flex shrink-0 items-center justify-center gap-1 border-b border-sky-500/30 bg-sky-500/15 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-sky-300">
+        {/* The event it's from: a competition event, or a seasonal event like Halloween 2026 */}
+        {eventName && (
+          <div className={`-mx-4 -mt-4 flex shrink-0 items-center justify-center gap-1 border-b px-2 py-1 text-[10px] font-semibold uppercase tracking-wide ${
+            item.seasonalEvent
+              ? "border-orange-500/30 bg-orange-500/15 text-orange-600 dark:text-orange-300"
+              : "border-sky-500/30 bg-sky-500/15 text-sky-300"
+          }`}>
             {eventName}
           </div>
         )}
@@ -115,7 +132,7 @@ function CosmeticCard({ item, owned, equipped, canAfford, eventName, eventCode, 
             >
               Owned
             </Button>
-          ) : (
+          ) : awarded ? null : (
             <Button
               size="sm"
               className="w-full text-xs gap-1"
@@ -178,11 +195,11 @@ export default function Shop({
   }, [user?.id]);
 
   // Collector: once they own every cosmetic they can always get. The free defaults don't
-  // count, and neither do event items, which are only sold while an event is on.
+  // count, and neither do event and seasonal items, which are only around for a while.
   useEffect(() => {
     if (!gameProfile) return;
     const owned = new Set(gameProfile.owned_cosmetics ?? []);
-    const collectible = COSMETICS.filter((cosmetic) => !cosmetic.default && cosmetic.currency !== "event");
+    const collectible = COSMETICS.filter((cosmetic) => !cosmetic.default && !isLimitedCosmetic(cosmetic));
     if (collectible.every((cosmetic) => owned.has(cosmetic.id))) {
       void unlockAchievement(user?.id, "collector");
     }
@@ -190,6 +207,9 @@ export default function Shop({
 
   useEffect(() => {
     loadProfile();
+    // Seasonal event items can be awarded while the Shop is open
+    window.addEventListener(COSMETICS_GRANTED_EVENT, loadProfile);
+    return () => window.removeEventListener(COSMETICS_GRANTED_EVENT, loadProfile);
   }, [loadProfile]);
 
   useEffect(() => {
@@ -282,7 +302,9 @@ export default function Shop({
   const rarityCompare = (a: CosmeticDefinition, b: CosmeticDefinition) =>
     a.rarity === b.rarity ? a.cost - b.cost : RARITY_VALUE[a.rarity] - RARITY_VALUE[b.rarity];
 
-  const themes = COSMETICS.filter((c) => c.category === "theme" && c.currency !== "event").sort(rarityCompare);
+  const themes = COSMETICS.filter((c) => c.category === "theme" && !isLimitedCosmetic(c)).sort(rarityCompare);
+  // Seasonal events on right now, each with its own tab
+  const seasonalEvents = activeSeasonalEvents();
   const eventItems = COSMETICS.filter((c) => c.currency === "event").sort(rarityCompare);
 
   function renderGrid(items: CosmeticDefinition[], currency: "points" | "event" = "points") {
@@ -299,7 +321,7 @@ export default function Shop({
             eventName={
               item.currency === "event"
                 ? eventCosmeticSources[item.id] ?? activeEvent?.name
-                : undefined
+                : seasonalEventName(item.seasonalEvent)
             }
             eventCode={activeEvent?.event_code}
             onBuy={() => setBuyTarget(item)}
@@ -400,6 +422,11 @@ export default function Shop({
                     Event
                   </TabsTrigger>
                 )}
+                {seasonalEvents.map((event) => (
+                  <TabsTrigger key={event.id} value={`seasonal:${event.id}`} className="flex-1 gap-1.5">
+                    {event.tabLabel}
+                  </TabsTrigger>
+                ))}
               </TabsList>
               <TabsContent value="themes" className="mt-4">
                 {renderGrid(themes)}
@@ -451,6 +478,24 @@ export default function Shop({
                   {renderGrid(eventItems, "event")}
                 </TabsContent>
               )}
+              {seasonalEvents.map((event) => {
+                const items = COSMETICS.filter((c) => c.seasonalEvent === event.id).sort(rarityCompare);
+                return (
+                  <TabsContent key={event.id} value={`seasonal:${event.id}`} className="mt-4 space-y-4">
+                    <div className="rounded-lg border border-border/50 bg-accent/30 px-4 py-3">
+                      <p className="text-xs text-muted-foreground">Seasonal Event · {seasonalEventDates(event)}</p>
+                      <p className="font-semibold">{event.name}</p>
+                    </div>
+                    {items.length === 0 ? (
+                      <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+                        No items yet. Check back soon!
+                      </p>
+                    ) : (
+                      renderGrid(items)
+                    )}
+                  </TabsContent>
+                );
+              })}
             </Tabs>
           </div>
         </div>
@@ -627,14 +672,14 @@ function CratesTab({ points, ownedCosmetics, tier, onPrevTier, onNextTier, onOpe
 
   const crateCategoryOrder: CosmeticCategory[] = ["hat", "decoration"];
   const cratePool = COSMETICS.filter(
-    (c) => c.currency !== "event" && !c.default && c.category !== "theme"
+    (c) => !isLimitedCosmetic(c) && !c.default && c.category !== "theme"
   );
 
   const rarityCounts = (["common", "uncommon", "rare", "ultra-rare", "legendary"] as CrateRarity[]).map((r) => ({
     rarity: r,
-    total: COSMETICS.filter((c) => c.rarity === r && c.currency !== "event" && !c.default && c.category !== "theme").length,
+    total: COSMETICS.filter((c) => c.rarity === r && !isLimitedCosmetic(c) && !c.default && c.category !== "theme").length,
     owned: COSMETICS.filter(
-      (c) => c.rarity === r && c.currency !== "event" && !c.default && c.category !== "theme" && ownedCosmetics.includes(c.id)
+      (c) => c.rarity === r && !isLimitedCosmetic(c) && !c.default && c.category !== "theme" && ownedCosmetics.includes(c.id)
     ).length,
   }));
 

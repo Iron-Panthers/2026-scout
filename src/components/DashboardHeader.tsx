@@ -25,6 +25,11 @@ const DEFAULT_SUBTITLES = [
   "Did you do your frcdle yet"
 ];
 
+// Subtitles that are links (opened in a new tab, so the app stays open)
+const SUBTITLE_LINKS: Record<string, string> = {
+  "Click for virus": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+};
+
 export default function DashboardHeader({
   userName,
   subtitle,
@@ -35,12 +40,27 @@ export default function DashboardHeader({
     return pool[Math.floor(Math.random() * pool.length)];
   });
 
+  const shownSubtitle = subtitle ?? randomSubtitle;
+
   return (
     <div>
       <h1 className="text-4xl font-bold mb-2">
         Hi, <span className="text-primary">{userName}</span>
       </h1>
-      <p className="text-muted-foreground">{subtitle ?? randomSubtitle}</p>
+      <p className="text-muted-foreground">
+        {SUBTITLE_LINKS[shownSubtitle] ? (
+          <a
+            href={SUBTITLE_LINKS[shownSubtitle]}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline-offset-2 hover:underline"
+          >
+            {shownSubtitle}
+          </a>
+        ) : (
+          shownSubtitle
+        )}
+      </p>
     </div>
   );
 }

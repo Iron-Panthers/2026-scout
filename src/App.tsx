@@ -24,6 +24,7 @@ import Shop from "./pages/Shop";
 import AvatarPage from "./pages/Avatar";
 import { Toaster } from "./components/ui/toaster";
 import AchievementToaster from "./components/AchievementToaster";
+import SeasonalEventAwards from "./components/SeasonalEventAwards";
 import UpdateBanner from "./components/UpdateBanner";
 import NotificationNavigationListener from "./components/NotificationNavigationListener";
 import GuestDashboard from "./pages/GuestDashboard";
@@ -241,6 +242,7 @@ function App() {
           </MessagesProvider>
           <Toaster />
           <AchievementToaster />
+          <SeasonalEventAwards />
           <UpdateBanner />
           <NotificationNavigationListener />
         </BrowserRouter>

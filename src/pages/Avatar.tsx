@@ -18,6 +18,7 @@ import {
   type ThemeBackground,
 } from "@/config/cosmetics";
 import { ThemeBackgroundToggle } from "@/components/ThemeBackgroundToggle";
+import { SEASONAL_ITEM_COLOR, seasonalEventName } from "@/config/seasonalEvents";
 import CosmeticAvatar from "@/components/CosmeticAvatar";
 import { useToast } from "@/hooks/use-toast";
 import { useRandomSubtitle } from "@/hooks/useRandomSubtitle";
@@ -145,19 +146,26 @@ export default function AvatarPage({
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
           {items.map((item) => {
             const isEquipped = equipped[item.category] === item.id;
-            const eventSource = eventCosmeticSources[item.id];
+            // The event it's from: where a competition event item was bought, or its seasonal event
+            const eventSource = eventCosmeticSources[item.id] ?? seasonalEventName(item.seasonalEvent);
+            const cardColor = item.seasonalEvent ? SEASONAL_ITEM_COLOR : RARITY_CONFIG[item.rarity].color;
             return (
               <Card
                 key={item.id}
                 className="relative overflow-hidden border pt-0"
                 style={{
-                  borderColor: RARITY_CONFIG[item.rarity].color,
-                  backgroundColor: `${RARITY_CONFIG[item.rarity].color}0D`,
+                  borderColor: cardColor,
+                  // A 10% tint of the card's color
+                  backgroundColor: `${cardColor}1A`,
                 }}
               >
                 <CardContent className="h-50 p-4 flex flex-col pb-0">
                   {eventSource && (
-                    <div className="-mx-4 -mt-4 flex shrink-0 items-center justify-center gap-1 border-b border-sky-500/30 bg-sky-500/15 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-sky-300">
+                    <div className={`-mx-4 -mt-4 flex shrink-0 items-center justify-center gap-1 border-b px-2 py-1 text-[10px] font-semibold uppercase tracking-wide ${
+                      item.seasonalEvent && !eventCosmeticSources[item.id]
+                        ? "border-orange-500/30 bg-orange-500/15 text-orange-600 dark:text-orange-300"
+                        : "border-sky-500/30 bg-sky-500/15 text-sky-300"
+                    }`}>
                       {eventSource}
                     </div>
                   )}

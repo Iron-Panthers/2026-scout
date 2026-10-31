@@ -3,7 +3,7 @@ import { flushSync } from "react-dom";
 import { gsap } from "gsap";
 import { Coins } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { COSMETICS, RARITY_CONFIG, type CosmeticDefinition, type CosmeticCategory, type CrateRarity } from "@/config/cosmetics";
+import { COSMETICS, RARITY_CONFIG, type CosmeticDefinition, type CosmeticCategory, type CrateRarity, isLimitedCosmetic } from "@/config/cosmetics";
 import type { CrateTier } from "@/config/crates";
 
 const CATEGORY_LABEL: Record<CosmeticCategory, string> = {
@@ -33,7 +33,7 @@ export function rollCrate(
   }
 
   let pool = COSMETICS.filter(
-    (c) => c.rarity === selectedRarity && c.currency !== "event" && !c.default && c.category !== "theme"
+    (c) => c.rarity === selectedRarity && !isLimitedCosmetic(c) && !c.default && c.category !== "theme"
   );
 
   // Legendaries never duplicate unless the player already owns every legendary.
