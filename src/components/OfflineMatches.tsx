@@ -12,7 +12,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  Cloud,
   CloudOff,
   Upload,
   Trash2,
@@ -31,7 +30,6 @@ import {
   deleteOfflineMatch,
   markAsUploaded,
   isApproachingQuota,
-  getStorageSizeEstimate,
   type OfflineMatchData,
 } from "@/lib/offlineStorage";
 import {
@@ -180,11 +178,9 @@ export default function OfflineMatches() {
       // Resolve match_id if needed
       let matchId = match.matchId;
       if (!matchId && match.eventCode && match.matchNumber) {
-        matchId = await resolveMatchId(
-          match.eventCode,
-          match.matchNumber,
-          match.role
-        );
+        matchId =
+          (await resolveMatchId(match.eventCode, match.matchNumber, match.role)) ??
+          undefined;
       }
 
       if (!matchId) {
@@ -340,9 +336,9 @@ export default function OfflineMatches() {
             )}
             {/* Network Status Indicator */}
             {isOnline ? (
-              <Wifi className="h-4 w-4 text-green-600" title="Online" />
+              <Wifi className="h-4 w-4 text-green-600"><title>Online</title></Wifi>
             ) : (
-              <WifiOff className="h-4 w-4 text-yellow-600" title="Offline" />
+              <WifiOff className="h-4 w-4 text-yellow-600"><title>Offline</title></WifiOff>
             )}
           </CardTitle>
           {pendingMatches.length > 0 && (
@@ -470,7 +466,7 @@ function MatchRow({
               ) : match.dbStatus === "uploaded" ? (
                 <CheckCircle2 className="h-4 w-4 text-green-600" />
               ) : match.dbStatus === "missing" ? (
-                <AlertCircle className="h-4 w-4 text-yellow-600" title="Not found in database" />
+                <AlertCircle className="h-4 w-4 text-yellow-600"><title>Not found in database</title></AlertCircle>
               ) : null
             ) : (
               <Badge className="text-xs">Not Uploaded</Badge>

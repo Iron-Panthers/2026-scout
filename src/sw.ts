@@ -137,22 +137,22 @@ self.addEventListener("notificationclick", (event) => {
   event.waitUntil(
     self.clients
       .matchAll({ type: "window", includeUncontrolled: true })
-      .then((clients) => {
+      .then(async (clients) => {
         // If a window is already open, focus it and send navigation message
         for (const client of clients) {
           if ("focus" in client) {
-            return client.focus().then(() => {
-              // Send navigation message WITHOUT base path
-              // React Router will add the basename automatically
-              client.postMessage({
-                type: "NAVIGATE",
-                url: url,  // Use original URL without base path
-              });
+            await client.focus();
+            // Send navigation message WITHOUT base path
+            // React Router will add the basename automatically
+            client.postMessage({
+              type: "NAVIGATE",
+              url: url,  // Use original URL without base path
             });
+            return;
           }
         }
         // Otherwise open a new window with full URL
-        return self.clients.openWindow(fullUrl);
+        await self.clients.openWindow(fullUrl);
       })
   );
 });

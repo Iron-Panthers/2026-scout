@@ -243,6 +243,7 @@ export function PitScoutingAssignmentsTab({
       let photoUrl: string | null = null;
       if (editPhoto !== null) {
         console.log(user, profile, loading, editPhoto)
+        if (!user) throw new Error("Not signed in");
 
         const { publicUrl } = await uploadPitPhoto(editPhoto, user.id, events.find(e => e.id === selectedEvent)?.event_code || "", Number(assigningTeam));
         photoUrl = publicUrl;

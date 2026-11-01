@@ -6,7 +6,6 @@ import { ScoutingReducer, type QualScoutingData } from "@/lib/ScoutingReducer";
 import { TeamImage } from "@/components/TeamImage";
 import { Loader2 } from "lucide-react";
 import { compressState } from "@/lib/stateCompression";
-import { Input } from "@/components/ui/input";
 
 // Row height used for drag hit-test
 const ROW_HEIGHT = 96; // px, must match rendered height

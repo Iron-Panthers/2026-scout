@@ -139,13 +139,13 @@ export function ScoutingDataTab({ selectedEvent, events: _events }: ScoutingData
           .in("match_id", matchIds)
           .order("created_at", { ascending: false });
 
-        const { data: qualData, error: qualError } = await supabase
+        const { data: qualData } = await supabase
           .from("qual_scouting_submissions")
           .select("*, matches(match_number, event_id), profiles(name)")
           .in("match_id", matchIds)
           .order("created_at", { ascending: false });
 
-        var qualSubmissions = [];
+        const qualSubmissions: SubmissionWithDetails[] = [];
         qualData?.forEach(d => {
           const sub = d as SubmissionWithDetails;
           sub.team_num = d.scouting_data.team1 + ", " + d.scouting_data.team2 + ", " + d.scouting_data.team3;
@@ -200,7 +200,8 @@ export function ScoutingDataTab({ selectedEvent, events: _events }: ScoutingData
         cmp = (ROLE_LABELS[a.role] ?? a.role).localeCompare(ROLE_LABELS[b.role] ?? b.role);
         break;
       case "team":
-        cmp = (a.team_num ?? 0) - (b.team_num ?? 0);
+        // Qual submissions list three teams ("254, 1678, 971"), so compare as numeric strings
+        cmp = String(a.team_num ?? 0).localeCompare(String(b.team_num ?? 0), undefined, { numeric: true });
         break;
       case "scout":
         cmp = (a.profiles?.name ?? "").localeCompare(b.profiles?.name ?? "");

@@ -1,4 +1,3 @@
-import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -8,15 +7,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import type { Roster, Profile, MatchAssignment } from "@/types";
 
 interface ConfirmationDialogProps {
   open: boolean;
+  title: string;
+  prompt: string;
   onOpenChange: (open: boolean) => void;
-  onRespond: (confirmed: boolean) => Promise<void>;
+  onRespond: (confirmed: boolean) => void | Promise<void>;
 }
 
 export function ConfirmationDialog({

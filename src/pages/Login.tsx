@@ -93,10 +93,6 @@ export default function Login() {
           await supabase.auth.signInWithPassword({
             email: data.email,
             password: data.password,
-            options: {
-              // Ensure redirect stays on current origin
-              emailRedirectTo: window.location.origin + '/dashboard',
-            },
           });
 
         console.log("=== LOGIN RESPONSE ===");

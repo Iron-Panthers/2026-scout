@@ -17,7 +17,7 @@ import { unlockAchievement } from "@/lib/achievements";
 import { getGameProfile } from "@/lib/gameProfiles";
 import { getBulkMatchOdds, getUserBets, blendOddsRedPct, settleMatchBets } from "@/lib/betting";
 import { getMatchLabel, wasUpset } from "@/lib/match13";
-import { getEventMatches, getMatchScores, getMatchTeam } from "@/lib/blueAlliance";
+import { getEventMatches } from "@/lib/blueAlliance";
 import { supabase } from "@/lib/supabase";
 import type { Match, Event } from "@/types";
 import type { MatchOdds, BetWithMatch } from "@/types/betting";
@@ -80,7 +80,7 @@ function useTimeRemaining(predTime: string | null | undefined): number | null {
 // Interest scoring — drives spotlight selection and grid ordering
 // ---------------------------------------------------------------------------
 function matchInterestScore(
-  match: Match,
+  _match: Match,
   m13?: Match13Match,
   odds?: MatchOdds,
   hasBet?: boolean
@@ -514,118 +514,6 @@ function MarketGrid({ openMatches, oddsMap, tbaMap, m13Map, myBetByMatch, tbaLoa
         </div>
       )}
     </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Open match card (kept for legacy — MarketGrid replaces it in the main view)
-// ---------------------------------------------------------------------------
-interface OpenMatchCardProps {
-  match: Match;
-  odds?: MatchOdds;
-  tba?: TBAMatchData;
-  m13?: Match13Match;
-  userBetAlliance?: "red" | "blue";
-  onClick: () => void;
-}
-
-function OpenMatchCard({ match, odds, tba, m13, userBetAlliance, onClick }: OpenMatchCardProps) {
-  const rawRedPct = odds?.redPct ?? 50;
-  const redPct = m13
-    ? blendOddsRedPct(rawRedPct, m13.pred.red_win_prob, odds?.totalPool ?? 0)
-    : rawRedPct;
-  const m13RedPct = m13 ? m13.pred.red_win_prob * 100 : null;
-
-  const { label: matchLabel, flavor } = m13
-    ? getMatchLabel(m13.pred.red_win_prob)
-    : { label: "Unknown", flavor: "slight" as const };
-
-  const flavorBorder: Record<string, string> = {
-    coinflip:  "border-yellow-700/40",
-    slight:    "border-border",
-    heavy:     "border-purple-700/30",
-    dominant:  "border-pink-700/30",
-  };
-  const flavorBadge: Record<string, string> = {
-    coinflip:  "bg-yellow-600/20 text-yellow-300 border-yellow-600/30",
-    slight:    "bg-gray-600/20 text-gray-300 border-gray-600/30",
-    heavy:     "bg-purple-600/20 text-purple-300 border-purple-600/30",
-    dominant:  "bg-pink-600/20 text-pink-300 border-pink-600/30",
-  };
-
-  const betFavour = redPct > 50 ? "red" : "blue";
-  const m13Favour = m13RedPct !== null ? (m13RedPct > 50 ? "red" : "blue") : null;
-  const isUpsetAlert = m13Favour !== null && betFavour !== m13Favour;
-
-  return (
-    <Card
-      className={`cursor-pointer transition-all hover:scale-[1.01] hover:shadow-md border ${flavorBorder[flavor]}`}
-      onClick={onClick}
-    >
-      <CardContent className="pt-4 pb-4 space-y-3">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-bold text-base">{match.name}</span>
-            {m13 && (
-              <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${flavorBadge[flavor]}`}>
-                {matchLabel}
-              </Badge>
-            )}
-            {isUpsetAlert && (
-              <Badge variant="outline" className="text-orange-300 border-orange-600/30 bg-orange-900/10 text-[10px] px-1.5 py-0">
-                Upset Alert
-              </Badge>
-            )}
-            {userBetAlliance && (
-              <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${
-                userBetAlliance === "red"
-                  ? "text-red-400 border-red-600/30 bg-red-900/10"
-                  : "text-blue-400 border-blue-600/30 bg-blue-900/10"}`}>
-                Your bet: {userBetAlliance.toUpperCase()}
-              </Badge>
-            )}
-          </div>
-          <div className="text-right text-xs text-muted-foreground shrink-0">
-            <div>{odds?.betCount ?? 0} bets</div>
-            <div>{odds?.totalPool ?? 0} pts</div>
-          </div>
-        </div>
-
-        {tba && (
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span className="text-red-400 font-medium">{teamNums(tba.alliances.red.team_keys)}</span>
-            <span className="text-muted-foreground/40">vs</span>
-            <span className="text-blue-400 font-medium">{teamNums(tba.alliances.blue.team_keys)}</span>
-          </div>
-        )}
-
-        <div className="flex h-3 rounded overflow-hidden">
-          <div className="bg-red-600/70 transition-all" style={{ width: `${redPct}%` }} />
-          <div className="bg-blue-600/70 transition-all" style={{ width: `${100 - redPct}%` }} />
-        </div>
-        <div className="flex justify-between text-xs text-muted-foreground -mt-1">
-          <span className="text-red-400 font-medium">Red {Math.round(redPct)}%</span>
-          <span className="text-xs text-muted-foreground/50">bet odds</span>
-          <span className="text-blue-400 font-medium">Blue {Math.round(100 - redPct)}%</span>
-        </div>
-
-        {m13RedPct !== null && (
-          <>
-            <div className="flex h-1.5 rounded overflow-hidden">
-              <div className="bg-red-500/50 transition-all" style={{ width: `${m13RedPct}%` }} />
-              <div className="bg-blue-500/50 transition-all" style={{ width: `${100 - m13RedPct}%` }} />
-            </div>
-            <div className="flex justify-between text-[10px] text-muted-foreground/60 -mt-1">
-              <span>match13: Red {m13RedPct.toFixed(1)}%</span>
-              {m13 && (
-                <span>Pred. {Math.round(m13.pred.red_score)} – {Math.round(m13.pred.blue_score)}</span>
-              )}
-              <span>Blue {(100 - m13RedPct).toFixed(1)}%</span>
-            </div>
-          </>
-        )}
-      </CardContent>
-    </Card>
   );
 }
 

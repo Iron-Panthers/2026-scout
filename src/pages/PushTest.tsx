@@ -61,7 +61,7 @@ export default function PushTest() {
       for (let i = 0; i < sendCount; i++) {
         for (const userId of selectedUserIds) {
           const response = await fetch(
-            `${supabase.supabaseUrl}/functions/v1/test-push-notification`,
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/test-push-notification`,
             {
               method: "POST",
               headers: {
