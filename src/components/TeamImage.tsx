@@ -31,7 +31,7 @@ export function TeamImage({
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const { settings, updateSetting } = useSettings();
+  const { updateSetting } = useSettings();
   const { user } = useAuth();
 
   useEffect(() => {

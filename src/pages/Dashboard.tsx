@@ -14,7 +14,7 @@ import {
   TrendingUp,
   Trophy,
 } from "lucide-react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDevMode } from "@/contexts/DevModeContext";
 import { getUserRescouts } from "@/lib/matchRescouts";

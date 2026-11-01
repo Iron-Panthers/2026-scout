@@ -270,7 +270,8 @@ export async function getUserMatches(
   }
 
   return {
-    matches: matchesResult.data ?? [],
+    // The select clause is built at runtime, so Supabase can't infer the row type
+    matches: (matchesResult.data ?? []) as unknown as Match[],
     profile: profileResult.data ?? null,
   };
 }
@@ -339,7 +340,7 @@ export async function updateEvent(
     start_date?: string;
     end_date?: string;
     scouting_map_url?: string;
-    users?: [];
+    users?: string[];
     scouters_per_robot?: 1 | 2;
     picklist_host_id?: string | null;
   }

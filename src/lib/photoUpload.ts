@@ -76,14 +76,14 @@ export async function compressImage(
 /**
  * Upload a pit scouting photo to Supabase Storage
  * @param file - The image file to upload
- * @param userId - The user's ID (for path organization)
+ * @param _userId - The uploader's ID (currently unused; photos are stored by event and team)
  * @param eventCode - The event code
  * @param teamNum - The team number
  * @returns Object with storage path and public URL
  */
 export async function uploadPitPhoto(
   file: File,
-  userId: string,
+  _userId: string,
   eventCode: string,
   teamNum: number
 ): Promise<{ path: string; publicUrl: string }> {

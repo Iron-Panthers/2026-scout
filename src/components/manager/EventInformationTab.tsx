@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,7 +18,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { CalendarIcon, Save, Star, Trash2, PlusCircle, Upload } from "lucide-react";
-import { format, set } from "date-fns";
+import { format } from "date-fns";
 import { updateEvent, setActiveEvent } from "@/lib/matches";
 import {
   deleteDevEvent,
@@ -33,7 +32,6 @@ import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import type { Event, Profile, MatchAssignment } from "@/types";
 import { ConfirmationDialog } from "./ConfirmationDialog";
-import UserProfileMenu from "../UserProfileMenu";
 import { AddScoutsDialog } from "./AddScoutsDialog";
 import CosmeticAvatar from "../CosmeticAvatar";
 import { Badge } from "../ui/badge";
@@ -366,7 +364,7 @@ export function EventInformationTab({
     }
   };
 
-  const handleDeleteClick = async (profile) => {
+  const handleDeleteClick = async (profile: Profile) => {
     const event = events.find(e => e.id === selectedEvent);
     if (!event) return;
     const updatedUsers = event.users.filter(u => u !== profile.id);
@@ -376,9 +374,8 @@ export function EventInformationTab({
     } else {
       await updateEvent(event.id, { users: updatedUsers });
     }
-    availableScouts = updatedUsers;
 
-    onEventUpdate();
+    onEventUpdate?.();
     setIsLoading(false);
   }
 
@@ -435,7 +432,7 @@ export function EventInformationTab({
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => { setEditedEvent(currentEvent); setIsEditing(true); } }
+                      onClick={() => { setEditedEvent(currentEvent ?? {}); setIsEditing(true); } }
                     >
                       Edit Event
                     </Button>
@@ -877,7 +874,7 @@ export function EventInformationTab({
                 No scouts available
               </p>
             ) : (
-              availableScouts.sort((a,b) => a.name?.localeCompare(b.name)).map((profile) => {
+              [...availableScouts].sort((a, b) => (a.name ?? "").localeCompare(b.name ?? "")).map((profile) => {
                 const initials = (profile.name || "U")
                   .split(" ")
                   .map((n) => n[0])

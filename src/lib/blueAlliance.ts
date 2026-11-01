@@ -11,10 +11,6 @@ if (!TBA_AUTH_KEY) {
   console.warn("Missing TBA_AUTH_KEY environment variable");
 }
 
-interface TBATeamKey {
-  team_number: number;
-}
-
 interface TBAMatch {
   key: string;
   comp_level: string;

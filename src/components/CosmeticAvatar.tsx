@@ -159,7 +159,7 @@ function CosmeticAvatar({
         <span
           className={cn(
             "absolute leading-none select-none pointer-events-none",
-            decorationId.id === "decoration_six_seven" ? cfg.emojiDecoration : cfg.decorationEmojiSize,
+            decorationId === "decoration_six_seven" ? cfg.emojiDecoration : cfg.decorationEmojiSize,
             cfg.decorationOffset
           )}
           aria-hidden

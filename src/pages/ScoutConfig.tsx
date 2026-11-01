@@ -1,18 +1,9 @@
 import { useAuth } from "@/contexts/AuthContext";
-import {
-  CURRENT_YEAR,
-  getEventMatches,
-  getMatchTeam,
-} from "@/lib/blueAlliance";
-import { getEvents, getMatch, getMatches, getUserMatches } from "@/lib/matches";
+import { getMatchTeam } from "@/lib/blueAlliance";
+import { getEvents, getMatch } from "@/lib/matches";
 import { TeamImage } from "@/components/TeamImage";
-import React, { useState, useEffect } from "react";
-import {
-  Navigate,
-  useNavigate,
-  useParams,
-  useSearchParams,
-} from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { prettifyRole } from "./Dashboard";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsTrigger, TabsList } from "@radix-ui/react-tabs";
@@ -20,7 +11,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuPortal,
   DropdownMenuTrigger,
 } from "@radix-ui/react-dropdown-menu";
 import {
@@ -33,7 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { ArrowLeft, Lock, Coins } from "lucide-react";
-import type { Match, GameDefinition, GameProfile } from "@/types";
+import type { GameDefinition, GameProfile } from "@/types";
 import { GAMES } from "@/config/games";
 import { getGameProfile, purchaseGame } from "@/lib/gameProfiles";
 import { GameCard } from "@/components/GameCard";
@@ -55,14 +45,14 @@ export default function ScoutConfig() {
   const { match_id: param_match_id } = useParams();
   const [search_params] = useSearchParams();
   const { user } = useAuth();
-  const { settings, updateSetting } = useSettings();
+  const { settings } = useSettings();
   const { devMode } = useDevMode();
   const navigate = useNavigate();
 
-  const [match_id, setMatchId] = useState(param_match_id || "");
+  const [match_id] = useState(param_match_id || "");
   const [matchType, setMatchType] = useState("Qualification");
-  const [matchNumber, setMatchNumber] = useState("");
-  const [teamNumber, setTeamNumber] = useState("");
+  const [matchNumber, setMatchNumber] = useState(0);
+  const [teamNumber, setTeamNumber] = useState(0);
   const [role, setRole] = useState(search_params.get("role") || "");
   // Scouting error that prompted this assignment, when it's a rescout.
   const [rescoutReason, setRescoutReason] = useState<string | null>(null);
@@ -71,10 +61,6 @@ export default function ScoutConfig() {
   const [eventCode, setEventCode] = useState("");
   const [eventName, setEventName] = useState("");
   const [availableEvents, setAvailableEvents] = useState<any[]>([]);
-  const [teamNumbers, setTeamNumbers] = useState<Record<string, number | null>>(
-    {}
-  );
-  const [manualMode, setManualMode] = useState(!param_match_id);
   const [isTeamNumberAutofilled, setIsTeamNumberAutofilled] = useState(false);
   const [qualTeamNumbers, setQualTeamNumbers] = useState<[number, number, number]>([0, 0, 0]);
 
@@ -170,7 +156,6 @@ export default function ScoutConfig() {
     const loadMatchData = async () => {
       if (!param_match_id) {
         console.log("No match_id provided, entering manual mode");
-        setManualMode(true);
         return;
       }
 
@@ -180,7 +165,6 @@ export default function ScoutConfig() {
       if (devMode && user?.id && isDevMatchId(param_match_id)) {
         const devMatch = getDevMatch(user.id, param_match_id);
         if (!devMatch) {
-          setManualMode(true);
           return;
         }
         const devEvent = getDevEvent(user.id, devMatch.event_id || undefined);
@@ -203,14 +187,12 @@ export default function ScoutConfig() {
             setIsTeamNumberAutofilled(true);
           }
         }
-        setManualMode(false);
         return;
       }
 
       const match = await getMatch(param_match_id);
       if (!match) {
         console.log("Match not found, entering manual mode");
-        setManualMode(true);
         return;
       }
 
@@ -279,7 +261,6 @@ export default function ScoutConfig() {
         setLockedRole(match_role);
         setLockedMatchType("Qualification");
       }
-      setManualMode(false);
 
       // Try to fetch team number if we have the data
       if (matchEvent?.event_code && match.match_number && match_role) {
@@ -539,9 +520,9 @@ export default function ScoutConfig() {
                   type="number"
                   placeholder="#####"
                   onInput={(e) => {
-                    setMatchNumber(parseInt(e.currentTarget.value));
+                    setMatchNumber(parseInt(e.currentTarget.value) || 0);
                   }}
-                  value={matchNumber}
+                  value={matchNumber || ""}
                 />
               </div>
               {role === "qualRed" || role === "qualBlue" ? (
@@ -589,9 +570,9 @@ export default function ScoutConfig() {
                       type="number"
                       placeholder="#####"
                       onInput={(e) => {
-                        setTeamNumber(parseInt(e.currentTarget.value));
+                        setTeamNumber(parseInt(e.currentTarget.value) || 0);
                       }}
-                      value={teamNumber}
+                      value={teamNumber || ""}
                       readOnly={isTeamNumberAutofilled}
                     />
                   </div>

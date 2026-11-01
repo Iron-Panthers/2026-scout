@@ -17,12 +17,16 @@ import SafeQRCode from "@/components/SafeQRCode";
 import {
   saveOfflineMatch,
   markAsUploaded,
-  generateOfflineKey,
 } from "@/lib/offlineStorage";
 import { compressState, decompressState, decodeLegacyBase64Url } from "@/lib/stateCompression";
-import { supabase } from "@/lib/supabase";
 import { Checkbox } from "@/components/ui/checkbox";
 
+type Dependency = {
+  label: string;
+  status: "pending" | "checking" | "success" | "error";
+  value?: string | number;
+  errorMessage?: string;
+};
 
 export default function ScoutingReview() {
   const navigate = useNavigate();
@@ -70,14 +74,7 @@ export default function ScoutingReview() {
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
-  const [dependencies, setDependencies] = useState<
-    Array<{
-      label: string;
-      status: "pending" | "checking" | "success" | "error";
-      value?: string | number;
-      errorMessage?: string;
-    }>
-  >([]);
+  const [dependencies, setDependencies] = useState<Dependency[]>([]);
   const [resolvedMatchId, setResolvedMatchId] = useState<string | null>(null);
   const [offlineKey, setOfflineKey] = useState<string | null>(null);
   const [qrCodeError, setQrCodeError] = useState(false);
@@ -176,8 +173,15 @@ export default function ScoutingReview() {
 
   // Handlers for note fields
   const handleFieldChange = (
-    field: "comments" | "errors" | "defenseDescription",
-    value: string
+    field:
+      | "comments"
+      | "errors"
+      | "defenseDescription"
+      | "commentsTeam1"
+      | "commentsTeam2"
+      | "commentsTeam3"
+      | "robot_problems",
+    value: string | null
   ) => {
     setState((prev: any) => ({ ...prev, [field]: value }));
     setRawValue((prevRaw) => {
@@ -190,16 +194,6 @@ export default function ScoutingReview() {
     });
   };
 
-  // Handler for raw JSON edit
-  const handleRawChange = (val: string) => {
-    setRawValue(val);
-    try {
-      const parsed = JSON.parse(val);
-      setState(parsed);
-    } catch {
-      // ignore parse errors, keep editing
-    }
-  };
 
   // Check dependencies and resolve matchId if needed
   const checkDependencies = async () => {
@@ -287,7 +281,7 @@ export default function ScoutingReview() {
     setShowStatusModal(true);
 
     // Check each dependency
-    const updatedDeps = [...deps];
+    const updatedDeps: Dependency[] = [...deps];
 
     // Check comments
     if (!commentsTooShort) {
@@ -417,12 +411,6 @@ export default function ScoutingReview() {
     setDependencies(updatedDeps);
   };
 
-  // Handle manager mode quick submission
-  const handleManagerSubmit = async () => {
-    setShowManagerModal(false);
-    // Use existing submission flow
-    await checkDependencies();
-  };
 
   // Handle copying link with forScoutingManager parameter
   const handleCopyLink = async () => {

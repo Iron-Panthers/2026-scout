@@ -155,7 +155,9 @@ export class ScoutingReducer<T extends Record<string, any> = ScoutingData> {
       team2: teamNumbers[1] ?? 0,
       team3: teamNumbers[2] ?? 0,
       rankings: teamNumbers,
-      comments: "",
+      commentsTeam1: "",
+      commentsTeam2: "",
+      commentsTeam3: "",
     };
   }
 

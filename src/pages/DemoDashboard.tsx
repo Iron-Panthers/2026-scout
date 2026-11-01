@@ -8,7 +8,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { LayoutDashboard, Plus, Settings } from "lucide-react";
-import React from "react";
 
 const DemoDashboard = () => {
   return (

@@ -232,7 +232,7 @@ export async function resolveEventId(
 export async function resolveMatchId(
   event_code: string,
   match_number: number,
-  role: string
+  _role: string
 ): Promise<string | null> {
   // First resolve event_code to event_id
   const event_id = await resolveEventId(event_code);
@@ -297,7 +297,7 @@ export async function submitScoutingData(
   matchId: string,
   role: string,
   scoutingData: Record<string, any>,
-  scouterId?: string,
+  scouterId: string | undefined,
   team_num: number,
   match_type: string = "qual"
 ) {

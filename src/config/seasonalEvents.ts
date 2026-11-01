@@ -24,8 +24,8 @@ export const SEASONAL_EVENTS: SeasonalEvent[] = [
     id: "halloween_2026",
     name: "Halloween 2026",
     tabLabel: "Halloween",
-    startDate: "2026-10-30",
-    endDate: "2026-11-01",
+    startDate: "2026-10-31",
+    endDate: "2026-10-31",
     welcome: {
       title: "Happy Halloween!",
       message: "Thank you for signing on on this spooky holiday. Enjoy some free items!",
