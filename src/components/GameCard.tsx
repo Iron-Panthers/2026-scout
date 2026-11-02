@@ -6,7 +6,6 @@ interface GameCardProps {
   game: GameDefinition;
   isUnlocked: boolean;
   userPoints: number;
-  isPlayable: boolean;
   onBuy: () => void;
   onPlay: () => void;
   /** Set right after this game is bought: plays the unlock animation once it shows as unlocked. */
@@ -54,7 +53,7 @@ function AnimatedLock({ opening }: { opening: boolean }) {
   );
 }
 
-export function GameCard({ game, isUnlocked, userPoints, isPlayable, onBuy, onPlay, playUnlockAnimation = false }: GameCardProps) {
+export function GameCard({ game, isUnlocked, userPoints, onBuy, onPlay, playUnlockAnimation = false }: GameCardProps) {
   const canAfford = userPoints >= game.cost;
   const [phase, setPhase] = useState<UnlockPhase>("idle");
 
@@ -74,11 +73,8 @@ export function GameCard({ game, isUnlocked, userPoints, isPlayable, onBuy, onPl
   // Stay dimmed while the latch opens, then fade up to full.
   const dimmed = !isUnlocked || phase === "latch";
 
-  // Owned but not playable here (most games are only played from the scouting screen)
-  const ownedElsewhere = isUnlocked && !isPlayable;
-
   function handleClick() {
-    if (animating || ownedElsewhere) return;
+    if (animating) return;
     if (isUnlocked) {
       onPlay();
     } else {
@@ -89,11 +85,8 @@ export function GameCard({ game, isUnlocked, userPoints, isPlayable, onBuy, onPl
   return (
     <button
       onClick={handleClick}
-      className={`relative flex aspect-square w-full flex-col rounded-lg border border-border bg-card overflow-hidden text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors ${ownedElsewhere ? "cursor-default" : "hover:bg-accent/30 active:scale-95"}`}
-      title={ownedElsewhere ? "Owned: play it from the scouting screen" : undefined}
-      aria-label={
-        ownedElsewhere ? `${game.name}, owned` : isUnlocked ? `Play ${game.name}` : `Buy ${game.name} for ${game.cost} points`
-      }
+      className="relative flex aspect-square w-full flex-col rounded-lg border border-border bg-card overflow-hidden text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors hover:bg-accent/30 active:scale-95"
+      aria-label={isUnlocked ? `Play ${game.name}` : `Buy ${game.name} for ${game.cost} points`}
     >
       {/* Thumbnail */}
       <div className="relative min-h-0 flex-1 w-full bg-muted flex items-center justify-center overflow-hidden">
@@ -120,7 +113,7 @@ export function GameCard({ game, isUnlocked, userPoints, isPlayable, onBuy, onPl
         )}
 
         {/* Play overlay for unlocked games on hover */}
-        {isUnlocked && isPlayable && !animating && (
+        {isUnlocked && !animating && (
           <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 bg-background/40 transition-opacity">
             <Play className="w-8 h-8 text-foreground fill-foreground" />
           </div>

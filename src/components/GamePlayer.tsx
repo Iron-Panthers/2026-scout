@@ -17,8 +17,8 @@ export function GamePlayer({ game, onClose, startUrl, onStartWithoutConfig }: Ga
 
   if (!game) return null;
 
-  // FRCdle is also playable from the Shop, which has no match to start.
-  const showStartMatch = game.id !== "frcdle" || Boolean(startUrl || onStartWithoutConfig);
+  // The Shop has no match to start, so it passes neither prop and the button is hidden.
+  const showStartMatch = Boolean(startUrl || onStartWithoutConfig);
 
   function handleStartMatch() {
     if (startUrl) {

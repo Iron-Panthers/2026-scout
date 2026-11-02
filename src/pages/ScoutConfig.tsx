@@ -739,7 +739,6 @@ export default function ScoutConfig() {
                       game={game}
                       isUnlocked={isUnlocked}
                       userPoints={gameProfile?.points ?? 0}
-                      isPlayable={true}
                       onBuy={() => setBuyingGame(game)}
                       onPlay={() => setActiveGame(game)}
                     />
