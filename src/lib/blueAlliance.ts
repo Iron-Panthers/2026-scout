@@ -397,6 +397,30 @@ export async function getEventAlliances(eventCode: string) {
   return tbaFetch<TBAEventAlliance[]>(`/event/${eventCode}/alliances`);
 }
 
+export interface TBATeamRanking {
+  rank: number;
+  /** Average ranking points per qualification match; null when TBA doesn't report it. */
+  rpAverage: number | null;
+}
+
+/** Each team's current qualification rank at an event, by team number; empty until TBA posts rankings. */
+export async function getEventRankings(eventCode: string): Promise<Map<number, TBATeamRanking>> {
+  const data = await tbaFetch<{
+    rankings: Array<{ rank: number; team_key: string; matches_played: number; sort_orders: number[] | null; extra_stats: number[] | null }> | null;
+    sort_order_info: Array<{ name: string }> | null;
+    extra_stats_info: Array<{ name: string }> | null;
+  }>(`/event/${eventCode}/rankings`);
+  // TBA's "Ranking Score" sort order is the average RP; failing that, total RP over matches played.
+  const scoreIndex = data?.sort_order_info?.findIndex((info) => /ranking score/i.test(info.name)) ?? -1;
+  const totalIndex = data?.extra_stats_info?.findIndex((info) => /ranking points/i.test(info.name)) ?? -1;
+  return new Map((data?.rankings ?? []).map((row) => {
+    const score = row.sort_orders?.[scoreIndex];
+    const total = row.extra_stats?.[totalIndex];
+    const rpAverage = score != null ? score : total != null && row.matches_played > 0 ? total / row.matches_played : null;
+    return [Number(row.team_key.replace(/^frc/, "")), { rank: row.rank, rpAverage }];
+  }));
+}
+
 /**
  * Returns cached TBA event matches without making a network request.
  * Returns null if nothing is cached or cache is stale.

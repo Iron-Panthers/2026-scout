@@ -1,0 +1,73 @@
+name: Find matches in a livestream
+
+# Started by the scan-livestream edge function when a manager adds an event livestream.
+# Downloads the stream, reads each match's name and clock off the broadcast overlay, and
+# saves where every match starts and ends (scripts/livestream_clips/find_matches.py).
+#
+# Repository secrets: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, and optionally YTDLP_COOKIES
+# (a cookies.txt export of a YouTube session, for when YouTube blocks the download as a bot).
+
+on:
+  workflow_dispatch:
+    inputs:
+      livestream_id:
+        description: "event_livestreams id"
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: livestream-${{ inputs.livestream_id }}
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: scripts/livestream_clips/requirements.txt
+
+      # yt-dlp runs YouTube's player code with Deno to get the video
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+
+      - name: Install dependencies
+        run: pip install -r scripts/livestream_clips/requirements.txt
+
+      - name: Find matches
+        working-directory: scripts/livestream_clips
+        env:
+          LIVESTREAM_ID: ${{ inputs.livestream_id }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          YTDLP_COOKIES: ${{ secrets.YTDLP_COOKIES }}
+        run: python find_matches.py "$LIVESTREAM_ID"
+
+      # Covers failures before the script could record its own (it sets a clearer message,
+      # which the status filter leaves alone), and runs cut off by the time limit
+      - name: Mark the scan failed
+        if: failure() || cancelled()
+        env:
+          LIVESTREAM_ID: ${{ inputs.livestream_id }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          curl -sf -X PATCH "$SUPABASE_URL/rest/v1/event_livestreams?id=eq.$LIVESTREAM_ID&status=neq.failed" \
+            -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{"status": "failed", "error": "The scan stopped unexpectedly. Check the GitHub Actions log."}'

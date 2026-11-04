@@ -17,6 +17,7 @@ import {
   formatNumber,
   loadEventData,
   setMatchVideoLink,
+  forgetEventData,
   type EventData,
   type MeanAndSpread,
   type PlayoffAlliance,
@@ -272,8 +273,8 @@ function MatchSchedule({ matches, onSelect }: {
   const nextRef = useRef<HTMLLIElement>(null);
   const nextMatch = matches.find((match) => match.status !== "played")?.matchNumber;
   const [watching, setWatching] = useState<QualScheduleMatch | null>(null);
-  // The video column only appears once TBA has a video for some match.
-  const showVideos = matches.some(hasTbaVideo);
+  // The video column only appears once TBA (or a livestream) has a video for some match.
+  const showVideos = matches.some(hasMatchVideo);
   // Start scrolled to the next match to be played
   useEffect(() => {
     nextRef.current?.scrollIntoView({ block: "center" });
@@ -328,7 +329,7 @@ function MatchSchedule({ matches, onSelect }: {
                   <ScoreCell color="blue" value={match.blueScore} won={match.winner === "blue"} />
                 </div>
               </div>
-              {hasTbaVideo(match) && <VideoButton title={`Quals ${match.matchNumber}`} onClick={() => setWatching(match)} />}
+              {hasMatchVideo(match) && <VideoButton title={`Quals ${match.matchNumber}`} onClick={() => setWatching(match)} />}
             </li>
           );
         })}
@@ -343,8 +344,8 @@ function MatchSchedule({ matches, onSelect }: {
   );
 }
 
-/** Whether The Blue Alliance has posted a video of the match. */
-const hasTbaVideo = (match: ScheduledMatch) => match.videos.some((video) => video.source === "tba");
+/** Whether The Blue Alliance has posted a video of the match, or it was found in an event livestream. */
+const hasMatchVideo = (match: ScheduledMatch) => match.videos.some((video) => video.source === "tba" || video.source === "clip");
 
 /**
  * Plays a match's video. It sits over a row's first (video) column, beside the row's
@@ -460,7 +461,7 @@ const playoffTitle = (label: string) => label.replace(/^M(\d+)$/, "Match $1").re
  */
 function PlayoffSchedule({ playoffs }: { playoffs: PlayoffScheduleMatch[] }) {
   const [watching, setWatching] = useState<PlayoffScheduleMatch | null>(null);
-  const showVideos = playoffs.some(hasTbaVideo);
+  const showVideos = playoffs.some(hasMatchVideo);
   const groups = [
     { title: "Playoffs", matches: playoffs.filter((match) => !match.isFinal) },
     { title: "Finals", matches: playoffs.filter((match) => match.isFinal) },
@@ -512,7 +513,7 @@ function PlayoffSchedule({ playoffs }: { playoffs: PlayoffScheduleMatch[] }) {
                       <ScoreCell color="blue" value={match.blueScore} won={match.winner === "blue"} />
                     </div>
                   </div>
-                  {hasTbaVideo(match) && <VideoButton title={playoffTitle(match.label)} onClick={() => setWatching(match)} />}
+                  {hasMatchVideo(match) && <VideoButton title={playoffTitle(match.label)} onClick={() => setWatching(match)} />}
                 </li>
               );
             })}
@@ -591,6 +592,8 @@ export function MatchDashboard({ event, userId, userName, devMode, toolbarSlot, 
   const navigate = useNavigate();
   const fromTeam = (useLocation().state as { fromTeam?: number } | null)?.fromTeam;
   const [videoOpen, setVideoOpen] = useState(false);
+  // Bumped to reload the event's data, e.g. when a livestream scan finds its matches
+  const [reloads, setReloads] = useState(0);
 
   useEffect(() => {
     if (!event) return;
@@ -603,7 +606,7 @@ export function MatchDashboard({ event, userId, userName, devMode, toolbarSlot, 
         if (mounted) setLoaded({ eventId: event.id, data: null, error: cause instanceof Error ? cause.message : "Could not load this event's data." });
       });
     return () => { mounted = false; };
-  }, [event, userId, userName, devMode]);
+  }, [event, userId, userName, devMode, reloads]);
 
   const current = loaded && loaded.eventId === event?.id ? loaded : null;
   const data = current?.data ?? null;
@@ -658,6 +661,18 @@ export function MatchDashboard({ event, userId, userName, devMode, toolbarSlot, 
 
   // Sandbox matches aren't in the database, so they have no link to change.
   const editableVideos = canEditVideos && !!event && !isDevEventId(event.id);
+  // Sandbox events aren't in the database either, so they have no livestreams
+  const livestreams = event && !isDevEventId(event.id)
+    ? {
+        eventId: event.id,
+        userId: userId ?? null,
+        canManage: editableVideos,
+        onScanFinished: () => {
+          forgetEventData(event.id);
+          setReloads((count) => count + 1);
+        },
+      }
+    : undefined;
   const saveVideoLink = async (link: string | null) => {
     if (!event || !data || !match) return;
     const updated = await setMatchVideoLink(event, data, match.matchNumber, link);
@@ -779,6 +794,7 @@ export function MatchDashboard({ event, userId, userName, devMode, toolbarSlot, 
           videos={match.videos}
           videoLink={match.videoLink}
           onSaveLink={editableVideos ? saveVideoLink : undefined}
+          livestreams={livestreams}
         />
       )}
       <Dialog open={photoTeam !== null} onOpenChange={(open) => { if (!open) setPhotoTeam(null); }}>

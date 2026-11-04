@@ -12,11 +12,9 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, useSortable, arrayMove, rectSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { ArrowDown, ArrowLeft, ArrowUp, ArrowUpDown, Check, ChevronDown, Equal, Loader2, MessageCircle, Send, Square, Undo2, Users, X } from "lucide-react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ArrowDown, ArrowLeft, ArrowUp, Check, ChevronDown, Equal, Loader2, MessageCircle, MessageSquareText, Send, Square, Undo2, Users, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Dialog,
@@ -37,6 +35,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import { PicklistCardContent } from "@/components/strategy/PicklistCardContent";
 import { TeamRankings } from "@/components/strategy/TeamRankings";
 import { LiveTeamNoteEditor } from "@/components/strategy/LiveTeamNote";
@@ -50,12 +49,17 @@ import {
   publishLivePicklist,
   resolveSuggestion,
   suggestMove,
+  countPendingSuggestions,
+  SUGGESTION_LIMIT,
+  SUGGESTION_REASON_MAX,
   type LivePicklistEntry,
   type LivePicklistRow,
   type LivePicklistTag,
   distinctTags,
   entryTags,
+  pitTags,
   sameTag,
+  syncPitTags,
   type LivePicklistSuggestion,
   type SuggestionDirection,
 } from "@/lib/livePicklists";
@@ -85,6 +89,8 @@ interface SavedLiveState {
   notes?: Record<number, string>;
   /** Teams the host moved into (true) or out of (false) DNP Teams, by team number. */
   dnpOverrides?: Record<number, boolean>;
+  /** The pit scouting tags last added to each team, by team number (see syncPitTags). */
+  pitTags?: Record<number, string[]>;
 }
 
 type RankLabel = { label: string; tied: boolean };
@@ -219,6 +225,23 @@ function DnpMark({ className = "" }: { className?: string }) {
   return <span className={`shrink-0 font-bold ${className}`}>DNP</span>;
 }
 
+/** The optional "why" box on both suggestion forms. */
+function ReasonField({ id, value, onChange }: { id: string; value: string; onChange: (value: string) => void }) {
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor={id}>Why? (optional)</Label>
+      <Textarea
+        id={id}
+        placeholder="Tell the host why they should make this change"
+        maxLength={SUGGESTION_REASON_MAX}
+        value={value}
+        onChange={(changeEvent) => onChange(changeEvent.target.value)}
+        className="max-h-40"
+      />
+    </div>
+  );
+}
+
 function SuggestionIcon({ direction }: { direction: SuggestionDirection }) {
   if (direction === "up") return <ArrowUp className="h-4 w-4 shrink-0 text-emerald-600" />;
   if (direction === "down") return <ArrowDown className="h-4 w-4 shrink-0 text-red-600" />;
@@ -288,14 +311,93 @@ function DnpToggle({ checked, onChange, count }: { checked: boolean; onChange: (
   );
 }
 
+const SUGGESTION_COUNT_CLASS =
+  "flex shrink-0 items-center gap-0.5 rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold text-primary";
+
+/** One waiting suggestion for the host, with its reason (if given) behind a button. */
+function SuggestionRow({
+  suggestion,
+  author,
+  place,
+  revealActions,
+  onResolve,
+}: {
+  suggestion: LivePicklistSuggestion;
+  author: string;
+  /** Where the team is now, e.g. "Now #4". */
+  place: string | null;
+  /** Apply and dismiss only show while the row is hovered or focused (always on touch screens). */
+  revealActions?: boolean;
+  onResolve: (accept: boolean) => void;
+}) {
+  const [reasonOpen, setReasonOpen] = useState(false);
+  const actionsClass = revealActions
+    ? "flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100"
+    : "flex shrink-0 items-center";
+
+  return (
+    <li className="group px-3 py-2 hover:bg-accent/40">
+      <div className="flex items-center gap-2">
+        <SuggestionIcon direction={suggestion.direction} />
+        <div className="min-w-0 flex-1 text-sm">
+          <p className="wrap-anywhere">
+            <span className="font-medium">{author}</span>: {describeMove(suggestion)}
+          </p>
+          {place && <p className="text-xs text-muted-foreground">{place}</p>}
+        </div>
+        {suggestion.reason && (
+          <Button
+            size="icon"
+            variant={reasonOpen ? "secondary" : "ghost"}
+            className="h-8 w-8 shrink-0 text-muted-foreground"
+            aria-label={reasonOpen ? "Hide reason" : "Show reason"}
+            aria-expanded={reasonOpen}
+            title={reasonOpen ? "Hide reason" : "Why?"}
+            onClick={() => setReasonOpen(!reasonOpen)}
+          >
+            <MessageSquareText className="h-4 w-4" />
+          </Button>
+        )}
+        <div className={actionsClass}>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-8 w-8 shrink-0 text-emerald-600"
+            aria-label="Apply suggestion"
+            title={suggestion.spots || isDnpMove(suggestion.direction) || suggestion.direction === "tie" ? "Apply" : "Apply (moves it one spot)"}
+            onClick={() => onResolve(true)}
+          >
+            <Check className="h-4 w-4" />
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-8 w-8 shrink-0 text-muted-foreground"
+            aria-label="Dismiss suggestion"
+            title="Dismiss"
+            onClick={() => onResolve(false)}
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+      {suggestion.reason && reasonOpen && (
+        <p className="mt-1.5 ml-6 whitespace-pre-wrap rounded-md bg-muted px-2 py-1.5 text-sm wrap-anywhere">
+          {suggestion.reason}
+        </p>
+      )}
+    </li>
+  );
+}
+
 function LiveTeamCard({
   team,
   entry,
   rank,
   editable,
   suggestionCount,
+  suggestionPanel,
   onClick,
-  onSuggest,
   onContextMenu,
   faded,
 }: {
@@ -304,8 +406,9 @@ function LiveTeamCard({
   rank: RankLabel;
   editable: boolean;
   suggestionCount?: number;
+  /** Opens beside the card from its suggestion count (for the host). */
+  suggestionPanel?: (teamNumber: number) => React.ReactNode;
   onClick: (team: TBATeamSimple) => void;
-  onSuggest?: (team: TBATeamSimple) => void;
   /** Right-click, with where it happened (for the host's menu). */
   onContextMenu?: (teamNumber: number, x: number, y: number) => void;
   /** Left out by the tag filter, so it's nearly see-through. */
@@ -346,15 +449,42 @@ function LiveTeamCard({
           below={entryTags(entry).length > 0 && <TeamTags tags={entryTags(entry)} dots />}
           detail={
             <>
-              {!!suggestionCount && (
+              {!!suggestionCount && (suggestionPanel ? (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      className={`${SUGGESTION_COUNT_CLASS} transition-colors hover:bg-primary/25`}
+                      title={`${suggestionCount} suggestion${suggestionCount === 1 ? "" : "s"} waiting. Click to see them.`}
+                      aria-label={`See ${suggestionCount} suggestion${suggestionCount === 1 ? "" : "s"} for team ${team.team_number}`}
+                      onClick={(clickEvent) => clickEvent.stopPropagation()}
+                    >
+                      <MessageCircle className="h-3 w-3" />
+                      {suggestionCount}
+                    </button>
+                  </PopoverTrigger>
+                  {/* Portaled, but React events still bubble to the card: keep clicks and drags off it */}
+                  <PopoverContent
+                    side="right"
+                    align="start"
+                    className="w-80 p-0"
+                    onClick={(clickEvent) => clickEvent.stopPropagation()}
+                    onPointerDown={(pointerEvent) => pointerEvent.stopPropagation()}
+                    onTouchStart={(touchEvent) => touchEvent.stopPropagation()}
+                    onContextMenu={(menuEvent) => menuEvent.stopPropagation()}
+                  >
+                    {suggestionPanel(team.team_number)}
+                  </PopoverContent>
+                </Popover>
+              ) : (
                 <span
-                  className="flex shrink-0 items-center gap-0.5 rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold text-primary"
+                  className={SUGGESTION_COUNT_CLASS}
                   title={`${suggestionCount} suggestion${suggestionCount === 1 ? "" : "s"} waiting`}
                 >
                   <MessageCircle className="h-3 w-3" />
                   {suggestionCount}
                 </span>
-              )}
+              ))}
               {entry.averageRank != null && (
                 <span
                   className="shrink-0 text-right text-[10px] leading-tight text-muted-foreground tabular-nums"
@@ -365,21 +495,6 @@ function LiveTeamCard({
                   <span className="text-xs font-semibold text-foreground">{formatRank(entry.averageRank)}</span>
                 </span>
               )}
-              {onSuggest && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 shrink-0 text-muted-foreground"
-                  aria-label={`Suggest a move for team ${team.team_number}`}
-                  title="Suggest a move"
-                  onClick={(clickEvent) => {
-                    clickEvent.stopPropagation();
-                    onSuggest(team);
-                  }}
-                >
-                  <ArrowUpDown className="h-4 w-4" />
-                </Button>
-              )}
             </>
           }
         />
@@ -389,17 +504,17 @@ function LiveTeamCard({
 }
 
 /**
- * Every team in one list that snakes down the screen: top to bottom, then on to the next
- * column, with as many columns as fit. Only the host's copy can be dragged.
+ * Every team in one list that reads left to right, then on to the next row, with as many
+ * columns as fit. Only the host's copy can be dragged.
  */
 function LiveGrid({
   entries,
   teamsByNumber,
   editable,
   suggestionCounts,
+  suggestionPanel,
   onReorder,
   onTeamClick,
-  onSuggest,
   menuItems,
   tagFilter,
   statMatches,
@@ -409,10 +524,11 @@ function LiveGrid({
   teamsByNumber: Map<number, TBATeamSimple>;
   editable: boolean;
   suggestionCounts?: Map<number, number>;
+  /** The host's list of a team's suggestions, opened from the count on its card. */
+  suggestionPanel?: (teamNumber: number) => React.ReactNode;
   /** Moves a team to where another team is. */
   onReorder?: (teamNumber: number, overTeamNumber: number) => void;
   onTeamClick: (team: TBATeamSimple) => void;
-  onSuggest?: (team: TBATeamSimple) => void;
   /** The host's right-click menu for a team. */
   menuItems?: (teamNumber: number) => LiveMenuItem[];
   /** Fades every team that doesn't have all of these tags (when there are any). */
@@ -451,7 +567,6 @@ function LiveGrid({
     onReorder?.(Number(active.id), Number(over.id));
   };
 
-  const rows = Math.max(1, Math.ceil(visible.length / columns));
   const activeTeam = activeTeamNumber != null ? teamsByNumber.get(activeTeamNumber) : undefined;
 
   return (
@@ -464,11 +579,7 @@ function LiveGrid({
         )}
         <div
           className="grid gap-2"
-          style={{
-            gridAutoFlow: "column",
-            gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
-            gridTemplateRows: `repeat(${rows}, auto)`,
-          }}
+          style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
         >
           {visible.map((entry, index) => (
             <LiveTeamCard
@@ -478,8 +589,8 @@ function LiveGrid({
               rank={labels[index]}
               editable={editable}
               suggestionCount={suggestionCounts?.get(entry.teamNumber)}
+              suggestionPanel={suggestionPanel}
               onClick={onTeamClick}
-              onSuggest={onSuggest}
               onContextMenu={menuItems && ((teamNumber, x, y) => setMenu({ teamNumber, x, y }))}
               faded={
                 (!!tagFilter?.length && !tagFilter.every((chosen) => entryTags(entry).some((tag) => sameTag(tag, chosen)))) ||
@@ -564,6 +675,17 @@ export function LivePicklist({ event, teams, userId, userName, devMode, live, on
   const [statFilter, setStatFilter] = useState<StatFilterValue | null>(null);
   const statMatches =
     statFilter && teamStats ? (teamNumber: number) => matchesStatFilter(teamStats.get(teamNumber), statFilter) : undefined;
+  // Pre-made tags from pit scouting (shooter type, robot height), added once the team stats
+  // load. Done while rendering rather than in an effect, so the first share already has them.
+  const [pitTagged, setPitTagged] = useState<Record<number, string[]>>(() => saved?.pitTags ?? {});
+  const [pitTagStats, setPitTagStats] = useState<typeof teamStats>(null);
+  if (teamStats && teamStats !== pitTagStats) {
+    setPitTagStats(teamStats);
+    const made = new Map([...teamStats].map(([teamNumber, team]) => [teamNumber, pitTags(team)]));
+    const synced = syncPitTags(tags, pitTagged, made);
+    setTags(synced.tags);
+    setPitTagged(synced.added);
+  }
   const [notes, setNotes] = useState<Record<number, string>>(() => saved?.notes ?? {});
   const [dnpOverrides, setDnpOverrides] = useState<Record<number, boolean>>(() => saved?.dnpOverrides ?? {});
   // The team whose info popup is open (kept while it closes, so it doesn't blank mid-animation)
@@ -651,11 +773,11 @@ export function LivePicklist({ event, teams, userId, userName, devMode, live, on
 
   useEffect(() => {
     try {
-      localStorage.setItem(storageKey(event.id), JSON.stringify({ selectedIds, compiledIds, manual, tags, notes, dnpOverrides }));
+      localStorage.setItem(storageKey(event.id), JSON.stringify({ selectedIds, compiledIds, manual, tags, notes, dnpOverrides, pitTags: pitTagged }));
     } catch {
       /* private window or full storage: the list just won't survive a reload */
     }
-  }, [event.id, selectedIds, compiledIds, manual, tags, notes, dnpOverrides]);
+  }, [event.id, selectedIds, compiledIds, manual, tags, notes, dnpOverrides, pitTagged]);
 
   const teamsByNumber = useMemo(() => new Map(teams.map((team) => [team.team_number, team])), [teams]);
   const roster = useMemo(() => teams.map((team) => team.team_number).sort((a, b) => a - b), [teams]);
@@ -844,6 +966,33 @@ export function LivePicklist({ event, teams, userId, userName, devMode, live, on
     }
   };
 
+  // One suggestion with where its team is now; `revealActions` hides apply/dismiss until hovered.
+  const suggestionRow = (suggestion: LivePicklistSuggestion, revealActions = false) => {
+    const place = groupOf(suggestion.team_number).findIndex((entry) => entry.teamNumber === suggestion.team_number);
+    return (
+      <SuggestionRow
+        key={suggestion.id}
+        suggestion={suggestion}
+        author={names.get(suggestion.author_id) ?? "Someone"}
+        place={place >= 0 ? `Now #${place + 1}${dnpTeams.has(suggestion.team_number) ? " in DNP Teams" : ""}` : null}
+        revealActions={revealActions}
+        onResolve={(accept) => void handleResolve(suggestion, accept)}
+      />
+    );
+  };
+
+  // Opened from a team card's suggestion count: every suggestion waiting for that team.
+  const teamSuggestions = (teamNumber: number) => (
+    <>
+      <p className="border-b px-3 py-2 text-sm font-semibold">Suggestions for {teamNumber}</p>
+      <ul className="max-h-80 divide-y overflow-y-auto">
+        {suggestions
+          .filter((suggestion) => suggestion.team_number === teamNumber)
+          .map((suggestion) => suggestionRow(suggestion, true))}
+      </ul>
+    </>
+  );
+
   const handleEnd = async () => {
     setEnding(true);
     endedRef.current = true;
@@ -887,48 +1036,7 @@ export function LivePicklist({ event, teams, userId, userName, devMode, live, on
               </p>
             ) : (
               <ul className="max-h-80 divide-y overflow-y-auto">
-                {suggestions.map((suggestion) => {
-                  const place = groupOf(suggestion.team_number).findIndex(
-                    (entry) => entry.teamNumber === suggestion.team_number
-                  );
-                  return (
-                    <li key={suggestion.id} className="flex items-center gap-2 px-3 py-2">
-                      <SuggestionIcon direction={suggestion.direction} />
-                      <div className="min-w-0 flex-1 text-sm">
-                        <p className="wrap-anywhere">
-                          <span className="font-medium">{names.get(suggestion.author_id) ?? "Someone"}</span>:{" "}
-                          {describeMove(suggestion)}
-                        </p>
-                        {place >= 0 && (
-                          <p className="text-xs text-muted-foreground">
-                            Now #{place + 1}
-                            {dnpTeams.has(suggestion.team_number) && " in DNP Teams"}
-                          </p>
-                        )}
-                      </div>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8 shrink-0 text-emerald-600"
-                        aria-label="Apply suggestion"
-                        title={suggestion.spots || isDnpMove(suggestion.direction) || suggestion.direction === "tie" ? "Apply" : "Apply (moves it one spot)"}
-                        onClick={() => void handleResolve(suggestion, true)}
-                      >
-                        <Check className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8 shrink-0 text-muted-foreground"
-                        aria-label="Dismiss suggestion"
-                        title="Dismiss"
-                        onClick={() => void handleResolve(suggestion, false)}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </li>
-                  );
-                })}
+                {suggestions.map((suggestion) => suggestionRow(suggestion))}
               </ul>
             )}
           </PopoverContent>
@@ -1015,6 +1123,7 @@ export function LivePicklist({ event, teams, userId, userName, devMode, live, on
         teamsByNumber={teamsByNumber}
         editable
         suggestionCounts={suggestionCounts}
+        suggestionPanel={teamSuggestions}
         onReorder={reorder}
         menuItems={teamMenu}
         tagFilter={activeTagFilter}
@@ -1116,152 +1225,6 @@ export function LivePicklist({ event, teams, userId, userName, devMode, live, on
   );
 }
 
-/**
- * For viewers: a "Suggest" button opening a form with three parts, like the filter: the team,
- * what to do with it (move up, move down or tie with), then how many places, or which team
- * to tie with.
- */
-function SuggestButton({
-  entries,
-  onSend,
-}: {
-  /** The host's shared list, both main and DNP. */
-  entries: LivePicklistEntry[];
-  onSend: (teamNumber: number, direction: SuggestionDirection, spots: number | null, tieTeamNumber: number | null) => Promise<boolean>;
-}) {
-  const [open, setOpen] = useState(false);
-  const [team, setTeam] = useState("");
-  const [action, setAction] = useState<"up" | "down" | "tie">("up");
-  const [places, setPlaces] = useState("");
-  const [tieTeam, setTieTeam] = useState("");
-  const [sending, setSending] = useState(false);
-
-  const byNumber = useMemo(() => [...entries].sort((a, b) => a.teamNumber - b.teamNumber), [entries]);
-  const chosen = entries.find((entry) => String(entry.teamNumber) === team);
-  // Teams can only tie within their own list (main or DNP)
-  const tieChoices = chosen ? byNumber.filter((entry) => entry.teamNumber !== chosen.teamNumber && !!entry.dnp === !!chosen.dnp) : [];
-  const placeCount = places === "" ? null : Number(places);
-  const placesValid = placeCount === null || (Number.isInteger(placeCount) && placeCount > 0);
-  const ready = !!chosen && (action === "tie" ? tieChoices.some((entry) => String(entry.teamNumber) === tieTeam) : placesValid);
-
-  const openForm = () => {
-    setTeam("");
-    setAction("up");
-    setPlaces("");
-    setTieTeam("");
-    setOpen(true);
-  };
-
-  const send = async () => {
-    if (!ready || !chosen) return;
-    setSending(true);
-    const sent = await onSend(
-      chosen.teamNumber,
-      action,
-      action === "tie" ? null : placeCount,
-      action === "tie" ? Number(tieTeam) : null
-    );
-    setSending(false);
-    if (sent) setOpen(false);
-  };
-
-  return (
-    <>
-      <Button variant="outline" className="gap-1.5" onClick={openForm}>
-        <Send className="h-4 w-4" />
-        Suggest
-      </Button>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-xl">
-          <DialogHeader>
-            <DialogTitle>Suggest a change</DialogTitle>
-            <DialogDescription>The picklist host decides whether to make the change.</DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]">
-            <Select
-              value={team}
-              onValueChange={(value) => {
-                setTeam(value);
-                if (value === tieTeam) setTieTeam("");
-              }}
-            >
-              <SelectTrigger className="w-full" aria-label="Team">
-                <SelectValue placeholder="Team" />
-              </SelectTrigger>
-              <SelectContent>
-                {byNumber.map((entry) => (
-                  <SelectItem key={entry.teamNumber} value={String(entry.teamNumber)}>
-                    {entry.teamNumber}
-                    {entry.dnp && <span className="text-muted-foreground"> (DNP)</span>}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={action} onValueChange={(value) => setAction(value as "up" | "down" | "tie")}>
-              <SelectTrigger className="w-full" aria-label="Change">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="up">Move up</SelectItem>
-                <SelectItem value="down">Move down</SelectItem>
-                <SelectItem value="tie">Tie with</SelectItem>
-              </SelectContent>
-            </Select>
-            {action === "tie" ? (
-              <Select value={tieTeam} onValueChange={setTieTeam} disabled={!chosen}>
-                <SelectTrigger className="w-full" aria-label="Team to tie with">
-                  <SelectValue placeholder={chosen ? "Team" : "Pick a team first"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {tieChoices.map((entry) => (
-                    <SelectItem key={entry.teamNumber} value={String(entry.teamNumber)}>
-                      {entry.teamNumber}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : (
-              <Input
-                aria-label="Places"
-                inputMode="numeric"
-                placeholder="Places (optional)"
-                value={places}
-                onChange={(changeEvent) => {
-                  if (/^\d*$/.test(changeEvent.target.value)) setPlaces(changeEvent.target.value);
-                }}
-                onKeyDown={(keyEvent) => {
-                  if (keyEvent.key === "Enter") void send();
-                }}
-              />
-            )}
-          </div>
-          {chosen && ready && (
-            <p className="text-sm text-muted-foreground">
-              “
-              {describeMove({
-                team_number: chosen.teamNumber,
-                direction: action,
-                spots: action === "tie" ? null : placeCount,
-                tie_team_number: action === "tie" ? Number(tieTeam) : null,
-              })}
-              ”
-            </p>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>
-              Cancel
-            </Button>
-            <Button disabled={!ready || sending} onClick={() => void send()}>
-              {sending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Send suggestion
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
-  );
-}
-
 interface LivePicklistViewerProps {
   event: Event;
   /** Every team at the event. */
@@ -1273,14 +1236,51 @@ interface LivePicklistViewerProps {
   onTeamClick: (team: TBATeamSimple) => void;
 }
 
-/** Everyone else's view of the live picklist: read only, with suggestions for the host. */
+/** How many suggestions are waiting for the host, kept up to date; null until first counted. */
+function usePendingSuggestionCount(eventId: string): number | null {
+  const [counted, setCounted] = useState<{ eventId: string; count: number } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      const count = await countPendingSuggestions(eventId);
+      if (!cancelled) setCounted({ eventId, count });
+    };
+    void load();
+    const channel = supabase
+      .channel(`live-picklist-suggestion-count-${eventId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "live_picklist_suggestions", filter: `event_id=eq.${eventId}` },
+        () => void load()
+      )
+      .subscribe();
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
+  }, [eventId]);
+
+  return counted?.eventId === eventId ? counted.count : null;
+}
+
+/**
+ * Everyone else's view of the live picklist: read only, until they press Suggest. Then the
+ * page changes color, the list can be dragged, and the first team dropped somewhere new is
+ * the suggestion, sent with an optional reason.
+ */
 export function LivePicklistViewer({ event, teams, live, userId, onExit, onTeamClick }: LivePicklistViewerProps) {
   const { toast } = useToast();
-  const [suggestTeam, setSuggestTeam] = useState<TBATeamSimple | null>(null);
-  const [direction, setDirection] = useState<SuggestionDirection>("up");
-  const [spots, setSpots] = useState("");
-  const [sending, setSending] = useState(false);
   const [showDnp, setShowDnp] = useState(false);
+  const [suggestMode, setSuggestMode] = useState(false);
+  // The team dropped in suggest mode and the team it was dropped on, until it's sent or cancelled
+  const [proposal, setProposal] = useState<{ teamNumber: number; overTeamNumber: number } | null>(null);
+  const [reason, setReason] = useState("");
+  const [sending, setSending] = useState(false);
+  const pendingCount = usePendingSuggestionCount(event.id);
+  const full = pendingCount != null && pendingCount >= SUGGESTION_LIMIT;
+  // Suggest mode switches off by itself once the host has as many suggestions as it takes
+  const suggesting = suggestMode && !full;
 
   const teamsByNumber = useMemo(() => new Map(teams.map((team) => [team.team_number, team])), [teams]);
   const dnpCount = useMemo(() => live.entries.filter((entry) => entry.dnp).length, [live.entries]);
@@ -1296,59 +1296,56 @@ export function LivePicklistViewer({ event, teams, live, userId, onExit, onTeamC
     () => live.entries.filter((entry) => !!entry.dnp === showDnp),
     [live.entries, showDnp]
   );
-  const labels = useMemo(() => rankLabels(visibleEntries), [visibleEntries]);
-  const suggestIndex = suggestTeam
-    ? visibleEntries.findIndex((entry) => entry.teamNumber === suggestTeam.team_number)
-    : -1;
-  const suggestPlace = suggestIndex >= 0 ? labels[suggestIndex] : undefined;
-  // DNP moves don't take a number of spots
-  const dnpMove = isDnpMove(direction);
-  const spotCount = spots === "" || dnpMove ? null : Number(spots);
-  const spotsValid = spotCount === null || (Number.isInteger(spotCount) && spotCount > 0);
-  const suggestTeamDnp =
-    !!suggestTeam && !!live.entries.find((entry) => entry.teamNumber === suggestTeam.team_number)?.dnp;
 
-  const openSuggest = (team: TBATeamSimple) => {
-    setSuggestTeam(team);
-    setDirection("up");
-    setSpots("");
+  // Places within the list shown (main or DNP), the way the host applies them; worked out
+  // from the live list, so they stay right if the host moves things while this is open.
+  const from = proposal ? visibleEntries.findIndex((entry) => entry.teamNumber === proposal.teamNumber) : -1;
+  const to = proposal ? visibleEntries.findIndex((entry) => entry.teamNumber === proposal.overTeamNumber) : -1;
+  const proposalValid = from >= 0 && to >= 0 && from !== to;
+  // While a move waits to be sent, the list shows it made
+  const shownEntries = useMemo(
+    () => (proposal && movedEntries(visibleEntries, proposal.teamNumber, proposal.overTeamNumber)) || visibleEntries,
+    [visibleEntries, proposal]
+  );
+
+  const handleDrop = (teamNumber: number, overTeamNumber: number) => {
+    setReason("");
+    setProposal({ teamNumber, overTeamNumber });
   };
 
-  // Sends a suggestion to the host; whether it went through.
-  const sendSuggestion = async (
-    teamNumber: number,
-    suggestedDirection: SuggestionDirection,
-    suggestedSpots: number | null,
-    tieTeamNumber: number | null = null
-  ) => {
-    const sent = await suggestMove(event.id, teamNumber, suggestedDirection, suggestedSpots, tieTeamNumber);
+  const handleSend = async () => {
+    if (!proposal || !proposalValid) return;
+    setSending(true);
+    const direction: SuggestionDirection = to < from ? "up" : "down";
+    const spots = Math.abs(to - from);
+    const sent = await suggestMove(event.id, proposal.teamNumber, direction, spots, null, reason);
+    setSending(false);
     if (sent) {
       void unlockAchievement(userId, "picklist_suggestion");
       toast({
         title: "Suggestion sent",
-        description: `You suggested to ${describeMove({
-          team_number: teamNumber,
-          direction: suggestedDirection,
-          spots: suggestedSpots,
-          tie_team_number: tieTeamNumber,
-        })}.`,
+        description: `You suggested to ${describeMove({ team_number: proposal.teamNumber, direction, spots })}.`,
       });
+      setProposal(null);
+      setSuggestMode(false);
     } else {
-      toast({ title: "Could not send your suggestion", variant: "destructive" });
+      toast({
+        title: "Could not send your suggestion",
+        description: full ? `The host already has ${SUGGESTION_LIMIT} suggestions waiting.` : undefined,
+        variant: "destructive",
+      });
     }
-    return sent;
-  };
-
-  const handleSend = async () => {
-    if (!suggestTeam || !spotsValid) return;
-    setSending(true);
-    const sent = await sendSuggestion(suggestTeam.team_number, direction, spotCount);
-    setSending(false);
-    if (sent) setSuggestTeam(null);
   };
 
   return (
     <div>
+      {/* Suggest mode tints the whole page; clicks pass through to the list */}
+      {suggesting && (
+        <div
+          aria-hidden
+          className="pointer-events-none fixed inset-0 z-40 bg-amber-400/10 ring-4 ring-inset ring-amber-400/70"
+        />
+      )}
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <Button variant="outline" className="gap-1.5" onClick={onExit}>
           <ArrowLeft className="h-4 w-4" />
@@ -1363,91 +1360,76 @@ export function LivePicklistViewer({ event, teams, live, userId, onExit, onTeamC
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <DnpToggle checked={showDnp} onChange={setShowDnp} count={dnpCount} />
         <div className="flex flex-wrap items-center gap-2">
-          <SuggestButton entries={live.entries} onSend={sendSuggestion} />
+          {/* Disabled buttons don't show their own tooltip, so it sits on a wrapper */}
+          <span
+            title={
+              full
+                ? `The host has ${SUGGESTION_LIMIT} suggestions waiting. You can suggest again once they've handled one.`
+                : suggesting
+                  ? "Stop suggesting"
+                  : "Drag a team to where you think it should go"
+            }
+          >
+            <Button
+              variant={suggesting ? "default" : "outline"}
+              className={`gap-1.5 ${suggesting ? "bg-amber-500 text-white hover:bg-amber-500/90" : ""}`}
+              disabled={full}
+              aria-pressed={suggesting}
+              onClick={() => setSuggestMode(!suggesting)}
+            >
+              {suggesting ? <X className="h-4 w-4" /> : <Send className="h-4 w-4" />}
+              {suggesting ? "Stop suggesting" : "Suggest"}
+            </Button>
+          </span>
           <StatFilterButton filter={statFilter} onChange={setStatFilter} loading={!teamStats} />
         </div>
       </div>
+      {suggesting && (
+        <p className="mb-3 text-sm font-medium text-amber-700 dark:text-amber-400">
+          Drag a team to where you think it should go. Your first move is sent to the host as your suggestion.
+        </p>
+      )}
 
       <LiveGrid
-        entries={visibleEntries}
+        entries={shownEntries}
         teamsByNumber={teamsByNumber}
-        editable={false}
+        editable={suggesting && !proposal}
+        onReorder={handleDrop}
         tagFilter={activeTagFilter}
         statMatches={statMatches}
         onTeamClick={onTeamClick}
-        onSuggest={openSuggest}
         emptyMessage={showDnp ? "No team is on anyone's Do Not Pick list." : "Every team is on someone's Do Not Pick list."}
       />
 
-      <Dialog open={suggestTeam != null} onOpenChange={(open) => !open && setSuggestTeam(null)}>
+      {/* Cancelling puts the team back and stays in suggest mode, to try another move */}
+      <Dialog open={proposal != null} onOpenChange={(open) => !open && setProposal(null)}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>Suggest a move for {suggestTeam?.team_number}</DialogTitle>
-            <DialogDescription>
-              {suggestPlace
-                ? `Currently ${suggestPlace.tied ? `tied for #${suggestPlace.label}` : `#${suggestPlace.label}`}. `
-                : ""}
-              The picklist host decides whether to make the move.
-            </DialogDescription>
+            <DialogTitle>Suggest this move?</DialogTitle>
+            <DialogDescription>The picklist host decides whether to make it.</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-2">
-              <Button
-                variant={direction === "up" ? "default" : "outline"}
-                className="gap-1.5"
-                onClick={() => setDirection("up")}
-              >
-                <ArrowUp className="h-4 w-4" />
-                Move up
-              </Button>
-              <Button
-                variant={direction === "down" ? "default" : "outline"}
-                className="gap-1.5"
-                onClick={() => setDirection("down")}
-              >
-                <ArrowDown className="h-4 w-4" />
-                Move down
-              </Button>
-              <Button
-                variant={dnpMove ? "default" : "outline"}
-                className="col-span-2 gap-1.5"
-                onClick={() => setDirection(suggestTeamDnp ? "from_dnp" : "to_dnp")}
-              >
-                {suggestTeamDnp ? <Undo2 className="h-4 w-4" /> : <DnpMark className="text-sm" />}
-                {suggestTeamDnp ? "Move out of DNP Teams" : "Move to DNP Teams"}
-              </Button>
-            </div>
-            {!dnpMove && (
-              <div className="space-y-1.5">
-                <Label htmlFor="suggest-spots">Spots (optional)</Label>
-                <Input
-                  id="suggest-spots"
-                  type="text"
-                  inputMode="numeric"
-                  placeholder="Any amount"
-                  value={spots}
-                  onChange={(changeEvent) => {
-                    if (/^\d*$/.test(changeEvent.target.value)) setSpots(changeEvent.target.value);
-                  }}
-                  onKeyDown={(keyEvent) => {
-                    if (keyEvent.key === "Enter") void handleSend();
-                  }}
-                />
-              </div>
+          <div className="space-y-3">
+            <ReasonField id="suggest-reason" value={reason} onChange={setReason} />
+            {proposal && (
+              <p className="font-mono text-sm font-semibold tabular-nums">
+                {proposalValid
+                  ? `${proposal.teamNumber}: #${from + 1} → #${to + 1}${showDnp ? " in DNP Teams" : ""}`
+                  : `${proposal.teamNumber}: the host moved this team, so cancel and try again.`}
+              </p>
             )}
-            {suggestTeam && (
-              <p className="text-sm text-muted-foreground">
-                “{describeMove({ team_number: suggestTeam.team_number, direction, spots: spotCount })}”
+            {full && (
+              <p className="text-sm text-destructive">
+                The host has {SUGGESTION_LIMIT} suggestions waiting. You can send this once they've handled one.
               </p>
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setSuggestTeam(null)}>
+            <Button variant="outline" onClick={() => setProposal(null)}>
               Cancel
             </Button>
-            <Button disabled={sending || !spotsValid} onClick={() => void handleSend()}>
+            <Button disabled={sending || !proposalValid || full} onClick={() => void handleSend()}>
               {sending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Send suggestion
+              Submit
             </Button>
           </DialogFooter>
         </DialogContent>

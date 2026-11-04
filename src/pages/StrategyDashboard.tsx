@@ -70,13 +70,14 @@ import { ScoutingDataTable } from "@/components/strategy/ScoutingDataTable";
 import { MatchDashboard } from "@/components/strategy/MatchDashboard";
 import { TeamInfoPage } from "@/components/strategy/TeamInfoPage";
 import { PicklistCardContent } from "@/components/strategy/PicklistCardContent";
+import { EventTeamsGrid } from "@/components/strategy/EventTeamsGrid";
 import { LivePicklist, LivePicklistViewer } from "@/components/strategy/LivePicklist";
 import { useLivePicklist } from "@/hooks/useLivePicklist";
 import { endLivePicklist, entryTags } from "@/lib/livePicklists";
 import { TeamTags } from "@/components/strategy/TeamTag";
 import { LiveTeamNote } from "@/components/strategy/LiveTeamNote";
 import { MyPicklistTab } from "@/components/strategy/MyPicklistTab";
-import { SCOUTING_DATA_TYPES, type ScoutingDataType } from "@/lib/strategyData";
+import { EVENT_TEAM_SORTS, SCOUTING_DATA_TYPES, type EventTeamSort, type ScoutingDataType } from "@/lib/strategyData";
 import type { Event } from "@/types";
 
 type PicklistColumnKey = "bank" | "picklist" | "doNotPick";
@@ -405,6 +406,7 @@ export default function StrategyDashboard() {
   const [doNotPickTeams, setDoNotPickTeams] = useState<TBATeamSimple[]>([]);
   const [bankTeams, setBankTeams] = useState<TBATeamSimple[]>([]);
   const [bankSortMode, setBankSortMode] = useState<"number" | "xp" | "scouting">("number");
+  const [eventTeamSort, setEventTeamSort] = useState<EventTeamSort>("number");
   const [teamXpMap, setTeamXpMap] = useState<Map<number, number>>(new Map());
   const [xpLoading, setXpLoading] = useState(false);
   const [xpLoadedEventId, setXpLoadedEventId] = useState<string | null>(null);
@@ -928,6 +930,21 @@ export default function StrategyDashboard() {
                 </Popover>
               </div>
             )}
+            {strategyPage === "event" && (
+              <Select value={eventTeamSort} onValueChange={(value) => setEventTeamSort(value as EventTeamSort)}>
+                <SelectTrigger className="mr-auto shrink-0 gap-1.5" aria-label="Sort teams">
+                  <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {EVENT_TEAM_SORTS.map(({ value, label }) => (
+                    <SelectItem key={value} value={value}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
             {!(strategyPage === "dashboard" && matchOpen) && (
               <Select value={selectedPicklistEventId} onValueChange={setSelectedPicklistEventId}>
                 <SelectTrigger className="w-full min-w-0 flex-1 sm:w-64 sm:flex-none" aria-label="Picklist event">
@@ -1176,25 +1193,23 @@ export default function StrategyDashboard() {
             </>
           ) : picklistLoading ? (
             <p className="text-muted-foreground">Loading event teams...</p>
-          ) : allEventTeams.length === 0 ? (
+          ) : allEventTeams.length === 0 || !selectedPicklistEvent ? (
             <Card className="p-8 text-center">
               <p className="text-muted-foreground">No teams found for the selected event.</p>
             </Card>
           ) : (
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-              {allEventTeams.map((team) => (
-                <Card
-                  key={team.team_number}
-                  onClick={() => {
-                    setTeamInfoTeam(team);
-                    setTeamInfoOpen(true);
-                  }}
-                  className="cursor-pointer gap-0 py-0 hover:bg-accent/50"
-                >
-                  <PicklistCardContent team={team} />
-                </Card>
-              ))}
-            </div>
+            <EventTeamsGrid
+              teams={allEventTeams}
+              event={selectedPicklistEvent}
+              sort={eventTeamSort}
+              userId={user?.id}
+              userName={profile?.name ?? null}
+              devMode={devMode}
+              onSelectTeam={(team) => {
+                setTeamInfoTeam(team);
+                setTeamInfoOpen(true);
+              }}
+            />
           )}
 
           <TeamInfoDialog

@@ -15,6 +15,68 @@ export function sameTag(a: LivePicklistTag, b: LivePicklistTag): boolean {
   return a.text.toLowerCase() === b.text.toLowerCase() && a.color === b.color;
 }
 
+/** Tags made from pit scouting: shooter type, then robot height. Colors are from the tag editor's swatches. */
+const SHOOTER_TAGS: Array<{ answer: string; tag: LivePicklistTag }> = [
+  { answer: "turret", tag: { text: "Turret", color: "#2563eb" } },
+  { answer: "drum", tag: { text: "Drum", color: "#0d9488" } },
+];
+const HEIGHT_TAGS: Record<string, LivePicklistTag> = {
+  Short: { text: "Short", color: "#16a34a" },
+  Tall: { text: "Tall", color: "#ea580c" },
+  Modular: { text: "Modular", color: "#9333ea" },
+  "Stretchy net": { text: "Stretchy net", color: "#db2777" },
+};
+
+/**
+ * A team's pit scouting tags, from its latest pit answers: Turret and/or Drum for its
+ * shooting mechanism, and one of Short, Tall, Modular or Stretchy net for its height.
+ */
+export function pitTags(team: { shooterType: string; terrain: string }): LivePicklistTag[] {
+  const shooter = team.shooterType.toLowerCase();
+  const tags = SHOOTER_TAGS.filter(({ answer }) => shooter.includes(answer)).map(({ tag }) => tag);
+  const height = HEIGHT_TAGS[team.terrain];
+  return height ? [...tags, height] : tags;
+}
+
+/** Whether a tag is one of the pit scouting tags, text and color unchanged. */
+const isPitTag = (tag: LivePicklistTag) =>
+  [...SHOOTER_TAGS.map(({ tag: shooter }) => shooter), ...Object.values(HEIGHT_TAGS)].some((pit) => sameTag(pit, tag));
+
+/**
+ * Brings the host's tags up to date with pit scouting. `previous` is the pit tag text last
+ * added to each team: those aren't added again (so one the host removed stays removed), and
+ * ones the pit data no longer backs are taken off, unless the host has recolored them.
+ * Returns the new tags and the pit tag text to remember for next time.
+ */
+export function syncPitTags(
+  tags: Record<number, LivePicklistTag[]>,
+  previous: Record<number, string[]>,
+  made: Map<number, LivePicklistTag[]>
+): { tags: Record<number, LivePicklistTag[]>; added: Record<number, string[]> } {
+  const nextTags = { ...tags };
+  const added: Record<number, string[]> = {};
+  const teamNumbers = new Set([...Object.keys(previous).map(Number), ...made.keys()]);
+  for (const teamNumber of teamNumbers) {
+    const before = previous[teamNumber] ?? [];
+    const now = (made.get(teamNumber) ?? []).map((tag) => ({ tag, text: tag.text.toLowerCase() }));
+    const current = tags[teamNumber] ?? [];
+    // Pit tags added before that the pit data has since dropped (e.g. a rescout changed the height)
+    const stale = (tag: LivePicklistTag) => {
+      const text = tag.text.toLowerCase();
+      return before.includes(text) && !now.some((pit) => pit.text === text) && isPitTag(tag);
+    };
+    const kept = current.filter((tag) => !stale(tag));
+    const fresh = now
+      .filter(({ text }) => !before.includes(text) && !kept.some((tag) => tag.text.toLowerCase() === text))
+      .map(({ tag }) => tag);
+    const result = [...kept, ...fresh];
+    if (result.length > 0) nextTags[teamNumber] = result;
+    else delete nextTags[teamNumber];
+    if (now.length > 0) added[teamNumber] = now.map(({ text }) => text);
+  }
+  return { tags: nextTags, added };
+}
+
 /** One team's spot in the live picklist. */
 export interface LivePicklistEntry {
   teamNumber: number;
@@ -78,6 +140,8 @@ export interface LivePicklistSuggestion {
   tie_team_number: number | null;
   /** How many spots to move; null when the suggester didn't say, and for DNP moves and ties. */
   spots: number | null;
+  /** Why the suggester wants the change; null when they didn't say. */
+  reason: string | null;
   author_id: string;
   status: "pending" | "accepted" | "dismissed";
   created_at: string;
@@ -161,13 +225,37 @@ export async function getPendingSuggestions(eventId: string): Promise<LivePickli
   return data ?? [];
 }
 
+/** How many suggestions can wait for the host at once (the database checks it too). */
+export const SUGGESTION_LIMIT = 3;
+
+/** How many suggestions are waiting for the host at an event. */
+export async function countPendingSuggestions(eventId: string): Promise<number> {
+  const { count, error } = await supabase
+    .from("live_picklist_suggestions")
+    .select("id", { count: "exact", head: true })
+    .eq("event_id", eventId)
+    .eq("status", "pending");
+
+  if (error) {
+    console.error("Error counting picklist suggestions:", error);
+    return 0;
+  }
+
+  return count ?? 0;
+}
+
+/** The longest reason a suggestion can give (the database checks it too). */
+export const SUGGESTION_REASON_MAX = 500;
+
 export async function suggestMove(
   eventId: string,
   teamNumber: number,
   direction: SuggestionDirection,
   spots: number | null,
-  tieTeamNumber: number | null = null
+  tieTeamNumber: number | null = null,
+  reason: string | null = null
 ): Promise<boolean> {
+  const trimmedReason = reason?.trim().slice(0, SUGGESTION_REASON_MAX) || null;
   const { error } = await supabase
     .from("live_picklist_suggestions")
     .insert({
@@ -176,6 +264,7 @@ export async function suggestMove(
       direction,
       spots,
       ...(direction === "tie" ? { tie_team_number: tieTeamNumber } : {}),
+      ...(trimmedReason ? { reason: trimmedReason } : {}),
     });
 
   if (error) {

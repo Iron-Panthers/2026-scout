@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { submitScoutingData, submitQualScoutingData, resolveMatchId } from "@/lib/scoutingSchema";
 import { isDevMatchId, submitDevScoutingData } from "@/lib/devMode";
+import { checkCommentAchievements } from "@/lib/achievements";
 import { useToast } from "@/hooks/use-toast";
 import { SubmissionStatusModal } from "@/components/SubmissionStatusModal";
 import SafeQRCode from "@/components/SafeQRCode";
@@ -473,6 +474,7 @@ export default function ScoutingReview() {
       } else {
         await submitScoutingData(matchId, state.role, state, user?.id, state.team_number ?? 0, state.match_type);
       }
+      checkCommentAchievements(user?.id, state);
 
       // Mark as uploaded in offline storage
       if (offlineKey) {

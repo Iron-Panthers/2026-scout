@@ -3,6 +3,7 @@ import { CURRENT_SCHEMA_VERSION, migrateScoutingData } from "@/lib/scoutingSchem
 import { getDevFakeScouts, getDevMatches, getDevMatchTeams, getDevScoutingSubmissions, getDevTeams } from "@/lib/devMode";
 import { getEventAlliances, getEventMatches, getEventTeams } from "@/lib/blueAlliance";
 import { parseYouTubeLink, type YouTubeVideo } from "@/lib/youtube";
+import { getEventMatchClips, type MatchClip } from "@/lib/livestreams";
 import { isOutlier, outlierFences } from "@/lib/outliers";
 import { AUTO_SHOTS_END } from "@/lib/useMatchTimer";
 import type { Event } from "@/types";
@@ -16,6 +17,15 @@ export const SCOUTING_DATA_TYPES: Array<{ value: ScoutingDataType; label: string
   { value: "quantitative", label: "Quantitative" },
   { value: "qualitative", label: "Qualitative" },
   { value: "pit", label: "Pit" },
+];
+
+/** How the Event page orders its teams. */
+export type EventTeamSort = "number" | "rank" | "points";
+
+export const EVENT_TEAM_SORTS: Array<{ value: EventTeamSort; label: string }> = [
+  { value: "number", label: "Team number" },
+  { value: "rank", label: "TBA ranking" },
+  { value: "points", label: "Scouting avg points" },
 ];
 
 /** One quantitative scouting submission, flattened for the quantitative table. */
@@ -476,13 +486,16 @@ export interface ScheduledMatch {
   winner: "red" | "blue" | "tie" | null;
   /** Each alliance's score breakdown once played; absent until TBA publishes one. */
   breakdown?: { red: AllianceBreakdown; blue: AllianceBreakdown };
-  /** YouTube videos of the match: a manager's pasted link first, then TBA's. */
+  /** YouTube videos of the match: a manager's pasted link first, then TBA's, then a livestream clip. */
   videos: MatchVideo[];
 }
 
 export interface MatchVideo extends YouTubeVideo {
-  /** "link": pasted by a manager (qualifications only, stored on the match row). */
-  source: "tba" | "link";
+  /**
+   * "link": pasted by a manager (qualifications only, stored on the match row).
+   * "clip": the match's part of an event livestream a manager added (see lib/livestreams).
+   */
+  source: "tba" | "link" | "clip";
 }
 
 /** The parts of an alliance's TBA score breakdown the dashboards show; null when TBA leaves a field out. */
@@ -688,6 +701,8 @@ export interface TeamDashboard {
    * Pit data, DC ELO and `allMatchFuel` / `qualMatches` always cover the whole event.
    */
   recentMatches: number[] | null;
+  /** How many matches `recentMatches` was asked for; null when it covers the whole event. */
+  recentCount: number | null;
   /** Distinct matches with quantitative scouting. */
   matchesScouted: number;
   /**
@@ -739,7 +754,7 @@ function weightLabel(value: string | null): string {
   return /^\d+(\.\d+)?$/.test(text) ? `${text} lb` : text;
 }
 
-/** How many of a team's latest matches the team page's "last matches" filter keeps. */
+/** How many of a team's latest matches the team page's "last matches" filter keeps by default. */
 export const RECENT_MATCH_COUNT = 4;
 
 /**
@@ -823,6 +838,7 @@ export function buildTeamDashboard(
     name: data.schedule.teamNames.get(teamNumber) ?? null,
     photoUrl: latestPit("photoUrl"),
     recentMatches,
+    recentCount: recentMatches ? lastMatches! : null,
     matchesScouted: matchAverages.length,
     matchFuel: fuelByMatch(matchAverages),
     allMatchFuel: fuelByMatch(allMatchAverages),
@@ -901,13 +917,18 @@ export async function loadEventData(event: Event, sandbox: { userId: string; use
   const loading = Promise.all([
     getEventSchedule(eventCode),
     getEventVideoLinks(event.id),
+    getEventMatchClips(event.id),
     getEventQuantRows(event.id),
     getEventQualRows(event.id),
     getEventPitRows(event.id),
-  ]).then(([schedule, videoLinks, quant, qual, pit]) => ({
+  ]).then(([schedule, videoLinks, clips, quant, qual, pit]) => ({
     schedule: {
       ...schedule,
-      matches: schedule.matches.map((match) => withVideoLink(match, videoLinks.get(match.matchNumber) ?? null)),
+      matches: schedule.matches.map((match) =>
+        withClip(withVideoLink(match, videoLinks.get(match.matchNumber) ?? null), clips.get(`qm${match.matchNumber}`))
+      ),
+      // TBA keys are "<event>_<match>", e.g. "2026cc_sf5m1"
+      playoffs: schedule.playoffs.map((match) => withClip(match, clips.get(match.key.split("_")[1]))),
     },
     quant,
     qual,
@@ -938,14 +959,25 @@ async function getEventVideoLinks(eventId: string): Promise<Map<number, string>>
   return new Map((data ?? []).map((row) => [row.match_number as number, row.video_url as string]));
 }
 
-/** The match with `link` (when it's a YouTube link) ahead of TBA's videos. */
+/** The match with `link` (when it's a YouTube link) ahead of its other videos. */
 function withVideoLink(match: QualScheduleMatch, link: string | null): QualScheduleMatch {
   const pasted = link ? parseYouTubeLink(link) : null;
   return {
     ...match,
     videoLink: link,
-    videos: [...(pasted ? [{ ...pasted, source: "link" as const }] : []), ...match.videos.filter((video) => video.source === "tba")],
+    videos: [...(pasted ? [{ ...pasted, source: "link" as const }] : []), ...match.videos.filter((video) => video.source !== "link")],
   };
+}
+
+/** The match with its livestream clip, when one was found, after its other videos. */
+function withClip<T extends ScheduledMatch>(match: T, clip: MatchClip | undefined): T {
+  return clip ? { ...match, videos: [...match.videos, { ...clip, source: "clip" as const }] } : match;
+}
+
+/** Drops an event's cached data, so the next load picks up changes made elsewhere (like a finished livestream scan). */
+export function forgetEventData(eventId: string) {
+  const cached = eventDataCache.get(eventId);
+  if (cached) cached.startedAt = 0;
 }
 
 /**

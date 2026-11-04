@@ -1,8 +1,10 @@
-/** A YouTube video, optionally starting partway in (e.g. one match in a full-day livestream). */
+/** A YouTube video, optionally just part of it (e.g. one match in a full-day livestream). */
 export interface YouTubeVideo {
   id: string;
   /** Seconds into the video to start at. */
   start?: number;
+  /** Seconds into the video to stop at. */
+  end?: number;
 }
 
 const VIDEO_ID = /^[\w-]{11}$/;
@@ -48,13 +50,14 @@ export function parseYouTubeLink(input: string): YouTubeVideo | null {
 }
 
 /**
- * The embed player for a video, autoplaying (inline on iOS) from its start time.
+ * The embed player for a video, autoplaying (inline on iOS) from its start time to its end.
  * Uses youtube.com rather than youtube-nocookie.com, whose player often fails with
  * "An error occurred" (notably in Safari).
  */
 export function youTubeEmbedUrl(video: YouTubeVideo): string {
   const params = new URLSearchParams({ autoplay: "1", rel: "0", playsinline: "1" });
   if (video.start) params.set("start", String(video.start));
+  if (video.end) params.set("end", String(video.end));
   return `https://www.youtube.com/embed/${video.id}?${params}`;
 }
 

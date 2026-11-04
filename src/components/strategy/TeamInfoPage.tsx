@@ -232,6 +232,20 @@ function MatchRow({ label, match, teamNumber, otherTeam, faded, onSelectTeam, on
       className={`flex items-center gap-2 transition-opacity ${otherTeam !== undefined ? "-mx-1 rounded-md px-1 py-0.5" : ""} ${shared ? SHARED_MATCH[shared].className : ""} ${faded ? "opacity-35" : ""}`}
       title={shared ? SHARED_MATCH[shared].title(otherTeam!) : undefined}
     >
+      {onWatch && (match.videos.length > 0 ? (
+        <button
+          type="button"
+          onClick={onWatch}
+          title={`Watch ${label}`}
+          aria-label={`Watch ${label}`}
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        >
+          <Play className="h-3.5 w-3.5" />
+        </button>
+      ) : (
+        // Keeps rows without a video lined up with those that have one
+        <span className="w-6 shrink-0" />
+      ))}
       <div className="flex w-16 shrink-0 items-center gap-1.5">
         {onOpen ? (
           <button
@@ -256,20 +270,6 @@ function MatchRow({ label, match, teamNumber, otherTeam, faded, onSelectTeam, on
         <AllianceStrip color="red" teams={match.red} score={match.redScore} won={match.winner === "red"} teamNumber={teamNumber} otherTeam={otherTeam} onSelectTeam={onSelectTeam} />
         <AllianceStrip color="blue" teams={match.blue} score={match.blueScore} won={match.winner === "blue"} teamNumber={teamNumber} otherTeam={otherTeam} onSelectTeam={onSelectTeam} />
       </div>
-      {onWatch && (match.videos.length > 0 ? (
-        <button
-          type="button"
-          onClick={onWatch}
-          title={`Watch ${label}`}
-          aria-label={`Watch ${label}`}
-          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-        >
-          <Play className="h-3.5 w-3.5" />
-        </button>
-      ) : (
-        // Keeps rows without a video lined up with those that have one
-        <span className="w-6 shrink-0" />
-      ))}
     </li>
   );
 }
@@ -543,7 +543,7 @@ function FuelCard({ entries }: { entries: Array<{ team: TeamDashboard; color: st
         {entries.length === 1
           ? "Normal curve from the scouted average and standard deviation; the darker band is ±1 SD. Dots are individual scouted matches; red ones are suspicious."
           : "Each team's normal curve from its scouted average and standard deviation, on a shared scale. Dots are individual scouted matches; red ones are suspicious."}
-        {entries.some(({ team }) => team.recentMatches) && ` Only each team's last ${RECENT_MATCH_COUNT} scouted matches count.`}
+        {entries[0]?.team.recentCount && ` Only each team's last ${entries[0].team.recentCount} scouted matches count.`}
         {ZOOM_HINT} Click a dot to open that match.
       </p>
     </Card>
@@ -594,7 +594,7 @@ function FuelByMatchCard({ teams }: { teams: TeamDashboard[] }) {
       <p className="mt-3 text-[10px] text-muted-foreground">
         Co-scouted matches are averaged. Dotted lines bridge played matches with no scouting, following the trend between the scouted matches on either side.
         {alignByTeamMatch && " Aligned: #1 is each team's first played qualification match, #2 its second, and so on."}
-        {teams.some((team) => team.recentMatches) && ` Matches before each team's last ${RECENT_MATCH_COUNT} scouted are faded.`}
+        {teams[0]?.recentCount && ` Matches before each team's last ${teams[0].recentCount} scouted are faded.`}
         {ZOOM_HINT} Click a dot to open that match.
       </p>
     </Card>
@@ -648,7 +648,7 @@ function MatchByMatchCard({ team, data, compareKey }: { team: TeamDashboard; dat
       <SectionTitle compareKey={compareKey}>Match by match</SectionTitle>
       {quant.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          {team.recentMatches ? `No quantitative scouting in this team's last ${RECENT_MATCH_COUNT} matches.` : "No quantitative scouting for this team yet."}
+          {team.recentCount ? `No quantitative scouting in this team's last ${team.recentCount} matches.` : "No quantitative scouting for this team yet."}
         </p>
       ) : (
         <Table>
@@ -796,6 +796,9 @@ export function TeamInfoPage({ event, userId, userName, devMode }: {
   const [sort, setSort] = useState<TeamSort>("number");
   const [compare, setCompare] = useState(false);
   const [recentOnly, setRecentOnly] = useState(false);
+  // The box's text as typed; an empty or invalid entry keeps the default count.
+  const [recentCountText, setRecentCountText] = useState(String(RECENT_MATCH_COUNT));
+  const recentCount = Math.max(1, Number.parseInt(recentCountText, 10) || RECENT_MATCH_COUNT);
   // Compare slots stay put, so a team keeps its color when the other one changes.
   const [compared, setCompared] = useState<{ eventId: string; slots: [number | null, number | null] } | null>(null);
 
@@ -821,8 +824,8 @@ export function TeamInfoPage({ event, userId, userName, devMode }: {
     const numbers = new Set<number>(data.schedule.teamNames.keys());
     [...data.quant, ...data.pit].forEach((row) => { if (row.teamNumber != null) numbers.add(row.teamNumber); });
     // The list's averages follow the filter too, so they match the summaries.
-    return [...numbers].map((teamNumber) => buildTeamDashboard(teamNumber, data, { lastMatches: recentOnly ? RECENT_MATCH_COUNT : undefined }));
-  }, [data, recentOnly]);
+    return [...numbers].map((teamNumber) => buildTeamDashboard(teamNumber, data, { lastMatches: recentOnly ? recentCount : undefined }));
+  }, [data, recentOnly, recentCount]);
 
   const visibleTeams = useMemo(() => {
     const search = query.trim().toLowerCase();
@@ -980,7 +983,18 @@ export function TeamInfoPage({ event, userId, userName, devMode }: {
               </Button>
             )}
             <div className="ml-auto flex items-center gap-2">
-              <Label htmlFor="recent-matches" className="text-xs">Last {RECENT_MATCH_COUNT} matches only</Label>
+              <Label htmlFor="recent-matches" className="gap-1 text-xs">
+                Last
+                <Input
+                  value={recentCountText}
+                  onChange={(e) => setRecentCountText(e.target.value.replace(/\D/g, "").slice(0, 2))}
+                  onBlur={() => setRecentCountText(String(recentCount))}
+                  inputMode="numeric"
+                  aria-label="Number of recent matches"
+                  className="h-5 w-7 px-0.5 py-0 text-center text-xs tabular-nums md:text-xs"
+                />
+                matches only
+              </Label>
               <Switch id="recent-matches" checked={recentOnly} onCheckedChange={setRecentOnly} />
             </div>
           </div>

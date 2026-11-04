@@ -7,7 +7,7 @@ import { getScoutedEvents, type ScoutedEvent } from "@/lib/scoutingHistory";
  *   - worked out live from what's already public on a scouter's profile (events and
  *     matches scouted, team years, event leaderboards);
  *   - "unlocked" the moment they happen, for things only the scouter can see (FRCdle
- *     rolls, owned cosmetics, picklists, bets, pages they open), and saved in
+ *     rolls, owned cosmetics, picklists, bets, pages they open, long comments), and saved in
  *     user_achievements via unlockAchievement().
  */
 
@@ -74,6 +74,7 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
   { id: "matches_25", name: "Getting the Hang of It", description: "Scout 25 matches", icon: "clipboard", measure: matchesScouted, goal: 25 },
   { id: "matches_100", name: "Centurion", description: "Scout 100 matches", icon: "clipboard", measure: matchesScouted, goal: 100 },
   { id: "matches_250", name: "Scouting Machine", description: "Scout 250 matches", icon: "clipboard", measure: matchesScouted, goal: 250 },
+  { id: "yapper", name: "Yapper", description: "Write 200 words in one comment", icon: "message", measure: unlocked("yapper"), goal: 1 },
   // Events
   { id: "events_1", name: "On the Map", description: "Scout at an event", icon: "map", measure: (d) => d.events.length, goal: 1 },
   { id: "events_5", name: "Road Warrior", description: "Scout at 5 events", icon: "map", measure: (d) => d.events.length, goal: 5 },
@@ -145,6 +146,7 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
 ];
 
 export type UnlockableAchievement =
+  | "yapper"
   | "picklist"
   | "match_view"
   | "live_picklist"
@@ -158,14 +160,16 @@ export type UnlockableAchievement =
 /**
  * Points each achievement pays (once, when it's earned). The database pays them from its
  * own copy: keep these in sync with achievement_rewards (latest amounts in
- * supabase/migrations/20261027030_match_achievement_points_to_app.sql and
- * supabase/migrations/20261027050_add_live_picklist_achievements.sql).
+ * supabase/migrations/20261027030_match_achievement_points_to_app.sql,
+ * supabase/migrations/20261027050_add_live_picklist_achievements.sql and
+ * supabase/migrations/20261102010_add_yapper_achievement.sql).
  */
 export const ACHIEVEMENT_POINTS: Record<string, number> = {
   first_match: 10,
   matches_25: 400,
   matches_100: 1000,
   matches_250: 3000,
+  yapper: 50,
   events_1: 25,
   events_5: 500,
   events_10: 2000,
@@ -225,6 +229,16 @@ export async function unlockAchievement(userId: string | null | undefined, id: U
   }
   // A row back means it was just inserted (an existing one is ignored and not returned)
   if (data && data.length > 0) announce(id);
+}
+
+// "Yapper": words needed in a single comment (quant comments, or one team's qual comments)
+const YAPPER_WORDS = 200;
+const COMMENT_FIELDS = ["comments", "commentsTeam1", "commentsTeam2", "commentsTeam3"];
+const wordCount = (text: unknown) => (typeof text === "string" ? text.trim().split(/\s+/).filter(Boolean).length : 0);
+
+/** After scouting is submitted: unlocks "Yapper" if any one of its comments is long enough. */
+export function checkCommentAchievements(userId: string | null | undefined, scoutingData: Record<string, unknown>) {
+  if (COMMENT_FIELDS.some((field) => wordCount(scoutingData[field]) >= YAPPER_WORDS)) void unlockAchievement(userId, "yapper");
 }
 
 /**

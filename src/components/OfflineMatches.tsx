@@ -40,6 +40,7 @@ import {
   CURRENT_SCHEMA_VERSION,
 } from "@/lib/scoutingSchema";
 import { supabase } from "@/lib/supabase";
+import { checkCommentAchievements } from "@/lib/achievements";
 import { compressState } from "@/lib/stateCompression";
 import { prettifyRole } from "@/lib/roleUtils";
 
@@ -212,6 +213,8 @@ export default function OfflineMatches() {
           scoutingData.match_type ?? "qual"
         );
       }
+      // Only for their own scouting (a match saved on this device may be someone else's)
+      if (!match.scouterId || match.scouterId === user?.id) checkCommentAchievements(user?.id, scoutingData);
 
       // Mark as uploaded in local storage
       markAsUploaded(match.key);
