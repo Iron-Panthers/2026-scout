@@ -1,8 +1,8 @@
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { ZoomOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatNumber } from "@/lib/strategyData";
-import { niceTicks, useWidth, useChartZoom } from "@/components/strategy/chartUtils";
+import { DEFENSE_COLOR, niceTicks, useWidth, useChartZoom } from "@/components/strategy/chartUtils";
 
 const HEIGHT = 180;
 const MARGIN = { top: 10, right: 10, bottom: 22, left: 30 };
@@ -19,6 +19,38 @@ const MIN_ZOOM_FUEL = 4;
 const DOT_HIT_RADIUS = 8;
 /** A press that moves further than this (px) was a pan, not a click. */
 const CLICK_SLOP = 4;
+/** How long (ms) toggling `alignByTeamMatch` takes to slide every match into place. */
+const ALIGN_DURATION = 450;
+
+const lerp = (from: number, to: number, t: number) => from + (to - from) * t;
+const easeInOutCubic = (t: number) => (t < 0.5 ? 4 * t ** 3 : 1 - (-2 * t + 2) ** 3 / 2);
+
+/**
+ * 0 for the qualification match axis, 1 for aligned by team match, easing between
+ * them whenever `aligned` changes (instantly for reduced motion). Reversing mid-slide
+ * starts back from wherever the matches are.
+ */
+function useAlignProgress(aligned: boolean) {
+  const target = aligned ? 1 : 0;
+  const [progress, setProgress] = useState(target);
+  const current = useRef(target);
+  useEffect(() => {
+    const from = current.current;
+    if (from === target) return;
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const duration = reduceMotion ? 0 : ALIGN_DURATION * Math.abs(target - from);
+    let start: number | null = null;
+    let frame = requestAnimationFrame(function step(now) {
+      start ??= now;
+      const t = duration > 0 ? Math.min(1, (now - start) / duration) : 1;
+      current.current = t === 1 ? target : lerp(from, target, easeInOutCubic(t));
+      setProgress(current.current);
+      if (t < 1) frame = requestAnimationFrame(step);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [target]);
+  return progress;
+}
 
 const METRICS = [
   { key: "auto", label: "Auto" },
@@ -31,17 +63,20 @@ export interface FuelByMatchSeries {
   name: string;
   /** Any CSS colors, e.g. "var(--fuel-a-auto)". */
   colors: Record<Metric, string>;
-  /** Scouted qualification matches, any order. */
-  matches: Array<{ matchNumber: number; auto: number; teleop: number }>;
+  /** Scouted qualification matches, any order. `defense` draws the match's dots green. */
+  matches: Array<{ matchNumber: number; auto: number; teleop: number; defense?: boolean }>;
   /** Played qualification matches with no scouting. */
   missing: number[];
   /** Qualification matches to emphasize; every other match fades. Omitted, none fade. */
   highlight?: number[] | null;
 }
 
-/** `x` is the axis position: the qualification match, or the team's nth played match when aligned. */
+/**
+ * `x` is the axis position: the qualification match, or the team's nth played match when
+ * aligned (in between while sliding from one to the other).
+ */
 type Slot = { x: number; matchNumber: number };
-type Point = Slot & { auto: number; teleop: number };
+type Point = Slot & { auto: number; teleop: number; defense?: boolean };
 
 /**
  * A run between consecutive scouted matches; dotted when the team played
@@ -63,11 +98,20 @@ function LegendKey({ color, dotted }: { color: string; dotted?: boolean }) {
   );
 }
 
+function LegendDot({ color }: { color: string }) {
+  return (
+    <svg width="14" height="8" className="shrink-0" aria-hidden="true">
+      <circle cx="7" cy="4" r="3.5" fill={color} />
+    </svg>
+  );
+}
+
 /**
  * Auto and teleop fuel per qualification match as lines, one pair per team on
  * a shared match axis. Unscouted matches between two scouted ones are bridged
  * with a dotted line along the trend. With `alignByTeamMatch`, the axis is each
- * team's own 1st, 2nd, 3rd… played match instead, so compared teams line up.
+ * team's own 1st, 2nd, 3rd… played match instead, so compared teams line up; toggling
+ * it slides every match to its new place.
  * Pinch (or ctrl+scroll) to zoom into a run of matches and range of fuel,
  * then drag to pan. With `onSelectMatch`, clicking a scouted match's dot opens it.
  */
@@ -86,11 +130,15 @@ export function FuelByMatchChart({ series, alignByTeamMatch = false, onSelectMat
   // Switching teams or the axis changes what the matches are, so it starts unzoomed.
   const zoom = useChartZoom(`${alignByTeamMatch}|${series.map((item) => item.name).join()}`);
   const clipId = `fuel-by-match-${useId().replace(/[^\w-]/g, "")}`;
+  const progress = useAlignProgress(alignByTeamMatch);
+  const sliding = progress > 0 && progress < 1;
 
   const teams = series.map((item) => {
     // Unscouted matches count toward a team's match number, so gaps stay visible when aligned.
     const played = [...item.matches.map((match) => match.matchNumber), ...item.missing].sort((a, b) => a - b);
-    const toX = (matchNumber: number) => (alignByTeamMatch ? played.indexOf(matchNumber) + 1 : matchNumber);
+    /** A match's axis position `alignment` of the way from its qualification match to its team match. */
+    const xAt = (matchNumber: number, alignment: number) => lerp(matchNumber, played.indexOf(matchNumber) + 1, alignment);
+    const toX = (matchNumber: number) => xAt(matchNumber, progress);
     const points: Point[] = item.matches.map((match) => ({ ...match, x: toX(match.matchNumber) })).sort((a, b) => a.x - b.x);
     const missing: Slot[] = item.missing.map((matchNumber) => ({ x: toX(matchNumber), matchNumber }));
     const segments: Segment[] = points.slice(1).map((to, i) => ({
@@ -99,9 +147,10 @@ export function FuelByMatchChart({ series, alignByTeamMatch = false, onSelectMat
       missing: missing.filter((slot) => slot.x > points[i].x && slot.x < to.x).sort((a, b) => a.x - b.x),
     }));
     const faded = (matchNumber: number) => !!item.highlight && !item.highlight.includes(matchNumber);
-    return { ...item, points, missing, segments, faded };
+    return { ...item, xAt, points, missing, segments, faded };
   });
   const anyDotted = teams.some((team) => team.segments.some((segment) => segment.missing.length > 0));
+  const anyDefense = teams.some((team) => team.points.some((point) => point.defense));
 
   const legend = (
     // One row per team, its auto and teleop keys running out to the right in shared columns.
@@ -123,6 +172,12 @@ export function FuelByMatchChart({ series, alignByTeamMatch = false, onSelectMat
           Not scouted (trend)
         </li>
       )}
+      {anyDefense && (
+        <li className="col-span-full flex items-center gap-1">
+          <LegendDot color={DEFENSE_COLOR} />
+          Played defense
+        </li>
+      )}
     </ul>
   );
 
@@ -140,11 +195,16 @@ export function FuelByMatchChart({ series, alignByTeamMatch = false, onSelectMat
   // Unscouted matches only appear where a dotted line passes through them.
   const bridged = teams.flatMap((team) => team.segments.flatMap((segment) => segment.missing));
   const xs = [...teams.flatMap((team) => team.points.map((point) => point.x)), ...bridged.map((slot) => slot.x)];
-  let xLo = Math.min(...xs) - 0.5;
-  let xHi = Math.max(...xs) + 0.5;
-  if (xHi - xLo < MIN_ZOOM_MATCHES) { xLo -= 1; xHi += 1; }
-  const viewLo = xLo + zoom.view.x.from * (xHi - xLo);
-  const viewHi = xLo + zoom.view.x.to * (xHi - xLo);
+  /** The match axis's domain, and the zoomed part of it, with matches `alignment` of the way to aligned. */
+  const xDomainAt = (alignment: number) => {
+    const at = teams.flatMap((team) => [...team.points, ...team.segments.flatMap((segment) => segment.missing)]
+      .map((slot) => team.xAt(slot.matchNumber, alignment)));
+    let lo = Math.min(...at) - 0.5;
+    let hi = Math.max(...at) + 0.5;
+    if (hi - lo < MIN_ZOOM_MATCHES) { lo -= 1; hi += 1; }
+    return { lo, hi, viewLo: lo + zoom.view.x.from * (hi - lo), viewHi: lo + zoom.view.x.to * (hi - lo) };
+  };
+  const { lo: xLo, hi: xHi, viewLo, viewHi } = xDomainAt(progress);
 
   const yHi = Math.max(1, ...teams.flatMap((team) => team.points.flatMap((point) => [point.auto, point.teleop])));
   const yViewLo = zoom.view.y.from * yHi;
@@ -156,8 +216,18 @@ export function FuelByMatchChart({ series, alignByTeamMatch = false, onSelectMat
   const baseline = HEIGHT - MARGIN.bottom;
   const xScale = (x: number) => MARGIN.left + ((x - viewLo) / (viewHi - viewLo)) * plotWidth;
   const yScale = (value: number) => baseline - ((value - yViewLo) / (yViewHi - yViewLo)) * (baseline - MARGIN.top);
-  const xLabel = (x: number) => (alignByTeamMatch ? `#${x}` : `Q${x}`);
-  const xTicks = niceTicks(Math.ceil(viewLo), Math.floor(viewHi), Math.max(2, Math.floor(plotWidth / 50))).filter(Number.isInteger);
+  // Each axis's labels where they sit on that axis; while the matches slide, the old axis fades out and the new one in.
+  const xAxes = [
+    { alignment: 0, opacity: 1 - progress, label: (x: number) => `Q${x}` },
+    { alignment: 1, opacity: progress, label: (x: number) => `#${x}` },
+  ].filter((axis) => axis.opacity > 0).map((axis) => {
+    const domain = xDomainAt(axis.alignment);
+    const ticks = niceTicks(Math.ceil(domain.viewLo), Math.floor(domain.viewHi), Math.max(2, Math.floor(plotWidth / 50))).filter(Number.isInteger);
+    return {
+      ...axis,
+      ticks: ticks.map((tick) => ({ tick, x: MARGIN.left + ((tick - domain.viewLo) / (domain.viewHi - domain.viewLo)) * plotWidth })),
+    };
+  });
 
   /** The visible scouted dot nearest a point in the chart, if one is close enough. */
   const dotAt = (px: number, py: number): { matchNumber: number; name: string } | null => {
@@ -193,7 +263,8 @@ export function FuelByMatchChart({ series, alignByTeamMatch = false, onSelectMat
     const rows = teams.flatMap((team) => {
       const point = team.points.find((item) => item.x === nearest);
       if (point) {
-        return [{ color: team.colors.auto, text: `${prefix(team, point)}auto ${formatNumber(point.auto)} · teleop ${formatNumber(point.teleop)}` }];
+        const defense = point.defense ? " · played defense" : "";
+        return [{ color: team.colors.auto, text: `${prefix(team, point)}auto ${formatNumber(point.auto)} · teleop ${formatNumber(point.teleop)}${defense}` }];
       }
       const segment = team.segments.find((item) => item.missing.some((slot) => slot.x === nearest));
       if (segment) {
@@ -232,7 +303,7 @@ export function FuelByMatchChart({ series, alignByTeamMatch = false, onSelectMat
   };
 
   const description = teams
-    .map((team) => `${team.name}: ${team.points.map((point) => `Q${point.matchNumber} auto ${formatNumber(point.auto)}, teleop ${formatNumber(point.teleop)}`).join("; ") || "no scouted matches"}`)
+    .map((team) => `${team.name}: ${team.points.map((point) => `Q${point.matchNumber} auto ${formatNumber(point.auto)}, teleop ${formatNumber(point.teleop)}${point.defense ? ", played defense" : ""}`).join("; ") || "no scouted matches"}`)
     .join(". ");
 
   return (
@@ -275,13 +346,21 @@ export function FuelByMatchChart({ series, alignByTeamMatch = false, onSelectMat
                 </text>
               </g>
             ))}
-            {xTicks.map((tick) => (
-              <text key={tick} x={xScale(tick)} y={HEIGHT - 6} textAnchor="middle" className="fill-muted-foreground text-[10px] tabular-nums">
-                {xLabel(tick)}
+            {xAxes.map((axis) => axis.ticks.map(({ tick, x }) => (
+              <text
+                key={`${axis.alignment}-${tick}`}
+                x={x}
+                y={HEIGHT - 6}
+                textAnchor="middle"
+                opacity={axis.opacity < 1 ? axis.opacity : undefined}
+                className="fill-muted-foreground text-[10px] tabular-nums"
+              >
+                {axis.label(tick)}
               </text>
-            ))}
+            )))}
 
-            {tooltip && (
+            {/* No readout mid-slide, when matches sit between axis positions. */}
+            {tooltip && !sliding && (
               <line x1={tooltip.x} x2={tooltip.x} y1={MARGIN.top} y2={baseline} stroke="var(--muted-foreground)" strokeOpacity={0.5} strokeWidth={1} />
             )}
 
@@ -309,7 +388,7 @@ export function FuelByMatchChart({ series, alignByTeamMatch = false, onSelectMat
                     cx={xScale(point.x)}
                     cy={yScale(point[key])}
                     r={DOT_RADIUS}
-                    fill={team.colors[key]}
+                    fill={point.defense ? DEFENSE_COLOR : team.colors[key]}
                     stroke="var(--card)"
                     opacity={team.faded(point.matchNumber) ? FADED_OPACITY : undefined}
                   />
@@ -318,7 +397,7 @@ export function FuelByMatchChart({ series, alignByTeamMatch = false, onSelectMat
             )))}
           </svg>
         )}
-        {tooltip && tooltip.rows.length > 0 && (
+        {tooltip && !sliding && tooltip.rows.length > 0 && (
           <div
             className="pointer-events-none absolute top-0 z-10 -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-md border bg-popover px-2 py-1 text-xs text-popover-foreground shadow-md"
             style={{ left: Math.min(Math.max(tooltip.x, 120), width - 120) }}

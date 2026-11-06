@@ -2,7 +2,7 @@ import { useId, useRef, useState } from "react";
 import { ZoomOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatNumber, type MeanAndSpread } from "@/lib/strategyData";
-import { niceTicks, useWidth, useChartZoom } from "@/components/strategy/chartUtils";
+import { DEFENSE_COLOR, niceTicks, useWidth, useChartZoom } from "@/components/strategy/chartUtils";
 
 /** Space kept clear above the plot for the reset-zoom button (h-5 plus a gap). */
 const RESET_BAND = 22;
@@ -42,12 +42,12 @@ export interface FuelSeries {
   stats: MeanAndSpread | null;
   /**
    * `matchNumber` (a qualification match) makes the dot clickable when the chart has `onSelectMatch`.
-   * `suspicious` draws the dot red and says so on hover.
+   * `suspicious` draws the dot red and `defense` green (green wins); hovering says which.
    */
-  matches: Array<{ label: string; value: number; matchNumber?: number | null; suspicious?: boolean }>;
+  matches: Array<{ label: string; value: number; matchNumber?: number | null; suspicious?: boolean; defense?: boolean }>;
 }
 
-type Tooltip = { x: number; y: number; value: string; rows: Array<{ color?: string; text: string; danger?: boolean }> };
+type Tooltip = { x: number; y: number; value: string; rows: Array<{ color?: string; text: string; tone?: "danger" | "defense" }> };
 
 /** Direct labels closer than this (px) collide; the legend and tooltip carry them instead. */
 const LABEL_SPACING = 40;
@@ -222,7 +222,8 @@ export function FuelDistributionChart({ title, series, onSelectMatch }: {
         value: `${formatNumber(dot.value)} fuel`,
         rows: [
           { color: single ? undefined : dot.color, text: single ? dot.label : `${dot.name} · ${dot.label}` },
-          ...(dot.suspicious ? [{ text: "Suspicious", danger: true }] : []),
+          ...(dot.defense ? [{ text: "Played defense", tone: "defense" as const }] : []),
+          ...(dot.suspicious ? [{ text: "Suspicious", tone: "danger" as const }] : []),
         ],
       });
       return;
@@ -351,7 +352,7 @@ export function FuelDistributionChart({ title, series, onSelectMatch }: {
               <line x1={tooltip.x} x2={tooltip.x} y1={MARGIN.top} y2={baseline} stroke="var(--muted-foreground)" strokeOpacity={0.5} strokeWidth={1} />
             )}
             {dots.map((dot, i) => (
-              <circle key={i} cx={dot.cx} cy={dot.cy} r={DOT_RADIUS} fill={dot.suspicious ? SUSPICIOUS_COLOR : dot.color} stroke="var(--card)" strokeWidth={2} />
+              <circle key={i} cx={dot.cx} cy={dot.cy} r={DOT_RADIUS} fill={dot.defense ? DEFENSE_COLOR : dot.suspicious ? SUSPICIOUS_COLOR : dot.color} stroke="var(--card)" strokeWidth={2} />
             ))}
           </svg>
         )}
@@ -377,7 +378,13 @@ export function FuelDistributionChart({ title, series, onSelectMatch }: {
             {tooltip.rows.map((row, i) => (
               <div
                 key={i}
-                className={`flex items-center gap-1.5 text-[10px] ${row.danger ? "font-semibold text-red-600 dark:text-red-400" : "text-muted-foreground"}`}
+                className={`flex items-center gap-1.5 text-[10px] ${
+                  row.tone === "danger"
+                    ? "font-semibold text-red-600 dark:text-red-400"
+                    : row.tone === "defense"
+                      ? "font-semibold text-green-600 dark:text-green-400"
+                      : "text-muted-foreground"
+                }`}
               >
                 {row.color && <span className="inline-block h-0.5 w-2.5 rounded-full" style={{ background: row.color }} />}
                 {row.text}

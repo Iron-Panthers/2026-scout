@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -58,6 +58,8 @@ import { CreateEventTab } from "@/components/manager/CreateEventTab";
 import { ScoutAssignmentDialog } from "@/components/manager/ScoutAssignmentDialog";
 import { ScoutingErrorDialog, type ScoutingErrorTarget } from "@/components/manager/ScoutingErrorDialog";
 import { assignMatchRescout, getValidatedScoutingErrors, setScoutingErrorValidated } from "@/lib/matchRescouts";
+import { getDevEventQuantRows, getEventQuantRows } from "@/lib/strategyData";
+import { findSuspiciousSubmissions, suspiciousReason, type SuspiciousSubmission } from "@/lib/suspiciousSubmissions";
 import { RosterManagementTab } from "@/components/manager/RosterManagementTab";
 import { PitScoutingAssignmentsTab } from "@/components/manager/PitScoutingAssignmentsTab";
 import { useUrlState } from "@/hooks/useUrlState";
@@ -93,6 +95,8 @@ const MANAGER_SUBTITLES = [
   "Hi guys",
   "Make sure to turn off auto pulling when we're done.",
 ];
+
+const NO_SUSPICIOUS = new Map<string, SuspiciousSubmission>();
 
 export default function ManagerDashboard() {
   const { user, profile: myProfile, getAvatarUrl } = useAuth();
@@ -150,6 +154,9 @@ export default function ManagerDashboard() {
   const [scoutingErrors, setScoutingErrors] = useState<Map<string, string>>(new Map());
   // "matchId:role:scouterId" of scouting errors a manager checked and marked correct
   const [validatedErrors, setValidatedErrors] = useState<Set<string>>(new Set());
+  // "matchId:role:scouterId" -> why the submission's numbers look off, for the selected event
+  // (tagged with it, so another event's never show)
+  const [suspiciousLoad, setSuspiciousLoad] = useState<{ eventId: string; byKey: Map<string, SuspiciousSubmission> } | null>(null);
   const [errorCell, setErrorCell] = useState<
     (ScoutingErrorTarget & { role: Role; slot: 1 | 2; scouterId: string }) | null
   >(null);
@@ -552,6 +559,27 @@ export default function ManagerDashboard() {
     }
   };
 
+  // Suspicious numbers are judged against each team's other submissions at the event, so they
+  // load every submission there: only for a single event, and again only when submissions change.
+  const submissionSignature = useMemo(() => [...completedSubmissions].sort().join("|"), [completedSubmissions]);
+  useEffect(() => {
+    if (selectedEvent === "all") return;
+    let cancelled = false;
+    // The sandbox stands in for every event's submissions, as in loadSubmissionStatus
+    const rows = devMode && user?.id
+      ? Promise.resolve(getDevEventQuantRows(user.id, selectedEvent, null))
+      : getEventQuantRows(selectedEvent);
+    rows
+      .then((quant) => {
+        if (!cancelled) setSuspiciousLoad({ eventId: selectedEvent, byKey: findSuspiciousSubmissions(quant) });
+      })
+      .catch((error) => console.error("Error loading suspicious submissions:", error));
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedEvent, submissionSignature, devMode, user?.id]);
+  const suspiciousSubmissions = suspiciousLoad?.eventId === selectedEvent ? suspiciousLoad.byKey : NO_SUSPICIOUS;
+
   const handleAssignScout = useCallback(
     (profile: Profile) => {
       if (!selectedCell) return;
@@ -669,9 +697,10 @@ export default function ManagerDashboard() {
   );
 
   const openScoutingError = useCallback(
-    (matchNumber: number, role: Role, slot: 1 | 2, scouterId: string, comment: string) => {
+    (matchNumber: number, role: Role, slot: 1 | 2, scouterId: string) => {
       const matchId = matches.find((m) => m.matchNumber === matchNumber)?.matchId;
       if (!matchId) return;
+      const key = `${matchId}:${role}:${scouterId}`;
       setErrorCell({
         matchId,
         devUserId: devModeStateRef.current.user?.id,
@@ -679,11 +708,12 @@ export default function ManagerDashboard() {
         role,
         slot,
         scouterId,
-        comment,
+        comment: scoutingErrors.get(key) || null,
+        suspicious: suspiciousSubmissions.get(key) ?? null,
         scouterName: allScouts.find((s) => s.id === scouterId)?.name || "Unknown",
       });
     },
-    [allScouts, matches]
+    [allScouts, matches, scoutingErrors, suspiciousSubmissions]
   );
 
   const handleAssignRescout = useCallback(
@@ -699,7 +729,8 @@ export default function ManagerDashboard() {
         slot: errorCell.slot,
         oldScouterId: errorCell.scouterId,
         newScouterId: profile.id,
-        reason: errorCell.comment,
+        // A reported error's comment, else what looked off about the numbers
+        reason: errorCell.comment ?? (errorCell.suspicious ? suspiciousReason(errorCell.suspicious) : ""),
         devUserId: devModeStateRef.current.user?.id,
       });
       if (!success) {
@@ -748,7 +779,7 @@ export default function ManagerDashboard() {
         devUserId: devModeStateRef.current.user?.id,
       });
       if (!success) {
-        toast({ title: "Couldn't update the scouting error", variant: "destructive" });
+        toast({ title: `Couldn't update the ${errorCell.comment != null ? "scouting error" : "suspicious entry"}`, variant: "destructive" });
         return;
       }
       const key = `${errorCell.matchId}:${errorCell.role}:${errorCell.scouterId}`;
@@ -1427,6 +1458,7 @@ export default function ManagerDashboard() {
                         completedSubmissions={completedSubmissions}
                         scoutingErrors={scoutingErrors}
                         validatedErrors={validatedErrors}
+                        suspiciousSubmissions={suspiciousSubmissions}
                         onOpenScoutingError={openScoutingError}
                         actualScouters={actualScouters}
                         availableScouts={availableScouts}

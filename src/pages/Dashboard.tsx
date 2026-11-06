@@ -53,7 +53,7 @@ export default function Dashboard() {
   const { user, profile, getAvatarUrl, refreshProfile, patchProfile } = useAuth();
   const { devMode } = useDevMode();
   const [matches, setMatches] = useState<UserMatch[]>([]);
-  // "matchId:role" -> scouting error that prompted this rescout
+  // "matchId:role" -> scouting error (or suspicious data) that prompted this rescout
   const [rescouts, setRescouts] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [teamNumbers, setTeamNumbers] = useState<Record<string, number | null>>(

@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 
+/** Fuel chart dots for matches the team played defense in (green-600), whichever team they're for. */
+export const DEFENSE_COLOR = "#16a34a";
+
 /** Round tick values about `count` apart across [lo, hi]. */
 export function niceTicks(lo: number, hi: number, count = 5) {
   const rough = (hi - lo) / count;

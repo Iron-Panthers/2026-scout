@@ -4,6 +4,7 @@ import { TableRow, TableCell } from "@/components/ui/table";
 import CosmeticAvatar from "@/components/CosmeticAvatar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, X } from "lucide-react";
+import type { SuspiciousSubmission } from "@/lib/suspiciousSubmissions";
 import type { Role, MatchAssignment, Profile } from "@/types";
 
 const isRedRole = (role: Role) => role.startsWith("red") || role === "qualRed";
@@ -16,7 +17,9 @@ const getRoleCellBackground = (role: Role) =>
 
 const SUBMITTED_BACKGROUND = "bg-green-900/40";
 const ERROR_BACKGROUND = "bg-red-600/60";
-// A scouting error a manager checked and found correct: green, but a brighter shade than submitted
+// Numbers outside the team's usual range: a darker red than a reported scouting error
+const SUSPICIOUS_BACKGROUND = "bg-red-900/70";
+// A scouting error (or suspicious entry) a manager checked and found correct: green, but a brighter shade than submitted
 const VALIDATED_BACKGROUND = "bg-emerald-600/45";
 
 interface MatchRowProps {
@@ -27,7 +30,9 @@ interface MatchRowProps {
   completedSubmissions: Set<string>; // Set of "matchId:role:scouterId" — per-scouter, not per-role
   scoutingErrors?: Map<string, string>; // "matchId:role:scouterId" -> scouting error comment
   validatedErrors?: Set<string>; // "matchId:role:scouterId" of scouting errors a manager marked correct
-  onOpenScoutingError?: (matchNumber: number, role: Role, slot: 1 | 2, scouterId: string, comment: string) => void;
+  suspiciousSubmissions?: Map<string, SuspiciousSubmission>; // "matchId:role:scouterId" -> why its numbers look off
+  /** Opens a submission's scouting error and/or suspicious numbers. */
+  onOpenScoutingError?: (matchNumber: number, role: Role, slot: 1 | 2, scouterId: string) => void;
   actualScouters: Map<string, string>; // Map of "matchId:role" -> scouter_id
   availableScouts: Profile[]; // All profiles to look up names
   cosmeticsMap?: Record<string, Record<string, string>>; // userId -> equipped cosmetics
@@ -46,6 +51,7 @@ export const MatchRow = memo(
     completedSubmissions,
     scoutingErrors,
     validatedErrors,
+    suspiciousSubmissions,
     onOpenScoutingError,
     actualScouters,
     availableScouts,
@@ -104,11 +110,20 @@ export const MatchRow = memo(
           // leave bands of the cell uncovered.
           const errorOf = (assignment: typeof assignment1) =>
             match.matchId && assignment ? scoutingErrors?.get(`${match.matchId}:${role}:${assignment.id}`) : undefined;
+          const suspiciousOf = (assignment: typeof assignment1) =>
+            match.matchId && assignment ? suspiciousSubmissions?.get(`${match.matchId}:${role}:${assignment.id}`) : undefined;
           const isValidated = (assignment: typeof assignment1) =>
             !!(match.matchId && assignment && validatedErrors?.has(`${match.matchId}:${role}:${assignment.id}`));
-          // A submitted slot's color: red for a scouting error, its own green once a manager marks it correct
+          // A submitted slot's color: red for a scouting error, darker red for suspicious numbers (a
+          // reported error wins), its own green once a manager marks it correct
           const submittedBackground = (assignment: typeof assignment1) =>
-            !errorOf(assignment) ? SUBMITTED_BACKGROUND : isValidated(assignment) ? VALIDATED_BACKGROUND : ERROR_BACKGROUND;
+            !errorOf(assignment) && !suspiciousOf(assignment)
+              ? SUBMITTED_BACKGROUND
+              : isValidated(assignment)
+                ? VALIDATED_BACKGROUND
+                : errorOf(assignment)
+                  ? ERROR_BACKGROUND
+                  : SUSPICIOUS_BACKGROUND;
           const singleSlotSubmitted = scoutersPerRobot === 1 && isCompleted1;
           const cellColorClass = `${getRoleCellBorder(role)} ${singleSlotSubmitted ? submittedBackground(assignment1) : getRoleCellBackground(role)}`;
 
@@ -116,6 +131,8 @@ export const MatchRow = memo(
             const assignment = slot === 2 ? assignment2 : assignment1;
             const isCompleted = slot === 2 ? isCompleted2 : isCompleted1;
             const errorComment = isCompleted ? errorOf(assignment) : undefined;
+            const suspicious = isCompleted ? suspiciousOf(assignment) : undefined;
+            const flag = errorComment ? "Scouting error" : suspicious ? "Suspicious" : null;
             const isDifferentScouter =
               slot === 1 && actualScouter && assignment && actualScouter.id !== assignment.id;
 
@@ -125,7 +142,7 @@ export const MatchRow = memo(
             const statusTitle = [
               assignment?.name,
               isDifferentScouter && actualScouter ? `Scouted by ${actualScouter.name || "another scout"}` : isCompleted ? "Submitted" : null,
-              errorComment ? (isValidated(assignment) ? "Scouting error checked — data is correct" : "Scouting error — click to review") : null,
+              flag ? (isValidated(assignment) ? `${flag} checked — data is correct` : `${flag} — click to review`) : null,
               assignment && !assignment.registered ? "Not registered for event" : null,
             ].filter(Boolean).join(" · ");
 
@@ -133,8 +150,8 @@ export const MatchRow = memo(
               <div className={`relative group flex-1 min-w-0 p-1.5 md:p-2 ${isCompleted && scoutersPerRobot === 2 ? submittedBackground(assignment) : ""}`}>
                 <button
                   onClick={() =>
-                    errorComment && assignment && onOpenScoutingError
-                      ? onOpenScoutingError(match.matchNumber, role, slot, assignment.id, errorComment)
+                    flag && assignment && onOpenScoutingError
+                      ? onOpenScoutingError(match.matchNumber, role, slot, assignment.id)
                       : onOpenDialog(match.matchNumber, role, slot)
                   }
                   title={statusTitle}

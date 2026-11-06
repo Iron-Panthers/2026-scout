@@ -32,6 +32,9 @@ export const EVENT_TEAM_SORTS: Array<{ value: EventTeamSort; label: string }> = 
 /** One quantitative scouting submission, flattened for the quantitative table. */
 export interface QuantRow {
   id: string;
+  /** The submission's match and scouter, which with `role` identify it on the manager dashboard. */
+  matchId: string | null;
+  scouterId: string | null;
   /** When the scout started the match (falls back to when it was submitted), ISO string. */
   scoutedAt: string;
   scouterName: string | null;
@@ -193,6 +196,7 @@ function withMatchNumber<T extends { matches?: unknown }>({ matches, ...row }: T
 
 interface RawQuantSubmission {
   id: string;
+  match_id?: string | null;
   role: string;
   team_num: number | null;
   match_type?: string | null;
@@ -222,6 +226,8 @@ export function toQuantRow(raw: RawQuantSubmission, names: Map<string, string | 
 
   return {
     id: raw.id,
+    matchId: raw.match_id ?? null,
+    scouterId: raw.scouter_id ?? null,
     scoutedAt: typeof data.matchStartTime === "number" ? new Date(data.matchStartTime).toISOString() : raw.created_at,
     scouterName: raw.scouter_id ? names.get(raw.scouter_id) ?? null : null,
     matchNumber: raw.matchNumber ?? (typeof data.match_number === "number" ? data.match_number : null),
@@ -253,7 +259,7 @@ function compareQuantRows(a: QuantRow, b: QuantRow): number {
 export async function getEventQuantRows(eventId: string): Promise<QuantRow[]> {
   const raws = (await fetchAllPages((from, to) => supabase
     .from("scouting_submissions")
-    .select("id, role, team_num, match_type, scouting_data, schema_version, scouter_id, created_at, tba_data, matches!inner(match_number, event_id)")
+    .select("id, match_id, role, team_num, match_type, scouting_data, schema_version, scouter_id, created_at, tba_data, matches!inner(match_number, event_id)")
     .eq("matches.event_id", eventId)
     .order("created_at", { ascending: true })
     .range(from, to)
@@ -690,6 +696,8 @@ export interface MatchFuel {
   teleop: number;
   autoSuspicious: boolean;
   teleopSuspicious: boolean;
+  /** A scout wrote a defense description for the match, so the team spent time defending. */
+  defense: boolean;
 }
 
 export interface TeamDashboard {
@@ -803,13 +811,14 @@ export function buildTeamDashboard(
     teleop: rows.reduce((sum, row) => sum + row.teleopShots, 0) / rows.length,
     autoSuspicious: rows.some((row) => isOutlier(row.autoShots, autoFences)),
     teleopSuspicious: rows.some((row) => isOutlier(row.teleopShots, teleopFences)),
+    defense: rows.some((row) => !!row.defense),
     points: rows.reduce((sum, row) => sum + row.totalPoints, 0) / rows.length,
     // TBA reports the same climb for every submission in a match; take the first known one.
     climb: rows.find((row) => row.endgameClimb && !/unknown/i.test(row.endgameClimb))?.endgameClimb ?? null,
   }));
   const matchAverages = allMatchAverages.filter((match) => inWindow(match.matchNumber));
   const fuelByMatch = (matches: typeof allMatchAverages) => matches
-    .map(({ matchNumber, auto, teleop, autoSuspicious, teleopSuspicious }) => ({ matchNumber, auto, teleop, autoSuspicious, teleopSuspicious }))
+    .map(({ matchNumber, auto, teleop, autoSuspicious, teleopSuspicious, defense }) => ({ matchNumber, auto, teleop, autoSuspicious, teleopSuspicious, defense }))
     .sort((a, b) => (a.matchNumber ?? Infinity) - (b.matchNumber ?? Infinity));
   const climbLevels = matchAverages
     .filter((match) => match.climb !== null)

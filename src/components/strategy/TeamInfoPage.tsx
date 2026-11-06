@@ -521,6 +521,7 @@ function FuelCard({ entries }: { entries: Array<{ team: TeamDashboard; color: st
         value: pick(match),
         matchNumber: match.matchNumber,
         suspicious: suspicious(match),
+        defense: match.defense,
       })),
     }));
 
@@ -541,8 +542,8 @@ function FuelCard({ entries }: { entries: Array<{ team: TeamDashboard; color: st
       </div>
       <p className="mt-3 text-[10px] text-muted-foreground">
         {entries.length === 1
-          ? "Normal curve from the scouted average and standard deviation; the darker band is ±1 SD. Dots are individual scouted matches; red ones are suspicious."
-          : "Each team's normal curve from its scouted average and standard deviation, on a shared scale. Dots are individual scouted matches; red ones are suspicious."}
+          ? "Normal curve from the scouted average and standard deviation; the darker band is ±1 SD. Dots are individual scouted matches; red ones are suspicious and green ones are matches where it played defense."
+          : "Each team's normal curve from its scouted average and standard deviation, on a shared scale. Dots are individual scouted matches; red ones are suspicious and green ones are matches where the team played defense."}
         {entries[0]?.team.recentCount && ` Only each team's last ${entries[0].team.recentCount} scouted matches count.`}
         {ZOOM_HINT} Click a dot to open that match.
       </p>
@@ -592,7 +593,7 @@ function FuelByMatchCard({ teams }: { teams: TeamDashboard[] }) {
       </div>
       <FuelByMatchChart series={series} alignByTeamMatch={alignByTeamMatch} onSelectMatch={(matchNumber, team) => openMatch(matchNumber, Number(team))} />
       <p className="mt-3 text-[10px] text-muted-foreground">
-        Co-scouted matches are averaged. Dotted lines bridge played matches with no scouting, following the trend between the scouted matches on either side.
+        Co-scouted matches are averaged. Green dots are matches where the team played defense. Dotted lines bridge played matches with no scouting, following the trend between the scouted matches on either side.
         {alignByTeamMatch && " Aligned: #1 is each team's first played qualification match, #2 its second, and so on."}
         {teams[0]?.recentCount && ` Matches before each team's last ${teams[0].recentCount} scouted are faded.`}
         {ZOOM_HINT} Click a dot to open that match.

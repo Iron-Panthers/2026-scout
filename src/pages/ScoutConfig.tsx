@@ -40,6 +40,7 @@ import {
   getDevMatchRescouts,
 } from "@/lib/devMode";
 import { getUserRescouts } from "@/lib/matchRescouts";
+import { SUSPICIOUS_REASON_PREFIX } from "@/lib/suspiciousSubmissions";
 
 export default function ScoutConfig() {
   const { match_id: param_match_id } = useParams();
@@ -54,7 +55,7 @@ export default function ScoutConfig() {
   const [matchNumber, setMatchNumber] = useState(0);
   const [teamNumber, setTeamNumber] = useState(0);
   const [role, setRole] = useState(search_params.get("role") || "");
-  // Scouting error that prompted this assignment, when it's a rescout.
+  // Scouting error (or suspicious data) that prompted this assignment, when it's a rescout.
   const [rescoutReason, setRescoutReason] = useState<string | null>(null);
   const isGuest = search_params.get("g") ?? false;
   const [eventId, setEventId] = useState("");
@@ -694,10 +695,12 @@ export default function ScoutConfig() {
               {rescoutReason !== null && (
                 <div className="space-y-1 p-3 rounded-lg border border-red-500/50 bg-red-500/10">
                   <span className="block text-sm font-semibold text-red-400">
-                    Rescout — scouting error to fix
+                    {rescoutReason.startsWith(SUSPICIOUS_REASON_PREFIX) ? "Rescout — suspicious data to fix" : "Rescout — scouting error to fix"}
                   </span>
                   <p className="text-sm whitespace-pre-wrap break-words">
-                    {rescoutReason || "No comment was left."}
+                    {rescoutReason.startsWith(SUSPICIOUS_REASON_PREFIX)
+                      ? rescoutReason.slice(SUSPICIOUS_REASON_PREFIX.length)
+                      : rescoutReason || "No comment was left."}
                   </p>
                 </div>
               )}

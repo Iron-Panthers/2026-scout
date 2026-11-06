@@ -65,7 +65,6 @@ function MyNotes({ userId, eventId, teamNumber }: {
   }
 
   return (
-    // Right margin leaves room for the dialog's close button.
     <Collapsible open={open} onOpenChange={setOpen}>
       <CollapsibleTrigger asChild>
         <Button variant="outline" size="sm" className="w-full justify-between gap-1.5" disabled={!canLoad}>
@@ -215,7 +214,8 @@ export function TeamInfoDialog({
           <DialogDescription>{team?.name ?? "Team summary"}</DialogDescription>
         </DialogHeader>
 
-        <div className="min-w-0 space-y-4">
+        {/* With the notes on top, they start below the dialog's close button (top-4, 16px tall). */}
+        <div className={`min-w-0 space-y-4 ${showMyNotes ? "pt-8 sm:pt-4" : ""}`}>
           {renderExtra?.(viewedTeam)}
 
           {/* Keyed so each team's notes start closed and never show another team's text. */}
