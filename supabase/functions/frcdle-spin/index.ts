@@ -10,6 +10,10 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+// What a spin beyond the day's free one costs, in points. Keep in sync with
+// FRCDLE_SPIN_COST in src/config/games.ts.
+const SPIN_COST = 100;
+
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -60,8 +64,8 @@ Deno.serve(async (request) => {
     if (authError || !user) return jsonResponse({ error: "Invalid session" }, 401);
 
     const body = await request.json() as { action?: string; timeZone?: string };
-    if (body.action !== "status" && body.action !== "spin" && body.action !== "reset" && body.action !== "top" && body.action !== "leaderboard") {
-      return jsonResponse({ error: "Action must be status, spin, reset, top, or leaderboard" }, 400);
+    if (!["status", "spin", "buy", "reset", "top", "leaderboard"].includes(body.action ?? "")) {
+      return jsonResponse({ error: "Action must be status, spin, buy, reset, top, or leaderboard" }, 400);
     }
 
     const timeZone = body.timeZone || "UTC";
@@ -148,7 +152,27 @@ Deno.serve(async (request) => {
       });
     }
 
-    // Developer sandbox reset: clear today's roll so it can be spun again.
+    // A bought spin, any number of times a day: the points come off and the roll is saved
+    // together (buy_frcdle_spin), or neither when they can't afford it.
+    if (body.action === "buy") {
+      const { data: bought, error: buyError } = await database.rpc("buy_frcdle_spin", {
+        p_user_id: user.id,
+        p_spin_day: spinDay,
+        p_spin_number: randomSixDigitNumber(),
+        p_time_zone: effectiveTimeZone,
+        p_cost: SPIN_COST,
+      });
+      if (buyError) {
+        if (buyError.message?.includes("not_enough_points")) {
+          return jsonResponse({ error: `You need ${SPIN_COST} points to buy a spin.` }, 402);
+        }
+        console.error("buy_frcdle_spin error:", buyError);
+        return jsonResponse({ error: "Could not buy a spin" }, 500);
+      }
+      return jsonResponse({ ...(bought as { spin: unknown; points: number }), timeZone: effectiveTimeZone });
+    }
+
+    // Developer sandbox reset: clear today's free roll so it can be spun again (bought ones stay).
     if (body.action === "reset") {
       const { data: profile, error: profileError } = await database
         .from("profiles")
@@ -161,34 +185,50 @@ Deno.serve(async (request) => {
         .from("frcdle_spins")
         .delete()
         .eq("user_id", user.id)
-        .eq("spin_day", spinDay);
+        .eq("spin_day", spinDay)
+        .eq("purchased", false);
       if (deleteError) return jsonResponse({ error: "Could not reset today's spin" }, 500);
       return jsonResponse({ spin: null, timeZone: effectiveTimeZone, alreadySpun: false });
     }
 
+    // Today's free spin (bought ones don't use it up)
     const findExisting = () => database
       .from("frcdle_spins")
-      .select("spin_day, spin_number, created_at")
+      .select("spin_day, spin_number, created_at, purchased")
       .eq("user_id", user.id)
       .eq("spin_day", spinDay)
+      .eq("purchased", false)
       .maybeSingle();
 
     const { data: existing, error: lookupError } = await findExisting();
     if (lookupError) return jsonResponse({ error: "Could not load today's spin" }, 500);
+
+    if (body.action === "status") {
+      // The latest roll today, free or bought, is the one the game shows
+      const { data: latest, error: latestTodayError } = await database
+        .from("frcdle_spins")
+        .select("spin_day, spin_number, created_at, purchased")
+        .eq("user_id", user.id)
+        .eq("spin_day", spinDay)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (latestTodayError) return jsonResponse({ error: "Could not load today's spin" }, 500);
+      return jsonResponse({ spin: existing, latest, timeZone: effectiveTimeZone, alreadySpun: !!existing });
+    }
     if (existing) return jsonResponse({ spin: existing, timeZone: effectiveTimeZone, alreadySpun: true });
-    if (body.action === "status") return jsonResponse({ spin: null, timeZone: effectiveTimeZone, alreadySpun: false });
 
     const spinNumber = randomSixDigitNumber();
     const { data: inserted, error: insertError } = await database
       .from("frcdle_spins")
       .insert({ user_id: user.id, spin_day: spinDay, spin_number: spinNumber, time_zone: effectiveTimeZone })
-      .select("spin_day, spin_number, created_at")
+      .select("spin_day, spin_number, created_at, purchased")
       .single();
 
     if (!insertError && inserted) return jsonResponse({ spin: inserted, timeZone: effectiveTimeZone, alreadySpun: false });
 
-    // A second tab may spin at the same time; the unique key guarantees only
-    // one number is saved for this account and local spin day.
+    // A second tab may spin at the same time; the unique index guarantees only
+    // one free number is saved for this account and local spin day.
     const { data: raceWinner } = await findExisting();
     if (raceWinner) return jsonResponse({ spin: raceWinner, timeZone: effectiveTimeZone, alreadySpun: true });
     return jsonResponse({ error: "Could not save today's spin" }, 500);

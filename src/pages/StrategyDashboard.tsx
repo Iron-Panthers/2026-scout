@@ -48,6 +48,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { ListOrdered, ArrowUpDown, Loader2, RotateCcw, Radio, Info, Tag } from "lucide-react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { BBotProvider } from "@/contexts/BBotContext";
+import { eventBBots, withBBotNames } from "@/lib/bbots";
 import { useDevMode } from "@/contexts/DevModeContext";
 import { getEvents } from "@/lib/matches";
 import { getEventTeams, type TBATeamSimple } from "@/lib/blueAlliance";
@@ -498,7 +500,8 @@ export default function StrategyDashboard() {
             }))
           : await getEventTeams(event.event_code!);
         if (!mounted) return;
-        const roster = teams.sort((a, b) => a.team_number - b.team_number);
+        // Converted demo numbers go by their main team's name, e.g. "Blazing Bulldogs (B)"
+        const roster = withBBotNames(teams, eventBBots(event)).sort((a, b) => a.team_number - b.team_number);
 
         const saved = user?.id
           ? isSandboxEvent
@@ -864,6 +867,8 @@ export default function StrategyDashboard() {
     : STRATEGY_PAGES[strategyPage];
 
   return (
+    // Off-season demo numbers show as their team's B/C/D/E bot, at events set to convert them
+    <BBotProvider event={selectedPicklistEvent}>
     <div className="min-h-screen bg-background my-5">
       {/* The dashboard uses the full width so all six robots fit in a row on wide
           screens, and less padding so three fit across a phone. The live picklist is full
@@ -1278,5 +1283,6 @@ export default function StrategyDashboard() {
         </nav>
       </main>
     </div>
+    </BBotProvider>
   );
 }

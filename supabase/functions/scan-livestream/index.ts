@@ -21,7 +21,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const GITHUB_TOKEN = Deno.env.get("ETHAN_CANT_CODE_HE_CAN_ONLY_CLAUDE");
+// Trimmed: a token pasted with a trailing newline is rejected as a bad credential
+const GITHUB_TOKEN = Deno.env.get("ETHAN_CANT_CODE_HE_CAN_ONLY_CLAUDE")?.trim();
 const GITHUB_REPO = Deno.env.get("GITHUB_REPO");
 const GITHUB_REF = Deno.env.get("GITHUB_REF") || "main";
 
@@ -88,12 +89,20 @@ Deno.serve(async (request) => {
     if (!dispatch.ok) {
       const detail = await dispatch.text();
       console.error("GitHub dispatch failed:", dispatch.status, detail);
+      // GitHub's own reason (e.g. "Bad credentials", "Resource not accessible by personal access token")
+      let reason = "";
+      try {
+        reason = (JSON.parse(detail) as { message?: string }).message ?? "";
+      } catch {
+        // Not JSON; the status code says enough
+      }
+      const githubSaid = reason ? ` GitHub said: "${reason}" (${dispatch.status}).` : ` (${dispatch.status})`;
       return fail(
         dispatch.status === 404
-          ? "Couldn't start the scan: GitHub can't find the livestream-clips workflow (is it on the main branch?) or the token can't see the repository."
+          ? `Couldn't start the scan: GitHub can't find the livestream-clips workflow (is it on the main branch?) or the token can't see the repository.${githubSaid}`
           : dispatch.status === 401 || dispatch.status === 403
-            ? "Couldn't start the scan: GitHub rejected the token (expired, or missing Actions write access)."
-            : "Couldn't start the scan on GitHub.",
+            ? `Couldn't start the scan: GitHub rejected the token (expired, or missing Actions write access).${githubSaid}`
+            : `Couldn't start the scan on GitHub.${githubSaid}`,
         502
       );
     }

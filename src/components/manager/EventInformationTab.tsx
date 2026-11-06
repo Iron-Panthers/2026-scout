@@ -33,6 +33,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { Event, Profile, MatchAssignment } from "@/types";
 import { ConfirmationDialog } from "./ConfirmationDialog";
 import { AddScoutsDialog } from "./AddScoutsDialog";
+import { BBotSettings } from "./BBotSettings";
 import CosmeticAvatar from "../CosmeticAvatar";
 import { Badge } from "../ui/badge";
 
@@ -697,6 +698,10 @@ export function EventInformationTab({
                   The host can start a live picklist from the Picklist tab of the Strategy Dashboard.
                 </p>
               </div>
+            )}
+
+            {!isAllEvents && currentEvent && (
+              <BBotSettings key={currentEvent.id} event={currentEvent} devUserId={devUserId} onSaved={onEventUpdate} />
             )}
 
             <div className="grid grid-cols-2 gap-4">

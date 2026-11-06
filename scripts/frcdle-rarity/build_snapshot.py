@@ -2,7 +2,8 @@
 
 Only teams that played an on-season event (Match13 week 1 through
 LAST_ON_SEASON_WEEK, i.e. through Championship) are kept, with their Match13
-season xP. Offseason-only teams are left out, so FRCdle scores them as 0.
+season xP. Offseason-only teams are left out, so FRCdle scores them as 0, and so are
+FIRST's off-season demo team numbers (9970-9999), which events lend to teams' extra robots.
 
 Usage: python3 -I scripts/frcdle-rarity/build_snapshot.py teams.json xp.jsonl src/config/frcdleSnapshot2026.json
 """
@@ -10,13 +11,17 @@ import datetime, json, sys
 
 YEAR = 2026
 LAST_ON_SEASON_WEEK = 8  # Championship
+DEMO_TEAMS = range(9970, 10000)  # "Off-Season Demo Team" numbers
 
 teams_path, xp_path, out_path = sys.argv[1:4]
 nicknames = {t["team"]: t["nickname"] for t in json.load(open(teams_path))}
 
-rows, offseason_only, unrated = [], 0, 0
+rows, offseason_only, unrated, demo = [], 0, 0, 0
 for line in open(xp_path):
     rec = json.loads(line)
+    if rec["team"] in DEMO_TEAMS:
+        demo += 1
+        continue
     on_season = any(week is not None and 1 <= week <= LAST_ON_SEASON_WEEK for _, week in rec["events"])
     if not on_season or rec["matches"] == 0:
         offseason_only += bool(rec["events"])
@@ -36,4 +41,4 @@ snapshot = {
 with open(out_path, "w") as out:
     json.dump(snapshot, out, separators=(",", ":"), ensure_ascii=False)
     out.write("\n")
-print(f"{len(rows)} on-season teams; skipped {offseason_only} offseason-only, {unrated} on-season without xP")
+print(f"{len(rows)} on-season teams; skipped {offseason_only} offseason-only, {unrated} on-season without xP, {demo} demo teams")

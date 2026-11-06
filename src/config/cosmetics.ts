@@ -31,6 +31,11 @@ export interface CosmeticDefinition {
    * free to everyone who opens the app during it, and only shown in that event's shop tab.
    */
   seasonalEvent?: string;
+  /**
+   * For event-currency items: the `event_code` of the competition event that sells them
+   * (src/config/eventCurrency.ts). Each event's Shop tab only shows its own items.
+   */
+  competitionEvent?: string;
 }
 
 /**
@@ -679,6 +684,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     rarity: "common",
   },
   // --- Event Exclusives (bought with event points, only during an event) ---
+  // Chezy Champs 2026
   {
     id: "hat_cheese",
     name: "Cheese Hat",
@@ -688,6 +694,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     cost: 50,
     rarity: "uncommon",
     currency: "event",
+    competitionEvent: "2026cc",
   },
   {
     id: "decoration_cc_trophy",
@@ -698,6 +705,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     cost: 200,
     rarity: "ultra-rare",
     currency: "event",
+    competitionEvent: "2026cc",
   },
   {
     id: "decoration_overload",
@@ -708,6 +716,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     cost: 300,
     rarity: "legendary",
     currency: "event",
+    competitionEvent: "2026cc",
   },
   {
     id: "hat_rsn",
@@ -718,6 +727,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     cost: 100,
     rarity: "rare",
     currency: "event",
+    competitionEvent: "2026cc",
   },
   {
     id: "hat_cc",
@@ -728,6 +738,7 @@ export const COSMETICS: CosmeticDefinition[] = [
     cost: 15,
     rarity: "common",
     currency: "event",
+    competitionEvent: "2026cc",
   },
   {
     id: "theme_poofs",
@@ -738,7 +749,45 @@ export const COSMETICS: CosmeticDefinition[] = [
     cost: 300,
     rarity: "legendary",
     currency: "event",
+    competitionEvent: "2026cc",
     themeValue: "poofs",
+    isLight: true,
+  },
+  // Madtown Throwdown 2026
+  {
+    id: "decoration_mttd_logo",
+    name: "Madtown Throwdown Logo",
+    description: "",
+    category: "decoration",
+    url: "/shop/decoration_mttd_logo.jpg",
+    cost: 100,
+    rarity: "rare",
+    currency: "event",
+    competitionEvent: "2026mttd",
+  },
+  {
+    id: "theme_madtown_robotics",
+    name: "Madtown Robotics",
+    description: "Angry village",
+    category: "theme",
+    url: "/shop/madtown%20logo.jpg",
+    cost: 300,
+    rarity: "legendary",
+    currency: "event",
+    competitionEvent: "2026mttd",
+    themeValue: "madtown",
+  },
+  {
+    id: "theme_buchanan_bird_brains",
+    name: "Buchanan Bird Brains",
+    description: "I've been impacted...",
+    category: "theme",
+    url: "/shop/theme_buchanan_bird_brains.png",
+    cost: 300,
+    rarity: "legendary",
+    currency: "event",
+    competitionEvent: "2026mttd",
+    themeValue: "bird-brains",
     isLight: true,
   },
 

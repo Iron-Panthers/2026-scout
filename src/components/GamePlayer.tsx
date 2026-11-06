@@ -10,9 +10,11 @@ interface GamePlayerProps {
   startUrl?: string | null;
   /** Called when Start Match is clicked but the match isn't configured yet. */
   onStartWithoutConfig?: () => void;
+  /** The player's new points balance after spending some in a game (FRCdle's bought spins). */
+  onPointsChange?: (points: number) => void;
 }
 
-export function GamePlayer({ game, onClose, startUrl, onStartWithoutConfig }: GamePlayerProps) {
+export function GamePlayer({ game, onClose, startUrl, onStartWithoutConfig, onPointsChange }: GamePlayerProps) {
   const navigate = useNavigate();
 
   if (!game) return null;
@@ -65,7 +67,7 @@ export function GamePlayer({ game, onClose, startUrl, onStartWithoutConfig }: Ga
       </div>
 
       {game.id === "frcdle" ? (
-        <FrcdleGame />
+        <FrcdleGame onPointsChange={onPointsChange} />
       ) : (
         <iframe
           src={game.iframeUrl}

@@ -820,7 +820,7 @@ export default function Betting({
     if (isStale()) return;
 
     setPoints(gameProfile?.points ?? 0);
-    // ChezCoins only show while the event is actually on (same window as the Shop's Event tab)
+    // Event currency only shows while the event is actually on (same window as the Shop's Event tab)
     setEventPoints(activeEvent && isEventWithinWindow(activeEvent) ? gameProfile?.event_points ?? 0 : null);
     setMyBets(userBets);
     setEvent(activeEvent);

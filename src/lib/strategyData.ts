@@ -2,6 +2,7 @@ import { supabase } from "@/lib/supabase";
 import { CURRENT_SCHEMA_VERSION, migrateScoutingData } from "@/lib/scoutingSchema";
 import { getDevFakeScouts, getDevMatches, getDevMatchTeams, getDevScoutingSubmissions, getDevTeams } from "@/lib/devMode";
 import { getEventAlliances, getEventMatches, getEventTeams } from "@/lib/blueAlliance";
+import { eventBBots, withBBotNameMap } from "@/lib/bbots";
 import { parseYouTubeLink, type YouTubeVideo } from "@/lib/youtube";
 import { getEventMatchClips, type MatchClip } from "@/lib/livestreams";
 import { isOutlier, outlierFences } from "@/lib/outliers";
@@ -893,11 +894,26 @@ const eventDataCache = new Map<string, { loading: Promise<EventData>; startedAt:
  */
 export function cachedEventLoad(event: Event | undefined): { eventId: string; data: EventData; error: null } | null {
   const data = event ? eventDataCache.get(event.id)?.data : null;
-  return event && data ? { eventId: event.id, data, error: null } : null;
+  return event && data ? { eventId: event.id, data: withEventBBotNames(data, event), error: null } : null;
+}
+
+/**
+ * `data` with the event's converted demo numbers named after their main team, e.g. 9991 as
+ * "Blazing Bulldogs (B)". Done as it's read rather than cached, so turning Convert B-bots on
+ * or off shows straight away; events without it get `data` itself back.
+ */
+function withEventBBotNames(data: EventData, event: Event): EventData {
+  const bbots = eventBBots(event);
+  if (bbots.size === 0) return data;
+  return { ...data, schedule: { ...data.schedule, teamNames: withBBotNameMap(data.schedule.teamNames, bbots) } };
 }
 
 /** Loads an event's schedule and scouting data; `sandbox` reads the dev-mode local store instead. */
 export async function loadEventData(event: Event, sandbox: { userId: string; userName: string | null } | null): Promise<EventData> {
+  return withEventBBotNames(await loadRawEventData(event, sandbox), event);
+}
+
+async function loadRawEventData(event: Event, sandbox: { userId: string; userName: string | null } | null): Promise<EventData> {
   if (sandbox) {
     return {
       schedule: getDevEventSchedule(sandbox.userId, event.id),

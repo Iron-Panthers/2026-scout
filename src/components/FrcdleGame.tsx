@@ -1,5 +1,5 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, ChevronLeft, Clock3, Dices, History, LayoutGrid, LoaderCircle, RotateCw, Search, Sparkles, Trophy } from "lucide-react";
+import { AlertCircle, ChevronLeft, Clock3, Coins, Dices, History, LayoutGrid, LoaderCircle, RotateCw, Search, Trophy } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,7 +7,9 @@ import { FRCDLE_XP_CDF, FRCDLE_XP_TABLE_MAX } from "@/config/frcdleRarity";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDevMode } from "@/contexts/DevModeContext";
 import { CURRENT_YEAR, getTeamLogo } from "@/lib/blueAlliance";
-import { getDevFrcdleSpins, getOrCreateDevFrcdleSpin } from "@/lib/devMode";
+import { buyDevFrcdleSpin, getDevFrcdleSpins, getOrCreateDevFrcdleSpin } from "@/lib/devMode";
+import { getGameProfile } from "@/lib/gameProfiles";
+import { FRCDLE_SPIN_COST } from "@/config/games";
 import { supabase } from "@/lib/supabase";
 import { unlockAchievement } from "@/lib/achievements";
 
@@ -15,6 +17,21 @@ interface DailySpin {
   spin_day: string;
   spin_number: string;
   created_at: string;
+  /** Bought with points, beyond the day's free spin. */
+  purchased?: boolean;
+}
+
+/** Calls the frcdle-spin edge function, with the function's own error message when it fails. */
+async function invokeFrcdleSpin(body: Record<string, unknown>) {
+  const { data, error } = await supabase.functions.invoke("frcdle-spin", { body });
+  if (error) {
+    // A non-2xx reply still carries { error } in its body
+    const context = (error as { context?: Response }).context;
+    const message = await context?.json?.().then((reply: { error?: string }) => reply?.error).catch(() => null);
+    throw new Error(message || error.message || "Could not contact the daily spin service.");
+  }
+  if (data?.error) throw new Error(data.error);
+  return data;
 }
 
 interface FoundTeam {
@@ -288,10 +305,26 @@ function DigitReel({ value, rolling, highlighted }: { value: string; rolling: bo
 /** One of this user's saved rolls, scored against the season snapshot. */
 interface PastRoll {
   spinDay: string;
+  /** Tells apart several rolls on one day (the free one and any bought). */
+  createdAt: string;
+  purchased?: boolean;
   spinNumber: string;
   teams: Omit<FoundTeam, "logo">[];
   /** Combined xP before clamping, as used for rarity. */
   xp: number;
+}
+
+/** A saved roll scored against the season snapshot. */
+function scoreRoll(saved: DailySpin, seasonTeams: Map<number, SnapshotTeam>): PastRoll {
+  const rolled = rollSnapshotTeams(saved.spin_number, seasonTeams);
+  return {
+    spinDay: saved.spin_day,
+    createdAt: saved.created_at,
+    purchased: !!saved.purchased,
+    spinNumber: saved.spin_number,
+    teams: rolled,
+    xp: rollXp(rolled),
+  };
 }
 
 /** The day's highest-scoring roll from another player. */
@@ -470,7 +503,8 @@ function SpinEntry({ spinNumber, subtitle, xp, teams, rank, highlight = false }:
 
 /** Every roll this user has made, newest first, with their best one on top. */
 function HistoryPage({ rolls, onBack }: { rolls: PastRoll[] | null; onBack: () => void }) {
-  const newestFirst = useMemo(() => (rolls ? [...rolls].sort((a, b) => b.spinDay.localeCompare(a.spinDay)) : []), [rolls]);
+  const newestFirst = useMemo(() => (rolls ? [...rolls].sort((a, b) => b.createdAt.localeCompare(a.createdAt)) : []), [rolls]);
+  const subtitle = (roll: PastRoll) => `${roll.spinDay}${roll.purchased ? " · bought" : ""}`;
   // Highest xP; ties go to the earlier roll.
   const best = newestFirst.reduce<PastRoll | null>((top, roll) => (!top || roll.xp >= top.xp ? roll : top), null);
   const lifetimeXp = newestFirst.reduce((total, roll) => total + boundedRollXp(roll.xp), 0);
@@ -508,7 +542,7 @@ function HistoryPage({ rolls, onBack }: { rolls: PastRoll[] | null; onBack: () =
             <h2 className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.12em] text-amber-300">
               <Trophy className="h-4 w-4" />Best spin
             </h2>
-            <SpinEntry spinNumber={best.spinNumber} subtitle={best.spinDay} xp={best.xp} teams={best.teams} highlight />
+            <SpinEntry spinNumber={best.spinNumber} subtitle={subtitle(best)} xp={best.xp} teams={best.teams} highlight />
           </section>
         )}
 
@@ -517,7 +551,7 @@ function HistoryPage({ rolls, onBack }: { rolls: PastRoll[] | null; onBack: () =
             <h2 className="text-xs font-bold uppercase tracking-[0.12em] text-sky-300">All spins</h2>
             <div className="grid gap-2 md:grid-cols-2">
               {newestFirst.map((roll) => (
-                <SpinEntry key={roll.spinDay} spinNumber={roll.spinNumber} subtitle={roll.spinDay} xp={roll.xp} teams={roll.teams} />
+                <SpinEntry key={roll.createdAt} spinNumber={roll.spinNumber} subtitle={subtitle(roll)} xp={roll.xp} teams={roll.teams} />
               ))}
             </div>
           </section>
@@ -664,10 +698,19 @@ function LeaderboardPage({ onBack }: { onBack: () => void }) {
   );
 }
 
-export function FrcdleGame() {
+/**
+ * One free spin a day (resetting at 9:00 local time), then as many as they like for
+ * FRCDLE_SPIN_COST points each. `onPointsChange` hears the new balance after a bought spin.
+ */
+export function FrcdleGame({ onPointsChange }: { onPointsChange?: (points: number) => void } = {}) {
   const { user } = useAuth();
   const { devMode } = useDevMode();
+  // The roll on screen: today's latest, free or bought
   const [spin, setSpin] = useState<DailySpin | null>(null);
+  // The spin day whose free spin is used up (bought spins don't count)
+  const [freeSpinDay, setFreeSpinDay] = useState<string | null>(null);
+  // Their points balance, for buying spins; null until loaded
+  const [points, setPoints] = useState<number | null>(null);
   const [revealCount, setRevealCount] = useState(0);
   const [isRevealing, setIsRevealing] = useState(false);
   const [isLoadingSpin, setIsLoadingSpin] = useState(true);
@@ -676,7 +719,8 @@ export function FrcdleGame() {
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date());
   const [spinTimeZone, setSpinTimeZone] = useState("");
-  const [pastRollsByDay, setPastRollsByDay] = useState<Map<string, PastRoll> | null>(null);
+  // Every roll they've saved, oldest first (today's included); null until loaded
+  const [savedRolls, setSavedRolls] = useState<PastRoll[] | null>(null);
   const [snapshot, setSnapshot] = useState<Map<number, SnapshotTeam> | null>(null);
   const [showAllTeams, setShowAllTeams] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
@@ -689,27 +733,39 @@ export function FrcdleGame() {
   const timeZone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC", []);
   const effectiveTimeZone = spinTimeZone || timeZone;
   const spinDay = localSpinDay(now, effectiveTimeZone);
-  const hasSpunToday = spin?.spin_day === spinDay;
+  const freeSpinUsed = freeSpinDay === spinDay;
+  const canAffordSpin = points !== null && points >= FRCDLE_SPIN_COST;
   const resetAt = nextResetAt(now, effectiveTimeZone);
   const number = spin?.spin_number ?? "000000";
 
+  // Today's free spin ("spin" makes it if needed), and with "status" also today's latest roll
   const fetchTodaySpin = useCallback(async (action: "status" | "spin") => {
     // Sandbox rolls stay in the sandbox and never touch the account's real rolls.
     if (devMode && user?.id) {
-      return {
-        spin: getOrCreateDevFrcdleSpin(user.id, localSpinDay(new Date(), timeZone), action === "spin"),
-        timeZone,
-      };
+      const today = localSpinDay(new Date(), timeZone);
+      const free = getOrCreateDevFrcdleSpin(user.id, today, action === "spin");
+      const latest = getDevFrcdleSpins(user.id)
+        .filter((item) => item.spin_day === today)
+        .sort((a, b) => b.created_at.localeCompare(a.created_at))[0] ?? null;
+      return { spin: free, latest, timeZone };
     }
-    const { data, error: invokeError } = await supabase.functions.invoke("frcdle-spin", {
-      body: { action, timeZone },
-    });
-    if (invokeError) throw new Error(invokeError.message || "Could not contact the daily spin service.");
-    if (data?.error) throw new Error(data.error);
+    const data = await invokeFrcdleSpin({ action, timeZone });
     return {
       spin: data?.spin as DailySpin | null,
+      latest: (data?.latest ?? null) as DailySpin | null,
       timeZone: data?.timeZone as string || timeZone,
     };
+  }, [devMode, user?.id, timeZone]);
+
+  // A bought spin: the new roll and their balance after paying for it
+  const buySpin = useCallback(async (): Promise<{ spin: DailySpin; points: number; timeZone: string }> => {
+    if (devMode && user?.id) {
+      const bought = buyDevFrcdleSpin(user.id, localSpinDay(new Date(), timeZone), FRCDLE_SPIN_COST);
+      if ("error" in bought) throw new Error(bought.error);
+      return { ...bought, timeZone };
+    }
+    const data = await invokeFrcdleSpin({ action: "buy", timeZone });
+    return { spin: data.spin as DailySpin, points: data.points as number, timeZone: data?.timeZone as string || timeZone };
   }, [devMode, user?.id, timeZone]);
 
   const resolveTeamResults = useCallback(async (spinNumber: string): Promise<FoundTeam[]> => {
@@ -737,13 +793,15 @@ export function FrcdleGame() {
     const spinTimers = timersRef.current;
     setIsLoadingSpin(true);
     fetchTodaySpin("status")
-      .then(({ spin: todaySpin, timeZone: resolvedTimeZone }) => {
+      .then(({ spin: freeSpin, latest, timeZone: resolvedTimeZone }) => {
         if (!mounted) return;
         setSpinTimeZone(resolvedTimeZone);
-        if (!todaySpin) return;
-        setSpin(todaySpin);
+        if (freeSpin) setFreeSpinDay(freeSpin.spin_day);
+        const shown = latest ?? freeSpin;
+        if (!shown) return;
+        setSpin(shown);
         setRevealCount(6);
-        void resolveTeamResults(todaySpin.spin_number);
+        void resolveTeamResults(shown.spin_number);
       })
       .catch((cause) => {
         if (mounted) setError(cause instanceof Error ? cause.message : "Could not load your daily spin.");
@@ -755,6 +813,16 @@ export function FrcdleGame() {
     };
   }, [user?.id, fetchTodaySpin, resolveTeamResults]);
 
+  // Their points, for buying spins (the sandbox's own in the sandbox)
+  useEffect(() => {
+    if (!user?.id) return;
+    let mounted = true;
+    getGameProfile(user.id).then((profile) => {
+      if (mounted && profile) setPoints(profile.points);
+    });
+    return () => { mounted = false; };
+  }, [user?.id, devMode]);
+
   // Lifetime xP and rolled teams: every saved roll scored against the season snapshot.
   useEffect(() => {
     if (!user?.id) return;
@@ -762,22 +830,19 @@ export function FrcdleGame() {
     Promise.all([
       devMode
         ? Promise.resolve({ data: getDevFrcdleSpins(user.id), error: null })
-        : supabase.from("frcdle_spins").select("spin_day, spin_number").eq("user_id", user.id),
+        : supabase.from("frcdle_spins").select("spin_day, spin_number, created_at, purchased").eq("user_id", user.id),
       loadSeasonSnapshot(),
     ])
       .then(([{ data, error: spinsError }, seasonTeams]) => {
         if (spinsError) throw spinsError;
         if (!mounted) return;
         setSnapshot(seasonTeams);
-        setPastRollsByDay(new Map((data ?? []).map(({ spin_day, spin_number }) => {
-          const rolled = rollSnapshotTeams(spin_number as string, seasonTeams);
-          return [spin_day as string, {
-            spinDay: spin_day as string,
-            spinNumber: spin_number as string,
-            teams: rolled,
-            xp: rollXp(rolled),
-          }];
-        })));
+        const rolls = ((data ?? []) as DailySpin[]).map((saved) => scoreRoll(saved, seasonTeams));
+        // Keep any roll made while these loaded
+        setSavedRolls((current) => [
+          ...rolls,
+          ...(current ?? []).filter((roll) => !rolls.some((loaded) => loaded.createdAt === roll.createdAt)),
+        ].sort((a, b) => a.createdAt.localeCompare(b.createdAt)));
       })
       .catch((cause) => console.error("Could not load lifetime FRCdle xP:", cause));
     return () => { mounted = false; };
@@ -785,7 +850,7 @@ export function FrcdleGame() {
 
   // Today's best roll from any player (this user's real spin included), shown until they spin.
   useEffect(() => {
-    if (!user?.id || isLoadingSpin || hasSpunToday) return;
+    if (!user?.id || isLoadingSpin || freeSpinUsed) return;
     let mounted = true;
     Promise.all([
       // Read-only, so the sandbox shows real scouters' rolls too.
@@ -815,21 +880,41 @@ export function FrcdleGame() {
       })
       .catch((cause) => console.error("Could not load today's top FRCdle spin:", cause));
     return () => { mounted = false; };
-  }, [user?.id, isLoadingSpin, hasSpunToday, spinDay, timeZone]);
+  }, [user?.id, isLoadingSpin, freeSpinUsed, spinDay, timeZone]);
 
   useEffect(() => {
     const interval = window.setInterval(() => setNow(new Date()), 30_000);
     return () => window.clearInterval(interval);
   }, []);
 
+  // The day's free spin, or once that's used, a bought one
   const startSpin = async () => {
-    if (!user?.id || isLoadingSpin || isRevealing || hasSpunToday) return;
+    const buying = freeSpinUsed;
+    if (!user?.id || isLoadingSpin || isRevealing || isRevealingTeams || (buying && !canAffordSpin)) return;
     setError(null);
     setIsLoadingSpin(true);
     try {
-      const { spin: dailySpin, timeZone: resolvedTimeZone } = await fetchTodaySpin("spin");
+      let dailySpin: DailySpin | null;
+      if (buying) {
+        const bought = await buySpin();
+        dailySpin = bought.spin;
+        setSpinTimeZone(bought.timeZone);
+        setPoints(bought.points);
+        onPointsChange?.(bought.points);
+      } else {
+        const free = await fetchTodaySpin("spin");
+        dailySpin = free.spin;
+        setSpinTimeZone(free.timeZone);
+        if (dailySpin) setFreeSpinDay(dailySpin.spin_day);
+      }
       if (!dailySpin) throw new Error("The daily spin did not return a number.");
-      setSpinTimeZone(resolvedTimeZone);
+      // Saved straight away; it only counts toward lifetime xP once its teams are revealed
+      const saved = dailySpin;
+      if (snapshot) {
+        setSavedRolls((current) => current && !current.some((roll) => roll.createdAt === saved.created_at)
+          ? [...current, scoreRoll(saved, snapshot)]
+          : current);
+      }
       setSpin(dailySpin);
       setTeams([]);
       setRevealCount(0);
@@ -883,18 +968,25 @@ export function FrcdleGame() {
   const xpTotal = rollXp(visibleTeams);
   const highlightedDigits = teamReveal?.digits;
   const boundedXpTotal = boundedRollXp(xpTotal);
-  // Today's roll counts once its teams are on screen, so the reveal isn't spoiled.
-  const pastRolls = pastRollsByDay ? [...pastRollsByDay].filter(([day]) => day !== spin?.spin_day).map(([, roll]) => roll) : [];
+  // The roll on screen counts once its teams are on screen, so the reveal isn't spoiled.
+  const pastRolls = savedRolls ? savedRolls.filter((roll) => roll.createdAt !== spin?.created_at) : [];
   const todayCounted = spin !== null && !isRevealing && !isResolvingTeams && !isRevealingTeams;
-  const historyRolls = pastRollsByDay && [
+  const historyRolls = savedRolls && [
     ...pastRolls,
-    ...(todayCounted && spin ? [{ spinDay: spin.spin_day, spinNumber: spin.spin_number, teams, xp: xpTotal }] : []),
+    ...(todayCounted && spin
+      ? [{ spinDay: spin.spin_day, createdAt: spin.created_at, purchased: spin.purchased, spinNumber: spin.spin_number, teams, xp: xpTotal }]
+      : []),
   ];
   const lifetimeXp = pastRolls.reduce((total, roll) => total + boundedRollXp(roll.xp), 0) + (todayCounted ? boundedXpTotal : 0);
+  const earlierTeams = pastRolls.flatMap((roll) => roll.teams.map((team) => team.teamNumber));
   const earnedTeams = new Set([
-    ...pastRolls.flatMap((roll) => roll.teams.map((team) => team.teamNumber)),
+    ...earlierTeams,
     ...(todayCounted ? teams.map((team) => team.teamNumber) : []),
   ]);
+  // Teams in today's roll the user has never rolled before; only once their past rolls have
+  // loaded, so nothing is marked new just because the history isn't in yet.
+  const earlierTeamSet = new Set(earlierTeams);
+  const isNewTeam = (teamNumber: number) => savedRolls !== null && !earlierTeamSet.has(teamNumber);
   const lifetimeRolls = pastRolls.length + (todayCounted ? 1 : 0);
   // Only once the teams are final, so an unfinished or failed lookup isn't rated "There's Nothing.".
   const spinRarity = !isRevealingTeams && !isResolvingTeams && !error ? rollRarity(xpTotal) : null;
@@ -908,14 +1000,18 @@ export function FrcdleGame() {
     return {
       mythic: rolls.some((roll) => rollRarity(roll.xp).rarity === "Mythic"),
       has5026: rolls.some((roll) => roll.spinNumber.includes("5026")),
+      // Not a single team in it (the roll on screen only once its teams loaded without error,
+      // since a failed lookup also leaves it empty)
+      nothing: rolls.some((roll) => roll.teams.length === 0 && (roll.createdAt !== spin?.created_at || !error)),
       everyTeam: !!snapshot && snapshot.size > 0 && [...snapshot.keys()].every((teamNumber) => earnedTeams.has(teamNumber)),
     };
     // historyRolls and earnedTeams are rebuilt every render; these are what they're made from
-  }, [pastRollsByDay, todayCounted, spin?.spin_day, teams, xpTotal, snapshot]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [savedRolls, todayCounted, spin?.created_at, teams, xpTotal, snapshot, error]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (rollAchievements.mythic) void unlockAchievement(user?.id, "mythic");
     if (rollAchievements.has5026) void unlockAchievement(user?.id, "frcdle_5026");
+    if (rollAchievements.nothing) void unlockAchievement(user?.id, "theres_nothing");
     if (rollAchievements.everyTeam) void unlockAchievement(user?.id, "full_roll");
   }, [rollAchievements, user?.id]);
 
@@ -937,10 +1033,6 @@ export function FrcdleGame() {
         {/* Buttons pinned top-right with the reset badge under them; on phones both stack under the title. */}
         <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
           <div className="sm:row-span-2">
-            <div className="mb-1 flex items-center gap-2 text-sky-300">
-              <Sparkles className="h-4 w-4" />
-              <span className="text-xs font-bold uppercase tracking-[0.12em]">FRC daily draw</span>
-            </div>
             <h1 className="text-3xl font-black tracking-tight sm:text-4xl">frcdle</h1>
           </div>
           {/* On phones the buttons get their own row under the title, without icons so all three fit. */}
@@ -956,7 +1048,7 @@ export function FrcdleGame() {
             </Button>
           </div>
           <Badge variant="outline" className="col-span-2 gap-1.5 justify-self-start border-sky-500/30 bg-sky-500/5 py-1.5 text-sky-200 sm:col-span-1 sm:col-start-2 sm:justify-self-end">
-            <Clock3 className="h-3.5 w-3.5" /> Resets in {formatCountdown(resetAt.getTime() - now.getTime())}
+            <Clock3 className="h-3.5 w-3.5" /> Free spin resets in {formatCountdown(resetAt.getTime() - now.getTime())}
           </Badge>
         </div>
 
@@ -971,21 +1063,36 @@ export function FrcdleGame() {
               />
             ))}
           </div>
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-            <p className="text-xs text-muted-foreground">
-              {spin ? `Daily number · ${spin.spin_day}` : "Your number is waiting."}
-            </p>
-            <Button onClick={startSpin} disabled={isLoadingSpin || isRevealing || hasSpunToday} className="gap-2">
-              {isLoadingSpin || isRevealing ? <LoaderCircle className="h-4 w-4 animate-spin" /> : hasSpunToday ? <Clock3 className="h-4 w-4" /> : <Dices className="h-4 w-4" />}
-              {isRevealing || isRevealingTeams ? "Revealing…" : isLoadingSpin ? "Checking spin…" : hasSpunToday ? "Already spun today" : "Spin today's number"}
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-0.5 text-xs text-muted-foreground">
+              <p>{spin ? `${spin.purchased ? "Bought spin" : "Daily number"} · ${spin.spin_day}` : "Your number is waiting."}</p>
+              {/* Once the free spin's used, their balance for buying more */}
+              {freeSpinUsed && points !== null && (
+                <p>
+                  You have <span className="font-semibold tabular-nums text-foreground">{points.toLocaleString()}</span> points
+                </p>
+              )}
+            </div>
+            {/* A fixed size (full width on phones), so its label changing as it spins doesn't
+                shrink it or push it onto another line */}
+            <Button
+              onClick={startSpin}
+              disabled={isLoadingSpin || isRevealing || isRevealingTeams || (freeSpinUsed && !canAffordSpin)}
+              title={freeSpinUsed && points !== null && !canAffordSpin ? `You need ${FRCDLE_SPIN_COST} points to buy a spin` : undefined}
+              className="w-full gap-2 sm:w-52"
+            >
+              {isLoadingSpin || isRevealing ? <LoaderCircle className="h-4 w-4 animate-spin" /> : freeSpinUsed ? <Coins className="h-4 w-4" /> : <Dices className="h-4 w-4" />}
+              {isRevealing || isRevealingTeams ? "Revealing…" : isLoadingSpin ? "Checking spin…" : freeSpinUsed ? `Buy a spin · ${FRCDLE_SPIN_COST} pts` : "Free spin (1)"}
             </Button>
           </div>
           {spin && revealCount === 6 && (
             <div className="mt-4 space-y-4 border-t border-border pt-4">
-              {spinRarity ? (
-                <RarityLine {...spinRarity} className="justify-center" />
-              ) : isRevealingTeams && (
-                <p className="text-center text-xs text-muted-foreground">Rarity appears once every team is revealed.</p>
+              {/* Room is kept for the rarity while the teams are revealed, so it pops in without
+                  pushing anything down; keyed by roll so each new one pops in again */}
+              {(spinRarity || isRevealingTeams || isResolvingTeams) && (
+                <div className="flex min-h-7 items-center justify-center sm:min-h-8">
+                  {spinRarity && <RarityLine key={spin.created_at} {...spinRarity} className="frcdle-rarity-pop justify-center" />}
+                </div>
               )}
               <div className="grid grid-cols-2 gap-2 text-center sm:gap-4">
                 <div className="min-w-0">
@@ -994,7 +1101,7 @@ export function FrcdleGame() {
                 </div>
                 <div className="min-w-0">
                   <div className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground sm:text-xs">Lifetime xP</div>
-                  <div className="mt-1 text-xl font-black tabular-nums sm:text-3xl">{pastRollsByDay ? lifetimeXp.toFixed(1) : "—"}</div>
+                  <div className="mt-1 text-xl font-black tabular-nums sm:text-3xl">{savedRolls ? lifetimeXp.toFixed(1) : "—"}</div>
                   <div className="mt-1 text-[10px] text-muted-foreground sm:text-xs">
                     Across {lifetimeRolls} {lifetimeRolls === 1 ? "roll" : "rolls"}
                   </div>
@@ -1004,7 +1111,7 @@ export function FrcdleGame() {
           )}
         </section>
 
-        {!hasSpunToday && topSpin !== undefined && (
+        {!freeSpinUsed && topSpin !== undefined && (
           <section className="rounded-lg border border-amber-400/30 bg-card/90 p-4 sm:p-6">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2 text-amber-300">
@@ -1078,7 +1185,17 @@ export function FrcdleGame() {
                   <div className="flex h-12 w-12 items-center justify-center rounded-md bg-muted text-xs font-bold text-muted-foreground">{team.teamNumber}</div>
                 )}
                 <div className="min-w-0 flex-1">
-                  <div className="text-xs font-semibold text-sky-300">FRC {team.teamNumber}</div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-semibold text-sky-300">FRC {team.teamNumber}</span>
+                    {isNewTeam(team.teamNumber) && (
+                      <span
+                        className="rounded-full bg-emerald-400/15 px-1.5 py-px text-[10px] font-bold uppercase leading-tight text-emerald-300 ring-1 ring-emerald-400/40"
+                        title="You've never rolled this team before"
+                      >
+                        New
+                      </span>
+                    )}
+                  </div>
                   <div className="truncate font-semibold">{team.name}</div>
                 </div>
                 <div className="text-right">
@@ -1121,7 +1238,14 @@ export function FrcdleGame() {
           to { transform: scale(1); }
         }
         .frcdle-digit-land { animation: frcdle-digit-land 500ms cubic-bezier(0.2, 0.8, 0.3, 1); }
-        @media (prefers-reduced-motion: reduce) { .frcdle-team-in, .frcdle-card-in, .frcdle-digit-land { animation: none; } }
+        /* The rarity pops up once every team is in: grows past full size, then settles. */
+        @keyframes frcdle-rarity-pop {
+          0% { opacity: 0; transform: scale(0.4); }
+          60% { opacity: 1; transform: scale(1.15); }
+          100% { opacity: 1; transform: scale(1); }
+        }
+        .frcdle-rarity-pop { animation: frcdle-rarity-pop 400ms cubic-bezier(0.2, 0.8, 0.3, 1); }
+        @media (prefers-reduced-motion: reduce) { .frcdle-team-in, .frcdle-card-in, .frcdle-digit-land, .frcdle-rarity-pop { animation: none; } }
       `}</style>
     </div>
   );

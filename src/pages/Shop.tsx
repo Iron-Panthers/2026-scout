@@ -15,13 +15,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useAuth } from "@/contexts/AuthContext";
-import { useDevMode } from "@/contexts/DevModeContext";
 import { getGameProfile } from "@/lib/gameProfiles";
 import { purchaseCosmetic, openCrate } from "@/lib/shopService";
 import { purchaseGame } from "@/lib/gameProfiles";
 import { unlockAchievement } from "@/lib/achievements";
 import { getActiveEvent, isEventWithinWindow } from "@/lib/matches";
-import { getDevEvent } from "@/lib/devMode";
 import {
   COSMETICS,
   RARITY_CONFIG,
@@ -43,7 +41,7 @@ import {
   seasonalEventDates,
   seasonalEventName,
 } from "@/config/seasonalEvents";
-import { getEventCurrencyLogo } from "@/config/eventCurrency";
+import { getCompetitionEventName, getEventCurrencyLogo, getEventCurrencyName } from "@/config/eventCurrency";
 import CosmeticAvatar from "@/components/CosmeticAvatar";
 import { ThemeBackgroundToggle } from "@/components/ThemeBackgroundToggle";
 import { useSettings } from "@/contexts/SettingsContext";
@@ -141,7 +139,7 @@ function CosmeticCard({ item, owned, equipped, canAfford, eventName, eventCode, 
               style={{ backgroundColor: RARITY_CONFIG[item.rarity].bgColor }}
             >
               {item.currency === "event" ? (
-                <img src={getEventCurrencyLogo(eventCode)} alt="ChezCoins" className="h-4 w-4" />
+                <img src={getEventCurrencyLogo(eventCode)} alt={getEventCurrencyName(eventCode)} className="h-4 w-4" />
               ) : (
                 <Coins className="h-3 w-3" />
               )}
@@ -166,7 +164,6 @@ export default function Shop({
 }: { embedded?: boolean; headerActions?: HTMLElement | null } = {}) {
   const navigate = useNavigate();
   const { user, profile, getAvatarUrl } = useAuth();
-  const { devMode } = useDevMode();
   const { toast } = useToast();
   const { settings, updateSetting } = useSettings();
   const subtitle = useRandomSubtitle(SHOP_SUBTITLES);
@@ -212,22 +209,17 @@ export default function Shop({
     return () => window.removeEventListener(COSMETICS_GRANTED_EVENT, loadProfile);
   }, [loadProfile]);
 
+  // The real active event, in the sandbox too, so its Event tab sells the same event's items
+  // (sandbox purchases still only spend the sandbox's balance)
   useEffect(() => {
     let mounted = true;
-    if (devMode && user?.id) {
-      setActiveEvent(getDevEvent(user.id));
-      return () => {
-        mounted = false;
-      };
-    }
-
     getActiveEvent().then((event) => {
       if (mounted) setActiveEvent(event);
     });
     return () => {
       mounted = false;
     };
-  }, [devMode, user?.id]);
+  }, []);
 
   const owned = gameProfile?.owned_cosmetics ?? [];
   const equipped = gameProfile?.equipped_cosmetics ?? {};
@@ -257,11 +249,11 @@ export default function Shop({
       buyTarget.id,
       buyTarget.cost,
       currency,
-      currency === "event" ? activeEvent?.name : undefined
+      currency === "event" ? getCompetitionEventName(activeEvent) : undefined
     );
     setBuying(false);
     if (result.success) {
-      const unit = currency === "event" ? "ChezCoins" : "pts";
+      const unit = currency === "event" ? getEventCurrencyName(activeEvent?.event_code) : "pts";
       toast({ title: `Purchased ${buyTarget.name}!`, description: `You have ${result.newPoints} ${unit} remaining.` });
       setBuyTarget(null);
       loadProfile();
@@ -305,7 +297,10 @@ export default function Shop({
   const themes = COSMETICS.filter((c) => c.category === "theme" && !isLimitedCosmetic(c)).sort(rarityCompare);
   // Seasonal events on right now, each with its own tab
   const seasonalEvents = activeSeasonalEvents();
-  const eventItems = COSMETICS.filter((c) => c.currency === "event").sort(rarityCompare);
+  // Only the running competition event's own items
+  const eventItems = COSMETICS
+    .filter((c) => c.currency === "event" && c.competitionEvent === activeEvent?.event_code)
+    .sort(rarityCompare);
 
   function renderGrid(items: CosmeticDefinition[], currency: "points" | "event" = "points") {
     const balance = currency === "event" ? eventPoints : points;
@@ -320,10 +315,10 @@ export default function Shop({
             canAfford={balance >= item.cost}
             eventName={
               item.currency === "event"
-                ? eventCosmeticSources[item.id] ?? activeEvent?.name
+                ? eventCosmeticSources[item.id] ?? getCompetitionEventName(activeEvent)
                 : seasonalEventName(item.seasonalEvent)
             }
-            eventCode={activeEvent?.event_code}
+            eventCode={item.competitionEvent ?? activeEvent?.event_code}
             onBuy={() => setBuyTarget(item)}
           />
         ))}
@@ -464,13 +459,13 @@ export default function Shop({
                   <div className="flex items-center justify-between rounded-lg border border-border/50 bg-accent/30 px-4 py-3">
                     <div>
                       <p className="text-xs text-muted-foreground">Live Event</p>
-                      <p className="font-semibold">{activeEvent.name}</p>
+                      <p className="font-semibold">{getCompetitionEventName(activeEvent)}</p>
                     </div>
                     <Badge
                       variant="outline"
                       className="gap-1.5 text-sky-400 border-sky-500/40 bg-sky-500/10 text-sm font-semibold"
                     >
-                      <img src={getEventCurrencyLogo(activeEvent.event_code)} alt="ChezCoins" className="h-5 w-5" />
+                      <img src={getEventCurrencyLogo(activeEvent.event_code)} alt={getEventCurrencyName(activeEvent.event_code)} className="h-5 w-5" />
                       {loading ? "—" : eventPoints.toLocaleString()}
                     </Badge>
                   </div>
@@ -543,7 +538,7 @@ export default function Shop({
             <span className="text-sm text-muted-foreground">Cost</span>
             <span className="flex items-center gap-1.5 font-semibold text-yellow-400">
               {buyTarget?.currency === "event" ? (
-                <img src={getEventCurrencyLogo(activeEvent?.event_code)} alt="ChezCoins" className="h-6 w-6" />
+                <img src={getEventCurrencyLogo(activeEvent?.event_code)} alt={getEventCurrencyName(activeEvent?.event_code)} className="h-6 w-6" />
               ) : (
                 <Coins className="h-4 w-4" />
               )}
@@ -561,7 +556,7 @@ export default function Shop({
               }`}
             >
               {buyTarget?.currency === "event" && (
-                <img src={getEventCurrencyLogo(activeEvent?.event_code)} alt="ChezCoins" className="h-4 w-4" />
+                <img src={getEventCurrencyLogo(activeEvent?.event_code)} alt={getEventCurrencyName(activeEvent?.event_code)} className="h-4 w-4" />
               )}
               {buyTarget?.currency === "event" ? eventPoints : points} {buyTarget?.currency !== "event" && "pts"}
             </span>
@@ -626,7 +621,12 @@ export default function Shop({
 
       {/* Game player overlay */}
       {playingGame && (
-        <GamePlayer game={playingGame} onClose={() => setPlayingGame(null)} />
+        <GamePlayer
+          game={playingGame}
+          onClose={() => setPlayingGame(null)}
+          // Bought FRCdle spins come out of the balance shown here
+          onPointsChange={(newPoints) => setGameProfile((prev) => (prev ? { ...prev, points: newPoints } : prev))}
+        />
       )}
 
       {/* Crate opening animation */}

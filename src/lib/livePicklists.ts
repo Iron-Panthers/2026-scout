@@ -142,6 +142,12 @@ export interface LivePicklistSuggestion {
   spots: number | null;
   /** Why the suggester wants the change; null when they didn't say. */
   reason: string | null;
+  /** The evidence: part of a qualification match's video. Null on suggestions sent before it was required. */
+  evidence_match_number: number | null;
+  evidence_video_id: string | null;
+  /** Whole seconds into the YouTube video (not the match), so it plays straight from there. */
+  evidence_start: number | null;
+  evidence_end: number | null;
   author_id: string;
   status: "pending" | "accepted" | "dismissed";
   created_at: string;
@@ -247,13 +253,38 @@ export async function countPendingSuggestions(eventId: string): Promise<number> 
 /** The longest reason a suggestion can give (the database checks it too). */
 export const SUGGESTION_REASON_MAX = 500;
 
+/** Part of a qualification match's YouTube video, attached to a suggestion to back it up. */
+export interface SuggestionEvidence {
+  matchNumber: number;
+  videoId: string;
+  /** Whole seconds into the YouTube video. */
+  start: number;
+  end: number;
+}
+
+/** A suggestion's evidence, or null for ones sent before evidence was required. */
+export function suggestionEvidence(suggestion: LivePicklistSuggestion): SuggestionEvidence | null {
+  const { evidence_match_number: matchNumber, evidence_video_id: videoId, evidence_start: start, evidence_end: end } = suggestion;
+  return matchNumber != null && videoId && start != null && end != null ? { matchNumber, videoId, start, end } : null;
+}
+
 export async function suggestMove(
   eventId: string,
-  teamNumber: number,
-  direction: SuggestionDirection,
-  spots: number | null,
-  tieTeamNumber: number | null = null,
-  reason: string | null = null
+  {
+    teamNumber,
+    direction,
+    spots,
+    tieTeamNumber = null,
+    reason = null,
+    evidence,
+  }: {
+    teamNumber: number;
+    direction: SuggestionDirection;
+    spots: number | null;
+    tieTeamNumber?: number | null;
+    reason?: string | null;
+    evidence: SuggestionEvidence;
+  }
 ): Promise<boolean> {
   const trimmedReason = reason?.trim().slice(0, SUGGESTION_REASON_MAX) || null;
   const { error } = await supabase
@@ -265,6 +296,10 @@ export async function suggestMove(
       spots,
       ...(direction === "tie" ? { tie_team_number: tieTeamNumber } : {}),
       ...(trimmedReason ? { reason: trimmedReason } : {}),
+      evidence_match_number: evidence.matchNumber,
+      evidence_video_id: evidence.videoId,
+      evidence_start: evidence.start,
+      evidence_end: evidence.end,
     });
 
   if (error) {

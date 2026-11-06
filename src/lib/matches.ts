@@ -343,6 +343,8 @@ export async function updateEvent(
     users?: string[];
     scouters_per_robot?: 1 | 2;
     picklist_host_id?: string | null;
+    convert_bbots?: boolean;
+    bbot_teams?: Record<string, string>;
   }
 ): Promise<boolean> {
   const { error } = await supabase

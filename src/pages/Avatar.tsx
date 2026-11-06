@@ -12,6 +12,7 @@ import {
   COSMETICS,
   RARITY_CONFIG,
   RARITY_VALUE,
+  isLimitedCosmetic,
   THEME_BACKGROUNDS_SETTING,
   themeValueFor,
   type CosmeticDefinition,
@@ -122,8 +123,11 @@ export default function AvatarPage({
     }
   }
 
+  // Common up to legendary, then event items (competition and seasonal) after them all;
+  // each group by rarity, then cost
   const rarityCompare = (a: CosmeticDefinition, b: CosmeticDefinition) =>
-    a.rarity === b.rarity ? a.cost - b.cost : RARITY_VALUE[a.rarity] - RARITY_VALUE[b.rarity];
+    Number(isLimitedCosmetic(a)) - Number(isLimitedCosmetic(b)) ||
+    (a.rarity === b.rarity ? a.cost - b.cost : RARITY_VALUE[a.rarity] - RARITY_VALUE[b.rarity]);
 
   const ownedItems = COSMETICS.filter((c) => owned.includes(c.id) || c.default);
   const hats = ownedItems.filter((c) => c.category === "hat").sort(rarityCompare);

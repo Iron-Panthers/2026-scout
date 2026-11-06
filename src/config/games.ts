@@ -3,6 +3,10 @@ import type { GameDefinition } from "@/types";
 // Points awarded per completed scouting submission
 export const POINTS_PER_MATCH = 20;
 
+// What an FRCdle spin beyond the day's free one costs, in points (the frcdle-spin edge
+// function charges its own copy: keep them the same)
+export const FRCDLE_SPIN_COST = 100;
+
 // Event points awarded per completed scouting submission
 export const EVENT_POINTS_PER_MATCH = 10;
 

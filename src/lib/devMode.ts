@@ -44,6 +44,8 @@ export interface DevFrcdleSpin {
   spin_day: string;
   spin_number: string;
   created_at: string;
+  /** Bought with points, beyond the day's free spin. */
+  purchased?: boolean;
 }
 
 interface DevData {
@@ -356,22 +358,42 @@ export function getDevFrcdleSpins(userId: string): DevFrcdleSpin[] {
   return getDevData(userId).sandboxFrcdleSpins ?? [];
 }
 
-/** The sandbox roll for `spinDay`, creating one when `create` is set and none exists. */
+const randomDevSpinNumber = () => {
+  const value = new Uint32Array(1);
+  crypto.getRandomValues(value);
+  return String(value[0] % 1_000_000).padStart(6, "0");
+};
+
+/** The sandbox's free roll for `spinDay`, creating one when `create` is set and none exists. */
 export function getOrCreateDevFrcdleSpin(userId: string, spinDay: string, create: boolean): DevFrcdleSpin | null {
   const data = getDevData(userId);
   const spins = data.sandboxFrcdleSpins ?? [];
-  const existing = spins.find((spin) => spin.spin_day === spinDay);
+  const existing = spins.find((spin) => spin.spin_day === spinDay && !spin.purchased);
   if (existing || !create) return existing ?? null;
-  const value = new Uint32Array(1);
-  crypto.getRandomValues(value);
-  const spin: DevFrcdleSpin = {
-    spin_day: spinDay,
-    spin_number: String(value[0] % 1_000_000).padStart(6, "0"),
-    created_at: new Date().toISOString(),
-  };
+  const spin: DevFrcdleSpin = { spin_day: spinDay, spin_number: randomDevSpinNumber(), created_at: new Date().toISOString() };
   data.sandboxFrcdleSpins = [...spins, spin];
   saveDevData(userId, data);
   return spin;
+}
+
+/** A bought sandbox roll, paid from the sandbox's points; an error when it can't afford it. */
+export function buyDevFrcdleSpin(
+  userId: string,
+  spinDay: string,
+  cost: number
+): { spin: DevFrcdleSpin; points: number } | { error: string } {
+  const data = getDevData(userId);
+  if (data.gameProfile.points < cost) return { error: `You need ${cost} points to buy a spin.` };
+  const spin: DevFrcdleSpin = {
+    spin_day: spinDay,
+    spin_number: randomDevSpinNumber(),
+    created_at: new Date().toISOString(),
+    purchased: true,
+  };
+  data.sandboxFrcdleSpins = [...(data.sandboxFrcdleSpins ?? []), spin];
+  data.gameProfile = { ...data.gameProfile, points: data.gameProfile.points - cost, updated_at: new Date().toISOString() };
+  saveDevData(userId, data);
+  return { spin, points: data.gameProfile.points };
 }
 
 // ---------------------------------------------------------------------------
@@ -449,7 +471,7 @@ export function createDevEvent(
 export function updateDevEvent(
   userId: string,
   eventId: string,
-  updates: Partial<Pick<Event, "name" | "event_code" | "location" | "start_date" | "end_date" | "scouting_map_url" | "users" | "scouters_per_robot" | "picklist_host_id">>
+  updates: Partial<Pick<Event, "name" | "event_code" | "location" | "start_date" | "end_date" | "scouting_map_url" | "users" | "scouters_per_robot" | "picklist_host_id" | "convert_bbots" | "bbot_teams">>
 ): boolean {
   const data = getDevData(userId);
   const event = [data.event, ...(data.additionalEvents ?? [])].find((item) => item.id === eventId);

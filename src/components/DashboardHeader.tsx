@@ -22,7 +22,7 @@ const DEFAULT_SUBTITLES = [
   "Go bother a random lead :D",
   "Click for virus",
   "Gurt",
-  "Did you do your frcdle yet"
+  "Did you do your frcdle yet?"
 ];
 
 // Subtitles that are links (opened in a new tab, so the app stays open)

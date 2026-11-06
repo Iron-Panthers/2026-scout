@@ -45,6 +45,7 @@ import {
   setDevPitAssignment,
 } from "@/lib/devMode";
 import { uploadPitPhoto } from "@/lib/photoUpload";
+import { eventBBots, withBBotNames } from "@/lib/bbots";
 
 interface PitScoutingAssignmentsTabProps {
   selectedEvent: string;
@@ -111,8 +112,8 @@ export function PitScoutingAssignmentsTab({
         getPitScoutingByEvent(currentEvent.id),
       ]);
 
-      // Sort teams by team number
-      const sorted = [...teamsData].sort(
+      // Sort teams by team number; converted demo numbers go by their main team's name
+      const sorted = withBBotNames(teamsData, eventBBots(currentEvent)).sort(
         (a, b) => a.team_number - b.team_number
       );
       setTeams(sorted);

@@ -21,12 +21,13 @@ import {
 import { getMatchLabel, wasUpset } from "@/lib/match13";
 import { getEventMatches, getEventTeams, getMatchScores } from "@/lib/blueAlliance";
 import { isEventWithinWindow } from "@/lib/matches";
-import { getEventCurrencyLogo } from "@/config/eventCurrency";
+import { getEventCurrencyLogo, getEventCurrencyName } from "@/config/eventCurrency";
 import type { Match, Event } from "@/types";
 import type { Bet, BetCurrency, MatchOdds, OddsHistoryPoint } from "@/types/betting";
 import type { Match13Match } from "@/lib/match13";
 import type { TBATeamSimple } from "@/lib/blueAlliance";
 import { getDevEvent, getDevMatch, getDevMatchTeams, getDevTeams, isDevMatchId } from "@/lib/devMode";
+import { eventBBots, withBBotNames } from "@/lib/bbots";
 
 // ---------------------------------------------------------------------------
 // Odds Area Chart — pure SVG
@@ -465,12 +466,14 @@ export default function MatchBetting() {
 
       // Event
       let eventCode: string | null = null;
+      let loadedEvent: Event | null = null;
       if (m.event_id) {
         const { data: ev } = await supabase
           .from("events").select("*").eq("id", m.event_id).maybeSingle();
         if (ev && !cancelled) {
-          setEvent(ev as Event);
-          eventCode = (ev as Event).event_code;
+          loadedEvent = ev as Event;
+          setEvent(loadedEvent);
+          eventCode = loadedEvent.event_code;
         }
       }
 
@@ -493,7 +496,8 @@ export default function MatchBetting() {
         }
         if (teams && !cancelled) {
           const map = new Map<number, TBATeamSimple>();
-          teams.forEach((t) => map.set(t.team_number, t));
+          // Converted demo numbers go by their main team's name, e.g. "Blazing Bulldogs (B)"
+          withBBotNames(teams, eventBBots(loadedEvent)).forEach((t) => map.set(t.team_number, t));
           setTeamInfo(map);
         }
 
@@ -724,7 +728,7 @@ export default function MatchBetting() {
     const result = await placeBet(user.id, match_id, selectedAlliance, betAmount, betCurrency);
 
     if (result.success) {
-      const unit = betCurrency === "event" ? "event points" : "pts";
+      const unit = betCurrency === "event" ? getEventCurrencyName(event?.event_code) : "pts";
       setFeedback({ ok: true, msg: `Bet placed! ${betAmount} ${unit} on ${selectedAlliance.toUpperCase()}.` });
       await refreshPoints();
       await refreshUserBet();
@@ -741,7 +745,7 @@ export default function MatchBetting() {
     setFeedback(null);
     const result = await cancelBet(userBet.id, user.id);
     if (result.success) {
-      const unit = userBet.currency === "event" ? "event points" : "pts";
+      const unit = userBet.currency === "event" ? getEventCurrencyName(event?.event_code) : "pts";
       setFeedback({ ok: true, msg: `Bet cancelled — ${userBet.amount} ${unit} refunded.` });
       await refreshPoints();
       setUserBet(null);

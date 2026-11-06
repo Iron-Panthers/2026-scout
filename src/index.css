@@ -431,6 +431,79 @@ html {
   --sidebar-ring: hsl(213.7, 100%, 50.4%);
 }
 
+/* Madtown Robotics — Madtown Throwdown 2026 event theme: dark navy background, #0068ff main color */
+[data-theme="madtown"] {
+  --background: hsl(215.5, 35%, 8%);
+  --foreground: hsl(0, 0%, 96%);
+  --card: hsl(215.5, 30%, 11%);
+  --card-foreground: hsl(0, 0%, 96%);
+  --popover: hsl(215.5, 30%, 12%);
+  --popover-foreground: hsl(0, 0%, 96%);
+  --primary: hsl(215.5, 100%, 50%);
+  --primary-foreground: hsl(0, 0%, 100%);
+  --secondary: hsl(215.5, 28%, 17%);
+  --secondary-foreground: hsl(0, 0%, 96%);
+  --muted: hsl(215.5, 28%, 16%);
+  --muted-foreground: hsl(215.5, 15%, 65%);
+  --accent: hsl(215.5, 40%, 19%);
+  --accent-foreground: hsl(0, 0%, 96%);
+  --destructive: hsl(0, 72%, 51%);
+  --destructive-foreground: hsl(0, 0%, 98%);
+  --border: hsl(215.5, 25%, 21%);
+  --input: hsl(215.5, 25%, 21%);
+  --ring: hsl(215.5, 100%, 50%);
+  --chart-1: hsl(215.5, 100%, 50%);
+  --chart-2: hsl(215.5, 100%, 72%);
+  --chart-3: hsl(142, 70%, 45%);
+  --chart-4: hsl(38, 92%, 55%);
+  --chart-5: hsl(0, 80%, 60%);
+  --sidebar: hsl(215.5, 35%, 10%);
+  --sidebar-foreground: hsl(0, 0%, 96%);
+  --sidebar-primary: hsl(215.5, 100%, 50%);
+  --sidebar-primary-foreground: hsl(0, 0%, 100%);
+  --sidebar-accent: hsl(215.5, 40%, 17%);
+  --sidebar-accent-foreground: hsl(0, 0%, 96%);
+  --sidebar-border: hsl(215.5, 25%, 21%);
+  --sidebar-ring: hsl(215.5, 100%, 50%);
+}
+
+/* Buchanan Bird Brains — Madtown Throwdown 2026 event theme: #f9f9f9 background,
+   #fc4849 main color, #4993fe secondary color */
+[data-theme="bird-brains"] {
+  --background: hsl(0, 0%, 97.6%);
+  --foreground: hsl(0, 0%, 10%);
+  --card: hsl(0, 0%, 100%);
+  --card-foreground: hsl(0, 0%, 10%);
+  --popover: hsl(0, 0%, 100%);
+  --popover-foreground: hsl(0, 0%, 10%);
+  --primary: hsl(359.7, 96.8%, 63.5%);
+  --primary-foreground: hsl(0, 0%, 100%);
+  --secondary: hsl(215.5, 98.9%, 64.1%);
+  --secondary-foreground: hsl(0, 0%, 100%);
+  --muted: hsl(215.5, 40%, 94%);
+  --muted-foreground: hsl(0, 0%, 42%);
+  --accent: hsl(215.5, 90%, 93%);
+  --accent-foreground: hsl(0, 0%, 10%);
+  --destructive: hsl(0, 84%, 45%);
+  --destructive-foreground: hsl(0, 0%, 98%);
+  --border: hsl(215.5, 25%, 87%);
+  --input: hsl(215.5, 25%, 87%);
+  --ring: hsl(359.7, 96.8%, 63.5%);
+  --chart-1: hsl(359.7, 96.8%, 63.5%);
+  --chart-2: hsl(215.5, 98.9%, 64.1%);
+  --chart-3: hsl(142, 76%, 36%);
+  --chart-4: hsl(38, 92%, 50%);
+  --chart-5: hsl(270, 70%, 60%);
+  --sidebar: hsl(0, 0%, 95%);
+  --sidebar-foreground: hsl(0, 0%, 10%);
+  --sidebar-primary: hsl(359.7, 96.8%, 63.5%);
+  --sidebar-primary-foreground: hsl(0, 0%, 100%);
+  --sidebar-accent: hsl(215.5, 90%, 93%);
+  --sidebar-accent-foreground: hsl(0, 0%, 10%);
+  --sidebar-border: hsl(215.5, 25%, 87%);
+  --sidebar-ring: hsl(359.7, 96.8%, 63.5%);
+}
+
 /* Jack in the Bot — purple base, green primary, yellow accent */
 [data-theme="jack"] {
   --background: hsl(262.7, 30%, 12%);

@@ -12,7 +12,7 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, useSortable, arrayMove, rectSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { ArrowDown, ArrowLeft, ArrowUp, Check, ChevronDown, Equal, Loader2, MessageCircle, MessageSquareText, Send, Square, Undo2, Users, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, Check, ChevronDown, Equal, Clapperboard, Loader2, MessageCircle, MessageSquareText, Send, Square, Undo2, Users, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -43,12 +43,17 @@ import { TagFilter, TeamTagEditor, TeamTags } from "@/components/strategy/TeamTa
 import { StatFilterButton } from "@/components/strategy/StatFilter";
 import { matchesStatFilter, useTeamStats, type StatFilterValue } from "@/lib/statFilter";
 import { TeamInfoDialog } from "@/components/TeamInfoDialog";
+import { MatchVideoDialog } from "@/components/MatchVideoDialog";
+import { EvidencePicker } from "@/components/strategy/EvidencePicker";
+import { loadEventData, type QualScheduleMatch } from "@/lib/strategyData";
+import { formatVideoTime } from "@/lib/youtube";
 import { getEventPicklists, getProfileNames } from "@/lib/picklists";
 import {
   getPendingSuggestions,
   publishLivePicklist,
   resolveSuggestion,
   suggestMove,
+  suggestionEvidence,
   countPendingSuggestions,
   SUGGESTION_LIMIT,
   SUGGESTION_REASON_MAX,
@@ -62,6 +67,7 @@ import {
   syncPitTags,
   type LivePicklistSuggestion,
   type SuggestionDirection,
+  type SuggestionEvidence,
 } from "@/lib/livePicklists";
 import { unlockAchievement } from "@/lib/achievements";
 import { getDevPicklist, isDevEventId } from "@/lib/devMode";
@@ -315,12 +321,17 @@ const SUGGESTION_COUNT_CLASS =
   "flex shrink-0 items-center gap-0.5 rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold text-primary";
 
 /** One waiting suggestion for the host, with its reason (if given) behind a button. */
+/** "Quals 12, 1:05–1:28". */
+const evidenceLabel = (evidence: SuggestionEvidence) =>
+  `Quals ${evidence.matchNumber}, ${formatVideoTime(evidence.start)}–${formatVideoTime(evidence.end)}`;
+
 function SuggestionRow({
   suggestion,
   author,
   place,
   revealActions,
   onResolve,
+  onWatchEvidence,
 }: {
   suggestion: LivePicklistSuggestion;
   author: string;
@@ -329,7 +340,10 @@ function SuggestionRow({
   /** Apply and dismiss only show while the row is hovered or focused (always on touch screens). */
   revealActions?: boolean;
   onResolve: (accept: boolean) => void;
+  /** Plays the suggestion's evidence clip. */
+  onWatchEvidence: (evidence: SuggestionEvidence) => void;
 }) {
+  const evidence = suggestionEvidence(suggestion);
   const [reasonOpen, setReasonOpen] = useState(false);
   const actionsClass = revealActions
     ? "flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100"
@@ -344,7 +358,20 @@ function SuggestionRow({
             <span className="font-medium">{author}</span>: {describeMove(suggestion)}
           </p>
           {place && <p className="text-xs text-muted-foreground">{place}</p>}
+          {evidence && <p className="text-xs text-muted-foreground">Evidence: {evidenceLabel(evidence)}</p>}
         </div>
+        {evidence && (
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-8 w-8 shrink-0 text-muted-foreground"
+            aria-label="Watch the evidence"
+            title={`Watch the evidence (${evidenceLabel(evidence)})`}
+            onClick={() => onWatchEvidence(evidence)}
+          >
+            <Clapperboard className="h-4 w-4" />
+          </Button>
+        )}
         {suggestion.reason && (
           <Button
             size="icon"
@@ -656,6 +683,9 @@ export function LivePicklist({ event, teams, userId, userName, devMode, live, on
   const [remotePicklists, setRemotePicklists] = useState<SourcePicklist[]>([]);
   const [remoteNames, setRemoteNames] = useState<Map<string, string>>(new Map());
   const [suggestions, setSuggestions] = useState<LivePicklistSuggestion[]>([]);
+  // The evidence clip the host is watching (kept while the player closes, so it doesn't blank)
+  const [watchingEvidence, setWatchingEvidence] = useState<SuggestionEvidence | null>(null);
+  const [evidenceOpen, setEvidenceOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>(saved?.selectedIds ?? []);
   const [compiledIds, setCompiledIds] = useState<string[] | null>(saved?.compiledIds ?? null);
   const [manual, setManual] = useState<SavedLiveState["manual"]>(saved?.manual ?? null);
@@ -976,6 +1006,11 @@ export function LivePicklist({ event, teams, userId, userName, devMode, live, on
         author={names.get(suggestion.author_id) ?? "Someone"}
         place={place >= 0 ? `Now #${place + 1}${dnpTeams.has(suggestion.team_number) ? " in DNP Teams" : ""}` : null}
         revealActions={revealActions}
+        // Opening the clip closes the popover the row is in, so the player lives up here
+        onWatchEvidence={(evidence) => {
+          setWatchingEvidence(evidence);
+          setEvidenceOpen(true);
+        }}
         onResolve={(accept) => void handleResolve(suggestion, accept)}
       />
     );
@@ -1135,6 +1170,13 @@ export function LivePicklist({ event, teams, userId, userName, devMode, live, on
         emptyMessage={showDnp ? "No team is on anyone's Do Not Pick list." : "Every team is on someone's Do Not Pick list."}
       />
 
+      <MatchVideoDialog
+        open={evidenceOpen}
+        onOpenChange={setEvidenceOpen}
+        title={watchingEvidence ? `Evidence: ${evidenceLabel(watchingEvidence)}` : "Evidence"}
+        videos={watchingEvidence ? [{ id: watchingEvidence.videoId, start: watchingEvidence.start, end: watchingEvidence.end, source: "link" }] : []}
+      />
+
       <TeamInfoDialog
         open={infoOpen}
         onOpenChange={setInfoOpen}
@@ -1264,10 +1306,29 @@ function usePendingSuggestionCount(eventId: string): number | null {
   return counted?.eventId === eventId ? counted.count : null;
 }
 
+/** The event's qualification matches with their videos, for picking evidence; null while they load. */
+function useQualMatches(event: Event): QualScheduleMatch[] | null {
+  const [loaded, setLoaded] = useState<{ eventId: string; matches: QualScheduleMatch[] } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    loadEventData(event, null)
+      .then((data) => data.schedule.matches)
+      .catch((cause) => {
+        console.error("Could not load match videos for evidence:", cause);
+        return [];
+      })
+      .then((matches) => { if (!cancelled) setLoaded({ eventId: event.id, matches }); });
+    return () => { cancelled = true; };
+  }, [event]);
+
+  return loaded?.eventId === event.id ? loaded.matches : null;
+}
+
 /**
  * Everyone else's view of the live picklist: read only, until they press Suggest. Then the
  * page changes color, the list can be dragged, and the first team dropped somewhere new is
- * the suggestion, sent with an optional reason.
+ * the suggestion, sent with part of a match video as evidence and an optional reason.
  */
 export function LivePicklistViewer({ event, teams, live, userId, onExit, onTeamClick }: LivePicklistViewerProps) {
   const { toast } = useToast();
@@ -1276,8 +1337,10 @@ export function LivePicklistViewer({ event, teams, live, userId, onExit, onTeamC
   // The team dropped in suggest mode and the team it was dropped on, until it's sent or cancelled
   const [proposal, setProposal] = useState<{ teamNumber: number; overTeamNumber: number } | null>(null);
   const [reason, setReason] = useState("");
+  const [evidence, setEvidence] = useState<SuggestionEvidence | null>(null);
   const [sending, setSending] = useState(false);
   const pendingCount = usePendingSuggestionCount(event.id);
+  const qualMatches = useQualMatches(event);
   const full = pendingCount != null && pendingCount >= SUGGESTION_LIMIT;
   // Suggest mode switches off by itself once the host has as many suggestions as it takes
   const suggesting = suggestMode && !full;
@@ -1310,15 +1373,16 @@ export function LivePicklistViewer({ event, teams, live, userId, onExit, onTeamC
 
   const handleDrop = (teamNumber: number, overTeamNumber: number) => {
     setReason("");
+    setEvidence(null);
     setProposal({ teamNumber, overTeamNumber });
   };
 
   const handleSend = async () => {
-    if (!proposal || !proposalValid) return;
+    if (!proposal || !proposalValid || !evidence) return;
     setSending(true);
     const direction: SuggestionDirection = to < from ? "up" : "down";
     const spots = Math.abs(to - from);
-    const sent = await suggestMove(event.id, proposal.teamNumber, direction, spots, null, reason);
+    const sent = await suggestMove(event.id, { teamNumber: proposal.teamNumber, direction, spots, reason, evidence });
     setSending(false);
     if (sent) {
       void unlockAchievement(userId, "picklist_suggestion");
@@ -1386,7 +1450,7 @@ export function LivePicklistViewer({ event, teams, live, userId, onExit, onTeamC
       </div>
       {suggesting && (
         <p className="mb-3 text-sm font-medium text-amber-700 dark:text-amber-400">
-          Drag a team to where you think it should go. Your first move is sent to the host as your suggestion.
+          Drag a team to where you think it should go.
         </p>
       )}
 
@@ -1403,12 +1467,13 @@ export function LivePicklistViewer({ event, teams, live, userId, onExit, onTeamC
 
       {/* Cancelling puts the team back and stays in suggest mode, to try another move */}
       <Dialog open={proposal != null} onOpenChange={(open) => !open && setProposal(null)}>
-        <DialogContent className="sm:max-w-sm">
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Suggest this move?</DialogTitle>
             <DialogDescription>The picklist host decides whether to make it.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
+            {proposal && <EvidencePicker teamNumber={proposal.teamNumber} matches={qualMatches} onChange={setEvidence} />}
             <ReasonField id="suggest-reason" value={reason} onChange={setReason} />
             {proposal && (
               <p className="font-mono text-sm font-semibold tabular-nums">
@@ -1427,7 +1492,11 @@ export function LivePicklistViewer({ event, teams, live, userId, onExit, onTeamC
             <Button variant="outline" onClick={() => setProposal(null)}>
               Cancel
             </Button>
-            <Button disabled={sending || !proposalValid || full} onClick={() => void handleSend()}>
+            <Button
+              disabled={sending || !proposalValid || full || !evidence}
+              title={evidence ? undefined : "Attach part of a match video as evidence first"}
+              onClick={() => void handleSend()}
+            >
               {sending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Submit
             </Button>

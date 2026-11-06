@@ -46,6 +46,10 @@ export interface Event {
   scouters_per_robot?: 1 | 2;
   // The scouter who runs the live picklist for this event (set on the Event Information tab).
   picklist_host_id?: string | null;
+  // Off-season demo team numbers that are really a team's B/C/D/E robot, as {"9991": "581B"},
+  // shown with the main team's logo and letter while convert_bbots is on (see lib/bbots).
+  convert_bbots?: boolean;
+  bbot_teams?: Record<string, string> | null;
   created_at: string;
   updated_at: string;
   users: string[];

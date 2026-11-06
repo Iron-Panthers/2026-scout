@@ -133,6 +133,15 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     secret: true,
   },
   {
+    id: "theres_nothing",
+    name: "There's Nothing.",
+    description: "Spin an FRCdle number without a single team inside",
+    icon: "dice",
+    measure: unlocked("theres_nothing"),
+    goal: 1,
+    secret: true,
+  },
+  {
     id: "full_roll",
     name: "Perfect Roll",
     description: "Roll every FRC team across all your FRCdle rolls",
@@ -154,6 +163,7 @@ export type UnlockableAchievement =
   | "upset"
   | "mythic"
   | "frcdle_5026"
+  | "theres_nothing"
   | "full_roll"
   | "collector";
 
@@ -161,8 +171,9 @@ export type UnlockableAchievement =
  * Points each achievement pays (once, when it's earned). The database pays them from its
  * own copy: keep these in sync with achievement_rewards (latest amounts in
  * supabase/migrations/20261027030_match_achievement_points_to_app.sql,
- * supabase/migrations/20261027050_add_live_picklist_achievements.sql and
- * supabase/migrations/20261102010_add_yapper_achievement.sql).
+ * supabase/migrations/20261027050_add_live_picklist_achievements.sql,
+ * supabase/migrations/20261102010_add_yapper_achievement.sql and
+ * supabase/migrations/20261105040_add_theres_nothing_achievement.sql).
  */
 export const ACHIEVEMENT_POINTS: Record<string, number> = {
   first_match: 10,
@@ -185,6 +196,7 @@ export const ACHIEVEMENT_POINTS: Record<string, number> = {
   upset: 150,
   mythic: 200,
   frcdle_5026: 200,
+  theres_nothing: 1500,
   full_roll: 200000,
   collector: 1500,
 };
@@ -280,6 +292,27 @@ export function getDevAchievementData(userId: string): AchievementData {
     submissions: event.matches,
   }));
   return { events, teamYears: [], topScoutEvents: 0, unlocked: getDevAchievements(userId) };
+}
+
+/** How many scouters hold each achievement, out of every scouter on the app. */
+export interface AchievementHolderCounts {
+  scouters: number;
+  /** Scouters holding it, by achievement id (missing means nobody yet). */
+  holders: Map<string, number>;
+}
+
+/**
+ * Every achievement's holder count. Profile-based achievements are counted once they're
+ * recorded, which the app does in the background whenever a scouter opens it.
+ */
+export async function getAchievementHolderCounts(): Promise<AchievementHolderCounts | null> {
+  const { data, error } = await supabase.rpc("get_achievement_holder_counts");
+  if (error || !data) {
+    if (error) console.error("Error loading achievement holder counts:", error);
+    return null;
+  }
+  const { scouters, holders } = data as { scouters: number; holders: Record<string, number> };
+  return { scouters, holders: new Map(Object.entries(holders)) };
 }
 
 /** Everything the achievements are worked out from, for one scouter. */

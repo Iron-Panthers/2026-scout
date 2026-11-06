@@ -6,7 +6,15 @@ import { Card, CardContent } from "@/components/ui/card";
 import { AchievementIcon } from "@/components/AchievementIcon";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAchievements } from "@/hooks/useAchievements";
+import { getAchievementHolderCounts, type AchievementHolderCounts } from "@/lib/achievements";
 import { getPublicProfile, type PublicProfile } from "@/lib/profiles";
+
+/** "12 of 87 scouters (14%)"; "<1%" for a few holders among many. */
+function holdersLabel(holders: number, scouters: number): string {
+  if (holders === 0) return `0 of ${scouters.toLocaleString()} scouters`;
+  const percent = (holders / scouters) * 100;
+  return `${holders.toLocaleString()} of ${scouters.toLocaleString()} scouters (${percent < 1 ? "<1" : Math.round(percent)}%)`;
+}
 
 /**
  * Every achievement, earned ones first, with progress toward the rest. /achievements is
@@ -28,6 +36,16 @@ export default function Achievements() {
       cancelled = true;
     };
   }, [isOwn, viewedId]);
+
+  // How many scouters have each one (the same for every profile)
+  const [holderCounts, setHolderCounts] = useState<AchievementHolderCounts | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    getAchievementHolderCounts().then((counts) => !cancelled && setHolderCounts(counts));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const teamYears = (isOwn ? profile?.team_years : other?.team_years) ?? [];
   // Someone else's team years come with their profile: wait for it before working anything out
@@ -99,6 +117,11 @@ export default function Achievements() {
                           {achievement.progress}/{achievement.goal}
                         </span>
                       </div>
+                    )}
+                    {holderCounts && holderCounts.scouters > 0 && (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {holdersLabel(holderCounts.holders.get(achievement.id) ?? 0, holderCounts.scouters)}
+                      </p>
                     )}
                   </div>
                 </CardContent>
