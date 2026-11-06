@@ -6,6 +6,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import Dashboard from "./pages/Dashboard";
 import ManagerDashboard from "./pages/ManagerDashboard";
 import StrategyDashboard from "./pages/StrategyDashboard";
+import StrategyBoard from "./pages/StrategyBoard";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
 import PitScouting from "./pages/PitScouting";
@@ -74,6 +75,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <StrategyDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/strategy-board/:matchKey?"
+              element={
+                <ProtectedRoute>
+                  <StrategyBoard />
                 </ProtectedRoute>
               }
             />

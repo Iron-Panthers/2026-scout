@@ -2,9 +2,7 @@ import { useState } from "react";
 import { Tag, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { TAG_MAX_LENGTH, sameTag, type LivePicklistTag } from "@/lib/livePicklists";
-
-const TAG_COLORS = ["#dc2626", "#ea580c", "#f59e0b", "#16a34a", "#0d9488", "#2563eb", "#9333ea", "#db2777", "#6b7280"];
+import { TAG_COLORS, TAG_MAX_LENGTH, sameTag, type LivePicklistTag } from "@/lib/livePicklists";
 
 /** Black or white, whichever reads better on the given hex color. */
 function textColorOn(hex: string): string {
@@ -213,42 +211,7 @@ export function TeamTagEditor({
       </div>
       {duplicate && <p className="text-xs text-destructive">This team already has a tag with that text.</p>}
 
-      <div className="flex flex-wrap items-center gap-1.5">
-        {TAG_COLORS.map((swatch) => (
-          <button
-            key={swatch}
-            type="button"
-            aria-label={`Color ${swatch}`}
-            aria-pressed={color === swatch}
-            onClick={() => setColor(swatch)}
-            className={`h-5 w-5 rounded-full border-2 transition-transform ${
-              color === swatch ? "scale-110 border-foreground" : "border-transparent"
-            }`}
-            style={{ backgroundColor: swatch }}
-          />
-        ))}
-        {/* Any other color, from the browser's color picker */}
-        <label
-          className={`relative h-5 w-5 cursor-pointer overflow-hidden rounded-full border-2 ${
-            TAG_COLORS.includes(color) ? "border-transparent" : "scale-110 border-foreground"
-          }`}
-          // Drawn from the outer edge so the gradient doesn't repeat into the (transparent) border
-          style={{
-            backgroundColor: color,
-            backgroundImage: TAG_COLORS.includes(color) ? "conic-gradient(red, yellow, lime, cyan, blue, magenta, red)" : "none",
-            backgroundOrigin: "border-box",
-          }}
-          title="Custom color"
-        >
-          <input
-            type="color"
-            value={color}
-            onChange={(changeEvent) => setColor(changeEvent.target.value)}
-            className="absolute inset-0 h-full w-full cursor-pointer appearance-none opacity-0"
-            aria-label="Custom color"
-          />
-        </label>
-      </div>
+      <TagColorPicker color={color} onChange={setColor} />
 
       {applicable.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5">
@@ -266,6 +229,48 @@ export function TeamTagEditor({
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/** The tag colors as swatches, plus any other color from the browser's color picker. */
+export function TagColorPicker({ color, onChange }: { color: string; onChange: (color: string) => void }) {
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {TAG_COLORS.map((swatch) => (
+        <button
+          key={swatch}
+          type="button"
+          aria-label={`Color ${swatch}`}
+          aria-pressed={color === swatch}
+          onClick={() => onChange(swatch)}
+          className={`h-5 w-5 rounded-full border-2 transition-transform ${
+            color === swatch ? "scale-110 border-foreground" : "border-transparent"
+          }`}
+          style={{ backgroundColor: swatch }}
+        />
+      ))}
+      {/* Any other color, from the browser's color picker */}
+      <label
+        className={`relative h-5 w-5 cursor-pointer overflow-hidden rounded-full border-2 ${
+          TAG_COLORS.includes(color) ? "border-transparent" : "scale-110 border-foreground"
+        }`}
+        // Drawn from the outer edge so the gradient doesn't repeat into the (transparent) border
+        style={{
+          backgroundColor: color,
+          backgroundImage: TAG_COLORS.includes(color) ? "conic-gradient(red, yellow, lime, cyan, blue, magenta, red)" : "none",
+          backgroundOrigin: "border-box",
+        }}
+        title="Custom color"
+      >
+        <input
+          type="color"
+          value={color}
+          onChange={(changeEvent) => onChange(changeEvent.target.value)}
+          className="absolute inset-0 h-full w-full cursor-pointer appearance-none opacity-0"
+          aria-label="Custom color"
+        />
+      </label>
     </div>
   );
 }

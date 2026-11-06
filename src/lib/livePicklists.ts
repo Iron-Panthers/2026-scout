@@ -10,6 +10,9 @@ export interface LivePicklistTag {
 
 export const TAG_MAX_LENGTH = 25;
 
+/** Tag colors offered as swatches (any other color can be picked too); the strategy board's pen uses them as well. */
+export const TAG_COLORS = ["#dc2626", "#ea580c", "#f59e0b", "#16a34a", "#0d9488", "#2563eb", "#9333ea", "#db2777", "#6b7280"];
+
 /** Whether two tags are the same tag: same text, ignoring case, and color. */
 export function sameTag(a: LivePicklistTag, b: LivePicklistTag): boolean {
   return a.text.toLowerCase() === b.text.toLowerCase() && a.color === b.color;
