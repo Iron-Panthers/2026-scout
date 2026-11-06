@@ -1,14 +1,28 @@
-import { createContext, useContext, useState, useEffect, useRef } from "react";
+import { createContext, useContext, useState, useEffect, useRef, useCallback } from "react";
 import type { ReactNode } from "react";
 import { useAuth } from "./AuthContext";
 import settingsConfig from "@/config/settings.json";
 import { getActiveEvent } from "@/lib/matches";
 import { getGameProfile } from "@/lib/gameProfiles";
-import { COSMETICS, THEME_BACKGROUNDS_SETTING, themeValueFor } from "@/config/cosmetics";
+import { COSMETICS, THEME_BACKGROUNDS_SETTING, themeValueFor, type ThemeBackground } from "@/config/cosmetics";
+import type { GameProfile } from "@/types";
 
 interface SettingsContextType {
   settings: Record<string, any>;
   updateSetting: (key: string, value: any) => void;
+  /**
+   * Re-applies the theme equipped on the active game profile, e.g. after switching between
+   * the developer sandbox and the real account; the default theme when none is equipped.
+   */
+  syncThemeFromProfile: () => Promise<void>;
+}
+
+/** The theme a game profile's equipped theme applies, if the profile owns it; the default dark theme otherwise. */
+function profileTheme(gameProfile: GameProfile, backgrounds?: Record<string, ThemeBackground>): string {
+  const equippedId = gameProfile.equipped_cosmetics?.["theme"];
+  const theme = equippedId ? COSMETICS.find((c) => c.id === equippedId && c.category === "theme") : undefined;
+  const owned = !!theme && (theme.default || (gameProfile.owned_cosmetics ?? []).includes(theme.id));
+  return (owned && themeValueFor(theme, backgrounds?.[theme.id])) || "dark";
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(
@@ -18,12 +32,27 @@ const SettingsContext = createContext<SettingsContextType | undefined>(
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [settings, setSettings] = useState<Record<string, any>>({});
-  // Tracks whether the user has explicitly changed the theme locally (e.g.
-  // by equipping one) since this provider mounted. The background fetch
-  // below resyncs the theme from the account on load, but it can resolve
-  // *after* a live equip — without this guard it would silently clobber the
-  // just-equipped theme back to whatever it read before the equip happened.
-  const userChangedThemeRef = useRef(false);
+  // Bumped by every theme change. Syncing the theme from the game profile is a fetch that can
+  // resolve *after* a live equip (or after the sandbox is toggled again) — a sync only applies
+  // if nothing changed the theme since it started, so it never clobbers a newer theme.
+  const themeVersionRef = useRef(0);
+
+  const userId = user?.id;
+  const syncThemeFromProfile = useCallback(async () => {
+    if (!userId) return;
+    const version = ++themeVersionRef.current;
+    // The sandbox's profile while dev mode is on, the account's otherwise
+    const gameProfile = await getGameProfile(userId);
+    if (!gameProfile || version !== themeVersionRef.current) return;
+    setSettings((prev) => {
+      // Keeps the background (light/dark) this browser picked for the theme, if it has a choice
+      const theme = profileTheme(gameProfile, prev[THEME_BACKGROUNDS_SETTING]);
+      if (prev.theme === theme) return prev;
+      const updated = { ...prev, theme };
+      localStorage.setItem(`settings_${userId}`, JSON.stringify(updated));
+      return updated;
+    });
+  }, [userId]);
 
   // Initialize settings with defaults
   useEffect(() => {
@@ -62,29 +91,11 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       // The equipped theme cosmetic (synced across devices via the account) is
       // the source of truth for the active theme — resync it over whatever
       // this browser's localStorage last had, so the theme follows the
-      // account rather than just the browser it was last set in.
-      if (user?.id) {
-        getGameProfile(user.id).then((gameProfile) => {
-          // The user already equipped/unequipped a theme locally while this
-          // fetch was in flight — their live action wins, don't overwrite it.
-          if (userChangedThemeRef.current) return;
-          const equippedThemeId = gameProfile?.equipped_cosmetics?.["theme"];
-          const equippedTheme = equippedThemeId
-            ? COSMETICS.find((c) => c.id === equippedThemeId)
-            : undefined;
-          if (equippedTheme?.themeValue) {
-            setSettings((prev) => {
-              // Keeps the background (light/dark) this browser picked for the theme, if it has a choice
-              const themeValue = themeValueFor(equippedTheme, prev[THEME_BACKGROUNDS_SETTING]?.[equippedTheme.id]);
-              const updated = { ...prev, theme: themeValue };
-              localStorage.setItem(`settings_${user.id}`, JSON.stringify(updated));
-              return updated;
-            });
-          }
-        });
-      }
+      // account rather than just the browser it was last set in (or a
+      // sandbox theme left over from dev mode).
+      void syncThemeFromProfile();
     }
-  }, [user?.id]);
+  }, [user?.id, syncThemeFromProfile]);
 
   // Apply theme class/data-attribute whenever theme setting changes
   useEffect(() => {
@@ -99,7 +110,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   }, [settings["theme"]]);
 
   const updateSetting = (key: string, value: any) => {
-    if (key === "theme") userChangedThemeRef.current = true;
+    if (key === "theme") themeVersionRef.current++;
     // Built from the latest settings, so two updates in a row both stick
     setSettings((prev) => {
       const newSettings = { ...prev, [key]: value };
@@ -111,7 +122,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <SettingsContext.Provider value={{ settings, updateSetting }}>
+    <SettingsContext.Provider value={{ settings, updateSetting, syncThemeFromProfile }}>
       {children}
     </SettingsContext.Provider>
   );

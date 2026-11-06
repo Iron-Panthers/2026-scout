@@ -419,6 +419,8 @@ export function EventInformationTab({
                         size="sm"
                         onClick={handleSetActive}
                         disabled={isSettingActive}
+                        // See supabase/migrations/20261106010_reset_event_points_per_event.sql
+                        title="If this event starts later than the one event coins are for, everyone's event coins reset to 0"
                       >
                         <Star className="h-4 w-4 mr-2" />
                         {isSettingActive ? "Setting..." : "Set as Active"}
