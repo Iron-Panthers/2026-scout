@@ -172,10 +172,14 @@ export async function updatePitScouting(
     .update(updates)
     .eq("id", submissionId)
     .select()
-    .single();
+    .maybeSingle();
 
   if (error) {
     throw new Error(`Failed to update pit scouting: ${error.message}`);
+  }
+  // RLS hides rows the user can't edit, so a disallowed update just matches nothing
+  if (!data) {
+    throw new Error("Failed to update pit scouting: you don't have permission to edit this submission");
   }
 
   return data;
