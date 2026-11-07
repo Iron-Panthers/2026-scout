@@ -35,6 +35,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { forgetEventData } from "@/lib/strategyData";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { RecursiveJsonEditor } from "@/components/RecursiveJsonEditor";
@@ -59,6 +60,8 @@ interface SubmissionWithDetails {
 interface ScoutingDataTabProps {
   selectedEvent: string;
   events: Event[];
+  /** Told after a submission is edited or deleted, so views judging it (suspicious entries) refresh. */
+  onSubmissionsChanged?: () => void;
 }
 
 type SortColumn = "match" | "role" | "team" | "scout" | "submitted";
@@ -93,7 +96,7 @@ function SortIcon({ col, sortCol, sortDir }: { col: SortColumn; sortCol: SortCol
     : <ChevronDown className="h-3.5 w-3.5 ml-1" />;
 }
 
-export function ScoutingDataTab({ selectedEvent, events: _events }: ScoutingDataTabProps) {
+export function ScoutingDataTab({ selectedEvent, events: _events, onSubmissionsChanged }: ScoutingDataTabProps) {
   const { toast } = useToast();
   const [submissions, setSubmissions] = useState<SubmissionWithDetails[]>([]);
   const [loading, setLoading] = useState(false);
@@ -252,6 +255,7 @@ export function ScoutingDataTab({ selectedEvent, events: _events }: ScoutingData
         description: `Submission for Q-${deleteTarget.matches?.match_number} (${roleLabel(deleteTarget.role)}) has been permanently deleted.`,
       });
       setDeleteTarget(null);
+      submissionsChanged(deleteTarget);
       loadSubmissions();
     } catch (error) {
       console.error("Error deleting submission:", error);
@@ -265,17 +269,27 @@ export function ScoutingDataTab({ selectedEvent, events: _events }: ScoutingData
     }
   };
 
+  /** The strategy pages and the manager dashboard's suspicious entries re-read the changed data. */
+  const submissionsChanged = (submission: SubmissionWithDetails) => {
+    const eventId = submission.matches?.event_id ?? (selectedEvent !== "all" ? selectedEvent : null);
+    if (eventId) forgetEventData(eventId);
+    onSubmissionsChanged?.();
+  };
+
   // Edit handlers
   const handleEditClick = (submission: SubmissionWithDetails) => {
     setEditTarget(submission);
 
-    if (submission.role.includes("qual")) { 
-      const og = submission.scouting_data.comments !== null;
-      const newComments = submission.scouting_data.commentsTeam1 !== null;
-      if (og && newComments) delete submission.scouting_data.comments
-      if (submission.scouting_data.robot_problems) delete submission.scouting_data.robot_problems
+    // A copy, so leaving the editor without saving leaves the loaded submission as it was
+    const data = { ...submission.scouting_data };
+    if (submission.role.includes("qual")) {
+      // Qual entries' old single comment and robot problems fields aren't edited (per-team comments replaced them)
+      const og = data.comments !== null;
+      const newComments = data.commentsTeam1 !== null;
+      if (og && newComments) delete data.comments;
+      if (data.robot_problems) delete data.robot_problems;
     }
-    setEditData(submission.scouting_data);
+    setEditData(data);
     setEditConfirming(false);
   };
 
@@ -283,12 +297,15 @@ export function ScoutingDataTab({ selectedEvent, events: _events }: ScoutingData
     if (!editTarget) return;
     setIsSaving(true);
     try {
-      const { error } = await supabase
-        .from("scouting_submissions")
+      const { data: rows, error } = await supabase
+        .from(editTarget.role.includes("qual") ? "qual_scouting_submissions" : "scouting_submissions")
         .update({ scouting_data: editData })
-        .eq("id", editTarget.id);
+        .eq("id", editTarget.id)
+        .select("id");
 
       if (error) throw error;
+      // Nothing matched: the row is gone, or the database's rules didn't allow the change
+      if (!rows?.length) throw new Error("No submission was updated");
 
       toast({
         title: "Saved",
@@ -296,6 +313,7 @@ export function ScoutingDataTab({ selectedEvent, events: _events }: ScoutingData
       });
       setEditTarget(null);
       setEditConfirming(false);
+      submissionsChanged(editTarget);
       loadSubmissions();
     } catch (error) {
       console.error("Error updating submission:", error);

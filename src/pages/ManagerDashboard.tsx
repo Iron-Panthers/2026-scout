@@ -382,6 +382,10 @@ export default function ManagerDashboard() {
     loadData();
   }, [devMode, loadData]);
 
+  // Bumped when a submission's data changes, so its suspicious check reruns (an edit leaves
+  // the set of submissions, which that check otherwise follows, as it was)
+  const [submissionEdits, setSubmissionEdits] = useState(0);
+
   // Subscribe to real-time updates for match assignments and submissions
   useEffect(() => {
     console.log("Setting up realtime subscriptions for matches and submissions...");
@@ -417,6 +421,8 @@ export default function ManagerDashboard() {
           console.log("Scouting submission changed (manager view):", payload);
           // Reload matches to update submission status
           loadData();
+          // An edited submission can stop (or start) looking suspicious
+          if (payload.eventType === "UPDATE") setSubmissionEdits((count) => count + 1);
         }
       )
       .subscribe();
@@ -577,7 +583,7 @@ export default function ManagerDashboard() {
     return () => {
       cancelled = true;
     };
-  }, [selectedEvent, submissionSignature, devMode, user?.id]);
+  }, [selectedEvent, submissionSignature, submissionEdits, devMode, user?.id]);
   const suspiciousSubmissions = suspiciousLoad?.eventId === selectedEvent ? suspiciousLoad.byKey : NO_SUSPICIOUS;
 
   const handleAssignScout = useCallback(
@@ -1530,7 +1536,7 @@ export default function ManagerDashboard() {
 
           {/* Scouting Data Tab */}
           <TabsContent value="data" className="mt-0">
-            <ScoutingDataTab selectedEvent={selectedEvent} events={events} />
+            <ScoutingDataTab selectedEvent={selectedEvent} events={events} onSubmissionsChanged={() => setSubmissionEdits((count) => count + 1)} />
           </TabsContent>
 
           {/* Points Economy Tab */}
