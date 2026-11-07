@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Eraser, Hand, Pencil, Trash2 } from "lucide-react";
+import { Eraser, Hand, Pencil, Redo2, Trash2, Undo2 } from "lucide-react";
 import fieldImage from "@/assets/FE-2026-_REBUILT_Playing_Field_With_Fuel.png";
 import { Button } from "@/components/ui/button";
 import { TagColorPicker } from "@/components/strategy/TeamTag";
@@ -183,8 +183,8 @@ interface TeamDrag {
 
 type Gesture =
   | { pointerId: number; kind: "draw" }
-  /** Where the eraser last was, to erase all the way from there */
-  | { pointerId: number; kind: "erase"; x: number; y: number }
+  /** Where the eraser last was, to erase all the way from there; `group` makes the drag one change to undo */
+  | { pointerId: number; kind: "erase"; x: number; y: number; group: string }
   | { pointerId: number; kind: "move"; dx: number; dy: number }
   | { pointerId: number; kind: "rotate" };
 
@@ -192,13 +192,18 @@ type Gesture =
  * One page of a match's strategy board: the field, the match's teams to drag onto it as
  * robots (which can then be moved and turned), and a pen and eraser for drawing. The field
  * fills whatever room its parent leaves, turned sideways when that draws it bigger.
- * `onChange` gets an update to apply to the page, so quick edits never work from a stale one.
+ * `onChange` gets an update to apply to the page, so quick edits never work from a stale one,
+ * and a `group` shared by the changes of one gesture (an eraser drag), which undo together.
  */
 export function StrategyFieldBoard({
   leading,
   pageKey,
   page,
   onChange,
+  canUndo,
+  canRedo,
+  onUndo,
+  onRedo,
   red,
   blue,
 }: {
@@ -207,7 +212,11 @@ export function StrategyFieldBoard({
   /** Which page this is; switching pages drops the selected robot. */
   pageKey: string;
   page: BoardPage;
-  onChange: (update: (page: BoardPage) => BoardPage) => void;
+  onChange: (update: (page: BoardPage) => BoardPage, group?: string) => void;
+  canUndo: boolean;
+  canRedo: boolean;
+  onUndo: () => void;
+  onRedo: () => void;
   red: MatchTeam[];
   blue: MatchTeam[];
 }) {
@@ -230,7 +239,10 @@ export function StrategyFieldBoard({
   const [penSize, setPenSize] = useState(PEN_SIZES[1]);
   const [penStyle, setPenStyle] = useState<PenStyle>("solid");
   const [selection, setSelection] = useState<{ pageKey: string; team: MatchTeam } | null>(null);
-  const selected = tool === "move" && selection?.pageKey === pageKey ? selection.team : null;
+  // Not once it's gone from the page (e.g. undone)
+  const selected = tool === "move" && selection?.pageKey === pageKey && page.robots.some((robot) => robot.team === selection.team)
+    ? selection.team
+    : null;
   /** Whether the eraser takes out every line it touches, or just the part under it. */
   const [eraseWholeLines, setEraseWholeLines] = useState(false);
   const [eraserAt, setEraserAt] = useState<{ x: number; y: number } | null>(null);
@@ -283,6 +295,22 @@ export function StrategyFieldBoard({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [selected, onChange]);
 
+  // Ctrl+Z (⌘Z on a Mac) undoes; adding Shift, or Ctrl+Y, redoes
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (!(event.ctrlKey || event.metaKey) || target?.closest("input, textarea, [contenteditable=true]")) return;
+      const key = event.key.toLowerCase();
+      if (key === "z" || key === "y") {
+        event.preventDefault();
+        if (key === "z" && !event.shiftKey) onUndo();
+        else onRedo();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onUndo, onRedo]);
+
   /** A screen point in field pixels. */
   const toField = (clientX: number, clientY: number) => {
     const matrix = fieldRef.current?.getScreenCTM();
@@ -292,7 +320,7 @@ export function StrategyFieldBoard({
   };
 
   /** Erases along the eraser's path from one spot to the next, filled in so a quick swipe doesn't skip over lines. */
-  const erase = (from: { x: number; y: number }, to: { x: number; y: number }) => {
+  const erase = (from: { x: number; y: number }, to: { x: number; y: number }, group: string) => {
     const radius = ERASER_RADIUS_PX / scale;
     const steps = Math.max(1, Math.ceil(Math.hypot(to.x - from.x, to.y - from.y) / (radius / 2)));
     onChange((current) => {
@@ -306,7 +334,7 @@ export function StrategyFieldBoard({
       }
       const changed = strokes.length !== current.strokes.length || strokes.some((stroke, index) => stroke !== current.strokes[index]);
       return changed ? { ...current, strokes } : current;
-    });
+    }, group);
   };
 
   const handlePointerDown = (event: React.PointerEvent<SVGSVGElement>) => {
@@ -325,8 +353,9 @@ export function StrategyFieldBoard({
       });
     } else if (tool === "eraser") {
       event.currentTarget.setPointerCapture(event.pointerId);
-      gesture.current = { pointerId: event.pointerId, kind: "erase", ...at };
-      erase(at, at);
+      const group = newId();
+      gesture.current = { pointerId: event.pointerId, kind: "erase", ...at, group };
+      erase(at, at, group);
     } else {
       // Robots stop their own presses, so this is the field itself
       setSelection(null);
@@ -360,7 +389,7 @@ export function StrategyFieldBoard({
       if (Math.hypot(at.x - stroke.points[n - 2], at.y - stroke.points[n - 1]) < 1 / scale) return;
       setDraft({ ...stroke, points: [...stroke.points, round(at.x), round(at.y)] });
     } else if (current.kind === "erase") {
-      erase(current, at);
+      erase(current, at, current.group);
       gesture.current = { ...current, ...at };
     } else {
       const robot = previewRef.current;
@@ -385,7 +414,10 @@ export function StrategyFieldBoard({
     if (ended.kind === "draw" && stroke) {
       onChange((current) => ({ ...current, strokes: [...current.strokes, stroke] }));
     } else if ((ended.kind === "move" || ended.kind === "rotate") && robot) {
-      onChange((current) => ({ ...current, robots: current.robots.map((item) => (item.team === robot.team ? robot : item)) }));
+      // Just tapped, so it's where it was: nothing to save (or undo)
+      onChange((current) => current.robots.includes(robot)
+        ? current
+        : { ...current, robots: current.robots.map((item) => (item.team === robot.team ? robot : item)) });
     }
     setDraft(null);
     setPreview(null);
@@ -500,6 +532,15 @@ export function StrategyFieldBoard({
               <Icon className="h-4 w-4" />
             </Button>
           ))}
+        </div>
+
+        <div className="flex gap-0.5 rounded-md border bg-card p-0.5">
+          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={onUndo} disabled={!canUndo} aria-label="Undo" title="Undo">
+            <Undo2 className="h-4 w-4" />
+          </Button>
+          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={onRedo} disabled={!canRedo} aria-label="Redo" title="Redo">
+            <Redo2 className="h-4 w-4" />
+          </Button>
         </div>
 
         {tool === "pen" && (

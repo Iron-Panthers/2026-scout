@@ -208,13 +208,30 @@ function MatchList({ userId }: { userId: string | null }) {
   );
 }
 
+/** A page's undo and redo: its earlier versions (latest last) and the ones undone (next first). */
+interface PageHistory {
+  past: BoardPage[];
+  future: BoardPage[];
+  /** The gesture (e.g. an eraser drag) the last change was part of, so the rest of it undoes with it. */
+  group: string | null;
+}
+
+const NO_HISTORY: PageHistory = { past: [], future: [], group: null };
+/** How many changes back each page can undo. */
+const UNDO_LIMIT = 100;
+
 /** A user's board for one match: a page for each part of the match, saved in this browser. */
 function MatchBoard({ userId, matchKey }: { userId: string | null; matchKey: string }) {
   const goBack = useGoBack("/strategy-board");
   const location = useLocation();
   const { toast } = useToast();
-  const [board, setBoard] = useState(() => loadBoard(userId, matchKey));
+  // The board and each page's undo history (for this visit), together so a change updates both at once
+  const [{ board, history }, setState] = useState(() => ({
+    board: loadBoard(userId, matchKey),
+    history: {} as Partial<Record<BoardPageKey, PageHistory>>,
+  }));
   const [pageKey, setPageKey] = useState<BoardPageKey>("auto");
+  const pageHistory = history[pageKey] ?? NO_HISTORY;
 
   // The match from the list, else what was saved with the drawings (so it opens offline),
   // else from the schedule (a link opened directly)
@@ -236,13 +253,46 @@ function MatchBoard({ userId, matchKey }: { userId: string | null; matchKey: str
   }, [userId, matchKey, board, match, toast]);
 
   const updatePage = useCallback(
-    (update: (page: BoardPage) => BoardPage) =>
-      setBoard((current) => {
-        const next = update(current.pages[pageKey]);
-        return next === current.pages[pageKey] ? current : { ...current, pages: { ...current.pages, [pageKey]: next } };
+    (update: (page: BoardPage) => BoardPage, group?: string) =>
+      setState((current) => {
+        const page = current.board.pages[pageKey];
+        const next = update(page);
+        if (next === page) return current;
+        const { past, group: lastGroup } = current.history[pageKey] ?? NO_HISTORY;
+        return {
+          board: { ...current.board, pages: { ...current.board.pages, [pageKey]: next } },
+          history: {
+            ...current.history,
+            // The rest of a gesture joins the change it started with; any new change ends what can be redone
+            [pageKey]: { past: group && group === lastGroup ? past : [...past, page].slice(-UNDO_LIMIT), future: [], group: group ?? null },
+          },
+        };
       }),
     [pageKey]
   );
+
+  /** Undoes the page's last change, or redoes its last undone one. */
+  const step = useCallback(
+    (direction: "undo" | "redo") =>
+      setState((current) => {
+        const { past, future } = current.history[pageKey] ?? NO_HISTORY;
+        const page = current.board.pages[pageKey];
+        const to = direction === "undo" ? past.at(-1) : future[0];
+        if (!to) return current;
+        return {
+          board: { ...current.board, pages: { ...current.board.pages, [pageKey]: to } },
+          history: {
+            ...current.history,
+            [pageKey]: direction === "undo"
+              ? { past: past.slice(0, -1), future: [page, ...future], group: null }
+              : { past: [...past, page], future: future.slice(1), group: null },
+          },
+        };
+      }),
+    [pageKey]
+  );
+  const undo = useCallback(() => step("undo"), [step]);
+  const redo = useCallback(() => step("redo"), [step]);
 
   const header = (
     <div className="flex items-center gap-1.5">
@@ -276,6 +326,10 @@ function MatchBoard({ userId, matchKey }: { userId: string | null; matchKey: str
           pageKey={pageKey}
           page={board.pages[pageKey]}
           onChange={updatePage}
+          canUndo={pageHistory.past.length > 0}
+          canRedo={pageHistory.future.length > 0}
+          onUndo={undo}
+          onRedo={redo}
           red={match.red}
           blue={match.blue}
         />
