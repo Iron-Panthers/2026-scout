@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { getEventTeams } from "@/lib/blueAlliance";
 import { formatBBotLines, parseBBotLines } from "@/lib/bbots";
 import { isDevEventId, updateDevEvent } from "@/lib/devMode";
-import { updateEvent } from "@/lib/matches";
+import { saveEventBBotTeams, updateEvent } from "@/lib/matches";
 import { useToast } from "@/hooks/use-toast";
 import type { Event } from "@/types";
 
@@ -58,10 +58,28 @@ export function BBotSettings({ event, devUserId, onSaved }: {
 
   const saveList = async () => {
     if (errors.length > 0) return;
-    if (await save({ bbot_teams: teams }, "Could not save the B-bot list")) {
-      // Tidied into the saved form (sorted, one style)
-      setText(formatBBotLines(teams));
+    if (devUserId && isDevEventId(event.id)) {
+      if (await save({ bbot_teams: teams }, "Could not save the B-bot list")) setText(formatBBotLines(teams));
+      return;
     }
+    // Saved with the data already scouted under each robot's old number moved to its new one
+    setSaving(true);
+    const result = await saveEventBBotTeams(event, teams);
+    setSaving(false);
+    if (!result) {
+      toast({ title: "Could not save the B-bot list", variant: "destructive" });
+      return;
+    }
+    // Tidied into the saved form (sorted, one style)
+    setText(formatBBotLines(teams));
+    onSaved?.();
+    toast({
+      title: "B-bot list saved",
+      description: [
+        result.moved > 0 && `Moved ${result.moved} scouting ${result.moved === 1 ? "entry" : "entries"} to ${result.moved === 1 ? "its" : "their"} new number.`,
+        !result.slotsFound && "Couldn't reach The Blue Alliance, so match scouting of newly listed robots stays under their main team.",
+      ].filter(Boolean).join(" ") || undefined,
+    });
   };
 
   return (

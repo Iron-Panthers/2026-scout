@@ -1,6 +1,7 @@
 import { supabase } from "./supabase";
 import type { Match, Profile, Event, Role } from "@/types";
 import { ALL_ROLE_COLUMNS, roleColumn } from "./roleUtils";
+import { getEventMatches } from "./blueAlliance";
 
 // Fetch all events
 export async function getEvents(): Promise<Event[]> {
@@ -358,6 +359,40 @@ export async function updateEvent(
   }
 
   return true;
+}
+
+/**
+ * Saves an event's B-bot list and moves each robot's existing data to its new number (see the
+ * set_event_bbot_teams migration). A robot newly listed was scouted under its main team's
+ * number, so its match and qual scouting is found by the stations TBA put it in; without TBA
+ * (`slotsFound` false) that part is skipped. Returns how many submissions moved, or null on failure.
+ */
+export async function saveEventBBotTeams(
+  event: Pick<Event, "id" | "event_code">,
+  bbotTeams: Record<string, string>
+): Promise<{ moved: number; slotsFound: boolean } | null> {
+  const tbaMatches = event.event_code ? await getEventMatches(event.event_code) : null;
+  const slots = (tbaMatches ?? [])
+    .filter((match) => match.comp_level === "qm")
+    .flatMap((match) =>
+      (["red", "blue"] as const).flatMap((alliance) =>
+        match.alliances[alliance].team_keys.flatMap((key, index) => {
+          const [, team, bot] = key.match(/^frc(\d+)([A-Z])$/i) ?? [];
+          return bot ? [{ match_number: match.match_number, alliance, station: index + 1, team: Number(team), bot }] : [];
+        })
+      )
+    );
+
+  const { data, error } = await supabase.rpc("set_event_bbot_teams", {
+    p_event_id: event.id,
+    p_bbot_teams: bbotTeams,
+    p_slots: slots,
+  });
+  if (error) {
+    console.error("Error saving B-bot list:", error);
+    return null;
+  }
+  return { moved: data ?? 0, slotsFound: !!tbaMatches };
 }
 
 // Backfill event_id for matches that don't have it set
