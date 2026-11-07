@@ -481,10 +481,22 @@ export async function getEventPitRows(eventId: string): Promise<PitRow[]> {
 /** Played; about to start or in progress; or not played yet. */
 export type MatchStatus = "played" | "current" | "upcoming";
 
+/**
+ * A team as a match lists it: its number, with a letter on a team's second robot (a "B-bot",
+ * e.g. "254B").
+ */
+export type MatchTeam = string;
+
+/** The team a match team is: scouting records a B-bot under its team's number, so its data is the team's. */
+export const mainTeamNumber = (team: MatchTeam) => parseInt(team, 10);
+
+/** Whether a team plays in a list of match teams, as itself or its B-bot. */
+export const includesTeam = (teams: MatchTeam[], teamNumber: number) => teams.some((team) => mainTeamNumber(team) === teamNumber);
+
 /** A scheduled match's alliances and, once played, its result. */
 export interface ScheduledMatch {
-  red: number[];
-  blue: number[];
+  red: MatchTeam[];
+  blue: MatchTeam[];
   status: MatchStatus;
   /** Final scores once played; null before then (TBA reports -1). */
   redScore: number | null;
@@ -533,9 +545,9 @@ export interface PlayoffAlliance {
   /** Seed, 1 first. */
   seed: number;
   /** The captain first, then picks in order. */
-  teams: number[];
+  teams: MatchTeam[];
   /** A backup robot called in, and the pick it replaced. */
-  backup: { in: number; out: number } | null;
+  backup: { in: MatchTeam; out: MatchTeam } | null;
   /** Null until the alliance plays a playoff match. */
   status: "won" | "eliminated" | "playing" | null;
   /** The last playoff round it reached (where it was knocked out, if it was); null until it plays. */
@@ -554,7 +566,7 @@ export interface EventSchedule {
 
 type TBAMatch = NonNullable<Awaited<ReturnType<typeof getEventMatches>>>[number];
 
-const teamNumberFromKey = (key: string) => Number(key.replace(/^frc/, ""));
+const teamFromKey = (key: string): MatchTeam => key.replace(/^frc/, "");
 
 /** How long before its start time an unplayed match counts as about to start. */
 const MATCH_SOON_MS = 10 * 60 * 1000;
@@ -593,8 +605,8 @@ function scheduledMatch(match: TBAMatch, now: number): ScheduledMatch {
       || (redScore! > blueScore! ? "red" : blueScore! > redScore! ? "blue" : "tie");
   }
   return {
-    red: match.alliances.red.team_keys.map(teamNumberFromKey),
-    blue: match.alliances.blue.team_keys.map(teamNumberFromKey),
+    red: match.alliances.red.team_keys.map(teamFromKey),
+    blue: match.alliances.blue.team_keys.map(teamFromKey),
     status,
     redScore,
     blueScore,
@@ -653,8 +665,8 @@ export async function getEventSchedule(eventCode: string): Promise<EventSchedule
     const status = alliance.status?.status;
     return {
       seed: index + 1,
-      teams: alliance.picks.map(teamNumberFromKey),
-      backup: alliance.backup ? { in: teamNumberFromKey(alliance.backup.in), out: teamNumberFromKey(alliance.backup.out) } : null,
+      teams: alliance.picks.map(teamFromKey),
+      backup: alliance.backup ? { in: teamFromKey(alliance.backup.in), out: teamFromKey(alliance.backup.out) } : null,
       status: status === "won" || status === "eliminated" || status === "playing" ? status : null,
       round: playoffRound(alliance.status?.double_elim_round, alliance.status?.level),
     };
@@ -667,7 +679,7 @@ export function getDevEventSchedule(userId: string, eventId: string): EventSched
   const matches = getDevMatches(userId, eventId)
     .map((match): QualScheduleMatch | null => {
       const teams = getDevMatchTeams(userId, match.match_number, eventId);
-      return teams && { matchNumber: match.match_number, red: teams.red, blue: teams.blue, status: "upcoming", redScore: null, blueScore: null, winner: null, videos: [] };
+      return teams && { matchNumber: match.match_number, red: teams.red.map(String), blue: teams.blue.map(String), status: "upcoming", redScore: null, blueScore: null, winner: null, videos: [] };
     })
     .filter((match): match is QualScheduleMatch => !!match)
     .sort((a, b) => a.matchNumber - b.matchNumber);
@@ -870,8 +882,8 @@ export function buildTeamDashboard(
     defense: notes((row) => row.defense),
     qualComments,
     qualMatches: data.schedule.matches
-      .filter((match) => match.red.includes(teamNumber) || match.blue.includes(teamNumber))
-      .map((match) => ({ matchNumber: match.matchNumber, alliance: match.red.includes(teamNumber) ? "red" : "blue", status: match.status })),
+      .filter((match) => includesTeam(match.red, teamNumber) || includesTeam(match.blue, teamNumber))
+      .map((match) => ({ matchNumber: match.matchNumber, alliance: includesTeam(match.red, teamNumber) ? "red" : "blue", status: match.status })),
   };
 }
 

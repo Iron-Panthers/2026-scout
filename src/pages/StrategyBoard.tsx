@@ -25,6 +25,7 @@ import {
   type BoardPageKey,
   type OurMatch,
 } from "@/lib/strategyBoard";
+import { mainTeamNumber, type MatchTeam } from "@/lib/strategyData";
 
 /** The strategy board: our matches at an event, and a drawing board for each. */
 export default function StrategyBoard() {
@@ -88,7 +89,7 @@ function useOurMatches(event: Event | null) {
   return loaded && loaded.for === loadKey ? loaded : null;
 }
 
-function TeamList({ teams, color }: { teams: number[]; color: "red" | "blue" }) {
+function TeamList({ teams, color }: { teams: MatchTeam[]; color: "red" | "blue" }) {
   return (
     <span
       className={`grid grid-cols-3 rounded-md px-2 py-1 text-center font-mono text-xs tabular-nums text-white sm:text-sm ${
@@ -96,7 +97,7 @@ function TeamList({ teams, color }: { teams: number[]; color: "red" | "blue" }) 
       }`}
     >
       {teams.map((team) => (
-        <span key={team} className={`px-1 ${team === OUR_TEAM ? "font-bold underline decoration-2 underline-offset-2" : ""}`}>
+        <span key={team} className={`px-1 ${mainTeamNumber(team) === OUR_TEAM ? "font-bold underline decoration-2 underline-offset-2" : ""}`}>
           {team}
         </span>
       ))}

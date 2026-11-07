@@ -181,13 +181,14 @@ function AllianceCard({ alliance, teamKeys, teamInfo }: AllianceCardProps) {
       </CardHeader>
       <CardContent className="p-0 pb-4 px-3 space-y-3">
         {teamKeys.map((key) => {
-          const num = parseInt(key.replace("frc", ""));
-          const info = teamInfo.get(num);
+          // As TBA lists it, with the letter on a team's second robot (e.g. "254B"); named after its team
+          const team = key.replace("frc", "");
+          const info = teamInfo.get(parseInt(team));
           return (
             <div key={key} className="flex items-start gap-2">
               <span className={`mt-1.5 h-2 w-2 rounded-full shrink-0 ${isRed ? "bg-red-500" : "bg-blue-500"}`} />
               <div>
-                <div className="font-bold text-sm leading-tight">{num}</div>
+                <div className="font-bold text-sm leading-tight">{team}</div>
                 {info && (
                   <div className="text-xs text-muted-foreground leading-tight">
                     {info.nickname}{info.city && `, ${info.city}`}
@@ -805,6 +806,8 @@ export default function MatchBetting() {
   }, [currentOdds, isOnline, betCurrency, match_id]);
 
   const currentBalance = betCurrency === "event" ? eventPoints : points;
+  /** How amounts in a currency read: "pts", or the event currency's name (e.g. "Madcoins"). */
+  const currencyUnit = (currency: BetCurrency) => (currency === "event" ? getEventCurrencyName(event?.event_code) : "pts");
   const canPlaceBets = isOnline || (devMode && isDevMatchId(match_id));
 
   // Event points can only be bet on the active event's own matches.
@@ -1006,7 +1009,7 @@ export default function MatchBetting() {
               {Math.round(blendedRedPct)}%
             </div>
             <div className="text-xs text-muted-foreground mt-1">
-              {currentOdds.redTotal} {betCurrency === "event" ? "evt" : "pts"} bet
+              {currentOdds.redTotal} {currencyUnit(betCurrency)} bet
             </div>
           </div>
           <div className="bg-blue-900/20 border border-blue-700/30 rounded-xl p-4 text-center">
@@ -1017,7 +1020,7 @@ export default function MatchBetting() {
               {Math.round(blendedBluePct)}%
             </div>
             <div className="text-xs text-muted-foreground mt-1">
-              {currentOdds.blueTotal} {betCurrency === "event" ? "evt" : "pts"} bet
+              {currentOdds.blueTotal} {currencyUnit(betCurrency)} bet
             </div>
           </div>
         </div>
@@ -1030,7 +1033,7 @@ export default function MatchBetting() {
                 Combined win probability (bets + match13)
               </span>
               <span className="text-xs text-muted-foreground">
-                Pool: {currentOdds.totalPool} {betCurrency === "event" ? "evt" : "pts"}
+                Pool: {currentOdds.totalPool} {currencyUnit(betCurrency)}
               </span>
             </div>
             <OddsChart history={blendedHistory} isLive={!matchComplete && isOnline} />
@@ -1108,7 +1111,7 @@ export default function MatchBetting() {
                     : "Better luck next time"}
                 </div>
                 <div className="text-sm text-muted-foreground mt-0.5">
-                  Bet {userBet.amount} {userBet.currency === "event" ? "evt" : "pts"} on {userBet.alliance.toUpperCase()}
+                  Bet {userBet.amount} {currencyUnit(userBet.currency)} on {userBet.alliance.toUpperCase()}
                 </div>
                 {m13RedProb !== undefined && (
                   <div className="text-xs text-muted-foreground mt-0.5">
@@ -1125,7 +1128,7 @@ export default function MatchBetting() {
                       +{userBet.payout - userBet.amount}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      Payout: {userBet.payout} {userBet.currency === "event" ? "evt" : "pts"}
+                      Payout: {userBet.payout} {currencyUnit(userBet.currency)}
                     </div>
                   </>
                 ) : (
@@ -1149,13 +1152,13 @@ export default function MatchBetting() {
                       {userBet.alliance.toUpperCase()}
                     </span>
                     <span className="text-sm">
-                      {userBet.amount} {userBet.currency === "event" ? "evt" : "pts"} wagered
+                      {userBet.amount} {currencyUnit(userBet.currency)} wagered
                     </span>
                   </div>
                   <div className="text-xs text-muted-foreground mt-1">
                     Est. payout:{" "}
                     {estimatePayout(userBet.amount, userBet.alliance as "red" | "blue",
-                      currentOdds as MatchOdds, m13RedProb)} {userBet.currency === "event" ? "evt" : "pts"} if {userBet.alliance} wins
+                      currentOdds as MatchOdds, m13RedProb)} {currencyUnit(userBet.currency)} if {userBet.alliance} wins
                   </div>
                 </div>
                 <Button
@@ -1222,7 +1225,7 @@ export default function MatchBetting() {
                     }`}
                   >
                     <img src={getEventCurrencyLogo(event?.event_code)} alt="" className="h-3.5 w-3.5" />
-                    {event?.name ?? "Event"} Points
+                    {getEventCurrencyName(event?.event_code)}
                   </button>
                 </div>
               )}
@@ -1279,12 +1282,12 @@ export default function MatchBetting() {
                 <div className="bg-muted/30 rounded-lg px-3 py-2 text-sm space-y-1">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Est. payout if {selectedAlliance} wins</span>
-                    <span className="font-bold">{estPayout} {betCurrency === "event" ? "evt" : "pts"}</span>
+                    <span className="font-bold">{estPayout} {currencyUnit(betCurrency)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Est. profit</span>
                     <span className={`font-bold ${estPayout - betAmount >= 0 ? "text-green-400" : "text-red-400"}`}>
-                      {estPayout - betAmount >= 0 ? "+" : ""}{estPayout - betAmount} {betCurrency === "event" ? "evt" : "pts"}
+                      {estPayout - betAmount >= 0 ? "+" : ""}{estPayout - betAmount} {currencyUnit(betCurrency)}
                     </span>
                   </div>
                   {m13RedProb !== undefined && (
@@ -1300,7 +1303,7 @@ export default function MatchBetting() {
                 onClick={handlePlaceBet}>
                 {placing && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                 {selectedAlliance
-                  ? `Bet ${betAmount} ${betCurrency === "event" ? "evt" : "pts"} on ${selectedAlliance.toUpperCase()}`
+                  ? `Bet ${betAmount} ${currencyUnit(betCurrency)} on ${selectedAlliance.toUpperCase()}`
                   : "Select an alliance"}
               </Button>
             </CardContent>

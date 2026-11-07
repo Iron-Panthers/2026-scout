@@ -19,9 +19,12 @@ import {
   defenseEloDetail,
   formatElo,
   formatNumber,
+  includesTeam,
   loadEventData,
+  mainTeamNumber,
   type EventData,
   type MatchFuel,
+  type MatchTeam,
   type MeanAndSpread,
   type PitRow,
   type EventSchedule,
@@ -151,7 +154,7 @@ function matchResult(match: ScheduledMatch, alliance: "red" | "blue"): MatchResu
 
 function AllianceStrip({ color, teams, score, won, teamNumber, otherTeam, onSelectTeam }: {
   color: "red" | "blue";
-  teams: number[];
+  teams: MatchTeam[];
   score: number | null;
   won: boolean;
   teamNumber: number;
@@ -167,15 +170,15 @@ function AllianceStrip({ color, teams, score, won, teamNumber, otherTeam, onSele
   return (
     <div className={`flex min-w-0 items-center justify-between gap-2 rounded-md px-2 py-1 ${tint}`}>
       <div className="flex min-w-0 flex-wrap gap-x-2 font-mono text-xs tabular-nums">
-        {teams.map((team) => team === teamNumber ? (
+        {teams.map((team) => mainTeamNumber(team) === teamNumber ? (
           <span key={team} className="font-black text-foreground underline underline-offset-2">{team}</span>
         ) : (
           <button
             key={team}
             type="button"
-            onClick={() => onSelectTeam(team)}
-            title={`Show team ${team}`}
-            className={`${text} ${team === otherTeam ? otherUnderline : "hover:underline"}`}
+            onClick={() => onSelectTeam(mainTeamNumber(team))}
+            title={`Show team ${mainTeamNumber(team)}`}
+            className={`${text} ${mainTeamNumber(team) === otherTeam ? otherUnderline : "hover:underline"}`}
           >
             {team}
           </button>
@@ -197,9 +200,9 @@ const SHARED_MATCH = {
 /** Whether `otherTeam` is on `teamNumber`'s alliance, the opposing one, or not in the match. */
 function sharedMatch(match: ScheduledMatch, teamNumber: number, otherTeam: number | undefined): keyof typeof SHARED_MATCH | null {
   if (otherTeam === undefined) return null;
-  const alliance = match.red.includes(teamNumber) ? match.red : match.blue;
+  const alliance = includesTeam(match.red, teamNumber) ? match.red : match.blue;
   const opponents = alliance === match.red ? match.blue : match.red;
-  return alliance.includes(otherTeam) ? "with" : opponents.includes(otherTeam) ? "against" : null;
+  return includesTeam(alliance, otherTeam) ? "with" : includesTeam(opponents, otherTeam) ? "against" : null;
 }
 
 /**
@@ -224,7 +227,7 @@ function MatchRow({ label, match, teamNumber, otherTeam, faded, onSelectTeam, on
   /** Opens the match on the dashboard (qualifications only; it has no playoff matches). */
   onOpen?: () => void;
 }) {
-  const result = matchResult(match, match.red.includes(teamNumber) ? "red" : "blue");
+  const result = matchResult(match, includesTeam(match.red, teamNumber) ? "red" : "blue");
   const shared = sharedMatch(match, teamNumber, otherTeam);
   return (
     // When comparing, every row gets the same padding so tinted and plain rows line up.
@@ -283,7 +286,7 @@ function MatchGroup({ title, matches, teamNumber, otherTeam, onSelectTeam, onWat
   onWatch?: (label: string, match: ScheduledMatch) => void;
 }) {
   const results = matches
-    .map(({ match }) => matchResult(match, match.red.includes(teamNumber) ? "red" : "blue"))
+    .map(({ match }) => matchResult(match, includesTeam(match.red, teamNumber) ? "red" : "blue"))
     .filter((result): result is MatchResult => result !== null);
   const count = (result: MatchResult) => results.filter((item) => item === result).length;
 
@@ -327,7 +330,7 @@ function MatchList({ teamNumber, schedule, recentMatches, onSelectTeam, compareK
   /** Compare mode: the other team, whose shared matches are tinted green (allies) or red (opponents). */
   otherTeam?: number;
 }) {
-  const plays = (match: ScheduledMatch) => match.red.includes(teamNumber) || match.blue.includes(teamNumber);
+  const plays = (match: ScheduledMatch) => includesTeam(match.red, teamNumber) || includesTeam(match.blue, teamNumber);
   const openMatch = useOpenMatch();
   const quals = schedule.matches.filter(plays).map((match) => ({
     key: `qm${match.matchNumber}`,

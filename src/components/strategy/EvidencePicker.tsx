@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { SuggestionEvidence } from "@/lib/livePicklists";
-import type { QualScheduleMatch } from "@/lib/strategyData";
+import { includesTeam, type QualScheduleMatch } from "@/lib/strategyData";
 import { formatVideoTime, type YouTubeVideo } from "@/lib/youtube";
 
 /** The parts of YouTube's IFrame API player used here. */
@@ -112,7 +112,7 @@ export function EvidencePicker({ teamNumber, matches, onChange }: {
   const [error, setError] = useState<string | null>(null);
 
   const withVideo = (matches ?? []).filter((match) => match.videos.length > 0);
-  const plays = (match: QualScheduleMatch) => match.red.includes(teamNumber) || match.blue.includes(teamNumber);
+  const plays = (match: QualScheduleMatch) => includesTeam(match.red, teamNumber) || includesTeam(match.blue, teamNumber);
   const teamMatches = withVideo.filter(plays);
   const otherMatches = withVideo.filter((match) => !plays(match));
   const match = withVideo.find((item) => String(item.matchNumber) === matchNumber);

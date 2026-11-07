@@ -4,6 +4,7 @@ import fieldImage from "@/assets/FE-2026-_REBUILT_Playing_Field_With_Fuel.png";
 import { Button } from "@/components/ui/button";
 import { TagColorPicker } from "@/components/strategy/TeamTag";
 import { TAG_COLORS } from "@/lib/livePicklists";
+import { mainTeamNumber, type MatchTeam } from "@/lib/strategyData";
 import {
   FIELD_HEIGHT,
   FIELD_WIDTH,
@@ -167,7 +168,7 @@ function useSize<T extends HTMLElement>() {
 
 /** A team being dragged from the bar above the field. */
 interface TeamDrag {
-  team: number;
+  team: MatchTeam;
   alliance: Alliance;
   station: number;
   pointerId: number;
@@ -207,8 +208,8 @@ export function StrategyFieldBoard({
   pageKey: string;
   page: BoardPage;
   onChange: (update: (page: BoardPage) => BoardPage) => void;
-  red: number[];
-  blue: number[];
+  red: MatchTeam[];
+  blue: MatchTeam[];
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
   // Everything on the field, in field pixels however it's turned
@@ -228,7 +229,7 @@ export function StrategyFieldBoard({
   const [color, setColor] = useState(TAG_COLORS[0]);
   const [penSize, setPenSize] = useState(PEN_SIZES[1]);
   const [penStyle, setPenStyle] = useState<PenStyle>("solid");
-  const [selection, setSelection] = useState<{ pageKey: string; team: number } | null>(null);
+  const [selection, setSelection] = useState<{ pageKey: string; team: MatchTeam } | null>(null);
   const selected = tool === "move" && selection?.pageKey === pageKey ? selection.team : null;
   /** Whether the eraser takes out every line it touches, or just the part under it. */
   const [eraseWholeLines, setEraseWholeLines] = useState(false);
@@ -259,7 +260,7 @@ export function StrategyFieldBoard({
   const handleRadius = clamp(HANDLE_RADIUS_PX / scale, ...HANDLE_RADIUS_RANGE);
   const handleHitRadius = Math.max(handleRadius, Math.min(HANDLE_HIT_PX / scale, HANDLE_HIT_MAX));
 
-  const removeRobot = (team: number) => {
+  const removeRobot = (team: MatchTeam) => {
     onChange((current) => ({ ...current, robots: current.robots.filter((robot) => robot.team !== team) }));
     setSelection(null);
   };
@@ -473,7 +474,7 @@ export function StrategyFieldBoard({
                     title={placed ? `Drag to move ${team.team}'s robot, or tap to select it` : `Drag ${team.team} onto the field, or tap to place it`}
                     className={`h-7 min-w-11 cursor-grab touch-none select-none rounded-md px-1.5 font-mono text-xs font-semibold tabular-nums text-white shadow-sm transition-opacity active:cursor-grabbing ${
                       placed ? "opacity-45" : ""
-                    } ${team.team === OUR_TEAM ? "underline decoration-2 underline-offset-2" : ""}`}
+                    } ${mainTeamNumber(team.team) === OUR_TEAM ? "underline decoration-2 underline-offset-2" : ""}`}
                     style={{ backgroundColor: ALLIANCE_COLOR[team.alliance] }}
                   >
                     {team.team}

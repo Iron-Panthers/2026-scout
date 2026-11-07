@@ -15,10 +15,13 @@ import {
   defenseEloDetail,
   formatElo,
   formatNumber,
+  includesTeam,
   loadEventData,
+  mainTeamNumber,
   setMatchVideoLink,
   forgetEventData,
   type EventData,
+  type MatchTeam,
   type MeanAndSpread,
   type PlayoffAlliance,
   type PlayoffScheduleMatch,
@@ -102,8 +105,10 @@ function NoteList({ title, notes }: { title: string; notes: TeamNote[] }) {
   );
 }
 
-function TeamCard({ team, station, border, selectedMatch, onSelectMatch, onOpenPhoto }: {
+function TeamCard({ team, label, station, border, selectedMatch, onSelectMatch, onOpenPhoto }: {
   team: TeamDashboard;
+  /** The team as the match lists it, e.g. "254B" for its second robot. */
+  label: MatchTeam;
   station: string;
   border: string;
   selectedMatch: number;
@@ -128,7 +133,7 @@ function TeamCard({ team, station, border, selectedMatch, onSelectMatch, onOpenP
             className="block w-fit font-mono text-lg font-black tabular-nums hover:underline @[12rem]:text-xl @[16rem]:text-2xl"
             title={`View team ${team.teamNumber} on the Teams page`}
           >
-            {team.teamNumber}
+            {label}
           </Link>
           <div className="truncate text-xs text-muted-foreground @[16rem]:text-sm" title={team.name ?? undefined}>{team.name ?? "Unknown team"}</div>
         </div>
@@ -234,16 +239,16 @@ const SCHEDULE_CELL = {
 } as const;
 
 /** One alliance's three teams, spread evenly across a colored block. Each opens its page on the Teams tab. */
-function ScheduleTeams({ color, teams, won, rounded }: { color: "red" | "blue"; teams: number[]; won: boolean; rounded: string }) {
+function ScheduleTeams({ color, teams, won, rounded }: { color: "red" | "blue"; teams: MatchTeam[]; won: boolean; rounded: string }) {
   return (
     // Clipped so a team's hover highlight takes the block's own rounded corners
     <div className={`grid h-full grid-cols-3 items-stretch overflow-hidden py-0 text-center font-mono text-[9px] leading-5 tabular-nums sm:text-[11px] sm:leading-none ${rounded} ${SCHEDULE_CELL[color][won ? "won" : "other"]}`}>
       {teams.map((team) => (
         <Link
           key={team}
-          to={`?page=teams&team=${team}`}
-          title={`View team ${team} on the Teams page`}
-          className={`flex items-center justify-center transition-colors hover:bg-white/20 ${team === OUR_TEAM ? "underline underline-offset-2" : ""}`}
+          to={`?page=teams&team=${mainTeamNumber(team)}`}
+          title={`View team ${mainTeamNumber(team)} on the Teams page`}
+          className={`flex items-center justify-center transition-colors hover:bg-white/20 ${mainTeamNumber(team) === OUR_TEAM ? "underline underline-offset-2" : ""}`}
         >
           {team}
         </Link>
@@ -299,7 +304,7 @@ function MatchSchedule({ matches, onSelect }: {
       <ul className="divide-y divide-border">
         {matches.map((match) => {
           const isNext = match.matchNumber === nextMatch;
-          const isOurs = match.red.includes(OUR_TEAM) || match.blue.includes(OUR_TEAM);
+          const isOurs = includesTeam(match.red, OUR_TEAM) || includesTeam(match.blue, OUR_TEAM);
           return (
             <li key={match.matchNumber} ref={isNext ? nextRef : undefined} className="relative">
               <div
@@ -389,7 +394,7 @@ function AllianceSelection({ alliances, teamNames }: { alliances: PlayoffAllianc
   const columns = "grid grid-cols-[2.5rem_minmax(0,1fr)_3rem] sm:grid-cols-[4rem_minmax(0,1fr)_7rem]";
   // Room for every alliance's teams, backups included (3 at regionals, 4 at championships).
   const slots = Math.max(...alliances.map((alliance) => alliance.teams.length + (alliance.backup ? 1 : 0)));
-  const teamName = (team: number) => teamNames.get(team) ?? `Team ${team}`;
+  const teamName = (team: MatchTeam) => teamNames.get(mainTeamNumber(team)) ?? `Team ${team}`;
 
   return (
     <div className="overflow-hidden rounded-lg border border-border bg-card">
@@ -403,7 +408,7 @@ function AllianceSelection({ alliances, teamNames }: { alliances: PlayoffAllianc
       ) : (
         <ul className="divide-y divide-border">
           {alliances.map((alliance) => {
-            const isOurs = alliance.teams.includes(OUR_TEAM) || alliance.backup?.in === OUR_TEAM;
+            const isOurs = includesTeam(alliance.teams, OUR_TEAM) || (!!alliance.backup && mainTeamNumber(alliance.backup.in) === OUR_TEAM);
             return (
               <li
                 key={alliance.seed}
@@ -425,7 +430,7 @@ function AllianceSelection({ alliances, teamNames }: { alliances: PlayoffAllianc
                       <span
                         key={team}
                         title={`${teamName(team)}: ${index === 0 ? "captain" : `pick ${index}`}${replaced ? `, replaced by ${alliance.backup!.in}` : ""}`}
-                        className={`${index === 0 ? "font-bold" : ""} ${team === OUR_TEAM ? "underline underline-offset-2" : ""} ${replaced ? "text-muted-foreground line-through" : ""}`}
+                        className={`${index === 0 ? "font-bold" : ""} ${mainTeamNumber(team) === OUR_TEAM ? "underline underline-offset-2" : ""} ${replaced ? "text-muted-foreground line-through" : ""}`}
                       >
                         {team}
                       </span>
@@ -434,7 +439,7 @@ function AllianceSelection({ alliances, teamNames }: { alliances: PlayoffAllianc
                   {alliance.backup && (
                     <span
                       title={`${teamName(alliance.backup.in)}: backup for ${alliance.backup.out}`}
-                      className={`italic ${alliance.backup.in === OUR_TEAM ? "underline underline-offset-2" : ""}`}
+                      className={`italic ${mainTeamNumber(alliance.backup.in) === OUR_TEAM ? "underline underline-offset-2" : ""}`}
                     >
                       {alliance.backup.in}
                     </span>
@@ -491,7 +496,7 @@ function PlayoffSchedule({ playoffs }: { playoffs: PlayoffScheduleMatch[] }) {
           </div>
           <ul className="divide-y divide-border">
             {group.matches.map((match) => {
-              const isOurs = match.red.includes(OUR_TEAM) || match.blue.includes(OUR_TEAM);
+              const isOurs = includesTeam(match.red, OUR_TEAM) || includesTeam(match.blue, OUR_TEAM);
               return (
                 <li key={match.key} className="relative">
                   <div
@@ -629,8 +634,8 @@ export function MatchDashboard({ event, userId, userName, devMode, toolbarSlot, 
   const teams = useMemo(() => {
     if (!data || !match) return null;
     return {
-      red: match.red.map((teamNumber) => buildTeamDashboard(teamNumber, data)),
-      blue: match.blue.map((teamNumber) => buildTeamDashboard(teamNumber, data)),
+      red: match.red.map((team) => buildTeamDashboard(mainTeamNumber(team), data)),
+      blue: match.blue.map((team) => buildTeamDashboard(mainTeamNumber(team), data)),
     };
   }, [data, match]);
 
@@ -765,8 +770,9 @@ export function MatchDashboard({ event, userId, userName, devMode, toolbarSlot, 
               <div className="grid grid-cols-3 items-start gap-2 sm:gap-3">
                 {teams[alliance.key].map((team, index) => (
                   <TeamCard
-                    key={team.teamNumber}
+                    key={match![alliance.key][index]}
                     team={team}
+                    label={match![alliance.key][index]}
                     station={`${alliance.key === "red" ? "Red" : "Blue"} ${index + 1}`}
                     border={alliance.border}
                     selectedMatch={match!.matchNumber}

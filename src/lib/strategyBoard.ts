@@ -1,6 +1,6 @@
 import { getEvents } from "@/lib/matches";
 import { getDevEvent, getDevEvents } from "@/lib/devMode";
-import { getDevEventSchedule, getEventSchedule } from "@/lib/strategyData";
+import { getDevEventSchedule, getEventSchedule, includesTeam, type MatchTeam } from "@/lib/strategyData";
 import type { Event } from "@/types";
 
 /** Our team: the strategy board lists its matches. */
@@ -22,7 +22,7 @@ export type BoardPageKey = (typeof BOARD_PAGES)[number]["key"];
 export type Alliance = "red" | "blue";
 
 export interface BoardRobot {
-  team: number;
+  team: MatchTeam;
   alliance: Alliance;
   /** Its center. */
   x: number;
@@ -53,8 +53,8 @@ export interface BoardPage {
 export interface BoardMatch {
   /** e.g. "Qualification 12" or "Playoff Match 7". */
   name: string;
-  red: number[];
-  blue: number[];
+  red: MatchTeam[];
+  blue: MatchTeam[];
 }
 
 /** One match's board, saved in this browser only. */
@@ -79,7 +79,13 @@ export function loadBoard(matchKey: string): SavedBoard {
     if (!raw) return emptyBoard();
     const saved = JSON.parse(raw) as SavedBoard;
     const empty = emptyBoard();
-    return { ...empty, ...saved, pages: { ...empty.pages, ...saved.pages } };
+    const pages = { ...empty.pages, ...saved.pages };
+    // Boards saved before B-bots (e.g. "254B") had plain team numbers
+    for (const key of Object.keys(pages) as BoardPageKey[]) {
+      pages[key] = { ...pages[key], robots: pages[key].robots.map((robot) => ({ ...robot, team: String(robot.team) })) };
+    }
+    const match = saved.match && { ...saved.match, red: saved.match.red.map(String), blue: saved.match.blue.map(String) };
+    return { ...empty, ...saved, match, pages };
   } catch {
     return emptyBoard();
   }
@@ -134,7 +140,7 @@ export async function getOurMatches(event: Event, sandboxUserId: string | null):
     : event.event_code
       ? await getEventSchedule(event.event_code)
       : null;
-  const ours = (match: { red: number[]; blue: number[] }) => match.red.includes(OUR_TEAM) || match.blue.includes(OUR_TEAM);
+  const ours = (match: Pick<BoardMatch, "red" | "blue">) => includesTeam(match.red, OUR_TEAM) || includesTeam(match.blue, OUR_TEAM);
   const matches: OurMatch[] = [
     ...(schedule?.matches ?? []).filter(ours).map((match) => ({
       key: `${code}_qm${match.matchNumber}`,
