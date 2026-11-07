@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Check, GripVertical, ArrowLeft } from "lucide-react";
 import { getMatchTeam } from "@/lib/blueAlliance";
+import { getEvents } from "@/lib/matches";
 import { ScoutingReducer, type QualScoutingData } from "@/lib/ScoutingReducer";
 import { TeamImage } from "@/components/TeamImage";
 import { Loader2 } from "lucide-react";
@@ -38,6 +39,17 @@ export default function QualScouting() {
   const reducerRef = useRef<ScoutingReducer<QualScoutingData> | null>(null);
   const [state, setState] = useState<QualScoutingData | null>(null);
   const [loading, setLoading] = useState(true);
+  // The event's id, so robot photos come from its pit scouting (a B bot's own photo included)
+  const [eventId, setEventId] = useState<string | undefined>();
+
+  useEffect(() => {
+    if (!eventCode) return;
+    let mounted = true;
+    getEvents().then((events) => {
+      if (mounted) setEventId(events.find((e) => e.event_code === eventCode)?.id);
+    });
+    return () => { mounted = false; };
+  }, [eventCode]);
 
   // Fixed color index per team — assigned once at load, never changes with position
   const teamColorIndex = useRef<Record<number, number>>({});
@@ -268,6 +280,7 @@ export default function QualScouting() {
                   <div className="w-14 h-14 rounded-lg overflow-hidden border border-border shrink-0">
                     <TeamImage
                       teamNumber={teamNum}
+                      eventId={eventId}
                       className="w-full h-full object-cover"
                       fallbackClassName="w-full h-full flex items-center justify-center bg-muted"
                     />

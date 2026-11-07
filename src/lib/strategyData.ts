@@ -2,7 +2,7 @@ import { supabase } from "@/lib/supabase";
 import { CURRENT_SCHEMA_VERSION, migrateScoutingData } from "@/lib/scoutingSchema";
 import { getDevFakeScouts, getDevMatches, getDevMatchTeams, getDevScoutingSubmissions, getDevTeams } from "@/lib/devMode";
 import { getEventAlliances, getEventMatches, getEventTeams } from "@/lib/blueAlliance";
-import { eventBBots, withBBotNameMap } from "@/lib/bbots";
+import { bbotDemoNumber, bbotName, eventBBots, withBBotNameMap } from "@/lib/bbots";
 import { parseYouTubeLink, type YouTubeVideo } from "@/lib/youtube";
 import { getEventMatchClips, type MatchClip } from "@/lib/livestreams";
 import { isOutlier, outlierFences } from "@/lib/outliers";
@@ -483,11 +483,11 @@ export type MatchStatus = "played" | "current" | "upcoming";
 
 /**
  * A team as a match lists it: its number, with a letter on a team's second robot (a "B-bot",
- * e.g. "254B").
+ * e.g. "254B") unless the event lists the demo number it plays as (then that number).
  */
 export type MatchTeam = string;
 
-/** The team a match team is: scouting records a B-bot under its team's number, so its data is the team's. */
+/** The team a match team is: a lettered B-bot the event doesn't list is scouted under its team's number, so its data is the team's. */
 export const mainTeamNumber = (team: MatchTeam) => parseInt(team, 10);
 
 /** Whether a team plays in a list of match teams, as itself or its B-bot. */
@@ -566,7 +566,7 @@ export interface EventSchedule {
 
 type TBAMatch = NonNullable<Awaited<ReturnType<typeof getEventMatches>>>[number];
 
-const teamFromKey = (key: string): MatchTeam => key.replace(/^frc/, "");
+type TeamFromKey = (key: string) => MatchTeam;
 
 /** How long before its start time an unplayed match counts as about to start. */
 const MATCH_SOON_MS = 10 * 60 * 1000;
@@ -595,7 +595,7 @@ function allianceBreakdown(breakdown: TBAScoreBreakdown): AllianceBreakdown {
   };
 }
 
-function scheduledMatch(match: TBAMatch, now: number): ScheduledMatch {
+function scheduledMatch(match: TBAMatch, now: number, teamFromKey: TeamFromKey): ScheduledMatch {
   const status = matchStatus(match, now);
   const redScore = match.alliances.red.score >= 0 ? match.alliances.red.score : null;
   const blueScore = match.alliances.blue.score >= 0 ? match.alliances.blue.score : null;
@@ -647,20 +647,35 @@ function playoffRound(doubleElimRound: string | null | undefined, level: string 
   return (level && PLAYOFF_ROUNDS[level]) || null;
 }
 
-/** Qualification and playoff schedules and team names for an event, from TBA. */
-export async function getEventSchedule(eventCode: string): Promise<EventSchedule> {
+/**
+ * Qualification and playoff schedules and team names for an event, from TBA. A B-bot TBA lists
+ * as "581B" becomes the demo number the event's `bbotTeams` gives it (e.g. "9991"), since it's
+ * scouted under that number, and joins the team names as "Blazing Bulldogs (B)".
+ */
+export async function getEventSchedule(eventCode: string, bbotTeams?: Event["bbot_teams"]): Promise<EventSchedule> {
   const [tbaMatches, teams, tbaAlliances] = await Promise.all([getEventMatches(eventCode), getEventTeams(eventCode), getEventAlliances(eventCode)]);
   const now = Date.now();
+  const teamNames = new Map(teams.map((team) => [team.team_number, team.nickname]));
+  const teamFromKey: TeamFromKey = (key) => {
+    const team = key.replace(/^frc/, "");
+    const [, number, bot] = team.match(/^(\d+)([A-Z])$/i) ?? [];
+    const demoNumber = bot ? bbotDemoNumber(bbotTeams, Number(number), bot) : null;
+    if (demoNumber === null) return team;
+    if (!teamNames.has(demoNumber)) {
+      teamNames.set(demoNumber, bbotName({ team: Number(number), bot: bot.toUpperCase() }, teamNames.get(Number(number))));
+    }
+    return String(demoNumber);
+  };
   const matches = (tbaMatches ?? [])
     .filter((match) => match.comp_level === "qm")
-    .map((match) => ({ matchNumber: match.match_number, ...scheduledMatch(match, now) }))
+    .map((match) => ({ matchNumber: match.match_number, ...scheduledMatch(match, now, teamFromKey) }))
     .sort((a, b) => a.matchNumber - b.matchNumber);
   const playoffs = (tbaMatches ?? [])
     .filter((match) => PLAYOFF_LEVELS.includes(match.comp_level))
     .sort((a, b) => PLAYOFF_LEVELS.indexOf(a.comp_level) - PLAYOFF_LEVELS.indexOf(b.comp_level)
       || a.set_number - b.set_number
       || a.match_number - b.match_number)
-    .map((match) => ({ key: match.key, isFinal: match.comp_level === "f", label: playoffLabel(match), ...scheduledMatch(match, now) }));
+    .map((match) => ({ key: match.key, isFinal: match.comp_level === "f", label: playoffLabel(match), ...scheduledMatch(match, now, teamFromKey) }));
   const alliances = (tbaAlliances ?? []).map((alliance, index): PlayoffAlliance => {
     const status = alliance.status?.status;
     return {
@@ -671,7 +686,7 @@ export async function getEventSchedule(eventCode: string): Promise<EventSchedule
       round: playoffRound(alliance.status?.double_elim_round, alliance.status?.level),
     };
   });
-  return { matches, alliances, playoffs, teamNames: new Map(teams.map((team) => [team.team_number, team.nickname])) };
+  return { matches, alliances, playoffs, teamNames };
 }
 
 /** Sandbox stand-in for getEventSchedule. Sandbox matches are never played. */
@@ -952,7 +967,7 @@ async function loadRawEventData(event: Event, sandbox: { userId: string; userNam
 
   const eventCode = event.event_code;
   const loading = Promise.all([
-    getEventSchedule(eventCode),
+    getEventSchedule(eventCode, event.bbot_teams),
     getEventVideoLinks(event.id),
     getEventMatchClips(event.id),
     getEventQuantRows(event.id),

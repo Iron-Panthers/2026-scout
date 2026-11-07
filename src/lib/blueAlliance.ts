@@ -1,6 +1,9 @@
 // The Blue Alliance API client
 // API Documentation: https://www.thebluealliance.com/apidocs/v3
 
+import { supabase } from "./supabase";
+import { bbotDemoNumber } from "./bbots";
+
 const TBA_BASE_URL = "https://www.thebluealliance.com/api/v3";
 const TBA_AUTH_KEY = import.meta.env.VITE_TBA_AUTH_KEY;
 
@@ -196,10 +199,15 @@ export async function getMatchTeam(
     return null;
   }
 
-  const teamKey = teamKeys[position]; // e.g., "frc1678"
-  const teamNumber = parseInt(teamKey.replace("frc", ""));
+  const teamKey = teamKeys[position]; // e.g., "frc1678", or "frc581B" for a team's B bot
+  const [, number, bot] = teamKey.match(/^frc(\d+)([A-Z]?)$/i) ?? [];
+  const teamNumber = parseInt(number);
+  if (!bot) return teamNumber;
 
-  return teamNumber;
+  // Scout a B bot under the off-season demo number the event lists for it, so its data and
+  // pit scouting stay its own; the main team's number if the event doesn't list one.
+  const { data: event } = await supabase.from("events").select("bbot_teams").eq("event_code", eventCode).limit(1).maybeSingle();
+  return bbotDemoNumber(event?.bbot_teams, teamNumber, bot) ?? teamNumber;
 }
 
 /**

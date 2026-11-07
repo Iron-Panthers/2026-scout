@@ -28,6 +28,15 @@ export function eventBBots(event: Pick<Event, "convert_bbots" | "bbot_teams"> | 
   return bbots;
 }
 
+/** The demo number an event lists for a team's lettered robot (581, "B" → 9991); null when it lists none. */
+export function bbotDemoNumber(bbotTeams: Record<string, string> | null | undefined, team: number, bot: string): number | null {
+  for (const [demoNumber, value] of Object.entries(bbotTeams ?? {})) {
+    const bbot = parseBBot(value);
+    if (bbot && bbot.team === team && bbot.bot === bot.toUpperCase() && /^\d+$/.test(demoNumber)) return Number(demoNumber);
+  }
+  return null;
+}
+
 /** One line per conversion ("9991 → 581 B"), sorted by main team, for the editor. */
 export function formatBBotLines(teams: Record<string, string> | null | undefined): string {
   return Object.entries(teams ?? {})

@@ -142,7 +142,7 @@ export async function getOurMatches(event: Event, sandboxUserId: string | null):
   const schedule = sandboxUserId
     ? getDevEventSchedule(sandboxUserId, event.id)
     : event.event_code
-      ? await getEventSchedule(event.event_code)
+      ? await getEventSchedule(event.event_code, event.bbot_teams)
       : null;
   const ours = (match: Pick<BoardMatch, "red" | "blue">) => includesTeam(match.red, OUR_TEAM) || includesTeam(match.blue, OUR_TEAM);
   const matches: OurMatch[] = [
