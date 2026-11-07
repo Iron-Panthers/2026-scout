@@ -15,6 +15,8 @@ export const ROBOT_SIZE = 60;
 export const BOARD_PAGES = [
   { key: "auto", label: "Auto" },
   { key: "teleop", label: "Teleop" },
+  { key: "off", label: "Off" },
+  { key: "on", label: "On" },
   { key: "endgame", label: "Endgame" },
 ] as const;
 export type BoardPageKey = (typeof BOARD_PAGES)[number]["key"];
@@ -57,7 +59,7 @@ export interface BoardMatch {
   blue: MatchTeam[];
 }
 
-/** One match's board, saved in this browser only. */
+/** A user's board for one match, saved in this browser only. */
 export interface SavedBoard {
   version: 1;
   /** Kept with the drawings so the board opens without a connection. */
@@ -66,16 +68,19 @@ export interface SavedBoard {
 }
 
 const STORAGE_PREFIX = "strategy-board:";
+/** Where a user's board for a match is saved; `userId` is null for guests. */
+const storageKey = (userId: string | null, matchKey: string) => `${STORAGE_PREFIX}${userId ?? "guest"}:${matchKey}`;
 
 const emptyBoard = (): SavedBoard => ({
   version: 1,
   match: null,
-  pages: { auto: { robots: [], strokes: [] }, teleop: { robots: [], strokes: [] }, endgame: { robots: [], strokes: [] } },
+  pages: Object.fromEntries(BOARD_PAGES.map((page): [BoardPageKey, BoardPage] => [page.key, { robots: [], strokes: [] }])) as Record<BoardPageKey, BoardPage>,
 });
 
-export function loadBoard(matchKey: string): SavedBoard {
+export function loadBoard(userId: string | null, matchKey: string): SavedBoard {
   try {
-    const raw = localStorage.getItem(STORAGE_PREFIX + matchKey);
+    // Boards saved before they were per user give everyone a copy to start from
+    const raw = localStorage.getItem(storageKey(userId, matchKey)) ?? localStorage.getItem(STORAGE_PREFIX + matchKey);
     if (!raw) return emptyBoard();
     const saved = JSON.parse(raw) as SavedBoard;
     const empty = emptyBoard();
@@ -92,19 +97,18 @@ export function loadBoard(matchKey: string): SavedBoard {
 }
 
 /** False when the browser's storage is full. */
-export function saveBoard(matchKey: string, board: SavedBoard): boolean {
+export function saveBoard(userId: string | null, matchKey: string, board: SavedBoard): boolean {
   try {
-    localStorage.setItem(STORAGE_PREFIX + matchKey, JSON.stringify(board));
+    localStorage.setItem(storageKey(userId, matchKey), JSON.stringify(board));
     return true;
   } catch {
     return false;
   }
 }
 
-/** Whether anything has been drawn or placed on any of a match's pages. */
-export function hasDrawing(matchKey: string): boolean {
-  if (!localStorage.getItem(STORAGE_PREFIX + matchKey)) return false;
-  return Object.values(loadBoard(matchKey).pages).some((page) => page.robots.length > 0 || page.strokes.length > 0);
+/** Whether the user has drawn or placed anything on any of a match's pages. */
+export function hasDrawing(userId: string | null, matchKey: string): boolean {
+  return Object.values(loadBoard(userId, matchKey).pages).some((page) => page.robots.length > 0 || page.strokes.length > 0);
 }
 
 /** One of our matches in the list, keyed like TBA's match keys (e.g. "2026mttd_qm12"). */

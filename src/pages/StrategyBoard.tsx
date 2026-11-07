@@ -30,8 +30,11 @@ import { mainTeamNumber, type MatchTeam } from "@/lib/strategyData";
 /** The strategy board: our matches at an event, and a drawing board for each. */
 export default function StrategyBoard() {
   const { matchKey } = useParams();
-  // Keyed so another match's board starts fresh
-  return matchKey ? <MatchBoard key={matchKey} matchKey={matchKey} /> : <MatchList />;
+  const { user } = useAuth();
+  // Each user has their own boards (guests share one); null for guests
+  const userId = user?.id ?? null;
+  // Keyed so another match's (or user's) board starts fresh
+  return matchKey ? <MatchBoard key={`${userId}:${matchKey}`} userId={userId} matchKey={matchKey} /> : <MatchList userId={userId} />;
 }
 
 /** The sandbox's owner while dev mode is on (its events stand in for the real ones); null otherwise. */
@@ -105,7 +108,7 @@ function TeamList({ teams, color }: { teams: MatchTeam[]; color: "red" | "blue" 
   );
 }
 
-function MatchList() {
+function MatchList({ userId }: { userId: string | null }) {
   const { user, profile, getAvatarUrl } = useAuth();
   const navigate = useNavigate();
   const boardEvents = useBoardEvents();
@@ -153,7 +156,7 @@ function MatchList() {
             >
               <span className="w-28 shrink-0">
                 <span className="block text-sm font-semibold">{match.name}</span>
-                {hasDrawing(match.key) && (
+                {hasDrawing(userId, match.key) && (
                   <span className="flex items-center gap-1 text-xs text-muted-foreground">
                     <PencilRuler className="h-3 w-3" />
                     Has a plan
@@ -205,12 +208,12 @@ function MatchList() {
   );
 }
 
-/** One match's board: its auto, teleop and endgame pages, saved in this browser. */
-function MatchBoard({ matchKey }: { matchKey: string }) {
+/** A user's board for one match: a page for each part of the match, saved in this browser. */
+function MatchBoard({ userId, matchKey }: { userId: string | null; matchKey: string }) {
   const goBack = useGoBack("/strategy-board");
   const location = useLocation();
   const { toast } = useToast();
-  const [board, setBoard] = useState(() => loadBoard(matchKey));
+  const [board, setBoard] = useState(() => loadBoard(userId, matchKey));
   const [pageKey, setPageKey] = useState<BoardPageKey>("auto");
 
   // The match from the list, else what was saved with the drawings (so it opens offline),
@@ -227,10 +230,10 @@ function MatchBoard({ matchKey }: { matchKey: string }) {
   );
 
   useEffect(() => {
-    if (!saveBoard(matchKey, { ...board, match })) {
+    if (!saveBoard(userId, matchKey, { ...board, match })) {
       toast({ title: "Couldn't save the drawing", description: "This browser's storage is full.", variant: "destructive" });
     }
-  }, [matchKey, board, match, toast]);
+  }, [userId, matchKey, board, match, toast]);
 
   const updatePage = useCallback(
     (update: (page: BoardPage) => BoardPage) =>
