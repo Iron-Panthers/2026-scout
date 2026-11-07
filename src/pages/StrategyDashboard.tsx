@@ -45,7 +45,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ListOrdered, ArrowUpDown, Loader2, RotateCcw, Radio, Info, Tag } from "lucide-react";
+import { ListOrdered, ArrowUpDown, Loader2, RotateCcw, Radio, Info, Tag, Sparkles } from "lucide-react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { BBotProvider } from "@/contexts/BBotContext";
@@ -966,6 +966,22 @@ export default function StrategyDashboard() {
             )}
             {strategyPage === "dashboard" && (
               <div ref={setToolbarSlot} className="flex min-w-0 items-center" />
+            )}
+            {/* A made-up match of any teams at the event (see FantasyMatch); a new step in history, so Back returns */}
+            {strategyPage === "dashboard" && !matchOpen && (
+              <Button
+                variant="outline"
+                className="ml-auto shrink-0 gap-1.5"
+                disabled={!selectedPicklistEvent}
+                onClick={() => setSearchParams((current) => {
+                  const params = new URLSearchParams(current);
+                  params.set("fantasy", "1");
+                  return params;
+                })}
+              >
+                <Sparkles className="h-4 w-4" />
+                Fantasy
+              </Button>
             )}
             {strategyPage === "picklist" && (
               <Button

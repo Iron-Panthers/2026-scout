@@ -18,6 +18,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDevMode } from "@/contexts/DevModeContext";
 import { getUserRescouts } from "@/lib/matchRescouts";
+import { matchRescoutFieldLabels } from "@/config/matchRescoutFields";
 import { getDevMatchRescouts, getDevEvents, getDevPitSubmissions, getDevMatches, getDevMatchTeamForRole, getDevUserPitAssignments, hasDevSubmission } from "@/lib/devMode";
 import { getUserMatches, getEvents } from "@/lib/matches";
 import { getMatchTeam } from "@/lib/blueAlliance";
@@ -55,6 +56,8 @@ export default function Dashboard() {
   const [matches, setMatches] = useState<UserMatch[]>([]);
   // "matchId:role" -> scouting error (or suspicious data) that prompted this rescout
   const [rescouts, setRescouts] = useState<Map<string, string>>(new Map());
+  // "matchId:role" -> what a partial rescout redoes, e.g. "Auto fuel, Defense"
+  const [rescoutFieldLabels, setRescoutFieldLabels] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [teamNumbers, setTeamNumbers] = useState<Record<string, number | null>>(
     {}
@@ -91,6 +94,9 @@ export default function Dashboard() {
       ? getDevMatchRescouts(user.id).filter((r) => r.scouter_id === user.id)
       : await getUserRescouts(user.id);
     setRescouts(new Map(rescoutRows.map((r) => [`${r.match_id}:${r.role}`, r.reason])));
+    setRescoutFieldLabels(new Map(rescoutRows
+      .filter((r) => r.rescout_fields?.length)
+      .map((r) => [`${r.match_id}:${r.role}`, matchRescoutFieldLabels(r.rescout_fields ?? [])])));
 
     // Sandbox mode: build the list entirely from the fake generated
     // schedule instead of Supabase/TBA, so nothing here touches real data.
@@ -682,6 +688,11 @@ export default function Dashboard() {
                                     `${userMatch.match.id}-${userMatch.role}`
                                   ]
                                 }
+                              </div>
+                            )}
+                            {rescoutFieldLabels.has(`${userMatch.match.id}:${userMatch.role}`) && (
+                              <div className="text-xs mt-1">
+                                Redo only: {rescoutFieldLabels.get(`${userMatch.match.id}:${userMatch.role}`)}
                               </div>
                             )}
                           </div>

@@ -103,15 +103,14 @@ export async function setBugReportFixed(reportId: string, fixed: boolean): Promi
   return true;
 }
 
-/** Developers only: deletes a report and every comment under it. */
-export async function deleteBugReport(reportId: string): Promise<boolean> {
-  const { error, count } = await supabase.from("bug_reports").delete({ count: "exact" }).eq("id", reportId);
-  if (error || count === 0) {
-    // count 0: the database's rules didn't allow it (not a developer)
-    console.error("Error deleting bug report:", error ?? "not allowed");
-    return false;
+/** Developers only: deletes a report and every comment under it. Returns why it couldn't, or null. */
+export async function deleteBugReport(reportId: string): Promise<string | null> {
+  const { error } = await supabase.rpc("delete_bug_report", { p_report: reportId });
+  if (error) {
+    console.error("Error deleting bug report:", error);
+    return error.message;
   }
-  return true;
+  return null;
 }
 
 /** Whether the user wrote this report or has commented on it. */

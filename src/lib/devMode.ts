@@ -1,4 +1,5 @@
 import type { Event, Match, GameProfile, PitScoutingAssignment, Profile, Role, Roster } from "@/types";
+import { mergeRescoutData } from "@/lib/rescoutMerge";
 import type { PitScoutingSubmission } from "@/types/pitScouting";
 import type { Bet, BetAlliance, BetCurrency, BetWithMatch } from "@/types/betting";
 import { ROLE_TO_COLUMN, ROLE_TO_COLUMN_2, roleColumn } from "./roleUtils";
@@ -58,7 +59,7 @@ interface DevData {
   sandboxRosters?: Record<string, Roster[]>;
   sandboxPicklists?: Record<string, { picked_team_numbers: number[]; do_not_pick_team_numbers: number[] }>;
   sandboxBets?: Bet[];
-  sandboxMatchRescouts?: Array<{ match_id: string; role: string; scouter_id: string; reason: string }>;
+  sandboxMatchRescouts?: Array<{ match_id: string; role: string; scouter_id: string; reason: string; rescout_fields?: string[] | null; original_scouter_id?: string | null }>;
   /** "matchId:role:scouterId" of sandbox scouting errors a manager marked correct. */
   sandboxValidatedErrors?: string[];
   sandboxPitSubmissions?: PitScoutingSubmission[];
@@ -801,6 +802,17 @@ export function submitDevScoutingData(
   scoutingData: Record<string, unknown>
 ): void {
   const data = getDevData(userId);
+  // A partial rescout keeps the original's other fields and replaces it (like submit_match_rescout)
+  const rescout = (data.sandboxMatchRescouts ?? []).find(
+    (r) => r.match_id === matchId && r.role === role && r.scouter_id === userId && r.rescout_fields?.length
+  );
+  const original = rescout && data.scoutingSubmissions.find(
+    (s) => s.match_id === matchId && s.role === role && s.scouter_id === rescout.original_scouter_id
+  );
+  if (rescout?.rescout_fields && original) {
+    scoutingData = mergeRescoutData(original.scouting_data, scoutingData, rescout.rescout_fields);
+    data.scoutingSubmissions = data.scoutingSubmissions.filter((s) => s !== original);
+  }
   data.scoutingSubmissions.push({
     id: `dev-sub-${matchId}-${role}-${Date.now()}`,
     match_id: matchId,
@@ -984,7 +996,7 @@ export function getDevMatchRescouts(userId: string) {
 
 export function addDevMatchRescout(
   userId: string,
-  rescout: { match_id: string; role: string; scouter_id: string; reason: string }
+  rescout: { match_id: string; role: string; scouter_id: string; reason: string; rescout_fields?: string[] | null; original_scouter_id?: string | null }
 ): void {
   const data = getDevData(userId);
   const others = (data.sandboxMatchRescouts ?? []).filter(

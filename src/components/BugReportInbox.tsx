@@ -143,11 +143,11 @@ export function BugReportInbox({ openKey, onOpen, onBack, userId, isDeveloper, n
   async function removeReport() {
     if (!report || busy) return;
     setBusy(true);
-    const ok = await deleteBugReport(report.id);
+    const failure = await deleteBugReport(report.id);
     setBusy(false);
     setConfirmingDelete(false);
-    if (!ok) {
-      toast({ title: "Couldn't delete the report", variant: "destructive" });
+    if (failure) {
+      toast({ title: "Couldn't delete the report", description: failure, variant: "destructive" });
       return;
     }
     toast({ title: "Bug report deleted" });

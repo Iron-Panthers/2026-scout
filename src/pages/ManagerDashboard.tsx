@@ -717,18 +717,17 @@ export default function ManagerDashboard() {
   );
 
   const handleAssignRescout = useCallback(
-    async (profile: Profile) => {
+    async (profile: Profile, rescoutFields: string[]) => {
       if (!errorCell) return;
-      const currentMatch = matches.find((m) => m.matchNumber === errorCell.matchNumber);
-      if (!currentMatch?.matchId) return;
 
       suppressReloadUntilRef.current = Date.now() + 3000;
       const success = await assignMatchRescout({
-        matchId: currentMatch.matchId,
+        matchId: errorCell.matchId,
         role: errorCell.role,
         slot: errorCell.slot,
         oldScouterId: errorCell.scouterId,
         newScouterId: profile.id,
+        rescoutFields,
         // A reported error's comment, else what looked off about the numbers
         reason: errorCell.comment ?? (errorCell.suspicious ? suspiciousReason(errorCell.suspicious) : ""),
         devUserId: devModeStateRef.current.user?.id,
@@ -738,7 +737,7 @@ export default function ManagerDashboard() {
         return;
       }
 
-      const key = `${currentMatch.matchId}:${errorCell.role}:${errorCell.scouterId}`;
+      const key = `${errorCell.matchId}:${errorCell.role}:${errorCell.scouterId}`;
       setScoutingErrors((prev) => { const next = new Map(prev); next.delete(key); return next; });
       setCompletedSubmissions((prev) => { const next = new Set(prev); next.delete(key); return next; });
       const assignmentsKey = errorCell.slot === 2 ? "assignments2" : "assignments";
@@ -764,7 +763,7 @@ export default function ManagerDashboard() {
       setErrorCell(null);
       toast({ title: "Rescout Assigned", description: `${profile.name || "Scout"} will rescout this match.` });
     },
-    [errorCell, matches, toast]
+    [errorCell, toast]
   );
 
   // The open scouting error's data is right after all (or undo that): no rescout needed

@@ -11,6 +11,7 @@ import { awardPoints, awardEventPoints } from "./gameProfiles";
 import { POINTS_PER_MATCH, EVENT_POINTS_PER_MATCH } from "@/config/games";
 import { ALL_ROLE_COLUMNS } from "./roleUtils";
 import { requestAchievementCheck } from "./achievementEvents";
+import { mergeRescoutData } from "./rescoutMerge";
 
 /**
  * Current schema version - increment when scouting data structure changes
@@ -303,19 +304,32 @@ export async function submitScoutingData(
 ) {
   const alreadySubmitted = await hasExistingSubmission(matchId, role, scouterId);
 
-  const { data, error } = await supabase
-    .from("scouting_submissions")
-    .insert({
-      match_id: matchId,
-      role: role,
-      scouting_data: scoutingData,
-      schema_version: CURRENT_SCHEMA_VERSION,
-      scouter_id: scouterId,
-      team_num: team_num,
-      match_type: match_type
-    })
-    .select()
-    .single();
+  const partial = scouterId ? await partialRescoutSubmission(matchId, role, scouterId, scoutingData) : null;
+  const { data, error } = partial
+    // Replaces the original scouter's submission in the same transaction
+    ? await supabase.rpc("submit_match_rescout", {
+        p_match_id: matchId,
+        p_role: role,
+        p_scouting_data: partial,
+        p_team_num: team_num,
+        p_match_type: match_type,
+        p_schema_version: CURRENT_SCHEMA_VERSION,
+      }).then(async ({ data: id, error }) =>
+        error ? { data: null, error } : await supabase.from("scouting_submissions").select().eq("id", id).single()
+      )
+    : await supabase
+        .from("scouting_submissions")
+        .insert({
+          match_id: matchId,
+          role: role,
+          scouting_data: scoutingData,
+          schema_version: CURRENT_SCHEMA_VERSION,
+          scouter_id: scouterId,
+          team_num: team_num,
+          match_type: match_type
+        })
+        .select()
+        .single();
 
   if (error) {
     console.error("Error submitting scouting data:", error);
@@ -329,6 +343,43 @@ export async function submitScoutingData(
   requestAchievementCheck({ refresh: "all" });
 
   return data as ScoutingSubmission;
+}
+
+/**
+ * For a scouter doing a partial rescout of this match role (the manager picked fields to
+ * redo), the submission to save: the original's data with those fields from `scoutingData`.
+ * Null for a regular submission, a full rescout, or when the original is already gone.
+ */
+async function partialRescoutSubmission(
+  matchId: string,
+  role: string,
+  scouterId: string,
+  scoutingData: Record<string, unknown>
+): Promise<Record<string, unknown> | null> {
+  const { data: rescout } = await supabase
+    .from("match_rescouts")
+    .select("rescout_fields, original_scouter_id")
+    .eq("match_id", matchId)
+    .eq("role", role)
+    .eq("scouter_id", scouterId)
+    .maybeSingle();
+  if (!rescout?.rescout_fields?.length || !rescout.original_scouter_id) return null;
+
+  const { data: original } = await supabase
+    .from("scouting_submissions")
+    .select("scouting_data, schema_version")
+    .eq("match_id", matchId)
+    .eq("role", role)
+    .eq("scouter_id", rescout.original_scouter_id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!original) return null;
+
+  const originalData = (original.schema_version ?? CURRENT_SCHEMA_VERSION) < CURRENT_SCHEMA_VERSION
+    ? migrateScoutingData(original.scouting_data ?? {}, original.schema_version)
+    : original.scouting_data ?? {};
+  return mergeRescoutData(originalData, scoutingData, rescout.rescout_fields);
 }
 
 export const QUAL_SCHEMA_VERSION = 1;

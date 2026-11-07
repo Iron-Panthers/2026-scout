@@ -16,11 +16,6 @@ import {
 import { isDevModeActive } from "@/lib/devMode";
 import type { Bet, BetAlliance, BetCurrency, MatchOdds, OddsHistoryPoint, BetWithMatch } from "@/types/betting";
 
-/** Which game_profiles column a currency's balance lives in. */
-function balanceColumn(currency: BetCurrency): "points" | "event_points" {
-  return currency === "event" ? "event_points" : "points";
-}
-
 function balanceOf(profile: { points: number; event_points: number }, currency: BetCurrency): number {
   return currency === "event" ? profile.event_points : profile.points;
 }
@@ -243,19 +238,25 @@ export function calcPayout(
  *
  * @param redWinProb - match13's prediction (for red). Pass undefined for 50/50.
  * @param predTime - ISO string of predicted match start. Used to compute time decay.
+ * @param coinOdds - For an event-currency bet: the match's coin pool, whose rate it's paid at
+ *   (see settle_match_bets). Ignored when no coins are on `alliance`.
  */
 export function estimatePayout(
   amount: number,
   alliance: BetAlliance,
   odds: MatchOdds,
   redWinProb?: number,
-  predTime?: string | null
+  predTime?: string | null,
+  coinOdds?: MatchOdds
 ): number {
   if (amount <= 0) return 0;
 
   const allianceTotal = alliance === "red" ? odds.redTotal : odds.blueTotal;
-  const newAllianceTotal = allianceTotal + amount;
-  const newTotalPool = odds.totalPool + amount;
+  const coinAllianceTotal = coinOdds ? (alliance === "red" ? coinOdds.redTotal : coinOdds.blueTotal) : 0;
+  // An event bet isn't in the coin pool, so the coin rate is the pool as it stands
+  const [rateAllianceTotal, rateTotalPool] = coinAllianceTotal > 0
+    ? [coinAllianceTotal, coinOdds!.totalPool]
+    : [allianceTotal + amount, odds.totalPool + amount];
 
   // p for the alliance they're betting on
   const p =
@@ -269,7 +270,7 @@ export function estimatePayout(
     ? computeTimeDecayFactor(new Date().toISOString(), predTime)
     : 1.0;
 
-  return Math.max(calcPayout(amount, newAllianceTotal, newTotalPool, p, timeDecayFactor), amount + 10);
+  return Math.max(calcPayout(amount, rateAllianceTotal, rateTotalPool, p, timeDecayFactor), amount + 10);
 }
 
 // ---------------------------------------------------------------------------
@@ -430,23 +431,11 @@ export async function placeBet(
     return createDevBet(userId, userId, matchId, alliance, amount, currency);
   }
 
-  const profile = await getGameProfile(userId);
-  if (!profile) return { success: false, error: "Could not load your game profile." };
-  const balance = balanceOf(profile, currency);
-  if (balance < amount) {
-    const label = currency === "event" ? "event points" : "points";
-    return { success: false, error: `Not enough ${label} — you have ${balance}.` };
-  }
-
   const { data: match } = await supabase
     .from("matches")
-    .select("winning_alliance, pred_time, event_id")
+    .select("event_id")
     .eq("id", matchId)
     .maybeSingle();
-
-  if (match?.winning_alliance) {
-    return { success: false, error: "This match has already been settled." };
-  }
 
   if (currency === "event") {
     const activeEvent = await getActiveEvent();
@@ -455,38 +444,18 @@ export async function placeBet(
     }
   }
 
-  // if (match?.pred_time && new Date(match.pred_time) <= new Date()) {
-  //   return { success: false, error: "Betting is closed — this match has already started." };
-  // }
-
-  const existing = await getMatchUserBet(matchId, userId, currency);
-  if (existing) {
-    return { success: false, error: "You already have an active bet on this match." };
-  }
-
-  const column = balanceColumn(currency);
-  const { error: balanceErr } = await supabase
-    .from("game_profiles")
-    .update({ [column]: balance - amount })
-    .eq("user_id", userId);
-
-  if (balanceErr) return { success: false, error: "Failed to deduct balance." };
-
-  const { error: betErr } = await supabase.from("bets").insert({
-    user_id: userId,
-    match_id: matchId,
-    alliance,
-    amount,
-    currency,
-    status: "pending",
+  // The stake comes out of the balance in the same transaction as the bet (place_bet), so
+  // a placed bet is always paid for up front; it also checks the balance, the match isn't
+  // settled and there's no other pending bet.
+  const { error } = await supabase.rpc("place_bet", {
+    p_match_id: matchId,
+    p_alliance: alliance,
+    p_amount: amount,
+    p_currency: currency,
   });
-
-  if (betErr) {
-    await supabase
-      .from("game_profiles")
-      .update({ [column]: balance })
-      .eq("user_id", userId);
-    return { success: false, error: "Failed to place bet." };
+  if (error) {
+    console.error("Error placing bet:", error);
+    return { success: false, error: error.message ? `${error.message}.` : "Failed to place bet." };
   }
 
   return { success: true };
@@ -501,32 +470,11 @@ export async function cancelBet(
     return succeeded ? { success: true } : { success: false, error: "Could not cancel this sandbox bet." };
   }
 
-  const { data: bet } = await supabase
-    .from("bets")
-    .select("*")
-    .eq("id", betId)
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (!bet) return { success: false, error: "Bet not found." };
-  if (bet.status !== "pending") return { success: false, error: "Can only cancel pending bets." };
-
-  const { error: updateErr } = await supabase
-    .from("bets")
-    .update({ status: "cancelled" })
-    .eq("id", betId)
-    .eq("user_id", userId);
-
-  if (updateErr) return { success: false, error: "Failed to cancel bet." };
-
-  const profile = await getGameProfile(userId);
-  if (profile) {
-    const currency = (bet.currency as BetCurrency) ?? "points";
-    const column = balanceColumn(currency);
-    await supabase
-      .from("game_profiles")
-      .update({ [column]: balanceOf(profile, currency) + bet.amount })
-      .eq("user_id", userId);
+  // Refunded in the same transaction as the cancel (cancel_bet), only while still pending
+  const { error } = await supabase.rpc("cancel_bet", { p_bet_id: betId });
+  if (error) {
+    console.error("Error cancelling bet:", error);
+    return { success: false, error: error.message ? `${error.message}.` : "Failed to cancel bet." };
   }
 
   return { success: true };
@@ -560,12 +508,18 @@ export async function settleMatchBets(
         ? 1 - statboticsRedWinProb
         : 0.5;
 
+    // Event bets are paid at the coin pool's rate, as settle_match_bets does
+    const coinPool = pendingBets.filter((bet) => (bet.currency ?? "points") === "points");
+    const coinTotal = coinPool.reduce((total, bet) => total + bet.amount, 0);
+    const coinWinnerPool = coinPool.filter((bet) => bet.alliance === winner).reduce((total, bet) => total + bet.amount, 0);
+
     for (const currency of ["points", "event"] as const) {
       const pool = pendingBets.filter((bet) => (bet.currency ?? "points") === currency);
       const redTotal = pool.filter((bet) => bet.alliance === "red").reduce((total, bet) => total + bet.amount, 0);
       const blueTotal = pool.filter((bet) => bet.alliance === "blue").reduce((total, bet) => total + bet.amount, 0);
-      const totalPool = redTotal + blueTotal;
-      const winnerPool = winner === "red" ? redTotal : blueTotal;
+      const useCoinRate = currency === "event" && coinWinnerPool > 0;
+      const totalPool = useCoinRate ? coinTotal : redTotal + blueTotal;
+      const winnerPool = useCoinRate ? coinWinnerPool : winner === "red" ? redTotal : blueTotal;
 
       for (const bet of pool) {
         const won = winner === "tie" || bet.alliance === winner;
@@ -590,7 +544,8 @@ export async function settleMatchBets(
   // Settlement runs server-side in one transaction: each bet is claimed
   // (pending → won/lost) and paid out together, so a retry, a reload or a
   // concurrent call can never pay the same bet twice. The payout math lives in
-  // supabase/migrations/20261009010_create_settle_match_bets_rpc.sql and
+  // supabase/migrations/20261009010_create_settle_match_bets_rpc.sql (event bets'
+  // coin-pool rate in 20261107050_pay_event_bets_at_coin_pool_rate.sql) and
   // mirrors calcPayout above.
   const { error } = await supabase.rpc("settle_match_bets", {
     p_match_id: matchId,

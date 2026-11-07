@@ -17,11 +17,17 @@ export interface MatchRescout {
   role: string;
   scouter_id: string;
   reason: string;
+  /** The fields to redo; null for a full rescout. */
+  rescout_fields?: string[] | null;
+  /** Whose submission a partial rescout corrects. */
+  original_scouter_id?: string | null;
 }
 
 /**
- * Hands a submission with a scouting error to a new scouter: records the rescout,
- * deletes the old submission and assigns the new scouter to the same slot.
+ * Hands a submission with a scouting error to a new scouter: records the rescout and
+ * assigns the new scouter to the same slot. A full rescout (`rescoutFields` null) deletes
+ * the old submission now; a partial one keeps it until the rescout replaces it with the
+ * merged submission (see mergeRescoutData).
  */
 export async function assignMatchRescout(params: {
   matchId: string;
@@ -30,26 +36,39 @@ export async function assignMatchRescout(params: {
   oldScouterId: string;
   newScouterId: string;
   reason: string;
+  /** The fields to redo (MATCH_RESCOUT_FIELDS ids); null or empty redoes the whole submission. */
+  rescoutFields?: string[] | null;
   /** The signed-in user's id, needed to reach the sandbox dataset. */
   devUserId?: string;
 }): Promise<boolean> {
   const { matchId, role, slot, oldScouterId, newScouterId, reason, devUserId } = params;
+  const rescoutFields = params.rescoutFields?.length ? params.rescoutFields : null;
+  const rescout = {
+    match_id: matchId,
+    role,
+    scouter_id: newScouterId,
+    reason,
+    rescout_fields: rescoutFields,
+    original_scouter_id: rescoutFields ? oldScouterId : null,
+  };
 
   if (isDevMatchId(matchId)) {
     if (!devUserId) return false;
-    deleteDevScoutingSubmission(devUserId, matchId, role, oldScouterId);
-    addDevMatchRescout(devUserId, { match_id: matchId, role, scouter_id: newScouterId, reason });
+    if (!rescoutFields) deleteDevScoutingSubmission(devUserId, matchId, role, oldScouterId);
+    addDevMatchRescout(devUserId, rescout);
     setDevMatchAssignment(devUserId, matchId, role, slot, newScouterId);
     return true;
   }
 
   const { error: rescoutError } = await supabase
     .from("match_rescouts")
-    .upsert({ match_id: matchId, role, scouter_id: newScouterId, reason }, { onConflict: "match_id,role,scouter_id" });
+    .upsert(rescout, { onConflict: "match_id,role,scouter_id" });
   if (rescoutError) {
     console.error("Error recording rescout:", rescoutError);
     return false;
   }
+
+  if (rescoutFields) return updateMatchAssignment(matchId, role, newScouterId, slot);
 
   const { error: deleteError } = await supabase
     .from("scouting_submissions")
@@ -121,7 +140,7 @@ export async function setScoutingErrorValidated(params: {
 export async function getUserRescouts(userId: string): Promise<MatchRescout[]> {
   const { data, error } = await supabase
     .from("match_rescouts")
-    .select("match_id, role, scouter_id, reason")
+    .select("match_id, role, scouter_id, reason, rescout_fields, original_scouter_id")
     .eq("scouter_id", userId);
   if (error) {
     console.error("Error fetching rescouts:", error);

@@ -1,8 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getSubmissionDetails, type SubmissionDetails } from "@/lib/matchRescouts";
 import { formatStat, type StatRange, type SuspiciousSubmission } from "@/lib/suspiciousSubmissions";
 import { AlertTriangle, CheckCircle2, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { MATCH_RESCOUT_FIELDS, matchRescoutFieldLabels } from "@/config/matchRescoutFields";
 import { ScoutPickerList } from "@/components/manager/ScoutAssignmentDialog";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { Profile } from "@/types";
@@ -25,7 +28,8 @@ interface ScoutingErrorDialogProps {
   onOpenChange: (open: boolean) => void;
   availableScouts: Profile[];
   cosmeticsMap?: Record<string, Record<string, string>>;
-  onAssignRescout: (profile: Profile) => Promise<void>;
+  /** `fields`: the MATCH_RESCOUT_FIELDS ids to redo; empty redoes the whole submission. */
+  onAssignRescout: (profile: Profile, fields: string[]) => Promise<void>;
   /** A manager already checked this error (or suspicious entry) and found the data correct. */
   validated: boolean;
   /** Marks the data correct (no rescout needed), or undoes that. */
@@ -82,13 +86,16 @@ function RangeStrip({ stat }: { stat: StatRange }) {
  */
 export function ScoutingErrorDialog({ target, onOpenChange, availableScouts, cosmeticsMap, onAssignRescout, validated, onSetValidated }: ScoutingErrorDialogProps) {
   const [picked, setPicked] = useState<Profile | null>(null);
+  const [fields, setFields] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
+  const confirmRef = useRef<HTMLDivElement>(null);
 
   const [details, setDetails] = useState<SubmissionDetails | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
 
   useEffect(() => {
     setPicked(null);
+    setFields(new Set());
     setSaving(false);
     setDetails(null);
     if (!target) return;
@@ -121,9 +128,21 @@ export function ScoutingErrorDialog({ target, onOpenChange, availableScouts, cos
   const confirm = async () => {
     if (!picked) return;
     setSaving(true);
-    await onAssignRescout(picked);
+    await onAssignRescout(picked, [...fields]);
     setSaving(false);
   };
+
+  // The confirm step can open below the fold of this scrolling dialog: bring it into view
+  useEffect(() => {
+    if (picked) confirmRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [picked]);
+
+  const toggleField = (id: string, checked: boolean) =>
+    setFields((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id); else next.delete(id);
+      return next;
+    });
 
   return (
     <Dialog open={!!target} onOpenChange={onOpenChange}>
@@ -210,21 +229,48 @@ export function ScoutingErrorDialog({ target, onOpenChange, availableScouts, cos
 
           <div className="min-w-0 space-y-2">
             <h3 className="text-sm font-semibold">Assign rescout</h3>
+            <div className="space-y-1.5 rounded-lg border p-3">
+              <p className="text-xs text-muted-foreground">
+                Fields to redo. The rest keep the current answers; pick none to redo the whole submission.
+              </p>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
+                {MATCH_RESCOUT_FIELDS.map((field) => (
+                  <div key={field.id} className="flex items-center gap-2">
+                    <Checkbox
+                      id={`match-rescout-${field.id}`}
+                      checked={fields.has(field.id)}
+                      onCheckedChange={(checked) => toggleField(field.id, checked === true)}
+                    />
+                    <Label htmlFor={`match-rescout-${field.id}`} className="cursor-pointer text-sm font-normal">{field.label}</Label>
+                  </div>
+                ))}
+              </div>
+            </div>
             <ScoutPickerList availableScouts={availableScouts} onSelect={setPicked} cosmeticsMap={cosmeticsMap} selectedId={picked?.id} listClassName="max-h-[40vh]" />
+
+            {picked && (
+              <div ref={confirmRef} className="space-y-2 rounded-lg border border-border p-3">
+                <p className="text-sm">
+                  Assign <strong>{picked.name || "Unknown"}</strong> to rescout?{" "}
+                  {fields.size > 0 ? (
+                    <>
+                      Their submission will replace <strong>{target?.scouterName}</strong>'s, with only{" "}
+                      <strong>{matchRescoutFieldLabels([...fields])}</strong> taken from it.
+                    </>
+                  ) : (
+                    <>
+                      The current submission by <strong>{target?.scouterName}</strong> will be{" "}
+                      <strong className="text-destructive">permanently deleted</strong>.
+                    </>
+                  )}
+                </p>
+                <Button onClick={confirm} disabled={saving} className="w-full">
+                  {saving ? "Assigning..." : fields.size > 0 ? "Assign rescout" : "Delete submission & assign rescout"}
+                </Button>
+              </div>
+            )}
           </div>
         </div>
-
-        {picked && (
-          <div className="space-y-2 rounded-lg border border-border p-3">
-            <p className="text-sm">
-              Assign <strong>{picked.name || "Unknown"}</strong> to rescout? The current submission by{" "}
-              <strong>{target?.scouterName}</strong> will be <strong className="text-destructive">permanently deleted</strong>.
-            </p>
-            <Button onClick={confirm} disabled={saving} className="w-full">
-              {saving ? "Assigning..." : "Delete submission & assign rescout"}
-            </Button>
-          </div>
-        )}
       </DialogContent>
     </Dialog>
   );

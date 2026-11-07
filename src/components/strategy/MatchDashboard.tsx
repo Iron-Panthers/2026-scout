@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { AlertCircle, ArrowLeft, ImageOff, Loader2, Play } from "lucide-react";
+import { AlertCircle, ArrowLeft, ChevronsUpDown, ImageOff, Loader2, Play, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { MatchVideoDialog } from "@/components/MatchVideoDialog";
 import { isDevEventId } from "@/lib/devMode";
@@ -278,7 +280,7 @@ function MatchSchedule({ matches, onSelect }: {
   const nextRef = useRef<HTMLLIElement>(null);
   const nextMatch = matches.find((match) => match.status !== "played")?.matchNumber;
   const [watching, setWatching] = useState<QualScheduleMatch | null>(null);
-  // The video column only appears once TBA (or a livestream) has a video for some match.
+  // The video column only appears once some match has a video.
   const showVideos = matches.some(hasMatchVideo);
   // Start scrolled to the next match to be played
   useEffect(() => {
@@ -349,8 +351,8 @@ function MatchSchedule({ matches, onSelect }: {
   );
 }
 
-/** Whether The Blue Alliance has posted a video of the match, or it was found in an event livestream. */
-const hasMatchVideo = (match: ScheduledMatch) => match.videos.some((video) => video.source === "tba" || video.source === "clip");
+/** Whether the match has a video: from The Blue Alliance, an event livestream, or a link a manager added. */
+const hasMatchVideo = (match: ScheduledMatch) => match.videos.length > 0;
 
 /**
  * Plays a match's video. It sits over a row's first (video) column, beside the row's
@@ -558,7 +560,7 @@ function AllianceSummary({ label, heading, border, teams, opponents }: {
       <div className="mb-2 flex items-baseline justify-between gap-2">
         <h2 className={`text-sm font-bold uppercase tracking-wide ${heading}`}>{label}</h2>
         <span className="text-[10px] text-muted-foreground">
-          {scouted === teams.length ? `All ${teams.length} robots scouted` : `${scouted} of ${teams.length} robots scouted`}
+          {teams.length === 0 ? "No robots" : scouted === teams.length ? `All ${teams.length} robots scouted` : `${scouted} of ${teams.length} robots scouted`}
         </span>
       </div>
       <div className="grid grid-cols-3 gap-x-4 gap-y-2">
@@ -567,6 +569,156 @@ function AllianceSummary({ label, heading, border, teams, opponents }: {
         {stat("Avg total points", (team) => team.totalPoints)}
       </div>
     </Card>
+  );
+}
+
+/** A fantasy alliance's robots: team numbers, null for a slot no team is picked for yet. */
+type FantasySlots = (number | null)[];
+
+/** "254,,1678" (an empty slot between) as slots; three empty ones when missing. */
+function parseFantasySlots(value: string | null): FantasySlots {
+  if (value === null) return [null, null, null];
+  if (value === "") return [];
+  return value.split(",").map((part) => (/^\d+$/.test(part) ? Number(part) : null));
+}
+
+const formatFantasySlots = (slots: FantasySlots) => slots.map((team) => team ?? "").join(",");
+
+/** Picks any team at the event for a fantasy robot slot, searchable by number or name. */
+function FantasyTeamPicker({ value, roster, onChange, onRemove }: {
+  value: number | null;
+  roster: { teamNumber: number; name: string }[];
+  onChange: (teamNumber: number) => void;
+  onRemove: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mb-1.5 flex min-w-0 items-center gap-1">
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button variant="outline" size="sm" className="min-w-0 flex-1 justify-between gap-1 px-2 font-mono tabular-nums">
+            <span className="truncate">{value ?? "Pick team"}</span>
+            <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="w-64 p-0">
+          <Command>
+            <CommandInput placeholder="Search teams..." />
+            <CommandList>
+              <CommandEmpty>No teams found.</CommandEmpty>
+              <CommandGroup>
+                {roster.map((team) => (
+                  <CommandItem
+                    key={team.teamNumber}
+                    value={`${team.teamNumber} ${team.name}`}
+                    onSelect={() => { onChange(team.teamNumber); setOpen(false); }}
+                    className={team.teamNumber === value ? "bg-accent" : ""}
+                  >
+                    <span className="w-12 shrink-0 font-mono tabular-nums">{team.teamNumber}</span>
+                    <span className="truncate text-muted-foreground">{team.name}</span>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+      <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-muted-foreground" onClick={onRemove} aria-label="Remove this robot">
+        <X className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+}
+
+/**
+ * A made-up match laid out like a real one: each alliance has as many robots as you like, each
+ * any team at the event, and the alliance totals add up whoever is on it.
+ */
+function FantasyMatch({ data, slots, onChangeSlots, onSelectMatch, onOpenPhoto }: {
+  data: EventData;
+  slots: Record<"red" | "blue", FantasySlots>;
+  onChangeSlots: (alliance: "red" | "blue", slots: FantasySlots) => void;
+  onSelectMatch: (matchNumber: number) => void;
+  onOpenPhoto: (team: TeamDashboard) => void;
+}) {
+  const roster = useMemo(
+    () => [...data.schedule.teamNames].map(([teamNumber, name]) => ({ teamNumber, name })).sort((a, b) => a.teamNumber - b.teamNumber),
+    [data]
+  );
+  const teams = useMemo(() => ({
+    red: slots.red.map((team) => (team === null ? null : buildTeamDashboard(team, data))),
+    blue: slots.blue.map((team) => (team === null ? null : buildTeamDashboard(team, data))),
+  }), [slots, data]);
+  const picked = (alliance: "red" | "blue") => teams[alliance].filter((team): team is TeamDashboard => team !== null);
+
+  return (
+    // Bottom margin keeps the last cards clear of the floating page nav.
+    <div className="mb-20 space-y-6">
+      <div className="grid gap-2 sm:grid-cols-2 sm:gap-3 xl:gap-4">
+        {ALLIANCES.map((alliance) => (
+          <AllianceSummary
+            key={alliance.key}
+            label={alliance.label}
+            heading={alliance.heading}
+            border={alliance.border}
+            teams={picked(alliance.key)}
+            opponents={picked(alliance.key === "red" ? "blue" : "red")}
+          />
+        ))}
+      </div>
+      <div className="grid gap-6 lg:grid-cols-2 lg:gap-4">
+        {ALLIANCES.map((alliance) => {
+          const allianceSlots = slots[alliance.key];
+          const setSlot = (index: number, team: number | null) =>
+            onChangeSlots(alliance.key, allianceSlots.map((slot, i) => (i === index ? team : slot)));
+          return (
+            <section key={alliance.key} className="min-w-0">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <h2 className={`text-sm font-bold uppercase tracking-wide ${alliance.heading}`}>{alliance.label}</h2>
+                <Button variant="outline" size="sm" className="h-7 gap-1 px-2 text-xs" onClick={() => onChangeSlots(alliance.key, [...allianceSlots, null])}>
+                  <Plus className="h-3.5 w-3.5" />
+                  Add robot
+                </Button>
+              </div>
+              {allianceSlots.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No robots. Add one to put a team on this alliance.</p>
+              ) : (
+                <div className="grid grid-cols-3 items-start gap-2 sm:gap-3">
+                  {allianceSlots.map((teamNumber, index) => {
+                    const team = teams[alliance.key][index];
+                    return (
+                      <div key={index} className="min-w-0">
+                        <FantasyTeamPicker
+                          value={teamNumber}
+                          roster={roster}
+                          onChange={(value) => setSlot(index, value)}
+                          onRemove={() => onChangeSlots(alliance.key, allianceSlots.filter((_, i) => i !== index))}
+                        />
+                        {team ? (
+                          <TeamCard
+                            team={team}
+                            label={String(team.teamNumber)}
+                            station={`${alliance.key === "red" ? "Red" : "Blue"} ${index + 1}`}
+                            border={alliance.border}
+                            selectedMatch={0}
+                            onSelectMatch={onSelectMatch}
+                            onOpenPhoto={onOpenPhoto}
+                          />
+                        ) : (
+                          <Card className={`min-w-0 items-center justify-center border-t-4 py-10 text-center text-xs text-muted-foreground ${alliance.border}`}>
+                            Pick a team
+                          </Card>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -618,8 +770,26 @@ export function MatchDashboard({ event, userId, userName, devMode, toolbarSlot, 
   const matches = data?.schedule.matches ?? [];
   // No (or an unknown) match picked: the list of every match
   const match = matchParam ? matches.find((item) => item.matchNumber === matchParam) : undefined;
+  // The fantasy match (?fantasy=1), its robots in the address too (&red=254,1678&blue=...)
+  const fantasyOpen = !match && searchParams.get("fantasy") === "1";
+  const redParam = searchParams.get("red");
+  const blueParam = searchParams.get("blue");
+  const fantasySlots = useMemo(
+    () => ({ red: parseFantasySlots(redParam), blue: parseFantasySlots(blueParam) }),
+    [redParam, blueParam]
+  );
+  const setFantasySlots = (alliance: "red" | "blue", slots: FantasySlots) => {
+    setSearchParams(
+      (current) => {
+        const params = new URLSearchParams(current);
+        params.set(alliance, formatFantasySlots(slots));
+        return params;
+      },
+      { replace: true }
+    );
+  };
 
-  const matchOpen = match !== undefined;
+  const matchOpen = match !== undefined || fantasyOpen;
   useEffect(() => {
     onMatchOpenChange(matchOpen);
     return () => onMatchOpenChange(false);
@@ -648,6 +818,8 @@ export function MatchDashboard({ event, userId, userName, devMode, toolbarSlot, 
       (current) => {
         const params = new URLSearchParams(current);
         params.set("match", String(value));
+        // From the fantasy match, a team's match chip opens that real match
+        for (const key of ["fantasy", "red", "blue"]) params.delete(key);
         return params;
       },
       { replace: match !== undefined }
@@ -657,7 +829,7 @@ export function MatchDashboard({ event, userId, userName, devMode, toolbarSlot, 
     setSearchParams(
       (current) => {
         const params = new URLSearchParams(current);
-        params.delete("match");
+        for (const key of ["match", "fantasy", "red", "blue"]) params.delete(key);
         return params;
       },
       { replace: true }
@@ -687,7 +859,7 @@ export function MatchDashboard({ event, userId, userName, devMode, toolbarSlot, 
   // Toolbar (in place of the event dropdown), only while a match is open: back to the list,
   // and its video when there is one (managers can always open it to paste a link).
   // Matches are picked from the list (or a team card's chips).
-  const matchToolbar = toolbarSlot && match && createPortal(
+  const matchToolbar = toolbarSlot && (match || fantasyOpen) && createPortal(
     <div className="flex min-w-0 items-center gap-2">
       {fromTeam ? (
         // Back through history, so the team's page comes back as it was
@@ -701,7 +873,7 @@ export function MatchDashboard({ event, userId, userName, devMode, toolbarSlot, 
           All matches
         </Button>
       )}
-      {(match.videos.length > 0 || editableVideos) && (
+      {match && (match.videos.length > 0 || editableVideos) && (
         <Button variant="outline" size="sm" className="shrink-0 gap-1.5" onClick={() => setVideoOpen(true)}>
           <Play className="h-4 w-4" />
           {match.videos.length > 0 ? "Video" : "Add video"}
@@ -726,6 +898,16 @@ export function MatchDashboard({ event, userId, userName, devMode, toolbarSlot, 
       <p className="flex items-center gap-2 text-muted-foreground">
         <Loader2 className="h-4 w-4 animate-spin" />Loading event data...
       </p>
+    );
+  } else if (fantasyOpen) {
+    body = (
+      <FantasyMatch
+        data={data}
+        slots={fantasySlots}
+        onChangeSlots={setFantasySlots}
+        onSelectMatch={selectMatch}
+        onOpenPhoto={setPhotoTeam}
+      />
     );
   } else if (matches.length === 0) {
     body = (

@@ -801,6 +801,12 @@ export default function MatchBetting() {
     return offlineOdds ?? { redPct: 50, bluePct: 50, totalPool: 0, betCount: 0, history: [], redTotal: 0, blueTotal: 0 };
   }, [bets, betCurrency, isOnline, offlineOdds]);
 
+  // Event-currency bets are paid at the coin pool's rate, so their estimates use it
+  const coinOdds: MatchOdds | undefined = useMemo(
+    () => (betCurrency === "event" && isOnline ? computeOddsFromBets(bets.filter((b) => (b.currency ?? "points") === "points")) : undefined),
+    [bets, betCurrency, isOnline]
+  );
+
   useEffect(() => {
     if (isOnline && match_id) cacheMatchOdds(match_id, currentOdds, betCurrency);
   }, [currentOdds, isOnline, betCurrency, match_id]);
@@ -838,7 +844,7 @@ export default function MatchBetting() {
   const inDecayWindow = currentDecayFactor < 1.0 && !bettingClosed;
 
   const estPayout = selectedAlliance
-    ? estimatePayout(betAmount, selectedAlliance, currentOdds as MatchOdds, m13RedProb, predTime)
+    ? estimatePayout(betAmount, selectedAlliance, currentOdds as MatchOdds, m13RedProb, predTime, coinOdds)
     : null;
 
   // Winning alliance is complete if match13 result says so OR match row says so
@@ -1158,7 +1164,7 @@ export default function MatchBetting() {
                   <div className="text-xs text-muted-foreground mt-1">
                     Est. payout:{" "}
                     {estimatePayout(userBet.amount, userBet.alliance as "red" | "blue",
-                      currentOdds as MatchOdds, m13RedProb)} {currencyUnit(userBet.currency)} if {userBet.alliance} wins
+                      currentOdds as MatchOdds, m13RedProb, undefined, coinOdds)} {currencyUnit(userBet.currency)} if {userBet.alliance} wins
                   </div>
                 </div>
                 <Button
