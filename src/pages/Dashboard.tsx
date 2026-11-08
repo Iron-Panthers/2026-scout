@@ -24,7 +24,6 @@ import { getUserMatches, getEvents } from "@/lib/matches";
 import { getMatchTeam } from "@/lib/blueAlliance";
 import { filterMatchesWithoutSubmissions } from "@/lib/scoutingSchema";
 import { getUserPitAssignments, type UserPitAssignment } from "@/lib/pitScoutingAssignments";
-import { clockIn, clockOut } from "@/lib/profiles";
 import { supabase } from "@/lib/supabase";
 import DashboardHeader from "@/components/DashboardHeader";
 import UserProfileMenu from "@/components/UserProfileMenu";
@@ -77,7 +76,6 @@ export default function Dashboard() {
   );
   const [pitAssignments, setPitAssignments] = useState<UserPitAssignment[]>([]);
   const [refreshing, setRefreshing] = useState(false);
-  const [clockingIn, setClocingIn] = useState(false);
   // The open tab lives in the address (?page=betting...), so reloading stays on it — and a
   // link like /dashboard?page=betting lands straight on that tab (MatchBetting's back
   // button uses that, since Betting lives here as a tab).
@@ -371,28 +369,6 @@ export default function Dashboard() {
     return "bg-blue-50 text-blue-800 border-blue-700/40 dark:bg-blue-600/20 dark:text-blue-400 dark:border-blue-600/30";
   };
 
-  const handleClockIn = async () => {
-    if (!user?.id) return;
-    setClocingIn(true);
-    // Flip the button/status immediately instead of waiting on the
-    // write-then-refetch round-trip to feel responsive. Only re-sync from
-    // the server on failure — refetching unconditionally can race the write
-    // and resolve with the pre-clock-in data, snapping the UI back.
-    patchProfile({ clocked_in: true });
-    const success = await clockIn(user.id);
-    if (!success) await refreshProfile();
-    setClocingIn(false);
-  };
-
-  const handleClockOut = async () => {
-    if (!user?.id) return;
-    setClocingIn(true);
-    patchProfile({ clocked_in: false });
-    const success = await clockOut(user.id);
-    if (!success) await refreshProfile();
-    setClocingIn(false);
-  };
-
   // Straight to the scout config page for this match and role.
   const handleMatchClick = (userMatch: UserMatch) => {
     const matchId = userMatch.match.id;
@@ -407,50 +383,6 @@ export default function Dashboard() {
 
     navigate(`/config/${matchId}?role=${userMatch.role}`);
   };
-
-  const clockInBar = (
-    <>
-      {profile?.clocked_in ? (
-        <div className="flex items-center justify-between p-4 bg-primary/10 border border-primary/40 rounded-lg">
-          <div className="flex items-center gap-3">
-            <div className="mx-5 h-3 w-3 rounded-full bg-primary animate-pulse" />
-            <div>
-              <p className="font-semibold text-primary">Clocked In</p>
-              <p className="text-xs text-muted-foreground">You're in stands!</p>
-            </div>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={clockingIn}
-            className="h-16 border-primary/40 text-primary hover:bg-primary/10 hover:text-primary"
-            onClick={handleClockOut}
-          >
-            {clockingIn ? (
-              <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-            ) : (
-              <LogOut className="h-4 w-4 mr-1.5" />
-            )}
-            Clock Out
-          </Button>
-        </div>
-      ) : (
-        <Button
-          size="lg"
-          disabled={clockingIn}
-          className="w-full h-20 lg:h-full text-lg"
-          onClick={handleClockIn}
-        >
-          {clockingIn ? (
-            <Loader2 className="h-6 w-6 mr-2 animate-spin" />
-          ) : (
-            <LogIn className="h-6 w-6 mr-2" />
-          )}
-          {Math.random() < 0.02 ? "Lock In" : "Clock In"}
-        </Button>
-      )}
-    </>
-  );
 
   return (
     <div className="min-h-screen bg-background my-5">
@@ -498,17 +430,9 @@ export default function Dashboard() {
 
         {dashboardPage === "scout" ? (
           <>
-        {/* Clock In bar — above grid on small screens */}
-        <div className="lg:hidden mb-4 space-y-2">
-          {clockInBar}
-        </div>
 
         {/* Action Buttons */}
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-0">
-          {/* Clock In / Out — in grid on sm+ screens */}
-          <div className="hidden lg:block mb-6 space-y-2 h-full">
-            {clockInBar}
-          </div>
+        <div className="grid grid-cols-2 lg:grid-cols-2 gap-4 mb-0">
           <Button
             size="lg"
             className="h-24 text-lg font-semibold flex flex-col gap-2"

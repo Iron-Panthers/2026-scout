@@ -21,8 +21,6 @@ export interface Profile {
   // separate from `role`, which is just a display label.
   is_developer: boolean;
   avatar_url: string | null;
-  clocked_in: boolean;
-  clocked_in_at: string | null;
   // Push notifications for new messages (Settings → Notifications → Messages)
   message_notifications?: boolean;
   // Seasons they were on the team (set on their profile page)
