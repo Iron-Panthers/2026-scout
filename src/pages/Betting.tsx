@@ -497,7 +497,7 @@ function MarketGrid({ openMatches, oddsMap, tbaMap, m13Map, myBetByMatch, tbaLoa
 
       {/* Responsive grid — 2 cols on mobile, 3 on md, 4 on lg+ */}
       {rest.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 h-100 overflow-scroll">
           {openMatches.map((match) => (
             <GridCard
               key={match.id}
@@ -552,10 +552,10 @@ function CompletedMatchCard({ match, odds, tba, m13, userBet, onClick }: Complet
 
   return (
     <Card className={`cursor-pointer transition-all hover:scale-[1.005] border ${winnerBorder}`} onClick={onClick}>
-      <CardContent className="pt-3 pb-3">
+      <CardContent className="pt-0 pb-0 h-20">
         <div className="flex items-center justify-between gap-2">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap mb-1">
+          <div className="flex-1 min-w-0 mb-8">
+            <div className="flex items-center gap-2 flex-wrap mb-1 w-max">
               <span className="font-bold text-sm">{match.name}</span>
               {winner && winner !== "tie" && (
                 <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${
@@ -570,7 +570,7 @@ function CompletedMatchCard({ match, odds, tba, m13, userBet, onClick }: Complet
               )}
               {userBet && (
                 <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${getBetStatusColor(userBet.status)}`}>
-                  {userBet.status === "won" ? "🎉 Won" : userBet.status === "lost" ? "Lost" : userBet.status}
+                  {userBet.status === "won" ? "Won" : userBet.status === "lost" ? "Lost" : userBet.status}
                   {userBet.status === "won" && userBet.payout !== null
                     ? ` +${userBet.payout - userBet.amount}`
                     : userBet.status === "lost" ? ` −${userBet.amount}` : ""}
@@ -687,7 +687,7 @@ function Leaderboard({ userId, matchIds }: { userId?: string; matchIds: string[]
   );
 
   return (
-    <div className="space-y-2">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
       {entries.map((e, i) => (
         <Card key={e.userId} className={e.userId === userId ? "border-primary/50 bg-primary/5" : ""}>
           <CardContent className="pt-3 pb-3 flex items-center gap-3">
@@ -1200,7 +1200,7 @@ export default function Betting({
             </TabsContent>
 
             {/* ── RESULTS ── */}
-            <TabsContent value="results" className="space-y-3 max-w-2xl mx-auto">
+            <TabsContent value="results" className="space-y-3 max-w mx-auto">
               {completedMatches.length === 0 && (
                 <div className="text-center text-muted-foreground py-12">
                   <Zap className="h-10 w-10 mx-auto mb-3 opacity-30" />
@@ -1228,12 +1228,14 @@ export default function Betting({
                             <span className="h-px flex-1 bg-border" />
                           </div>
                         )}
-                        {normal.map((match) => (
-                          <CompletedMatchCard key={match.id} match={match}
-                            odds={oddsMap.get(match.id)} tba={tbaMap.get(match.match_number)}
-                            m13={m13Map.get(match.match_number)} userBet={myBetByMatch.get(match.id)}
-                            onClick={() => navigate(`/betting/${match.id}`)} />
-                        ))}
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 h-150 overflow-scroll">
+                          {normal.map((match) => (
+                            <CompletedMatchCard key={match.id} match={match}
+                              odds={oddsMap.get(match.id)} tba={tbaMap.get(match.match_number)}
+                              m13={m13Map.get(match.match_number)} userBet={myBetByMatch.get(match.id)}
+                              onClick={() => navigate(`/betting/${match.id}`)} />
+                          ))}
+                        </div>
                       </>
                     )}
                   </>
@@ -1242,13 +1244,14 @@ export default function Betting({
             </TabsContent>
 
             {/* ── MY BETS ── */}
-            <TabsContent value="mybets" className="space-y-3 max-w-2xl mx-auto">
+            <TabsContent value="mybets" className="space-y-3 max-w mx-auto">
               {myBets.length === 0 && (
                 <div className="text-center text-muted-foreground py-12">
                   <Coins className="h-10 w-10 mx-auto mb-3 opacity-30" />
                   <p>You haven't placed any bets yet.</p>
                 </div>
               )}
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
               {myBets.map((bet) => {
                 const m13 = bet.match?.match_number ? m13Map.get(bet.match.match_number) : undefined;
                 return (
@@ -1294,10 +1297,11 @@ export default function Betting({
                   </Card>
                 );
               })}
+              </div>
             </TabsContent>
 
             {/* ── LEADERBOARD ── */}
-            <TabsContent value="leaderboard" className="max-w-2xl mx-auto">
+            <TabsContent value="leaderboard" className="max-w mx-auto">
               <Leaderboard userId={user?.id} matchIds={matches.map((m) => m.id)} />
             </TabsContent>
           </Tabs>

@@ -59,7 +59,7 @@ export default function Leaderboard() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-4 pb-20">
+    <div className="mx-auto max-w space-y-4 pb-20">
       {/* <Select value={selectedId ?? undefined} onValueChange={setSelectedId}>
         <SelectTrigger><SelectValue placeholder="Select an event" /></SelectTrigger>
         <SelectContent>
@@ -79,11 +79,11 @@ export default function Leaderboard() {
       </Tabs>
 
       <Card>
-        <CardContent className="divide-y p-0">
+        <CardContent className="grid w-full grid-rows-10 grid-flow-col">
           {ranked.map((row, index) => (
             <div
               key={row.scouter_id}
-              className={`flex items-center gap-3 px-4 py-3 ${row.scouter_id === user?.id ? "bg-primary/10" : ""}`}
+              className={`flex items-center border-l-1 gap-3 px-4 py-3 ${row.scouter_id === user?.id ? "bg-primary/10" : ""}`}
             >
               <span className={`flex w-8 items-center gap-1 font-bold tabular-nums ${rankStyle(index + 1)}`}>
                 {index < 3 ? <Medal className="h-4 w-4" /> : null}{index + 1}

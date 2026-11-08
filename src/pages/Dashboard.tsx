@@ -409,15 +409,6 @@ export default function Dashboard() {
               </div>
             </div>
           )}
-          {dashboardPage === "betting" && (
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-6 w-6 text-primary" />
-              <div>
-                <span className="text-2xl font-bold block">Betting</span>
-                <p className="text-sm text-muted-foreground">{bettingSubtitle}</p>
-              </div>
-            </div>
-          )}
           <div className="flex items-center gap-3">
             <div ref={setHeaderActionsEl} className="flex items-center gap-2" />
             <UserProfileMenu
@@ -642,9 +633,13 @@ export default function Dashboard() {
           )}
         </div>
 
+        <SectionHeading>Predictions</SectionHeading>
+        <Betting embedded headerActions={headerActionsEl} />
+
         <SectionHeading>Leaderboard</SectionHeading>
         <Leaderboard />
 
+        <SectionHeading>Offline Matches</SectionHeading>
         {/* Offline Matches Section */}
         <div className="mb-8">
           <OfflineMatches />
@@ -654,13 +649,9 @@ export default function Dashboard() {
           <section className="my-8">
             <Shop embedded headerActions={headerActionsEl} />
           </section>
-        ) : dashboardPage === "avatar" ? (
-          <section className="my-8">
-            <AvatarPage embedded onVisitShop={() => setDashboardPage("shop")} />
-          </section>
         ) : (
           <section className="my-8">
-            <Betting embedded headerActions={headerActionsEl} />
+            <AvatarPage embedded onVisitShop={() => setDashboardPage("shop")} />
           </section>
         )}
 
@@ -700,18 +691,6 @@ export default function Dashboard() {
             onClick={() => setDashboardPage("avatar")}
           >
             Avatar
-          </Button>
-          <Button
-            size="sm"
-            variant={dashboardPage === "betting" ? "default" : "ghost"}
-            className={
-              dashboardPage === "betting"
-                ? "flex-1 min-w-0 px-1.5 text-xs font-semibold shadow-sm sm:px-3 sm:text-sm"
-                : "flex-1 min-w-0 px-1.5 text-xs text-muted-foreground hover:text-foreground sm:px-3 sm:text-sm"
-            }
-            onClick={() => setDashboardPage("betting")}
-          >
-            Betting
           </Button>
         </nav>
       </main>
