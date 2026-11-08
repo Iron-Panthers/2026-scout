@@ -44,8 +44,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ListOrdered, ArrowUpDown, Loader2, RotateCcw, Radio, Info, Tag, Sparkles } from "lucide-react";
+import { ListOrdered, ArrowUpDown, Loader2, RotateCcw, Radio, Info, Tag, Sparkles, LayoutDashboard, ClipboardList, Users, Calendar, PencilRuler } from "lucide-react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { BBotProvider } from "@/contexts/BBotContext";
@@ -67,6 +68,7 @@ import {
   saveDevPicklist,
 } from "@/lib/devMode";
 import UserProfileMenu from "@/components/UserProfileMenu";
+import { BoardMatchList } from "./StrategyBoard";
 import { TeamInfoDialog } from "@/components/TeamInfoDialog";
 import { ScoutingDataTable } from "@/components/strategy/ScoutingDataTable";
 import { MatchDashboard } from "@/components/strategy/MatchDashboard";
@@ -344,7 +346,7 @@ function PicklistColumn({
   );
 }
 
-type StrategyPage = "data" | "dashboard" | "teams" | "picklist" | "event";
+type StrategyPage = "data" | "dashboard" | "teams" | "picklist" | "event" | "board";
 
 const STRATEGY_PAGES: Record<StrategyPage, { label: string; title: string; description: string }> = {
   data: {
@@ -371,6 +373,11 @@ const STRATEGY_PAGES: Record<StrategyPage, { label: string; title: string; descr
     label: "Event",
     title: "Event",
     description: "All teams competing at the selected event.",
+  },
+  board: {
+    label: "Board",
+    title: "Strategy Board",
+    description: "Plan your team's matches on a drawing board.",
   },
 };
 const STRATEGY_PAGE_IDS = Object.keys(STRATEGY_PAGES) as StrategyPage[];
@@ -869,14 +876,14 @@ export default function StrategyDashboard() {
   return (
     // Off-season demo numbers show as their team's B/C/D/E bot, at events set to convert them
     <BBotProvider event={selectedPicklistEvent}>
-    <div className="min-h-screen bg-background my-5">
+    <div className="min-h-screen bg-background my-5 container mx-auto p-4 md:p-6 max-w-[1600px]">
       {/* The dashboard uses the full width so all six robots fit in a row on wide
           screens, and less padding so three fit across a phone. The live picklist is full
           width too, with the same padding at every size so its toolbar doesn't wrap and
           unwrap as the padding jumps. */}
       <main
         className={`mx-auto ${
-          strategyPage === "dashboard" ? "w-full p-3 sm:p-6" : liveOpen ? "w-full p-6 pl-10" : "container p-6 max-w-7xl"
+          strategyPage === "dashboard" ? "w-full p-3 sm:p-6 md:p-6 max-w-[1600px]" : liveOpen ? "w-full p-6 pl-10" : "container p-6 w-full"
         }`}
       >
         {/* Your own picklist beside the live one, for the host and everyone watching */}
@@ -896,11 +903,92 @@ export default function StrategyDashboard() {
           <UserProfileMenu userName={userName} userInitials={userInitials} avatarUrl={avatarUrl} />
         </div>
 
+        {/* Tab navigation: mobile dropdown + desktop tabs (mirroring Manager Dashboard) */}
+        {!liveOpen && (
+          <Tabs value={strategyPage} onValueChange={(v) => setStrategyPage(v as StrategyPage)} className="w-full mb-6">
+            {/* Mobile: Dropdown */}
+            <div className="lg:hidden w-full">
+              <Select value={strategyPage} onValueChange={(v) => setStrategyPage(v as StrategyPage)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue>
+                    {strategyPage === "dashboard" && (
+                      <div className="flex items-center gap-2"><LayoutDashboard className="h-4 w-4" />Dashboard</div>
+                    )}
+                    {strategyPage === "data" && (
+                      <div className="flex items-center gap-2"><ClipboardList className="h-4 w-4" />Data</div>
+                    )}
+                    {strategyPage === "teams" && (
+                      <div className="flex items-center gap-2"><Users className="h-4 w-4" />Teams</div>
+                    )}
+                    {strategyPage === "picklist" && (
+                      <div className="flex items-center gap-2"><ListOrdered className="h-4 w-4" />Picklist</div>
+                    )}
+                    {strategyPage === "event" && (
+                      <div className="flex items-center gap-2"><Calendar className="h-4 w-4" />Event</div>
+                    )}
+                    {strategyPage === "board" && (
+                      <div className="flex items-center gap-2"><PencilRuler className="h-4 w-4" />Board</div>
+                    )}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="dashboard">
+                    <div className="flex items-center gap-2"><LayoutDashboard className="h-4 w-4" />Dashboard</div>
+                  </SelectItem>
+                  <SelectItem value="data">
+                    <div className="flex items-center gap-2"><ClipboardList className="h-4 w-4" />Data</div>
+                  </SelectItem>
+                  <SelectItem value="teams">
+                    <div className="flex items-center gap-2"><Users className="h-4 w-4" />Teams</div>
+                  </SelectItem>
+                  <SelectItem value="picklist">
+                    <div className="flex items-center gap-2"><ListOrdered className="h-4 w-4" />Picklist</div>
+                  </SelectItem>
+                  <SelectItem value="event">
+                    <div className="flex items-center gap-2"><Calendar className="h-4 w-4" />Event</div>
+                  </SelectItem>
+                  <SelectItem value="board">
+                    <div className="flex items-center gap-2"><PencilRuler className="h-4 w-4" />Board</div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Desktop: Tab Buttons */}
+            <TabsList className="hidden lg:grid w-full grid-cols-6 gap-1">
+              <TabsTrigger value="dashboard" className="flex items-center justify-center gap-2">
+                <LayoutDashboard className="h-4 w-4" />
+                Dashboard
+              </TabsTrigger>
+              <TabsTrigger value="data" className="flex items-center justify-center gap-2">
+                <ClipboardList className="h-4 w-4" />
+                Data
+              </TabsTrigger>
+              <TabsTrigger value="teams" className="flex items-center justify-center gap-2">
+                <Users className="h-4 w-4" />
+                Teams
+              </TabsTrigger>
+              <TabsTrigger value="picklist" className="flex items-center justify-center gap-2">
+                <ListOrdered className="h-4 w-4" />
+                Picklist
+              </TabsTrigger>
+              <TabsTrigger value="event" className="flex items-center justify-center gap-2">
+                <Calendar className="h-4 w-4" />
+                Event
+              </TabsTrigger>
+              <TabsTrigger value="board" className="flex items-center justify-center gap-2">
+                <PencilRuler className="h-4 w-4" />
+                Board
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        )}
+
         <section>
           {/* On the Data page the event sits left and the data type right, on one line. On the
               Dashboard page the event sits left, and while a match is open the match toolbar
               (All matches, video) takes its place; the other pages keep the event dropdown on the right. */}
-          <div className={`mb-4 flex gap-2 ${liveOpen ? "hidden" : ""} ${strategyPage === "data" ? "justify-between" : strategyPage === "dashboard" ? "justify-start" : "justify-end"}`}>
+          <div className={`mb-4 flex gap-2 ${liveOpen || strategyPage === "board" ? "hidden" : ""} ${strategyPage === "data" ? "justify-between" : strategyPage === "dashboard" ? "justify-start" : "justify-end"}`}>
             {strategyPage === "picklist" && (
               <div className="mr-auto flex shrink-0 items-center gap-0.5">
                 <Button
@@ -1212,6 +1300,8 @@ export default function StrategyDashboard() {
                 </DndContext>
               )}
             </>
+          ) : strategyPage === "board" ? (
+            <BoardMatchList userId={user?.id ?? null} />
           ) : picklistLoading ? (
             <p className="text-muted-foreground">Loading event teams...</p>
           ) : allEventTeams.length === 0 || !selectedPicklistEvent ? (
@@ -1280,23 +1370,6 @@ export default function StrategyDashboard() {
           </Dialog>
         </section>
 
-        <nav className={`${liveOpen ? "hidden" : "flex"} fixed inset-x-4 bottom-4 z-30 mx-auto mt-8 max-w-xl items-center justify-center gap-1 rounded-xl border-2 border-border bg-card p-1 shadow-xl backdrop-blur`}>
-          {(Object.keys(STRATEGY_PAGES) as StrategyPage[]).map((page) => (
-            <Button
-              key={page}
-              size="sm"
-              variant={strategyPage === page ? "default" : "ghost"}
-              className={
-                strategyPage === page
-                  ? "flex-1 min-w-0 px-1.5 text-xs font-semibold shadow-sm sm:px-3 sm:text-sm"
-                  : "flex-1 min-w-0 px-1.5 text-xs text-muted-foreground hover:text-foreground sm:px-3 sm:text-sm"
-              }
-              onClick={() => setStrategyPage(page)}
-            >
-              {STRATEGY_PAGES[page].label}
-            </Button>
-          ))}
-        </nav>
       </main>
     </div>
     </BBotProvider>

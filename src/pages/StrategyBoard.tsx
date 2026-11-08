@@ -108,22 +108,14 @@ function TeamList({ teams, color }: { teams: MatchTeam[]; color: "red" | "blue" 
   );
 }
 
-function MatchList({ userId }: { userId: string | null }) {
-  const { user, profile, getAvatarUrl } = useAuth();
+/** Embeddable match list for the strategy board: event selector + our team's matches. */
+export function BoardMatchList({ userId }: { userId: string | null }) {
   const navigate = useNavigate();
   const boardEvents = useBoardEvents();
   const eventIds = useMemo(() => boardEvents?.events.map((event) => event.id) ?? [], [boardEvents]);
-  // In the address, so coming back from a match keeps the event; the active one is left out
   const [eventId, setEventId] = useUrlState("event", boardEvents?.initialId ?? "", eventIds);
   const event = boardEvents?.events.find((item) => item.id === eventId) ?? null;
   const loaded = useOurMatches(event);
-  const userName = profile?.name || user?.user_metadata?.name || user?.email?.split("@")[0] || "Scout";
-  const userInitials = userName
-    .split(" ")
-    .map((n: string) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
 
   const open = (match: OurMatch) => {
     const boardMatch: BoardMatch = { name: match.name, red: match.red, blue: match.blue };
@@ -176,6 +168,35 @@ function MatchList({ userId }: { userId: string | null }) {
   }
 
   return (
+    <div className="mx-auto max-w-2xl">
+      <Select value={eventId} onValueChange={setEventId} disabled={!boardEvents || boardEvents.events.length === 0}>
+        <SelectTrigger className="mb-4 w-full" aria-label="Event">
+          <SelectValue placeholder="Select event" />
+        </SelectTrigger>
+        <SelectContent>
+          {boardEvents?.events.map((item) => (
+            <SelectItem key={item.id} value={item.id}>
+              {item.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {body}
+    </div>
+  );
+}
+
+function MatchList({ userId }: { userId: string | null }) {
+  const { user, profile, getAvatarUrl } = useAuth();
+  const userName = profile?.name || user?.user_metadata?.name || user?.email?.split("@")[0] || "Scout";
+  const userInitials = userName
+    .split(" ")
+    .map((n: string) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+
+  return (
     <div className="min-h-screen bg-background my-5">
       <main className="container mx-auto max-w-3xl p-6">
         <div className="mb-8 flex items-start justify-between">
@@ -188,21 +209,7 @@ function MatchList({ userId }: { userId: string | null }) {
           </div>
           <UserProfileMenu userName={userName} userInitials={userInitials} avatarUrl={getAvatarUrl()} />
         </div>
-        <div className="mx-auto max-w-2xl">
-          <Select value={eventId} onValueChange={setEventId} disabled={!boardEvents || boardEvents.events.length === 0}>
-            <SelectTrigger className="mb-4 w-full" aria-label="Event">
-              <SelectValue placeholder="Select event" />
-            </SelectTrigger>
-            <SelectContent>
-              {boardEvents?.events.map((item) => (
-                <SelectItem key={item.id} value={item.id}>
-                  {item.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {body}
-        </div>
+        <BoardMatchList userId={userId} />
       </main>
     </div>
   );

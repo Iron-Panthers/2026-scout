@@ -645,54 +645,7 @@ export default function Dashboard() {
           <OfflineMatches />
         </div>
           </>
-        ) : dashboardPage === "shop" ? (
-          <section className="my-8">
-            <Shop embedded headerActions={headerActionsEl} />
-          </section>
-        ) : (
-          <section className="my-8">
-            <AvatarPage embedded onVisitShop={() => setDashboardPage("shop")} />
-          </section>
-        )}
-
-        <nav className="fixed inset-x-4 bottom-4 z-30 mx-auto mt-8 flex max-w-xl items-center justify-center gap-1 rounded-xl border-2 border-border bg-card p-1 shadow-xl backdrop-blur">
-          <Button
-            size="sm"
-            variant={dashboardPage === "scout" ? "default" : "ghost"}
-            className={
-              dashboardPage === "scout"
-                ? "flex-1 min-w-0 px-1.5 text-xs font-semibold shadow-sm sm:px-3 sm:text-sm"
-                : "flex-1 min-w-0 px-1.5 text-xs text-muted-foreground hover:text-foreground sm:px-3 sm:text-sm"
-            }
-            onClick={() => setDashboardPage("scout")}
-          >
-            Scout
-          </Button>
-          <Button
-            size="sm"
-            variant={dashboardPage === "shop" ? "default" : "ghost"}
-            className={
-              dashboardPage === "shop"
-                ? "flex-1 min-w-0 px-1.5 text-xs font-semibold shadow-sm sm:px-3 sm:text-sm"
-                : "flex-1 min-w-0 px-1.5 text-xs text-muted-foreground hover:text-foreground sm:px-3 sm:text-sm"
-            }
-            onClick={() => setDashboardPage("shop")}
-          >
-            Shop
-          </Button>
-          <Button
-            size="sm"
-            variant={dashboardPage === "avatar" ? "default" : "ghost"}
-            className={
-              dashboardPage === "avatar"
-                ? "flex-1 min-w-0 px-1.5 text-xs font-semibold shadow-sm sm:px-3 sm:text-sm"
-                : "flex-1 min-w-0 px-1.5 text-xs text-muted-foreground hover:text-foreground sm:px-3 sm:text-sm"
-            }
-            onClick={() => setDashboardPage("avatar")}
-          >
-            Avatar
-          </Button>
-        </nav>
+        ) : (<></>)}
       </main>
     </div>
   );

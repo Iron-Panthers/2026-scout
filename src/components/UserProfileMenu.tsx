@@ -8,7 +8,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Settings, User, LogOut, Users, LayoutDashboard, ListOrdered, PencilRuler } from "lucide-react";
+import { Settings, User, LogOut, Users, LayoutDashboard, ListOrdered, ShoppingCart } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { getGameProfile } from "@/lib/gameProfiles";
@@ -27,7 +27,7 @@ export default function UserProfileMenu({
   const isOnManagerDashboard = location.pathname === "/manager";
   const isOnStrategyDashboard = location.pathname === "/strategy";
   const isOnScoutDashboard = location.pathname === "/dashboard";
-  const isOnStrategyBoard = location.pathname.startsWith("/strategy-board");
+
 
   const [equippedCosmetics, setEquippedCosmetics] = useState<Record<string, string>>({});
 
@@ -60,15 +60,20 @@ export default function UserProfileMenu({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel>My Account</DropdownMenuLabel>
+        <DropdownMenuItem onClick={() => navigate("/settings")}>
+          <Settings className="mr-2 h-4 w-4" />
+          <span>Settings</span>
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => navigate("/profile")}>
           <User className="mr-2 h-4 w-4" />
           <span>Profile</span>
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => navigate("/settings")}>
-          <Settings className="mr-2 h-4 w-4" />
-          <span>Settings</span>
+        <DropdownMenuItem onClick={() => navigate("/shop")}>
+          <ShoppingCart className="mr-2 h-4 w-4" />
+          <span>Shop</span>
         </DropdownMenuItem>
+        <DropdownMenuSeparator />
         {!isOnScoutDashboard && (
           <DropdownMenuItem onClick={() => navigate("/dashboard")}>
             <LayoutDashboard className="mr-2 h-4 w-4" />
@@ -81,12 +86,7 @@ export default function UserProfileMenu({
             <span>Strategy Dashboard</span>
           </DropdownMenuItem>
         )}
-        {!isOnStrategyBoard && (
-          <DropdownMenuItem onClick={() => navigate("/strategy-board")}>
-            <PencilRuler className="mr-2 h-4 w-4" />
-            <span>Strategy Board</span>
-          </DropdownMenuItem>
-        )}
+
         {isManager && !isOnManagerDashboard && (
           <DropdownMenuItem onClick={() => navigate("/manager")}>
             <Users className="mr-2 h-4 w-4" />

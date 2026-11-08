@@ -328,16 +328,16 @@ export default function Shop({
 
   return (
     <div className={embedded ? undefined : "min-h-screen bg-background"}>
-      <div className="max-w-xl mx-auto md:max-w-none px-4 py-6 space-y-5">
+      <div className="max-w-xl mx-auto md:max-w-none px-4 py-5 space-y-5">
         {/* Header */}
         {!embedded && (
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 ml-5">
               <Button variant="ghost" size="sm" className="gap-2 px-2" onClick={() => navigate(-1)}>
                 <ArrowLeft className="h-4 w-4" />
                 Back
               </Button>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 ml-5">
                 <ShoppingBag className="h-6 w-6 text-primary" />
                 <div>
                   <span className="text-2xl font-bold block">Shop</span>
@@ -370,7 +370,7 @@ export default function Shop({
         {/* Main layout: stacked on mobile, sidebar+content on md+ */}
         <div className="flex flex-col md:flex-row gap-5 justify-center">
           {/* Avatar sidebar */}
-          <div className="w-full md:w-56 md:shrink-0 md:sticky md:top-6">
+          <div className="w-full md:w-100 md:shrink-0 md:sticky md:top-6">
             <Card className="border-border/50">
               <CardContent className="p-4">
                 <div className="flex md:flex-col items-center md:items-center gap-4 md:gap-3 md:text-center">
