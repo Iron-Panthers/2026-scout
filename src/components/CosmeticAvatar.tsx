@@ -89,6 +89,7 @@ const sizeConfig = {
   sm: { wrapperClass: "size-8", emojiHat: "text-sm", emojiDecoration: "text-xs", hatOffset: "-top-2.5", decorationOffset: "-bottom-1.5 -right-1.5", decorationImage: "w-6", decorationEmojiSize: "text-sm" },
   md: { wrapperClass: "size-10", emojiHat: "text-base", emojiDecoration: "text-sm", hatOffset: "-top-3", decorationOffset: "-bottom-2 -right-2", decorationImage: "w-7", decorationEmojiSize: "text-2xl" },
   lg: { wrapperClass: "size-16", emojiHat: "text-3xl", emojiDecoration: "text-lg", hatOffset: "-top-5", decorationOffset: "-bottom-2 -right-2", decorationImage: "w-7", decorationEmojiSize: "text-2xl" },
+  xl: { wrapperClass: "size-32", emojiHat: "text-3xl", emojiDecoration: "text-lg", hatOffset: "-top-5", decorationOffset: "-bottom-2 -right-2", decorationImage: "w-7", decorationEmojiSize: "text-2xl" },
 };
 
 function CosmeticAvatar({

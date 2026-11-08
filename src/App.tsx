@@ -90,7 +90,7 @@ function App() {
               path="/profile"
               element={
                 <ProtectedRoute>
-                  <Profile />
+                  <AvatarPage />
                 </ProtectedRoute>
               }
             />
@@ -99,7 +99,7 @@ function App() {
               path="/profile/:userId"
               element={
                 <ProtectedRoute>
-                  <Profile />
+                  <AvatarPage />
                 </ProtectedRoute>
               }
             />

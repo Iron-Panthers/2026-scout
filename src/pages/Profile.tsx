@@ -16,6 +16,7 @@ import { AchievementIcon } from "@/components/AchievementIcon";
 import { useAchievements } from "@/hooks/useAchievements";
 import { getScoutedEvents, type ScoutedEvent } from "@/lib/scoutingHistory";
 import type { Match } from "@/types";
+import AvatarPage from "./Avatar";
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -146,8 +147,8 @@ export default function Profile() {
 
 
   return (
-    <div className="min-h-screen bg-background my-5">
-      <main className="container mx-auto p-6 max-w-4xl">
+    <div className="min-h-screen bg-background my-5 w-max">
+      <main className="container mx-auto p-6 w-max">
         {/* Back Button */}
         <Button variant="ghost" className="mb-6" onClick={() => navigate(-1)}>
           <ArrowLeft className="mr-2 h-4 w-4" />
@@ -155,257 +156,262 @@ export default function Profile() {
         </Button>
 
         {/* Profile Header */}
-        <Card className="mb-6">
-          <CardContent className="pt-6">
-            <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
-              <div className="relative shrink-0">
-                <CosmeticAvatar
-                  avatarUrl={avatarUrl}
-                  initials={userInitials}
-                  equippedCosmetics={equippedCosmetics}
-                  size="lg"
-                  className="h-32 w-32"
-                />
-                {isOwn && (
-                <>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleAvatarUpload}
-                />
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploading}
-                  className="absolute bottom-1 right-1 bg-primary text-primary-foreground rounded-full p-1.5 shadow-md hover:bg-primary/90 transition-colors disabled:opacity-50"
-                  aria-label="Change profile photo"
-                >
-                  <Camera className="h-4 w-4" />
-                </button>
-                </>
-                )}
-              </div>
-              <div className="flex-1 text-center md:text-left">
-                {isEditingName ? (
-                  <div className="flex w-full items-center gap-2 justify-center md:w-auto md:justify-start mb-2">
-                    <input
-                      type="text"
-                      value={editedName}
-                      onChange={(e) => setEditedName(e.target.value)}
-                      className="min-w-0 flex-1 text-2xl font-bold bg-background border border-input rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary md:flex-initial"
-                      autoFocus
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") handleSaveName();
-                        if (e.key === "Escape") handleCancelEditName();
-                      }}
+        <div className="grid grid-col-2">
+          <AvatarPage></AvatarPage>
+          <div className="block">
+            <Card className="mb-6">
+              <CardContent className="pt-6">
+                <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
+                  <div className="relative shrink-0">
+                    <CosmeticAvatar
+                      avatarUrl={avatarUrl}
+                      initials={userInitials}
+                      equippedCosmetics={equippedCosmetics}
+                      size="lg"
+                      className="h-32 w-32"
                     />
-                    <Button
-                      size="sm"
-                      variant="default"
-                      onClick={handleSaveName}
-                      disabled={savingName}
-                    >
-                      <Save className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={handleCancelEditName}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 justify-center md:justify-start">
-                    <h1 className="text-3xl font-bold mb-2">{userName}</h1>
                     {isOwn && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={handleStartEditName}
-                        className="mb-2"
-                      >
-                        <Pencil className="h-4 w-4" />
+                    <>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleAvatarUpload}
+                    />
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploading}
+                      className="absolute bottom-1 right-1 bg-primary text-primary-foreground rounded-full p-1.5 shadow-md hover:bg-primary/90 transition-colors disabled:opacity-50"
+                      aria-label="Change profile photo"
+                    >
+                      <Camera className="h-4 w-4" />
+                    </button>
+                    </>
+                    )}
+                  </div>
+                  <div className="flex-1 text-center md:text-left">
+                    {isEditingName ? (
+                      <div className="flex w-full items-center gap-2 justify-center md:w-auto md:justify-start mb-2">
+                        <input
+                          type="text"
+                          value={editedName}
+                          onChange={(e) => setEditedName(e.target.value)}
+                          className="min-w-0 flex-1 text-2xl font-bold bg-background border border-input rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary md:flex-initial"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handleSaveName();
+                            if (e.key === "Escape") handleCancelEditName();
+                          }}
+                        />
+                        <Button
+                          size="sm"
+                          variant="default"
+                          onClick={handleSaveName}
+                          disabled={savingName}
+                        >
+                          <Save className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={handleCancelEditName}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 justify-center md:justify-start">
+                        <h1 className="text-3xl font-bold mb-2">{userName}</h1>
+                        {isOwn && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={handleStartEditName}
+                            className="mb-2"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                    <div className="flex gap-2 justify-center md:justify-start mb-4">
+                      <Badge variant="secondary">
+                        {userRole.charAt(0).toUpperCase() + userRole.slice(1)}
+                      </Badge>
+                      {isManager && <Badge variant="default">Manager</Badge>}
+                    </div>
+                    <div className="space-y-2 mt-4">
+                      {email && (
+                        <div className="flex items-center justify-center md:justify-start gap-2 text-muted-foreground">
+                          <Mail className="h-4 w-4" />
+                          <span className="text-sm">{email}</span>
+                        </div>
+                      )}
+                      <div className="flex items-center justify-center md:justify-start gap-2 text-muted-foreground">
+                        <Calendar className="h-4 w-4" />
+                        <span className="text-sm">Joined {joinDate}</span>
+                      </div>
+                      <TeamYears
+                        years={(isOwn ? profile?.team_years : otherProfile?.team_years) ?? []}
+                        onSave={isOwn ? handleSaveTeamYears : undefined}
+                      />
+                    </div>
+                    {!isOwn && viewedId && (
+                      <Button className="mt-4 gap-2" onClick={() => navigate(`/messages?with=${viewedId}`)}>
+                        <MessageCircle className="h-4 w-4" />
+                        Message
                       </Button>
                     )}
                   </div>
-                )}
-                <div className="flex gap-2 justify-center md:justify-start mb-4">
-                  <Badge variant="secondary">
-                    {userRole.charAt(0).toUpperCase() + userRole.slice(1)}
-                  </Badge>
-                  {isManager && <Badge variant="default">Manager</Badge>}
                 </div>
-                <div className="space-y-2 mt-4">
-                  {email && (
-                    <div className="flex items-center justify-center md:justify-start gap-2 text-muted-foreground">
-                      <Mail className="h-4 w-4" />
-                      <span className="text-sm">{email}</span>
-                    </div>
-                  )}
-                  <div className="flex items-center justify-center md:justify-start gap-2 text-muted-foreground">
-                    <Calendar className="h-4 w-4" />
-                    <span className="text-sm">Joined {joinDate}</span>
-                  </div>
-                  <TeamYears
-                    years={(isOwn ? profile?.team_years : otherProfile?.team_years) ?? []}
-                    onSave={isOwn ? handleSaveTeamYears : undefined}
-                  />
-                </div>
-                {!isOwn && viewedId && (
-                  <Button className="mt-4 gap-2" onClick={() => navigate(`/messages?with=${viewedId}`)}>
-                    <MessageCircle className="h-4 w-4" />
-                    Message
-                  </Button>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
 
-        {/* Events and account status side by side */}
-        <div className="grid grid-cols-2 gap-4 mb-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Events
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold text-primary">
-                {scoutedEvents === null ? "..." : scoutedEvents.length}
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Account Status
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-6 w-6 text-green-500" />
-                <p className="text-lg font-semibold">Active</p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Achievements: opens the full list (anyone can view anyone's) */}
-        <Card
-          className="mb-6 cursor-pointer transition-colors hover:bg-accent/40"
-          role="button"
-          tabIndex={0}
-          onClick={() => viewedId && navigate(`/achievements/${viewedId}`)}
-          onKeyDown={(e) => {
-            if ((e.key === "Enter" || e.key === " ") && viewedId) navigate(`/achievements/${viewedId}`);
-          }}
-        >
-          <CardContent className="flex items-center gap-4 py-4">
-            <Trophy className="h-8 w-8 shrink-0 text-primary" />
-            <div className="min-w-0 flex-1">
-              <p className="font-semibold">Achievements</p>
-              <p className="text-sm text-muted-foreground">
-                {achievements
-                  ? `${achievements.filter((achievement) => achievement.earned).length}/${achievements.length} achievements`
-                  : "Loading..."}
-              </p>
-            </div>
-            {/* A few earned ones, as a preview */}
-            <div className="hidden items-center -space-x-2 sm:flex">
-              {achievements
-                ?.filter((achievement) => achievement.earned)
-                .slice(-5)
-                .map((achievement) => (
-                  <AchievementIcon key={achievement.id} icon={achievement.icon} earned size="sm" />
-                ))}
-            </div>
-            <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
-          </CardContent>
-        </Card>
-
-        {/* Map of every event scouted at */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Events Scouted</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {scoutedEvents === null ? (
-              <p className="text-muted-foreground text-center py-8">Loading events...</p>
-            ) : scoutedEvents.length === 0 ? (
-              <p className="text-muted-foreground text-center py-8">
-                {isOwn ? "No events yet. Events you scout at will show up here." : "No events scouted yet."}
-              </p>
-            ) : (
-              <ScoutingMap events={scoutedEvents} />
-            )}
-            {/* Your own map: add events the app has no record of */}
-            {isOwn && authUser?.id && scoutedEvents !== null && (
-              <>
-                <div className="mt-2 text-right">
-                  <button
-                    type="button"
-                    onClick={() => setAddEventsOpen(true)}
-                    className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
-                  >
-                    Incorrect?
-                  </button>
-                </div>
-                <AddEventsDialog
-                  open={addEventsOpen}
-                  onOpenChange={setAddEventsOpen}
-                  userId={authUser.id}
-                  teamYears={profile?.team_years ?? []}
-                  mapEvents={scoutedEvents}
-                  onChanged={() => getScoutedEvents(authUser.id).then(setScoutedEvents)}
-                />
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Recent Match Assignments */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Match Assignments</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <p className="text-muted-foreground text-center py-8">
-                Loading assignments...
-              </p>
-            ) : userMatches.length === 0 ? (
-              <p className="text-muted-foreground text-center py-8">
-                No match assignments yet
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {userMatches.slice(0, 5).map((match) => (
-                  <div
-                    key={match.id}
-                    className="flex items-center justify-between p-3 rounded-lg bg-accent/50"
-                  >
-                    <div>
-                      <p className="font-semibold">{match.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        Match #{match.match_number}
-                      </p>
-                    </div>
-                    <Badge variant="outline">Assigned</Badge>
-                  </div>
-                ))}
-                {userMatches.length > 5 && (
-                  <p className="text-sm text-muted-foreground text-center pt-2">
-                    And {userMatches.length - 5} more...
+            {/* Events and account status side by side */}
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Events
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-3xl font-bold text-primary">
+                    {scoutedEvents === null ? "..." : scoutedEvents.length}
                   </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Account Status
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-6 w-6 text-green-500" />
+                    <p className="text-lg font-semibold">Active</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Achievements: opens the full list (anyone can view anyone's) */}
+            <Card
+              className="mb-6 cursor-pointer transition-colors hover:bg-accent/40"
+              role="button"
+              tabIndex={0}
+              onClick={() => viewedId && navigate(`/achievements/${viewedId}`)}
+              onKeyDown={(e) => {
+                if ((e.key === "Enter" || e.key === " ") && viewedId) navigate(`/achievements/${viewedId}`);
+              }}
+            >
+              <CardContent className="flex items-center gap-4 py-4">
+                <Trophy className="h-8 w-8 shrink-0 text-primary" />
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold">Achievements</p>
+                  <p className="text-sm text-muted-foreground">
+                    {achievements
+                      ? `${achievements.filter((achievement) => achievement.earned).length}/${achievements.length} achievements`
+                      : "Loading..."}
+                  </p>
+                </div>
+                {/* A few earned ones, as a preview */}
+                <div className="hidden items-center -space-x-2 sm:flex">
+                  {achievements
+                    ?.filter((achievement) => achievement.earned)
+                    .slice(-5)
+                    .map((achievement) => (
+                      <AchievementIcon key={achievement.id} icon={achievement.icon} earned size="sm" />
+                    ))}
+                </div>
+                <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
+              </CardContent>
+            </Card>
+
+            {/* Map of every event scouted at */}
+            <Card className="mb-6">
+              <CardHeader>
+                <CardTitle>Events Scouted</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {scoutedEvents === null ? (
+                  <p className="text-muted-foreground text-center py-8">Loading events...</p>
+                ) : scoutedEvents.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-8">
+                    {isOwn ? "No events yet. Events you scout at will show up here." : "No events scouted yet."}
+                  </p>
+                ) : (
+                  <ScoutingMap events={scoutedEvents} />
                 )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                {/* Your own map: add events the app has no record of */}
+                {isOwn && authUser?.id && scoutedEvents !== null && (
+                  <>
+                    <div className="mt-2 text-right">
+                      <button
+                        type="button"
+                        onClick={() => setAddEventsOpen(true)}
+                        className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                      >
+                        Incorrect?
+                      </button>
+                    </div>
+                    <AddEventsDialog
+                      open={addEventsOpen}
+                      onOpenChange={setAddEventsOpen}
+                      userId={authUser.id}
+                      teamYears={profile?.team_years ?? []}
+                      mapEvents={scoutedEvents}
+                      onChanged={() => getScoutedEvents(authUser.id).then(setScoutedEvents)}
+                    />
+                  </>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Recent Match Assignments */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Recent Match Assignments</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <p className="text-muted-foreground text-center py-8">
+                    Loading assignments...
+                  </p>
+                ) : userMatches.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-8">
+                    No match assignments yet
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {userMatches.slice(0, 5).map((match) => (
+                      <div
+                        key={match.id}
+                        className="flex items-center justify-between p-3 rounded-lg bg-accent/50"
+                      >
+                        <div>
+                          <p className="font-semibold">{match.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            Match #{match.match_number}
+                          </p>
+                        </div>
+                        <Badge variant="outline">Assigned</Badge>
+                      </div>
+                    ))}
+                    {userMatches.length > 5 && (
+                      <p className="text-sm text-muted-foreground text-center pt-2">
+                        And {userMatches.length - 5} more...
+                      </p>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </main>
     </div>
   );
