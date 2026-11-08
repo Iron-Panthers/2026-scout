@@ -50,6 +50,19 @@ interface UserMatch {
   match: Match;
 }
 
+function SectionHeading({ children, action }) {
+  return (
+    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 mb-4">
+      <div className="h-px bg-border" />
+      <h2 className="text-lg font-bold text-foreground whitespace-nowrap">{children}</h2>
+      <div className="flex items-center gap-4">
+        <div className="flex-1 h-px bg-border" />
+        {action}
+      </div>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const { user, profile, getAvatarUrl, refreshProfile, patchProfile } = useAuth();
   const { devMode } = useDevMode();
@@ -473,15 +486,6 @@ export default function Dashboard() {
               </div>
             </div>
           )}
-          {dashboardPage === "leaderboard" && (
-            <div className="flex items-center gap-2">
-              <Trophy className="h-6 w-6 text-primary" />
-              <div>
-                <span className="text-2xl font-bold block">Leaderboard</span>
-                <p className="text-sm text-muted-foreground">Top scouters at every event</p>
-              </div>
-            </div>
-          )}
           <div className="flex items-center gap-3">
             <div ref={setHeaderActionsEl} className="flex items-center gap-2" />
             <UserProfileMenu
@@ -529,10 +533,8 @@ export default function Dashboard() {
         {/* Pit Scouting Assignments Section */}
         {pitAssignments.length > 0 && (
           <div className="my-8">
-            <h2 className="text-2xl font-bold mb-4">
-              Your Pit Scouting Assignments
-            </h2>
-            <div className="overflow-x-auto pb-4">
+          <SectionHeading>Pit Scouting</SectionHeading>
+          <div className="overflow-x-auto pb-4">
               <div className="flex gap-4 min-w-min items-stretch">
                 {pitAssignments.map((assignment, index) => (
                   <AnimatedContent
@@ -607,8 +609,8 @@ export default function Dashboard() {
 
         {/* Scheduled Matches Section */}
         <div className="my-8">
-          <div className="flex items-center gap-3 mb-4">
-            <h2 className="text-2xl font-bold">Your Assigned Matches</h2>
+          <SectionHeading>
+            Assigned Matches
             <Button
               variant="ghost"
               size="icon"
@@ -622,7 +624,7 @@ export default function Dashboard() {
             >
               <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
             </Button>
-          </div>
+          </SectionHeading>
           {loading ? (
             <div className="text-muted-foreground">Loading matches...</div>
           ) : matches.length === 0 ? (
@@ -716,6 +718,9 @@ export default function Dashboard() {
           )}
         </div>
 
+        <SectionHeading>Leaderboard</SectionHeading>
+        <Leaderboard />
+
         {/* Offline Matches Section */}
         <div className="mb-8">
           <OfflineMatches />
@@ -728,10 +733,6 @@ export default function Dashboard() {
         ) : dashboardPage === "avatar" ? (
           <section className="my-8">
             <AvatarPage embedded onVisitShop={() => setDashboardPage("shop")} />
-          </section>
-        ) : dashboardPage === "leaderboard" ? (
-          <section className="my-8">
-            <Leaderboard />
           </section>
         ) : (
           <section className="my-8">
@@ -787,18 +788,6 @@ export default function Dashboard() {
             onClick={() => setDashboardPage("betting")}
           >
             Betting
-          </Button>
-          <Button
-            size="sm"
-            variant={dashboardPage === "leaderboard" ? "default" : "ghost"}
-            className={
-              dashboardPage === "leaderboard"
-                ? "flex-1 min-w-0 px-1.5 text-xs font-semibold shadow-sm sm:px-3 sm:text-sm"
-                : "flex-1 min-w-0 px-1.5 text-xs text-muted-foreground hover:text-foreground sm:px-3 sm:text-sm"
-            }
-            onClick={() => setDashboardPage("leaderboard")}
-          >
-            Leaderboard
           </Button>
         </nav>
       </main>

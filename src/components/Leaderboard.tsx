@@ -60,7 +60,7 @@ export default function Leaderboard() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-4 pb-20">
-      <Select value={selectedId ?? undefined} onValueChange={setSelectedId}>
+      {/* <Select value={selectedId ?? undefined} onValueChange={setSelectedId}>
         <SelectTrigger><SelectValue placeholder="Select an event" /></SelectTrigger>
         <SelectContent>
           {events.map((event) => (
@@ -69,7 +69,7 @@ export default function Leaderboard() {
             </SelectItem>
           ))}
         </SelectContent>
-      </Select>
+      </Select> */}
 
       <Tabs value={category} onValueChange={(value) => setCategory(value as Category)}>
         <TabsList className="grid w-full grid-cols-2">
