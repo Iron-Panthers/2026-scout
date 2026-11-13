@@ -14,7 +14,7 @@ export const ROBOT_SIZE = 60;
 
 export const BOARD_PAGES = [
   { key: "auto", label: "Auto" },
-  { key: "teleop", label: "Teleop" },
+  { key: "transition", label: "Transition" },
   { key: "off", label: "Off" },
   { key: "on", label: "On" },
   { key: "endgame", label: "Endgame" },

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Medal } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -53,6 +53,16 @@ export default function Leaderboard() {
     );
   }, [selected, category]);
 
+  // On phones the list scrolls inside its box; start it on the user's own row if they're below the top 10
+  const listRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const list = listRef.current;
+    const own = list?.querySelector<HTMLElement>("[data-own-row]");
+    if (!list || !own || list.scrollHeight <= list.clientHeight) return;
+    const offset = own.getBoundingClientRect().top - list.getBoundingClientRect().top + list.scrollTop;
+    list.scrollTop = Math.max(0, offset - (list.clientHeight - own.offsetHeight) / 2);
+  }, [ranked, loading]);
+
   if (loading) return <p className="text-center text-muted-foreground py-12">Loading leaderboards...</p>;
   if (events.length === 0) {
     return <p className="text-center text-muted-foreground py-12">No leaderboards yet. Standings appear once scouts submit data.</p>;
@@ -79,11 +89,15 @@ export default function Leaderboard() {
       </Tabs>
 
       <Card>
-        <CardContent className="grid w-full grid-rows-10 grid-flow-col">
+        <CardContent
+          ref={listRef}
+          className="grid max-h-[30rem] w-full grid-cols-1 overflow-y-auto sm:max-h-none sm:grid-flow-col sm:grid-cols-none sm:grid-rows-10 sm:overflow-visible"
+        >
           {ranked.map((row, index) => (
             <div
               key={row.scouter_id}
-              className={`flex items-center border-l-1 gap-3 px-4 py-3 ${row.scouter_id === user?.id ? "bg-primary/10" : ""}`}
+              data-own-row={row.scouter_id === user?.id || undefined}
+              className={`flex items-center gap-3 sm:border-l-1 px-4 py-3 ${row.scouter_id === user?.id ? "bg-primary/10" : ""}`}
             >
               <span className={`flex w-8 items-center gap-1 font-bold tabular-nums ${rankStyle(index + 1)}`}>
                 {index < 3 ? <Medal className="h-4 w-4" /> : null}{index + 1}
