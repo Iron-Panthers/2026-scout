@@ -17,6 +17,8 @@ export interface BugReport {
 
 export interface BugReportWithCount extends BugReport {
   commentCount: number;
+  /** Everyone who has commented on it (each once). */
+  commenterIds: string[];
 }
 
 export interface BugReportComment {
@@ -38,19 +40,20 @@ export function bugReportIdFromKey(key: string | null): string | null {
   return key?.startsWith(`${BUG_INBOX_KEY}:`) ? key.slice(BUG_INBOX_KEY.length + 1) : null;
 }
 
-/** Every bug report, most recent activity first, with how many comments each has. */
+/** Every bug report, most recent activity first, with how many comments each has and who wrote them. */
 export async function getBugReports(): Promise<BugReportWithCount[]> {
   const { data, error } = await supabase
     .from("bug_reports")
-    .select("*, bug_report_comments(count)")
+    .select("*, bug_report_comments(count), commenters:bug_report_comments(author_id)")
     .order("updated_at", { ascending: false });
   if (error) {
     console.error("Error loading bug reports:", error);
     return [];
   }
-  return (data ?? []).map(({ bug_report_comments, ...report }) => ({
+  return (data ?? []).map(({ bug_report_comments, commenters, ...report }) => ({
     ...(report as BugReport),
     commentCount: (bug_report_comments as Array<{ count: number }> | null)?.[0]?.count ?? 0,
+    commenterIds: [...new Set(((commenters as Array<{ author_id: string }> | null) ?? []).map((c) => c.author_id))],
   }));
 }
 
@@ -123,12 +126,34 @@ export async function isBugReportParticipant(reportId: string, userId: string): 
 }
 
 // ---------------------------------------------------------------------------
-// "New activity" markers: when each report was last opened, kept in this browser
+// "New activity" markers: when each user last opened each report. Kept in the database
+// (bug_report_views, stamped with the server's clock) so they survive a new deploy address
+// or another device; this browser's localStorage copy covers being offline and older markers.
 // ---------------------------------------------------------------------------
+
+/** Report id → when it was last seen (ISO timestamp). */
+export type SeenBugReports = Record<string, string>;
 
 const seenKey = (userId: string) => `bug-reports-seen-${userId}`;
 
-export function getSeenBugReports(userId: string): Record<string, string> {
+/** The later of two timestamps (either may be missing); compared as times, not text. */
+export function laterTime(a: string | undefined, b: string | undefined): string | undefined {
+  if (!a) return b;
+  if (!b) return a;
+  return Date.parse(b) > Date.parse(a) ? b : a;
+}
+
+/** Each report's latest seen time across several sets of markers. */
+export function mergeSeen(...sets: SeenBugReports[]): SeenBugReports {
+  const merged: SeenBugReports = {};
+  for (const set of sets) {
+    for (const [reportId, at] of Object.entries(set)) merged[reportId] = laterTime(merged[reportId], at)!;
+  }
+  return merged;
+}
+
+/** This browser's markers. */
+export function getLocalSeenBugReports(userId: string): SeenBugReports {
   try {
     return JSON.parse(localStorage.getItem(seenKey(userId)) || "{}");
   } catch {
@@ -136,12 +161,37 @@ export function getSeenBugReports(userId: string): Record<string, string> {
   }
 }
 
-export function markBugReportSeen(userId: string, reportId: string, at: string = new Date().toISOString()) {
+function setLocalSeen(userId: string, reportId: string, at: string) {
   try {
-    const seen = getSeenBugReports(userId);
-    seen[reportId] = at;
+    const seen = getLocalSeenBugReports(userId);
+    seen[reportId] = laterTime(seen[reportId], at)!;
     localStorage.setItem(seenKey(userId), JSON.stringify(seen));
   } catch {
-    /* storage blocked: markers just won't persist */
+    /* storage blocked: the database copy still has it */
   }
+}
+
+/** The user's markers from the database; null if they couldn't be loaded. */
+export async function getStoredSeenBugReports(userId: string): Promise<SeenBugReports | null> {
+  const { data, error } = await supabase
+    .from("bug_report_views")
+    .select("report_id, seen_at")
+    .eq("user_id", userId);
+  if (error) {
+    console.error("Error loading seen bug reports:", error);
+    return null;
+  }
+  return Object.fromEntries((data ?? []).map((row) => [row.report_id as string, row.seen_at as string]));
+}
+
+/**
+ * Mark a report seen now. Saved in this browser straight away and in the database, whose
+ * (server) time is returned — or this browser's time if the database couldn't be reached.
+ */
+export async function markBugReportSeen(userId: string, reportId: string): Promise<string> {
+  setLocalSeen(userId, reportId, new Date().toISOString());
+  const { data, error } = await supabase.rpc("mark_bug_report_seen", { p_report: reportId });
+  if (error || !data) return getLocalSeenBugReports(userId)[reportId] ?? new Date().toISOString();
+  setLocalSeen(userId, reportId, data as string);
+  return data as string;
 }
