@@ -192,7 +192,7 @@ export default function Profile() {
                   </div>
                   <div className="flex-1 text-center md:text-left">
                     {isEditingName ? (
-                      <div className="flex w-full items-center gap-2 justify-center md:w-auto md:justify-start mb-2">
+                      <div className="flex w-full items-center gap-2 justify-center mb-2">
                         <input
                           type="text"
                           value={editedName}
@@ -221,7 +221,7 @@ export default function Profile() {
                         </Button>
                       </div>
                     ) : (
-                      <div className="flex items-center gap-2 justify-center md:justify-start">
+                      <div className="flex items-center gap-2 justify-center">
                         <h1 className="text-3xl font-bold mb-2">{userName}</h1>
                         {isOwn && (
                           <Button
@@ -235,7 +235,7 @@ export default function Profile() {
                         )}
                       </div>
                     )}
-                    <div className="flex gap-2 justify-center md:justify-start mb-4">
+                    <div className="flex gap-2 justify-center mb-4">
                       <Badge variant="secondary">
                         {userRole.charAt(0).toUpperCase() + userRole.slice(1)}
                       </Badge>
@@ -243,12 +243,12 @@ export default function Profile() {
                     </div>
                     <div className="space-y-2 mt-4">
                       {email && (
-                        <div className="flex items-center justify-center md:justify-start gap-2 text-muted-foreground">
+                        <div className="flex items-center justify-center gap-2 text-muted-foreground">
                           <Mail className="h-4 w-4" />
                           <span className="text-sm">{email}</span>
                         </div>
                       )}
-                      <div className="flex items-center justify-center md:justify-start gap-2 text-muted-foreground">
+                      <div className="flex items-center justify-center gap-2 text-muted-foreground">
                         <Calendar className="h-4 w-4" />
                         <span className="text-sm">Joined {joinDate}</span>
                       </div>

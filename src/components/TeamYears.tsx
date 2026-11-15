@@ -55,8 +55,8 @@ export function TeamYears({ years, onSave }: TeamYearsProps) {
   if (editing) {
     return (
       <div className="space-y-2">
-        <p className="text-sm font-medium">Which seasons were you on the team?</p>
-        <div className="flex flex-wrap justify-center gap-1.5 md:justify-start">
+        <p className="text-sm font-medium text-center">Which seasons were you on the team?</p>
+        <div className="flex flex-wrap justify-center gap-1.5">
           {seasons.map((year) => (
             <Button
               key={year}
@@ -71,7 +71,7 @@ export function TeamYears({ years, onSave }: TeamYearsProps) {
             </Button>
           ))}
         </div>
-        <div className="flex justify-center gap-2 md:justify-start">
+        <div className="flex justify-center gap-2">
           <Button size="sm" onClick={save} disabled={saving} className="gap-1.5">
             <Save className="h-4 w-4" /> Save
           </Button>
@@ -84,7 +84,7 @@ export function TeamYears({ years, onSave }: TeamYearsProps) {
   }
 
   return (
-    <div className="flex items-center justify-center gap-2 text-muted-foreground md:justify-start">
+    <div className="flex items-center justify-center gap-2 text-muted-foreground">
       <Users className="h-4 w-4 shrink-0" />
       <span className="text-sm">
         {years.length > 0 ? `On the team: ${formatTeamYears(years)}` : onSave ? "Add the years you were on the team" : "Team years not set"}

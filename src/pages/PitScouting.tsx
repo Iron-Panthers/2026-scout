@@ -436,7 +436,7 @@ export default function PitScouting() {
           <div className="aspect-video bg-muted rounded-lg overflow-hidden border-2 border-border">
             <img
               src={activeEvent.scouting_map_url}
-              alt="Event Scouting Map"
+              alt="Event Map"
               className="w-full h-full object-contain"
               onError={(e) => {
                 e.currentTarget.style.display = "none";
@@ -446,7 +446,7 @@ export default function PitScouting() {
           </div>
         ) : (
           <div className="aspect-video bg-muted rounded-lg flex items-center justify-center border-2 border-dashed border-border">
-            <p className="text-muted-foreground">No scouting map available</p>
+            <p className="text-muted-foreground">No map available</p>
           </div>
         )}
       </CardContent>

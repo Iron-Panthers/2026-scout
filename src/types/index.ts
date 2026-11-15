@@ -48,6 +48,12 @@ export interface Event {
   // shown with the main team's logo and letter while convert_bbots is on (see lib/bbots).
   convert_bbots?: boolean;
   bbot_teams?: Record<string, string> | null;
+  // A demo replaying a real event: results are hidden until a manager reveals each one
+  // (reveal_match_result), never filled in from TBA.
+  manual_results?: boolean;
+  // Accounts created on this day (Pacific) join the event and start with signup_points coins.
+  signup_date?: string | null;
+  signup_points?: number | null;
   created_at: string;
   updated_at: string;
   users: string[];

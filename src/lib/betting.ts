@@ -556,3 +556,22 @@ export async function settleMatchBets(
   if (error) return { success: false, error: "Failed to settle bets." };
   return { success: true };
 }
+
+/**
+ * Manager-only: reveal a manual-results (demo) match's score, which sets its winner and
+ * settles every bet on it (reveal_match_result in
+ * supabase/migrations/20261115010_create_invent_the_rest_demo.sql).
+ */
+export async function revealMatchResult(
+  matchId: string,
+  redScore: number,
+  blueScore: number
+): Promise<{ success: boolean; error?: string }> {
+  const { error } = await supabase.rpc("reveal_match_result", {
+    p_match_id: matchId,
+    p_red_score: redScore,
+    p_blue_score: blueScore,
+  });
+  if (error) return { success: false, error: error.message || "Failed to reveal the result." };
+  return { success: true };
+}

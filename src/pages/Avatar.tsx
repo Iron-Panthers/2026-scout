@@ -27,7 +27,12 @@ import { AVATAR_SUBTITLES } from "@/config/headerSubtitles";
 import type { GameProfile } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { TeamYears } from "@/components/TeamYears";
-import { updateProfile } from "@/lib/profiles";
+import { getPublicProfile, updateProfile, uploadAvatar, type PublicProfile } from "@/lib/profiles";
+import { ScoutingMap } from "@/components/ScoutingMap";
+import { AddEventsDialog } from "@/components/AddEventsDialog";
+import { useAchievements } from "@/hooks/useAchievements";
+import { getScoutedEvents, type ScoutedEvent } from "@/lib/scoutingHistory";
+import { AchievementsGrid } from "./Achievements";
 import Shop from "./Shop";
 
 export default function AvatarPage({
@@ -38,13 +43,14 @@ export default function AvatarPage({
   const { user, profile, getAvatarUrl, refreshProfile } = useAuth();
   const { userId: routeUserId } = useParams();
   const isOwn = !routeUserId || routeUserId === user?.id;
+  const viewedId = isOwn ? user?.id : routeUserId;
   const { toast } = useToast();
   const { settings, updateSetting } = useSettings();
   const subtitle = useRandomSubtitle(AVATAR_SUBTITLES);
 
   const [gameProfile, setGameProfile] = useState<GameProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [category, setCategory] = useState<"hats" | "decorations" | "themes">("hats");
+  const [category, setCategory] = useState<"hats" | "decorations" | "themes" | "map" | "achievements">("hats");
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isEditingName, setIsEditingName] = useState(false);
@@ -52,6 +58,38 @@ export default function AvatarPage({
   const [savingName, setSavingName] = useState(false);
   const [scoutedEvents, setScoutedEvents] = useState<ScoutedEvent[] | null>(null);
   const [addEventsOpen, setAddEventsOpen] = useState(false);
+  const [otherProfile, setOtherProfile] = useState<PublicProfile | null>(null);
+  const [otherLoaded, setOtherLoaded] = useState(false);
+
+  // Someone else's profile (their name, roles and team years)
+  useEffect(() => {
+    if (isOwn || !viewedId) return;
+    let cancelled = false;
+    getPublicProfile(viewedId).then((other) => {
+      if (cancelled) return;
+      setOtherProfile(other);
+      setOtherLoaded(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOwn, viewedId]);
+
+  // Every event they've scouted at, for the map (and shared with the achievements)
+  useEffect(() => {
+    if (!viewedId) return;
+    let cancelled = false;
+    getScoutedEvents(viewedId).then((events) => !cancelled && setScoutedEvents(events));
+    return () => {
+      cancelled = true;
+    };
+  }, [viewedId]);
+
+  const achievements = useAchievements(
+    isOwn || otherLoaded ? viewedId : null,
+    (isOwn ? profile?.team_years : otherProfile?.team_years) ?? [],
+    scoutedEvents
+  );
 
   const loadProfile = useCallback(async () => {
     if (!user?.id) return;
@@ -342,7 +380,7 @@ export default function AvatarPage({
                   </div>
                   <div className="md:w-full">
                     {isEditingName ? (
-                      <div className="flex w-full items-center gap-2 justify-center md:w-auto md:justify-start mb-2">
+                      <div className="flex w-full items-center gap-2 justify-center mb-2">
                         <input
                           type="text"
                           value={editedName}
@@ -371,21 +409,23 @@ export default function AvatarPage({
                         </Button>
                       </div>
                     ) : (
-                      <div className="flex items-center gap-2 justify-center md:justify-start">
+                      <div className="flex justify-center">
+                        <div className="relative">
                         <h1 className="text-3xl font-bold mb-2">{userName}</h1>
                         {isOwn && (
                           <Button
                             size="sm"
                             variant="ghost"
                             onClick={handleStartEditName}
-                            className="mb-2"
+                            className="absolute left-full top-0 ml-1"
                           >
                             <Pencil className="h-4 w-4" />
                           </Button>
                         )}
+                        </div>
                       </div>
                     )}
-                    <div className="flex gap-2 w-fit justify-center md:justify-start mb-4">
+                    <div className="flex gap-2 justify-center mb-4">
                       <Badge variant="secondary">
                         {userRole.charAt(0).toUpperCase() + userRole.slice(1)}
                       </Badge>
@@ -406,12 +446,12 @@ export default function AvatarPage({
                     
                     <div className="space-y-2 mt-4">
                       {email && (
-                        <div className="flex items-center justify-center md:justify-start gap-2 text-muted-foreground">
+                        <div className="flex items-center justify-center gap-2 text-muted-foreground">
                           <Mail className="h-4 w-4" />
                           <span className="text-sm">{email}</span>
                         </div>
                       )}
-                      <div className="flex items-center justify-center md:justify-start gap-2 text-muted-foreground">
+                      <div className="flex items-center justify-center gap-2 text-muted-foreground">
                         <Calendar className="h-4 w-4" />
                         <span className="text-sm">Joined {joinDate}</span>
                       </div>
@@ -432,38 +472,74 @@ export default function AvatarPage({
             </Card>
           </div>
 
-          {/* Owned cosmetics */}
-          <div className="flex-1 min-w-0">
-            {loading ? (
+          {/* Owned cosmetics, then their scouting map and achievements */}
+          <div className="flex-1 min-w-0 space-y-4">
+            <Tabs value={category} onValueChange={(value) => setCategory(value as typeof category)}>
+              <TabsList className="w-full">
+                <TabsTrigger value="hats" className="flex-1">
+                  Hats
+                </TabsTrigger>
+                <TabsTrigger value="decorations" className="flex-1">
+                  Decorations
+                </TabsTrigger>
+                <TabsTrigger value="themes" className="flex-1">
+                  Themes
+                </TabsTrigger>
+                <div className="mx-1 h-5 w-px shrink-0 bg-border" aria-hidden="true" />
+                <TabsTrigger value="map" className="flex-1">
+                  Map
+                </TabsTrigger>
+                <TabsTrigger value="achievements" className="flex-1">
+                  Achievements
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+            {category === "map" ? (
+              <Card>
+                <CardContent>
+                  {scoutedEvents === null ? (
+                    <p className="text-muted-foreground text-center py-8">Loading events...</p>
+                  ) : scoutedEvents.length === 0 ? (
+                    <p className="text-muted-foreground text-center py-8">
+                      {isOwn ? "No events yet. Events you scout at will show up here." : "No events scouted yet."}
+                    </p>
+                  ) : (
+                    <ScoutingMap events={scoutedEvents} />
+                  )}
+                  {/* Your own map: add events the app has no record of */}
+                  {isOwn && user?.id && scoutedEvents !== null && (
+                    <>
+                      <div className="mt-2 text-right">
+                        <button
+                          type="button"
+                          onClick={() => setAddEventsOpen(true)}
+                          className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                        >
+                          Incorrect?
+                        </button>
+                      </div>
+                      <AddEventsDialog
+                        open={addEventsOpen}
+                        onOpenChange={setAddEventsOpen}
+                        userId={user.id}
+                        teamYears={profile?.team_years ?? []}
+                        mapEvents={scoutedEvents}
+                        onChanged={() => getScoutedEvents(user.id).then(setScoutedEvents)}
+                      />
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            ) : category === "achievements" ? (
+              <AchievementsGrid achievements={achievements} />
+            ) : loading ? (
               <p className="text-muted-foreground text-center">Loading...</p>
-            ) : ownedItems.length === 0 ? (
-              <div className="text-center py-10 space-y-3">
-                <p className="text-muted-foreground">You don't own any cosmetics yet.</p>
-                <Button onClick={() => (onVisitShop ? onVisitShop() : navigate("/shop"))}>
-                  Visit the Shop
-                </Button>
-              </div>
+            ) : category === "hats" ? (
+              renderSection(hats, "You don't own any hats yet.")
+            ) : category === "decorations" ? (
+              renderSection(decorations, "You don't own any decorations yet.")
             ) : (
-              <div className="space-y-4">
-                <Tabs value={category} onValueChange={(value) => setCategory(value as typeof category)}>
-                  <TabsList className="w-full">
-                    <TabsTrigger value="hats" className="flex-1">
-                      Hats
-                    </TabsTrigger>
-                    <TabsTrigger value="decorations" className="flex-1">
-                      Decorations
-                    </TabsTrigger>
-                    <TabsTrigger value="themes" className="flex-1">
-                      Themes
-                    </TabsTrigger>
-                  </TabsList>
-                </Tabs>
-                {category === "hats"
-                  ? renderSection(hats, "You don't own any hats yet.")
-                  : category === "decorations"
-                  ? renderSection(decorations, "You don't own any decorations yet.")
-                  : renderSection(themes, "You don't own any themes yet.")}
-              </div>
+              renderSection(themes, "You don't own any themes yet.")
             )}
           </div>
         </div>

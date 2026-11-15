@@ -40,10 +40,6 @@ interface TBAMatchData {
   };
 }
 
-function teamNums(keys: string[]): string {
-  return keys.map((k) => k.replace("frc", "")).join(" · ");
-}
-
 function getBetStatusColor(status: string) {
   switch (status) {
     case "won":       return "bg-green-600/20 text-green-400 border-green-600/30";
@@ -113,7 +109,7 @@ interface MarketCardProps {
   onClick: () => void;
 }
 
-function SpotlightCard({ match, odds, tba, m13, userBetAlliance, tbaLoading, m13Loading, onClick }: MarketCardProps) {
+function SpotlightCard({ match, odds, tba, m13, userBetAlliance, m13Loading, onClick }: MarketCardProps) {
   const effectivePredTime = match.pred_time
     ?? (tba?.predicted_time ? new Date(tba.predicted_time * 1000).toISOString() : null);
   const bettingClosed = !!effectivePredTime && Date.now() >= new Date(effectivePredTime).getTime();
@@ -195,21 +191,6 @@ function SpotlightCard({ match, odds, tba, m13, userBetAlliance, tbaLoading, m13
         </div>
       </div>
 
-      {/* Teams */}
-      {tba ? (
-        <div className="flex items-center gap-2 text-xs text-muted-foreground mb-4">
-          <span className="text-red-400 font-medium">{teamNums(tba.alliances.red.team_keys)}</span>
-          <span className="text-muted-foreground/30">vs</span>
-          <span className="text-blue-400 font-medium">{teamNums(tba.alliances.blue.team_keys)}</span>
-        </div>
-      ) : tbaLoading ? (
-        <div className="flex items-center gap-1.5 mb-4">
-          <div className="h-2.5 w-24 rounded bg-muted/60 animate-pulse" />
-          <span className="text-muted-foreground/30 text-xs">vs</span>
-          <div className="h-2.5 w-24 rounded bg-muted/60 animate-pulse" />
-        </div>
-      ) : null}
-
       {/* Big split */}
       <div className="grid grid-cols-2 gap-3 mb-4">
         <div className="bg-red-900/20 border border-red-700/30 rounded-xl p-4 text-center">
@@ -259,7 +240,7 @@ function SpotlightCard({ match, odds, tba, m13, userBetAlliance, tbaLoading, m13
 // ---------------------------------------------------------------------------
 // Grid card — compact, lives in the 2-col grid below the spotlight
 // ---------------------------------------------------------------------------
-function GridCard({ match, odds, tba, m13, userBetAlliance, tbaLoading, m13Loading, onClick }: MarketCardProps) {
+function GridCard({ match, odds, tba, m13, userBetAlliance, m13Loading, onClick }: MarketCardProps) {
   const effectivePredTime = match.pred_time
     ?? (tba?.predicted_time ? new Date(tba.predicted_time * 1000).toISOString() : null);
   const bettingClosed = !!effectivePredTime && Date.now() >= new Date(effectivePredTime).getTime();
@@ -308,19 +289,6 @@ function GridCard({ match, odds, tba, m13, userBetAlliance, tbaLoading, m13Loadi
           )}
         </div>
       </div>
-
-      {tba ? (
-        <div className="text-[10px] text-muted-foreground mb-2 leading-tight">
-          <span className="text-red-400">{teamNums(tba.alliances.red.team_keys)}</span>
-          <span className="text-muted-foreground/30"> vs </span>
-          <span className="text-blue-400">{teamNums(tba.alliances.blue.team_keys)}</span>
-        </div>
-      ) : tbaLoading ? (
-        <div className="flex items-center gap-1 mb-2">
-          <div className="h-2 w-16 rounded bg-muted/60 animate-pulse" />
-          <div className="h-2 w-16 rounded bg-muted/60 animate-pulse" />
-        </div>
-      ) : null}
 
       {/* Split */}
       <div className="flex items-center justify-between mb-1.5">
@@ -529,7 +497,7 @@ interface CompletedMatchCardProps {
   onClick: () => void;
 }
 
-function CompletedMatchCard({ match, odds, tba, m13, userBet, onClick }: CompletedMatchCardProps) {
+function CompletedMatchCard({ match, odds, m13, userBet, onClick }: CompletedMatchCardProps) {
   const winner = (match.winning_alliance ?? m13?.result?.winner) as "red" | "blue" | "tie" | null | undefined;
   // match13 only forecasts — it has no actual result, so `m13.result` here is
   // always just a copy of the DB-persisted (TBA-sourced) score/winner.
@@ -550,64 +518,56 @@ function CompletedMatchCard({ match, odds, tba, m13, userBet, onClick }: Complet
     : winner === "blue" ? "border-blue-700/40 bg-blue-900/5"
     : "border-border";
 
-  return (
-    <Card className={`cursor-pointer transition-all hover:scale-[1.005] border ${winnerBorder}`} onClick={onClick}>
-      <CardContent className="pt-0 pb-0 h-20">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex-1 min-w-0 mb-8">
-            <div className="flex items-center gap-2 flex-wrap mb-1 w-max">
-              <span className="font-bold text-sm">{match.name}</span>
-              {winner && winner !== "tie" && (
-                <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${
-                  winner === "red" ? "text-red-400 border-red-600/30" : "text-blue-400 border-blue-600/30"}`}>
-                  {winner.toUpperCase()} WIN
-                </Badge>
-              )}
-              {isUpset && (
-                <Badge className="bg-yellow-600/20 text-yellow-300 border-yellow-600/30 text-[10px] px-1.5 py-0">
-                  UPSET
-                </Badge>
-              )}
-              {userBet && (
-                <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${getBetStatusColor(userBet.status)}`}>
-                  {userBet.status === "won" ? "Won" : userBet.status === "lost" ? "Lost" : userBet.status}
-                  {userBet.status === "won" && userBet.payout !== null
-                    ? ` +${userBet.payout - userBet.amount}`
-                    : userBet.status === "lost" ? ` −${userBet.amount}` : ""}
-                </Badge>
-              )}
-            </div>
-            {tba && (
-              <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                <span className={`font-medium ${winner === "red" ? "text-red-400" : "text-red-400/60"}`}>
-                  {teamNums(tba.alliances.red.team_keys)}
-                </span>
-                <span className="text-muted-foreground/40">vs</span>
-                <span className={`font-medium ${winner === "blue" ? "text-blue-400" : "text-blue-400/60"}`}>
-                  {teamNums(tba.alliances.blue.team_keys)}
-                </span>
-              </div>
-            )}
-          </div>
+  const hasScore = red != null && blue != null;
 
-          {red !== null && blue !== null && red !== undefined && blue !== undefined ? (
-            <div className="flex items-center gap-2 shrink-0">
-              <div className={`text-center w-12 ${winner === "red" ? "text-red-300" : "text-muted-foreground"}`}>
-                <div className="text-xl font-black leading-none">{red}</div>
-                <div className="text-[9px] text-red-400/60 mt-0.5">RED</div>
-              </div>
-              <div className="text-muted-foreground/40 text-xs">–</div>
-              <div className={`text-center w-12 ${winner === "blue" ? "text-blue-300" : "text-muted-foreground"}`}>
-                <div className="text-xl font-black leading-none">{blue}</div>
-                <div className="text-[9px] text-blue-400/60 mt-0.5">BLUE</div>
-              </div>
-            </div>
-          ) : (
-            <div className="text-xs text-muted-foreground shrink-0">
-              {odds?.betCount ?? 0} bets · {odds?.totalPool ?? 0} pts
-            </div>
+  return (
+    <Card className={`cursor-pointer transition-all hover:scale-[1.01] border py-0 ${winnerBorder}`} onClick={onClick}>
+      <CardContent className="p-3 flex flex-col gap-2.5">
+        <div className="flex items-start justify-between gap-2">
+          <span className="font-bold text-sm leading-tight truncate">{match.name}</span>
+          {winner && winner !== "tie" && (
+            <Badge variant="outline" className={`shrink-0 text-[10px] px-1.5 py-0 ${
+              winner === "red" ? "text-red-400 border-red-600/30" : "text-blue-400 border-blue-600/30"}`}>
+              {winner.toUpperCase()} WIN
+            </Badge>
           )}
         </div>
+
+        {hasScore ? (
+          <div className="flex items-end justify-center gap-3">
+            <div className={`text-center ${winner === "red" ? "text-red-300" : "text-muted-foreground"}`}>
+              <div className="text-2xl font-black leading-none tabular-nums">{red}</div>
+              <div className="text-[9px] text-red-400/70 mt-1 tracking-wider">RED</div>
+            </div>
+            <div className="text-muted-foreground/40 text-sm pb-4">–</div>
+            <div className={`text-center ${winner === "blue" ? "text-blue-300" : "text-muted-foreground"}`}>
+              <div className="text-2xl font-black leading-none tabular-nums">{blue}</div>
+              <div className="text-[9px] text-blue-400/70 mt-1 tracking-wider">BLUE</div>
+            </div>
+          </div>
+        ) : (
+          <div className="text-xs text-muted-foreground text-center py-2">
+            {odds?.betCount ?? 0} bets · {odds?.totalPool ?? 0} pts
+          </div>
+        )}
+
+        {(isUpset || userBet) && (
+          <div className="flex items-center justify-center gap-1.5 flex-wrap">
+            {isUpset && (
+              <Badge className="bg-yellow-600/20 text-yellow-300 border-yellow-600/30 text-[10px] px-1.5 py-0">
+                UPSET
+              </Badge>
+            )}
+            {userBet && (
+              <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${getBetStatusColor(userBet.status)}`}>
+                {userBet.status === "won" ? "Won" : userBet.status === "lost" ? "Lost" : userBet.status}
+                {userBet.status === "won" && userBet.payout !== null
+                  ? ` +${userBet.payout - userBet.amount}`
+                  : userBet.status === "lost" ? ` −${userBet.amount}` : ""}
+              </Badge>
+            )}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -893,7 +853,10 @@ export default function Betting({
         if (tba) {
           const map = new Map<number, TBAMatchData>();
           (tba as TBAMatchData[]).forEach((m) => {
-            if (m.comp_level === "qm" || (m as any).key?.includes("_qm")) map.set(m.match_number, m);
+            if (m.comp_level !== "qm" && !(m as any).key?.includes("_qm")) return;
+            // A manual-results (demo) event replays a real one: its real, past start
+            // times would show every match as closed
+            map.set(m.match_number, activeEvent.manual_results ? { ...m, predicted_time: undefined } : m);
           });
           setTbaMap(map);
         }
@@ -1046,8 +1009,6 @@ export default function Betting({
   const myBetByMatch = new Map<string, BetWithMatch>();
   myBets.forEach((b) => myBetByMatch.set(b.match_id, b));
 
-  const pendingBetCount = myBets.filter((b) => b.status === "pending").length;
-
   // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
@@ -1161,24 +1122,13 @@ export default function Betting({
               <TabsTrigger value="markets" className="flex-1">
                 <Target className="h-3.5 w-3.5 mr-1" />
                 Matches
-                {openMatches.length > 0 && (
-                  <Badge className="ml-1.5 h-5 px-1.5 text-xs">{openMatches.length}</Badge>
-                )}
               </TabsTrigger>
               <TabsTrigger value="results" className="flex-1">
                 <Zap className="h-3.5 w-3.5 mr-1" />
                 Results
-                {completedMatches.length > 0 && (
-                  <Badge className="ml-1.5 h-5 px-1.5 text-xs bg-muted text-muted-foreground">
-                    {completedMatches.length}
-                  </Badge>
-                )}
               </TabsTrigger>
               <TabsTrigger value="mybets" className="flex-1">
                 My Bets
-                {pendingBetCount > 0 && (
-                  <Badge className="ml-1.5 h-5 px-1.5 text-xs bg-yellow-600">{pendingBetCount}</Badge>
-                )}
               </TabsTrigger>
               <TabsTrigger value="leaderboard" className="flex-1">
                 <Trophy className="h-3.5 w-3.5" />

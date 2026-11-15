@@ -16,7 +16,7 @@ import {
   getMatchBets, getMatchUserBet, placeBet, cancelBet,
   computeOddsFromBets, estimatePayout, settleMatchBets,
   cacheMatchOdds, getCachedMatchOdds, blendOddsRedPct,
-  computeTimeDecayFactor, FULL_VALUE_MS, MAX_BET,
+  computeTimeDecayFactor, FULL_VALUE_MS, MAX_BET, revealMatchResult,
 } from "@/lib/betting";
 import { getMatchLabel, wasUpset } from "@/lib/match13";
 import { getEventMatches, getEventTeams, getMatchScores } from "@/lib/blueAlliance";
@@ -213,6 +213,79 @@ interface ResultCardProps {
   dbBlueScore?: number | null;
 }
 
+// ---------------------------------------------------------------------------
+// Manager reveal (manual-results events): enter the score, which settles everyone's bets
+// ---------------------------------------------------------------------------
+interface RevealResultCardProps {
+  matchId: string;
+  eventCode: string | null;
+  matchNumber: number;
+  onRevealed: () => void | Promise<void>;
+}
+
+function RevealResultCard({ matchId, eventCode, matchNumber, onRevealed }: RevealResultCardProps) {
+  const [red, setRed] = useState("");
+  const [blue, setBlue] = useState("");
+  const [revealing, setRevealing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Start from the real event's score, so the manager usually just confirms it
+  useEffect(() => {
+    if (!eventCode) return;
+    let cancelled = false;
+    getMatchScores(eventCode, matchNumber).then((scores) => {
+      const [r, b] = scores ?? [];
+      if (cancelled || typeof r !== "number" || typeof b !== "number" || r < 0 || b < 0) return;
+      setRed((prev) => prev || String(r));
+      setBlue((prev) => prev || String(b));
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [eventCode, matchNumber]);
+
+  const redScore = Number.parseInt(red, 10);
+  const blueScore = Number.parseInt(blue, 10);
+  const valid = Number.isInteger(redScore) && Number.isInteger(blueScore) && redScore >= 0 && blueScore >= 0;
+  const winnerLabel = !valid ? null : redScore > blueScore ? "Red wins" : blueScore > redScore ? "Blue wins" : "Tie";
+
+  async function reveal() {
+    if (!valid) return;
+    if (!window.confirm(`Reveal ${redScore}–${blueScore} (${winnerLabel}) and pay out every bet on this match? This can't be undone.`)) return;
+    setRevealing(true);
+    setError(null);
+    const result = await revealMatchResult(matchId, redScore, blueScore);
+    if (!result.success) setError(result.error ?? "Failed to reveal the result.");
+    else await onRevealed();
+    setRevealing(false);
+  }
+
+  return (
+    <Card className="border-amber-600/30 bg-amber-900/10">
+      <CardContent className="space-y-3 pt-4">
+        <div>
+          <h2 className="font-semibold text-amber-200">Reveal result</h2>
+          <p className="text-xs text-muted-foreground">
+            Managers only. Shows this score to everyone and settles all bets on the match.
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="space-y-1">
+            <span className="text-[10px] text-red-400 font-semibold uppercase tracking-wider">Red score</span>
+            <Input type="number" inputMode="numeric" min={0} value={red} onChange={(e) => setRed(e.target.value)} />
+          </label>
+          <label className="space-y-1">
+            <span className="text-[10px] text-blue-400 font-semibold uppercase tracking-wider">Blue score</span>
+            <Input type="number" inputMode="numeric" min={0} value={blue} onChange={(e) => setBlue(e.target.value)} />
+          </label>
+        </div>
+        {error && <p className="text-xs text-red-400">{error}</p>}
+        <Button className="w-full" disabled={!valid || revealing} onClick={reveal}>
+          {revealing ? <Loader2 className="h-4 w-4 animate-spin" /> : `Reveal${winnerLabel ? ` — ${winnerLabel}` : ""}`}
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
 function ResultCard({ m13Match, winner, dbRedScore, dbBlueScore }: ResultCardProps) {
   const upset = wasUpset(winner, m13Match.pred.red_win_prob);
   // match13 only forecasts — it has no actual result, so `m13Match.result`
@@ -329,7 +402,7 @@ interface TBAMatchFull {
 export default function MatchBetting() {
   const { match_id } = useParams<{ match_id: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { devMode } = useDevMode();
   const isOnline = useOnlineStatus();
 
@@ -502,8 +575,13 @@ export default function MatchBetting() {
           setTeamInfo(map);
         }
 
-        const tba_scores = await getMatchScores(eventCode, m.match_number);
-        let results: Match13Match["result"] = { winner: null, red_score: null, blue_score: null };
+        // A manual-results event (a demo replaying a real one) only has the result a manager
+        // revealed, which is on the match row — TBA's real score would give it away.
+        const manualResults = !!loadedEvent?.manual_results;
+        const tba_scores = manualResults ? null : await getMatchScores(eventCode, m.match_number);
+        let results: Match13Match["result"] = manualResults
+          ? { winner: m.winning_alliance ?? null, red_score: m.red_score ?? null, blue_score: m.blue_score ?? null }
+          : { winner: null, red_score: null, blue_score: null };
         // TBA reports -1 for an unplayed match; 0 is a real score, and equal scores are a tie.
         const [redScore, blueScore] = tba_scores ?? [];
         if (typeof redScore === "number" && typeof blueScore === "number" && redScore >= 0 && blueScore >= 0) {
@@ -552,8 +630,9 @@ export default function MatchBetting() {
           if (!cancelled) setM13Match(m13);
         }
 
-        const predTimeSeconds = found?.predicted_time;
-        if (!predTimeSeconds && !m.pred_time) {
+        // The real event's (past) start times would close a manual-results event's betting
+        const predTimeSeconds = manualResults ? null : found?.predicted_time;
+        if (!manualResults && !predTimeSeconds && !m.pred_time) {
           setLoading(true);
           return;
         }
@@ -994,6 +1073,20 @@ export default function MatchBetting() {
         {/* Result card (if match is complete) */}
         {m13Match && effectiveWinner && effectiveWinner !== "tie" && (
           <ResultCard m13Match={m13Match} winner={effectiveWinner} dbRedScore={match?.red_score} dbBlueScore={match?.blue_score} />
+        )}
+
+        {event?.manual_results && profile?.is_manager && !match.winning_alliance && !(devMode && isDevMatchId(match.id)) && (
+          <RevealResultCard
+            matchId={match.id}
+            eventCode={event.event_code}
+            matchNumber={match.match_number}
+            onRevealed={async () => {
+              await refetchMatch();
+              setBets(await getMatchBets(match.id));
+              await refreshUserBet();
+              await refreshPoints();
+            }}
+          />
         )}
 
         {/* match13 prediction bar */}

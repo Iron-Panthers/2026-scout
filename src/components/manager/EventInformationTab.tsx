@@ -709,7 +709,7 @@ export function EventInformationTab({
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label className="text-sm font-medium text-muted-foreground">
-                  Scouting Map
+                  Map
                 </Label>
                 {isEditing ? (
                   <div className="mt-1 space-y-2">

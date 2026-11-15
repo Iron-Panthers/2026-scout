@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { AchievementIcon } from "@/components/AchievementIcon";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAchievements } from "@/hooks/useAchievements";
-import { getAchievementHolderCounts, type AchievementHolderCounts } from "@/lib/achievements";
+import { getAchievementHolderCounts, type AchievementHolderCounts, type AchievementProgress } from "@/lib/achievements";
 import { getPublicProfile, type PublicProfile } from "@/lib/profiles";
 
 /** "12 of 87 scouters (14%)"; "<1%" for a few holders among many. */
@@ -37,25 +37,12 @@ export default function Achievements() {
     };
   }, [isOwn, viewedId]);
 
-  // How many scouters have each one (the same for every profile)
-  const [holderCounts, setHolderCounts] = useState<AchievementHolderCounts | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    getAchievementHolderCounts().then((counts) => !cancelled && setHolderCounts(counts));
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   const teamYears = (isOwn ? profile?.team_years : other?.team_years) ?? [];
   // Someone else's team years come with their profile: wait for it before working anything out
   const achievements = useAchievements(isOwn || other ? viewedId : null, teamYears);
   const name = isOwn ? "Your" : other ? `${other.name}'s` : "";
   const earned = achievements?.filter((achievement) => achievement.earned).length ?? 0;
   const pointsEarned = achievements?.reduce((sum, achievement) => sum + (achievement.earned ? achievement.points : 0), 0) ?? 0;
-  // Earned first, then the ones still to get, with secret (still hidden) ones last
-  const rank = (achievement: { earned: boolean; secret?: boolean }) => (achievement.earned ? 0 : achievement.secret ? 2 : 1);
-  const sorted = achievements ? [...achievements].sort((a, b) => rank(a) - rank(b)) : [];
 
   return (
     <div className="min-h-screen bg-background my-5">
@@ -83,54 +70,75 @@ export default function Achievements() {
           </div>
         )}
 
-        {!achievements ? (
-          <p className="py-10 text-center text-muted-foreground">Loading achievements...</p>
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2">
-            {sorted.map((achievement) => {
-              // Secret ones stay a mystery until earned
-              const hidden = !!achievement.secret && !achievement.earned;
-              return (
-              <Card key={achievement.id} className={achievement.earned ? "" : "opacity-70"}>
-                <CardContent className="flex items-center gap-4 p-4">
-                  <AchievementIcon icon={achievement.icon} earned={achievement.earned} hidden={hidden} />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
-                      <p className="truncate font-semibold">{hidden ? "???" : achievement.name}</p>
-                      {!achievement.earned && <Lock className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
-                    </div>
-                    <p className="text-sm text-muted-foreground">{hidden ? "???" : achievement.description}</p>
-                    {/* What it pays (hidden too while it's secret) */}
-                    <p className={`mt-1 text-xs font-semibold ${achievement.earned ? "text-primary" : "text-muted-foreground"}`}>
-                      {hidden ? "??? points" : `${achievement.earned ? "Earned " : ""}+${achievement.points} points`}
-                    </p>
-                    {/* Progress toward ones that take more than one step (never for secret ones) */}
-                    {!achievement.earned && !hidden && achievement.goal > 1 && (
-                      <div className="mt-2 flex items-center gap-2">
-                        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-                          <div
-                            className="h-full rounded-full bg-primary/60"
-                            style={{ width: `${(achievement.progress / achievement.goal) * 100}%` }}
-                          />
-                        </div>
-                        <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                          {achievement.progress}/{achievement.goal}
-                        </span>
-                      </div>
-                    )}
-                    {holderCounts && holderCounts.scouters > 0 && (
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {holdersLabel(holderCounts.holders.get(achievement.id) ?? 0, holderCounts.scouters)}
-                      </p>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-              );
-            })}
-          </div>
-        )}
+        <AchievementsGrid achievements={achievements} />
       </main>
     </div>
+  );
+}
+
+/** Every achievement as a grid of cards: earned first, then the rest, with secret ones last. */
+export function AchievementsGrid({ achievements }: { achievements: AchievementProgress[] | null }) {
+  // How many scouters have each one (the same for every profile)
+  const [holderCounts, setHolderCounts] = useState<AchievementHolderCounts | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    getAchievementHolderCounts().then((counts) => !cancelled && setHolderCounts(counts));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Earned first, then the ones still to get, with secret (still hidden) ones last
+  const rank = (achievement: { earned: boolean; secret?: boolean }) => (achievement.earned ? 0 : achievement.secret ? 2 : 1);
+  const sorted = achievements ? [...achievements].sort((a, b) => rank(a) - rank(b)) : [];
+
+  if (!achievements) {
+    return <p className="py-10 text-center text-muted-foreground">Loading achievements...</p>;
+  }
+
+  return (
+      <div className="grid gap-3 sm:grid-cols-2">
+        {sorted.map((achievement) => {
+          // Secret ones stay a mystery until earned
+          const hidden = !!achievement.secret && !achievement.earned;
+          return (
+          <Card key={achievement.id} className={achievement.earned ? "" : "opacity-70"}>
+            <CardContent className="flex items-center gap-4 p-4">
+              <AchievementIcon icon={achievement.icon} earned={achievement.earned} hidden={hidden} />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  <p className="truncate font-semibold">{hidden ? "???" : achievement.name}</p>
+                  {!achievement.earned && <Lock className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+                </div>
+                <p className="text-sm text-muted-foreground">{hidden ? "???" : achievement.description}</p>
+                {/* What it pays (hidden too while it's secret) */}
+                <p className={`mt-1 text-xs font-semibold ${achievement.earned ? "text-primary" : "text-muted-foreground"}`}>
+                  {hidden ? "??? points" : `${achievement.earned ? "Earned " : ""}+${achievement.points} points`}
+                </p>
+                {/* Progress toward ones that take more than one step (never for secret ones) */}
+                {!achievement.earned && !hidden && achievement.goal > 1 && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+                      <div
+                        className="h-full rounded-full bg-primary/60"
+                        style={{ width: `${(achievement.progress / achievement.goal) * 100}%` }}
+                      />
+                    </div>
+                    <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                      {achievement.progress}/{achievement.goal}
+                    </span>
+                  </div>
+                )}
+                {holderCounts && holderCounts.scouters > 0 && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {holdersLabel(holderCounts.holders.get(achievement.id) ?? 0, holderCounts.scouters)}
+                  </p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+          );
+        })}
+      </div>
   );
 }
