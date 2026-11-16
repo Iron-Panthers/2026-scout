@@ -838,6 +838,16 @@ html {
     padding-top: env(safe-area-inset-top);
   }
 }
+/* A full-screen view (the scouting screens) that fits what's actually visible on a phone.
+   100vh is the height with the browser's address bar hidden, so with the bar showing (and the
+   body's notch padding above) the bottom of the view sat under the browser's bar. 100dvh
+   follows the bar as it shows and hides; the bottom padding keeps the buttons clear of the
+   home indicator. */
+.full-screen-view {
+  height: calc(100vh - env(safe-area-inset-top));
+  height: calc(100dvh - env(safe-area-inset-top));
+  padding-bottom: env(safe-area-inset-bottom);
+}
 /* Team comparison overlay (strategy Teams tab): the first two categorical hues,
    validated for colorblind separation and 3:1 contrast on the white and #1A1A1A cards. */
 :root {

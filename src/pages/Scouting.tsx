@@ -210,7 +210,7 @@ export default function Scouting() {
 
   // ── Frame 1 ─────────────────────────────────────────────────────────────
   const Frame1 = () => (
-    <div className="h-screen w-screen flex flex-col select-none touch-none overflow-hidden bg-background">
+    <div className="full-screen-view w-screen flex flex-col select-none touch-none overflow-hidden bg-background">
       {Header()}
 
       {/* Main button grid */}

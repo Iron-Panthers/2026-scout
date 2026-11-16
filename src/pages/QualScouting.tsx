@@ -178,7 +178,7 @@ export default function QualScouting() {
   // ── Loading state ────────────────────────────────────────────────────────
   if (loading || !state) {
     return (
-      <div className="h-screen w-screen flex items-center justify-center bg-background">
+      <div className="full-screen-view w-screen flex items-center justify-center bg-background">
         <Loader2 className="w-10 h-10 animate-spin text-muted-foreground" />
       </div>
     );
@@ -188,7 +188,7 @@ export default function QualScouting() {
 
   return (
     <div
-      className="h-screen w-screen flex flex-col select-none touch-none overflow-hidden bg-background"
+      className="full-screen-view w-screen flex flex-col select-none touch-none overflow-hidden bg-background"
       onPointerMove={onDragPointerMove}
       onPointerUp={onDragPointerUp}
     >
