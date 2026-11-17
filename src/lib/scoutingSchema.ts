@@ -317,6 +317,19 @@ export async function submitScoutingData(
       }).then(async ({ data: id, error }) =>
         error ? { data: null, error } : await supabase.from("scouting_submissions").select().eq("id", id).single()
       )
+    : scouterId
+    // One submission per scouter for each robot in a match: submitting again (a resubmit, or
+    // the offline list re-uploading) replaces the earlier one instead of adding a copy
+    ? await supabase.rpc("submit_scouting_data", {
+        p_match_id: matchId,
+        p_role: role,
+        p_scouting_data: scoutingData,
+        p_team_num: team_num,
+        p_match_type: match_type,
+        p_schema_version: CURRENT_SCHEMA_VERSION,
+      }).then(async ({ data: id, error }) =>
+        error ? { data: null, error } : await supabase.from("scouting_submissions").select().eq("id", id).single()
+      )
     : await supabase
         .from("scouting_submissions")
         .insert({
@@ -403,15 +416,16 @@ export async function submitQualScoutingData(
 ): Promise<QualScoutingSubmission> {
   const alreadySubmitted = await hasExistingQualSubmission(matchId, role, scouterId);
 
+  // One per scouter for each robot in a match: submitting again replaces the earlier one
   const { data, error } = await supabase
     .from("qual_scouting_submissions")
-    .insert({
+    .upsert({
       match_id: matchId,
       role,
       scouting_data: scoutingData,
       schema_version: QUAL_SCHEMA_VERSION,
       scouter_id: scouterId,
-    })
+    }, { onConflict: "match_id,role,scouter_id" })
     .select()
     .single();
 

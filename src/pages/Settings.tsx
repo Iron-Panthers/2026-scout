@@ -11,6 +11,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { supabase } from "@/lib/supabase";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -28,13 +37,32 @@ const MESSAGE_NOTIFICATIONS_FIELD = "message-notifications";
 
 export default function Settings() {
   const navigate = useNavigate();
-  const { user, profile, refreshProfile } = useAuth();
+  const { user, profile, refreshProfile, signOut } = useAuth();
   const { settings, updateSetting } = useSettings();
   const { canUseDevMode, devMode, toggleDevMode, resetSandbox } = useDevMode();
   const { toast } = useToast();
   const { supported, subscribed, loading, permission, error, toggleNotifications } =
     usePushNotifications();
   const [recording, setRecording] = useState<string | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const handleDeleteAccount = async () => {
+    setDeleting(true);
+    setDeleteError(null);
+    // delete_my_account: removes the sign-in and everything personal; scouting data is kept
+    const { error } = await supabase.rpc("delete_my_account");
+    if (error) {
+      setDeleteError(error.message || "Couldn't delete your account.");
+      setDeleting(false);
+      return;
+    }
+    // The session's user no longer exists; clear it locally and leave
+    await signOut().catch(() => {});
+    navigate("/login", { replace: true });
+  };
 
   useEffect(() => {
     if (!recording) return;
@@ -321,9 +349,49 @@ export default function Settings() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button variant="destructive">Delete Account</Button>
+            <Button
+              variant="destructive"
+              onClick={() => { setDeleteConfirm(""); setDeleteError(null); setDeleteOpen(true); }}
+            >
+              Delete Account
+            </Button>
           </CardContent>
         </Card>
+
+        <Dialog open={deleteOpen} onOpenChange={(open) => !deleting && setDeleteOpen(open)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete your account?</DialogTitle>
+              <DialogDescription>
+                This permanently deletes your profile, coins, bets, messages, achievements and
+                personal picklists. Your scouting submissions stay with the team, without your
+                name. This can't be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2">
+              <Label htmlFor="delete-confirm">Type DELETE to confirm</Label>
+              <Input
+                id="delete-confirm"
+                value={deleteConfirm}
+                autoComplete="off"
+                onChange={(e) => setDeleteConfirm(e.target.value)}
+              />
+              {deleteError && <p className="text-sm text-destructive">{deleteError}</p>}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" disabled={deleting} onClick={() => setDeleteOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                disabled={deleteConfirm !== "DELETE" || deleting}
+                onClick={handleDeleteAccount}
+              >
+                {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Delete account"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );

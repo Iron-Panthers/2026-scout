@@ -229,11 +229,15 @@ export function EventInformationTab({
       return;
     }
 
+    if (!currentEvent?.id) return;
     try {
+      // By id: events can share a TBA event code (a demo replaying a real event), and deleting
+      // by code took every event with it — and, through cascades, all of their matches and
+      // scouting data.
       const { error } = await supabase
         .from("events")
         .delete()
-        .eq("event_code", editedEvent.event_code);
+        .eq("id", currentEvent.id);
 
       if (error) throw error;
 

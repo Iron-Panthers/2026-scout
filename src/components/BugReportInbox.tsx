@@ -42,7 +42,7 @@ interface BugReportInboxProps {
   userId: string;
   isDeveloper: boolean;
   nameOf: (id: string | null) => string;
-  avatarOf: (id: string) => ReactNode;
+  avatarOf: (id: string | null) => ReactNode;
   bugReports: ReturnType<typeof useBugReports>;
 }
 

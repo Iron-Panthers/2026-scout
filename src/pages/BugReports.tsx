@@ -38,7 +38,7 @@ export default function BugReports() {
 
   const nameOf = (id: string | null) =>
     id === userId ? "You" : contacts.find((contact) => contact.id === id)?.name ?? "Unknown";
-  const avatarOf = (id: string) => {
+  const avatarOf = (id: string | null) => {
     const name = id === userId ? profile?.name || "You" : nameOf(id);
     const avatarUrl = id === userId ? profile?.avatar_url : contacts.find((contact) => contact.id === id)?.avatar_url;
     return <CosmeticAvatar avatarUrl={avatarUrl} initials={initialsOf(name)} size="sm" className="shrink-0" />;

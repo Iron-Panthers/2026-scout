@@ -113,7 +113,7 @@ export interface Roster {
   name: string;
   description: string | null;
   event_id: string;
-  created_by: string;
+  created_by: string | null; // null once its creator deleted their account
   red1_scouter_id: string | null;
   red2_scouter_id: string | null;
   red3_scouter_id: string | null;

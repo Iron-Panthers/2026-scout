@@ -4,7 +4,8 @@ export type BugReportStatus = "open" | "fixed";
 
 export interface BugReport {
   id: string;
-  author_id: string;
+  /** Null once the author has deleted their account. */
+  author_id: string | null;
   title: string;
   description: string;
   status: BugReportStatus;
@@ -24,7 +25,8 @@ export interface BugReportWithCount extends BugReport {
 export interface BugReportComment {
   id: string;
   report_id: string;
-  author_id: string;
+  /** Null once the author has deleted their account. */
+  author_id: string | null;
   body: string;
   created_at: string;
 }
@@ -53,7 +55,8 @@ export async function getBugReports(): Promise<BugReportWithCount[]> {
   return (data ?? []).map(({ bug_report_comments, commenters, ...report }) => ({
     ...(report as BugReport),
     commentCount: (bug_report_comments as Array<{ count: number }> | null)?.[0]?.count ?? 0,
-    commenterIds: [...new Set(((commenters as Array<{ author_id: string }> | null) ?? []).map((c) => c.author_id))],
+    commenterIds: [...new Set(((commenters as Array<{ author_id: string | null }> | null) ?? [])
+      .flatMap((c) => c.author_id ? [c.author_id] : []))],
   }));
 }
 
