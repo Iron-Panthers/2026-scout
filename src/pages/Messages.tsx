@@ -218,7 +218,7 @@ export default function Messages() {
         {/* Their picture and name open their profile */}
         <button
           type="button"
-          onClick={() => navigate(`/profile/${openContact.id}`)}
+          onClick={() => navigate(`/profile/${openContact.id}`, { state: { fromMessages: true } })}
           className="flex min-w-0 items-center gap-3 rounded-lg p-1 -m-1 text-left transition-colors hover:bg-accent/50"
           aria-label={`View ${openContact.name}'s profile`}
         >

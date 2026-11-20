@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, ChevronRight, Loader2, PencilRuler } from "lucide-react";
+import { ArrowLeft, ChevronRight, Loader2, PencilRuler, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import UserProfileMenu from "@/components/UserProfileMenu";
 import { StrategyFieldBoard } from "@/components/StrategyFieldBoard";
+import { SendBoardDialog } from "@/components/strategy/SendBoardDialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDevMode } from "@/contexts/DevModeContext";
 import { useGoBack } from "@/hooks/useGoBack";
@@ -17,13 +18,18 @@ import {
   eventForMatchKey,
   getBoardEvents,
   getOurMatches,
+  getReceivedBoardSenders,
+  getReceivedBoards,
   hasDrawing,
   loadBoard,
+  loadReceivedCopy,
   saveBoard,
+  saveReceivedCopy,
   type BoardMatch,
   type BoardPage,
   type BoardPageKey,
   type OurMatch,
+  type ReceivedBoard,
 } from "@/lib/strategyBoard";
 import { mainTeamNumber, type MatchTeam } from "@/lib/strategyData";
 
@@ -116,6 +122,16 @@ export function BoardMatchList({ userId }: { userId: string | null }) {
   const [eventId, setEventId] = useUrlState("event", boardEvents?.initialId ?? "", eventIds);
   const event = boardEvents?.events.find((item) => item.id === eventId) ?? null;
   const loaded = useOurMatches(event);
+  // Who has sent the user boards, by match
+  const [senders, setSenders] = useState<Map<string, string[]>>(new Map());
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    getReceivedBoardSenders(userId).then((found) => { if (!cancelled) setSenders(found); });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
 
   const open = (match: OurMatch) => {
     const boardMatch: BoardMatch = { name: match.name, red: match.red, blue: match.blue };
@@ -152,6 +168,12 @@ export function BoardMatchList({ userId }: { userId: string | null }) {
                   <span className="flex items-center gap-1 text-xs text-muted-foreground">
                     <PencilRuler className="h-3 w-3" />
                     Has a plan
+                  </span>
+                )}
+                {senders.has(match.key) && (
+                  <span className="flex items-center gap-1 text-xs text-muted-foreground" title={`Sent by ${senders.get(match.key)?.join(", ")}`}>
+                    <Send className="h-3 w-3 shrink-0" />
+                    <span className="truncate">From {senders.get(match.key)?.join(", ")}</span>
                   </span>
                 )}
               </span>
@@ -227,37 +249,143 @@ const NO_HISTORY: PageHistory = { past: [], future: [], group: null };
 /** How many changes back each page can undo. */
 const UNDO_LIMIT = 100;
 
-/** A user's board for one match: a page for each part of the match, saved in this browser. */
+/** The board shown: the user's own drawings, or the one a sender sent them. */
+const MY_BOARD = "mine";
+
+/** A user's board for one match, and any boards sent to them for it. */
 function MatchBoard({ userId, matchKey }: { userId: string | null; matchKey: string }) {
   const goBack = useGoBack("/strategy-board");
   const location = useLocation();
-  const { toast } = useToast();
-  // The board and each page's undo history (for this visit), together so a change updates both at once
-  const [{ board, history }, setState] = useState(() => ({
-    board: loadBoard(userId, matchKey),
-    history: {} as Partial<Record<BoardPageKey, PageHistory>>,
-  }));
   const [pageKey, setPageKey] = useState<BoardPageKey>("auto");
-  const pageHistory = history[pageKey] ?? NO_HISTORY;
+  const [view, setView] = useState(MY_BOARD);
+  const [ownMatch] = useState(() => loadBoard(userId, matchKey).match);
+  const [received, setReceived] = useState<ReceivedBoard[]>([]);
 
-  // The match from the list, else what was saved with the drawings (so it opens offline),
-  // else from the schedule (a link opened directly)
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    getReceivedBoards(userId, matchKey)
+      .then((boards) => { if (!cancelled) setReceived(boards); })
+      .catch((error) => console.error("Could not load boards sent to you:", error));
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, matchKey]);
+  const source = view === MY_BOARD ? null : received.find((board) => board.senderId === view) ?? null;
+
+  // The match from the list, else what was saved with the drawings (so it opens offline), else
+  // what a sender saved with theirs, else from the schedule (a link opened directly)
   const fromList = (location.state as { match?: BoardMatch } | null)?.match ?? null;
-  const needsSchedule = !fromList && !board.match;
+  const fromSaved = ownMatch ?? received.find((board) => board.board.match)?.board.match ?? null;
+  const needsSchedule = !fromList && !fromSaved;
   const boardEvents = useBoardEvents(needsSchedule);
   const matchEvent = (boardEvents && eventForMatchKey(boardEvents.events, matchKey)) ?? null;
   const loaded = useOurMatches(needsSchedule ? matchEvent : null);
   const fromSchedule = loaded?.matches.find((match) => match.key === matchKey) ?? null;
   const match = useMemo<BoardMatch | null>(
-    () => fromList ?? board.match ?? (fromSchedule && { name: fromSchedule.name, red: fromSchedule.red, blue: fromSchedule.blue }),
-    [fromList, board.match, fromSchedule]
+    () => fromList ?? fromSaved ?? (fromSchedule && { name: fromSchedule.name, red: fromSchedule.red, blue: fromSchedule.blue }),
+    [fromList, fromSaved, fromSchedule]
   );
 
+  const renderHeader = (actions?: ReactNode) => (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={goBack} aria-label="Back" title="Back">
+        <ArrowLeft className="h-4 w-4" />
+      </Button>
+      <h1 className="whitespace-nowrap text-sm font-semibold sm:text-base">{match?.name ?? "Strategy Board"}</h1>
+      <div className="flex gap-0.5 rounded-md border bg-card p-0.5">
+        {BOARD_PAGES.map((page) => (
+          <Button
+            key={page.key}
+            size="sm"
+            variant={pageKey === page.key ? "default" : "ghost"}
+            className="h-7 px-2 text-xs"
+            onClick={() => setPageKey(page.key)}
+            aria-pressed={pageKey === page.key}
+          >
+            {page.label}
+          </Button>
+        ))}
+      </div>
+      {received.length > 0 && (
+        <Select value={source ? source.senderId : MY_BOARD} onValueChange={setView}>
+          <SelectTrigger size="sm" className="h-7 w-auto gap-1 px-2 text-xs" aria-label="Whose drawings to show">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={MY_BOARD}>My drawings</SelectItem>
+            {received.map((board) => (
+              <SelectItem key={board.senderId} value={board.senderId}>
+                From {board.senderName}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+      {actions}
+    </div>
+  );
+
+  return (
+    // Exactly the screen's height (less the notch's padding on the body), so the field can take what the bar leaves
+    <main className="flex h-[calc(100dvh-env(safe-area-inset-top))] flex-col gap-2 bg-background p-2 sm:p-3">
+      {match ? (
+        <BoardEditor
+          // Each board (and each new send of one) has its own drawings and undo history
+          key={source ? `${source.senderId}:${source.sentAt}` : MY_BOARD}
+          userId={userId}
+          matchKey={matchKey}
+          match={match}
+          source={source}
+          pageKey={pageKey}
+          renderHeader={renderHeader}
+        />
+      ) : (
+        <>
+          {renderHeader()}
+          {loaded || (boardEvents && !matchEvent) ? (
+            <p className="text-center text-sm text-muted-foreground">Couldn't find this match.</p>
+          ) : (
+            <p className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Loading match...
+            </p>
+          )}
+        </>
+      )}
+    </main>
+  );
+}
+
+interface BoardEditorProps {
+  userId: string | null;
+  matchKey: string;
+  match: BoardMatch;
+  /** The received board being shown, or null for the user's own. */
+  source: ReceivedBoard | null;
+  pageKey: BoardPageKey;
+  renderHeader: (actions: ReactNode) => ReactNode;
+}
+
+/** One board for a match: a page for each part of the match, saved in this browser. */
+function BoardEditor({ userId, matchKey, match, source, pageKey, renderHeader }: BoardEditorProps) {
+  const { toast } = useToast();
+  const [sendOpen, setSendOpen] = useState(false);
+  // The board and each page's undo history (for this visit), together so a change updates both at once
+  const [{ board, history }, setState] = useState(() => ({
+    // A received board opens as the user last left it (their edits stay theirs), or as sent
+    board: source && userId ? loadReceivedCopy(userId, matchKey, source) : loadBoard(userId, matchKey),
+    history: {} as Partial<Record<BoardPageKey, PageHistory>>,
+  }));
+  const pageHistory = history[pageKey] ?? NO_HISTORY;
+  const fullBoard = useMemo(() => ({ ...board, match }), [board, match]);
+
   useEffect(() => {
-    if (!saveBoard(userId, matchKey, { ...board, match })) {
+    const saved = source && userId ? saveReceivedCopy(userId, matchKey, source, fullBoard) : saveBoard(userId, matchKey, fullBoard);
+    if (!saved) {
       toast({ title: "Couldn't save the drawing", description: "This browser's storage is full.", variant: "destructive" });
     }
-  }, [userId, matchKey, board, match, toast]);
+  }, [userId, matchKey, source, fullBoard, toast]);
 
   const updatePage = useCallback(
     (update: (page: BoardPage) => BoardPage, group?: string) =>
@@ -301,58 +429,45 @@ function MatchBoard({ userId, matchKey }: { userId: string | null; matchKey: str
   const undo = useCallback(() => step("undo"), [step]);
   const redo = useCallback(() => step("redo"), [step]);
 
-  const header = (
-    <div className="flex items-center gap-1.5">
-      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={goBack} aria-label="Back" title="Back">
-        <ArrowLeft className="h-4 w-4" />
-      </Button>
-      <h1 className="whitespace-nowrap text-sm font-semibold sm:text-base">{match?.name ?? "Strategy Board"}</h1>
-      <div className="flex gap-0.5 rounded-md border bg-card p-0.5">
-        {BOARD_PAGES.map((page) => (
-          <Button
-            key={page.key}
-            size="sm"
-            variant={pageKey === page.key ? "default" : "ghost"}
-            className="h-7 px-2 text-xs"
-            onClick={() => setPageKey(page.key)}
-            aria-pressed={pageKey === page.key}
-          >
-            {page.label}
-          </Button>
-        ))}
-      </div>
-    </div>
+  const isEmpty = Object.values(board.pages).every((page) => page.robots.length === 0 && page.strokes.length === 0);
+  const sendButton = userId && (
+    <Button
+      size="sm"
+      variant="outline"
+      className="h-7 gap-1 px-2 text-xs"
+      onClick={() => setSendOpen(true)}
+      disabled={isEmpty}
+      title={isEmpty ? "Draw something to send" : "Send these drawings to someone"}
+    >
+      <Send className="h-3.5 w-3.5" />
+      Send
+    </Button>
   );
 
   return (
-    // Exactly the screen's height (less the notch's padding on the body), so the field can take what the bar leaves
-    <main className="flex h-[calc(100dvh-env(safe-area-inset-top))] flex-col gap-2 bg-background p-2 sm:p-3">
-      {match ? (
-        <StrategyFieldBoard
-          leading={header}
-          pageKey={pageKey}
-          page={board.pages[pageKey]}
-          onChange={updatePage}
-          canUndo={pageHistory.past.length > 0}
-          canRedo={pageHistory.future.length > 0}
-          onUndo={undo}
-          onRedo={redo}
-          red={match.red}
-          blue={match.blue}
+    <>
+      <StrategyFieldBoard
+        leading={renderHeader(sendButton)}
+        pageKey={pageKey}
+        page={board.pages[pageKey]}
+        onChange={updatePage}
+        canUndo={pageHistory.past.length > 0}
+        canRedo={pageHistory.future.length > 0}
+        onUndo={undo}
+        onRedo={redo}
+        red={match.red}
+        blue={match.blue}
+      />
+      {userId && (
+        <SendBoardDialog
+          open={sendOpen}
+          onOpenChange={setSendOpen}
+          senderId={userId}
+          matchKey={matchKey}
+          matchName={match.name}
+          board={fullBoard}
         />
-      ) : (
-        <>
-          {header}
-          {loaded || (boardEvents && !matchEvent) ? (
-            <p className="text-center text-sm text-muted-foreground">Couldn't find this match.</p>
-          ) : (
-            <p className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Loading match...
-            </p>
-          )}
-        </>
       )}
-    </main>
+    </>
   );
 }

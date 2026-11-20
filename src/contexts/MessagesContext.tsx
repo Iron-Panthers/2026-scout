@@ -13,6 +13,8 @@ interface MessagesContextValue {
   contacts: MessageContact[];
   /** Re-counts unread messages (e.g. after a conversation is read). */
   refreshUnread: () => Promise<void>;
+  /** Drops someone from the contacts (their account was just deleted). */
+  removeContact: (id: string) => void;
   /**
    * What's open: a person's conversation on the messages page (their id), or a report on
    * the bug reporting page ("bug:<report id>"), so its new
@@ -66,6 +68,11 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
     if (!userId) return;
     setUnreadCount(await getUnreadMessageCount(userId));
   }, [userId]);
+
+  const removeContact = useCallback((id: string) => {
+    contactsRef.current = contactsRef.current.filter((contact) => contact.id !== id);
+    setContacts((current) => current.filter((contact) => contact.id !== id));
+  }, []);
 
   const setOpenConversation = useCallback((key: string | null) => {
     openConversation.current = key;
@@ -168,7 +175,7 @@ export function MessagesProvider({ children }: { children: ReactNode }) {
 
   return (
     <MessagesContext.Provider
-      value={{ unreadCount: visibleUnread, contacts: visibleContacts, refreshUnread, setOpenConversation, bugReports }}
+      value={{ unreadCount: visibleUnread, contacts: visibleContacts, refreshUnread, removeContact, setOpenConversation, bugReports }}
     >
       {children}
       {showButton && (

@@ -635,19 +635,6 @@ export function StrategyFieldBoard({
             <g ref={fieldRef} transform={rotated ? `translate(0 ${FIELD_WIDTH}) rotate(-90)` : undefined}>
               <image href={fieldImage} width={FIELD_WIDTH} height={FIELD_HEIGHT} />
 
-              {/* Lines under the robots, so team numbers stay readable */}
-              <g fill="none" strokeLinecap="round" strokeLinejoin="round" pointerEvents="none">
-                {[...page.strokes, ...(draft ? [draft] : [])].map((stroke) => (
-                  <path
-                    key={stroke.id}
-                    d={strokePath(stroke.points)}
-                    stroke={stroke.color}
-                    strokeWidth={stroke.width}
-                    {...styleAttributes(stroke.style, stroke.width)}
-                  />
-                ))}
-              </g>
-
               {robots.map((robot) => {
                 const isSelected = selected === robot.team;
                 return (
@@ -716,6 +703,19 @@ export function StrategyFieldBoard({
                   </g>
                 );
               })}
+
+              {/* Lines over the robots */}
+              <g fill="none" strokeLinecap="round" strokeLinejoin="round" pointerEvents="none">
+                {[...page.strokes, ...(draft ? [draft] : [])].map((stroke) => (
+                  <path
+                    key={stroke.id}
+                    d={strokePath(stroke.points)}
+                    stroke={stroke.color}
+                    strokeWidth={stroke.width}
+                    {...styleAttributes(stroke.style, stroke.width)}
+                  />
+                ))}
+              </g>
 
               {tool === "eraser" && eraserAt && (
                 <circle

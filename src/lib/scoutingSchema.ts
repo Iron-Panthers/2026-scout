@@ -7,8 +7,7 @@
  */
 
 import { supabase } from "./supabase";
-import { awardPoints, awardEventPoints } from "./gameProfiles";
-import { POINTS_PER_MATCH, EVENT_POINTS_PER_MATCH } from "@/config/games";
+import { isDevModeActive } from "./devMode";
 import { ALL_ROLE_COLUMNS } from "./roleUtils";
 import { requestAchievementCheck } from "./achievementEvents";
 import { mergeRescoutData } from "./rescoutMerge";
@@ -278,17 +277,15 @@ async function isAssignedToMatch(matchId: string, scouterId: string): Promise<bo
 }
 
 /**
- * Award points + event points for a first-time submission, but only for a match
- * the scouter was assigned to.
+ * Award points + event points (POINTS_PER_MATCH, EVENT_POINTS_PER_MATCH) for scouting a match
+ * the scouter was assigned to. The database pays each scouter once per match, so submitting it
+ * again (a resubmit, a re-upload, a double tap, another robot) pays nothing more.
  */
 async function awardMatchPoints(matchId: string, scouterId: string): Promise<void> {
+  if (isDevModeActive()) return;
   if (!(await isAssignedToMatch(matchId, scouterId))) return;
-  awardPoints(scouterId, POINTS_PER_MATCH)
-    .then((r) => !r.success && console.error("Failed to award points for match submission:", r.error))
-    .catch((err) => console.error("Error awarding points for match submission:", err));
-  awardEventPoints(scouterId, EVENT_POINTS_PER_MATCH)
-    .then((r) => !r.success && console.error("Failed to award event points for match submission:", r.error))
-    .catch((err) => console.error("Error awarding event points for match submission:", err));
+  const { error } = await supabase.rpc("award_match_points", { p_match_id: matchId });
+  if (error) console.error("Failed to award points for match submission:", error);
 }
 
 /**
@@ -302,8 +299,6 @@ export async function submitScoutingData(
   team_num: number,
   match_type: string = "qual"
 ) {
-  const alreadySubmitted = await hasExistingSubmission(matchId, role, scouterId);
-
   const partial = scouterId ? await partialRescoutSubmission(matchId, role, scouterId, scoutingData) : null;
   const { data, error } = partial
     // Replaces the original scouter's submission in the same transaction
@@ -349,7 +344,7 @@ export async function submitScoutingData(
     throw error;
   }
 
-  if (scouterId && !alreadySubmitted) {
+  if (scouterId) {
     void awardMatchPoints(matchId, scouterId);
   }
   // New scouting can complete match/event achievements: check now, not on the next page
@@ -414,8 +409,6 @@ export async function submitQualScoutingData(
   scoutingData: Record<string, any>,
   scouterId?: string
 ): Promise<QualScoutingSubmission> {
-  const alreadySubmitted = await hasExistingQualSubmission(matchId, role, scouterId);
-
   // One per scouter for each robot in a match: submitting again replaces the earlier one
   const { data, error } = await supabase
     .from("qual_scouting_submissions")
@@ -434,7 +427,7 @@ export async function submitQualScoutingData(
     throw error;
   }
 
-  if (scouterId && !alreadySubmitted) {
+  if (scouterId) {
     void awardMatchPoints(matchId, scouterId);
   }
   requestAchievementCheck({ refresh: "all" });

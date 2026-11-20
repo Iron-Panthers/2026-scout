@@ -1,4 +1,5 @@
 import { getEvents } from "@/lib/matches";
+import { supabase } from "@/lib/supabase";
 import { getDevEvent, getDevEvents } from "@/lib/devMode";
 import { getDevEventSchedule, getEventSchedule, includesTeam, type MatchTeam } from "@/lib/strategyData";
 import type { Event } from "@/types";
@@ -77,20 +78,23 @@ const emptyBoard = (): SavedBoard => ({
   pages: Object.fromEntries(BOARD_PAGES.map((page): [BoardPageKey, BoardPage] => [page.key, { robots: [], strokes: [] }])) as Record<BoardPageKey, BoardPage>,
 });
 
+/** A saved board brought up to date with the current format. */
+function normalizeBoard(saved: SavedBoard): SavedBoard {
+  const empty = emptyBoard();
+  const pages = { ...empty.pages, ...saved.pages };
+  // Boards saved before B-bots (e.g. "254B") had plain team numbers
+  for (const key of Object.keys(pages) as BoardPageKey[]) {
+    pages[key] = { ...pages[key], robots: pages[key].robots.map((robot) => ({ ...robot, team: String(robot.team) })) };
+  }
+  const match = saved.match && { ...saved.match, red: saved.match.red.map(String), blue: saved.match.blue.map(String) };
+  return { ...empty, ...saved, match, pages };
+}
+
 export function loadBoard(userId: string | null, matchKey: string): SavedBoard {
   try {
     // Boards saved before they were per user give everyone a copy to start from
     const raw = localStorage.getItem(storageKey(userId, matchKey)) ?? localStorage.getItem(STORAGE_PREFIX + matchKey);
-    if (!raw) return emptyBoard();
-    const saved = JSON.parse(raw) as SavedBoard;
-    const empty = emptyBoard();
-    const pages = { ...empty.pages, ...saved.pages };
-    // Boards saved before B-bots (e.g. "254B") had plain team numbers
-    for (const key of Object.keys(pages) as BoardPageKey[]) {
-      pages[key] = { ...pages[key], robots: pages[key].robots.map((robot) => ({ ...robot, team: String(robot.team) })) };
-    }
-    const match = saved.match && { ...saved.match, red: saved.match.red.map(String), blue: saved.match.blue.map(String) };
-    return { ...empty, ...saved, match, pages };
+    return raw ? normalizeBoard(JSON.parse(raw) as SavedBoard) : emptyBoard();
   } catch {
     return emptyBoard();
   }
@@ -109,6 +113,99 @@ export function saveBoard(userId: string | null, matchKey: string, board: SavedB
 /** Whether the user has drawn or placed anything on any of a match's pages. */
 export function hasDrawing(userId: string | null, matchKey: string): boolean {
   return Object.values(loadBoard(userId, matchKey).pages).some((page) => page.robots.length > 0 || page.strokes.length > 0);
+}
+
+/** A board someone sent the signed-in user for a match. */
+export interface ReceivedBoard {
+  senderId: string;
+  senderName: string;
+  /** When it was (last) sent; sending again replaces it. */
+  sentAt: string;
+  board: SavedBoard;
+}
+
+interface SharedBoardRow {
+  sender_id: string;
+  board: SavedBoard;
+  sent_at: string;
+  sender: { name: string | null } | null;
+}
+
+/** The boards sent to `userId` for a match, newest first. */
+export async function getReceivedBoards(userId: string, matchKey: string): Promise<ReceivedBoard[]> {
+  const { data, error } = await supabase
+    .from("shared_strategy_boards")
+    .select("sender_id, board, sent_at, sender:profiles!shared_strategy_boards_sender_id_fkey(name)")
+    .eq("recipient_id", userId)
+    .eq("match_key", matchKey)
+    .order("sent_at", { ascending: false });
+  if (error) throw error;
+  return ((data ?? []) as unknown as SharedBoardRow[]).map((row) => ({
+    senderId: row.sender_id,
+    senderName: row.sender?.name || "Unknown",
+    sentAt: row.sent_at,
+    board: normalizeBoard(row.board),
+  }));
+}
+
+/** Who has sent `userId` boards, by match key (for the match list). */
+export async function getReceivedBoardSenders(userId: string): Promise<Map<string, string[]>> {
+  const { data, error } = await supabase
+    .from("shared_strategy_boards")
+    .select("match_key, sender:profiles!shared_strategy_boards_sender_id_fkey(name)")
+    .eq("recipient_id", userId)
+    .order("sent_at", { ascending: false });
+  if (error) {
+    console.error("Error loading boards sent to you:", error);
+    return new Map();
+  }
+  const senders = new Map<string, string[]>();
+  for (const row of (data ?? []) as unknown as Array<{ match_key: string; sender: { name: string | null } | null }>) {
+    senders.set(row.match_key, [...(senders.get(row.match_key) ?? []), row.sender?.name || "Unknown"]);
+  }
+  return senders;
+}
+
+/** Sends a copy of a board to each recipient, replacing anything sent them for this match before. */
+export async function sendBoard(senderId: string, recipientIds: string[], matchKey: string, board: SavedBoard): Promise<void> {
+  const sentAt = new Date().toISOString();
+  const { error } = await supabase.from("shared_strategy_boards").upsert(
+    recipientIds.map((recipientId) => ({ match_key: matchKey, sender_id: senderId, recipient_id: recipientId, board, sent_at: sentAt })),
+    { onConflict: "match_key,sender_id,recipient_id" }
+  );
+  if (error) throw error;
+}
+
+/** The recipient's copy of a received board, with their edits, saved in this browser. */
+interface ReceivedCopy {
+  /** The send it was made from: a newer send replaces it. */
+  sentAt: string;
+  board: SavedBoard;
+}
+
+const receivedKey = (userId: string, matchKey: string, senderId: string) => `${storageKey(userId, matchKey)}:from:${senderId}`;
+
+/** The received board as the recipient last left it, or as sent if it's been sent again since. */
+export function loadReceivedCopy(userId: string, matchKey: string, received: ReceivedBoard): SavedBoard {
+  try {
+    const raw = localStorage.getItem(receivedKey(userId, matchKey, received.senderId));
+    const copy = raw ? (JSON.parse(raw) as ReceivedCopy) : null;
+    if (copy && copy.sentAt === received.sentAt) return normalizeBoard(copy.board);
+  } catch {
+    // Fall back to what was sent
+  }
+  return received.board;
+}
+
+/** False when the browser's storage is full. */
+export function saveReceivedCopy(userId: string, matchKey: string, received: ReceivedBoard, board: SavedBoard): boolean {
+  try {
+    const copy: ReceivedCopy = { sentAt: received.sentAt, board };
+    localStorage.setItem(receivedKey(userId, matchKey, received.senderId), JSON.stringify(copy));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** One of our matches in the list, keyed like TBA's match keys (e.g. "2026mttd_qm12"). */

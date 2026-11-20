@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Calendar, Camera, Mail, MessageCircle, Pencil, Save, ShoppingBag, Sparkles, X } from "lucide-react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { ArrowLeft, Calendar, Camera, Mail, Map as MapIcon, MessageCircle, Pencil, Save, ShoppingBag, Sparkles, Trash2, Trophy, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
+import { useMessages } from "@/contexts/MessagesContext";
 import { useSettings } from "@/contexts/SettingsContext";
-import { getGameProfile } from "@/lib/gameProfiles";
+import { getGameProfile, getPublicCosmetics, type PublicCosmetics } from "@/lib/gameProfiles";
 import { equipCosmetic, unequipCosmetic } from "@/lib/shopService";
 import {
   COSMETICS,
@@ -21,10 +22,10 @@ import {
 import { ThemeBackgroundToggle } from "@/components/ThemeBackgroundToggle";
 import { SEASONAL_ITEM_COLOR, seasonalEventName } from "@/config/seasonalEvents";
 import CosmeticAvatar from "@/components/CosmeticAvatar";
+import { DeleteUserDialog } from "@/components/DeleteUserDialog";
 import { useToast } from "@/hooks/use-toast";
 import { useRandomSubtitle } from "@/hooks/useRandomSubtitle";
 import { AVATAR_SUBTITLES } from "@/config/headerSubtitles";
-import type { GameProfile } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { TeamYears } from "@/components/TeamYears";
 import { getPublicProfile, updateProfile, uploadAvatar, type PublicProfile } from "@/lib/profiles";
@@ -45,12 +46,16 @@ export default function AvatarPage({
   const isOwn = !routeUserId || routeUserId === user?.id;
   const viewedId = isOwn ? user?.id : routeUserId;
   const { toast } = useToast();
+  const location = useLocation();
+  const { removeContact } = useMessages();
   const { settings, updateSetting } = useSettings();
   const subtitle = useRandomSubtitle(AVATAR_SUBTITLES);
 
-  const [gameProfile, setGameProfile] = useState<GameProfile | null>(null);
+  const [gameProfile, setGameProfile] = useState<PublicCosmetics | null>(null);
   const [loading, setLoading] = useState(true);
-  const [category, setCategory] = useState<"hats" | "decorations" | "themes" | "map" | "achievements">("hats");
+  // What the panel beside the profile shows (chosen with the buttons under it), and which cosmetics
+  const [view, setView] = useState<"cosmetics" | "map" | "achievements">("cosmetics");
+  const [category, setCategory] = useState<"hats" | "decorations" | "themes">("hats");
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isEditingName, setIsEditingName] = useState(false);
@@ -60,6 +65,7 @@ export default function AvatarPage({
   const [addEventsOpen, setAddEventsOpen] = useState(false);
   const [otherProfile, setOtherProfile] = useState<PublicProfile | null>(null);
   const [otherLoaded, setOtherLoaded] = useState(false);
+  const [deleteUserOpen, setDeleteUserOpen] = useState(false);
 
   // Someone else's profile (their name, roles and team years)
   useEffect(() => {
@@ -91,12 +97,14 @@ export default function AvatarPage({
     scoutedEvents
   );
 
+  // The viewed user's cosmetics (what they own and have on)
   const loadProfile = useCallback(async () => {
-    if (!user?.id) return;
-    const gp = await getGameProfile(user.id);
+    if (!viewedId) return;
+    // Only your own full game profile can be read (and is created on first visit)
+    const gp = isOwn ? await getGameProfile(viewedId) : await getPublicCosmetics(viewedId);
     setGameProfile(gp);
     setLoading(false);
-  }, [user?.id]);
+  }, [viewedId, isOwn]);
 
   useEffect(() => {
     loadProfile();
@@ -108,11 +116,12 @@ export default function AvatarPage({
   // Each theme's chosen background (for themes with a Light/Dark choice), kept in this browser's settings
   const themeBackgrounds: Record<string, ThemeBackground> = settings[THEME_BACKGROUNDS_SETTING] ?? {};
 
-  const userName =
-    profile?.name ||
-    user?.user_metadata?.name ||
-    user?.email?.split("@")[0] ||
-    "User";
+  const userName = isOwn
+    ? profile?.name ||
+      user?.user_metadata?.name ||
+      user?.email?.split("@")[0] ||
+      "User"
+    : otherProfile?.name ?? (otherLoaded ? "Unknown user" : "Loading...");
   const initials = userName
     .split(" ")
     .map((n: string) => n[0])
@@ -245,10 +254,12 @@ export default function AvatarPage({
     if (items.length === 0) {
       return (
         <div className="text-center py-10 space-y-3">
-          <p className="text-muted-foreground">{emptyMessage}</p>
-          <Button onClick={() => (onVisitShop ? onVisitShop() : navigate("/shop"))}>
-            Visit the Shop
-          </Button>
+          <p className="text-muted-foreground">{isOwn ? emptyMessage : emptyMessage.replace("You don't", "They don't")}</p>
+          {isOwn && (
+            <Button onClick={() => (onVisitShop ? onVisitShop() : navigate("/shop"))}>
+              Visit the Shop
+            </Button>
+          )}
         </div>
       );
     }
@@ -290,14 +301,19 @@ export default function AvatarPage({
                       <p className="text-xs text-muted-foreground leading-snug">{item.description}</p>
                     </div>
                   </div>
-                  {item.lightThemeValue && (
+                  {/* Someone else's cosmetics are just for looking at */}
+                  {isOwn && item.lightThemeValue && (
                     <ThemeBackgroundToggle
                       className="mb-2"
                       value={themeBackgrounds[item.id] ?? "dark"}
                       onChange={(background) => handleSetBackground(item, background)}
                     />
                   )}
-                  {isEquipped ? (
+                  {!isOwn ? (
+                    isEquipped && (
+                      <p className="mt-auto pb-3 text-center text-xs font-semibold text-yellow-500">Equipped</p>
+                    )
+                  ) : isEquipped ? (
                     <Button
                       size="sm"
                       variant="outline"
@@ -337,7 +353,7 @@ export default function AvatarPage({
             <div className="flex items-center gap-2 ml-5">
               <Sparkles className="h-6 w-6 text-primary" />
               <div>
-                <span className="text-2xl font-bold block">My Profile</span>
+                <span className="text-2xl font-bold block">{isOwn ? "My Profile" : "Profile"}</span>
                 <p className="text-sm text-muted-foreground">{subtitle}</p>
               </div>
             </div>
@@ -353,7 +369,7 @@ export default function AvatarPage({
                 <div className="flex md:flex-col items-center md:items-center gap-4 md:gap-3 md:text-center h-full">
                   <div className="relative shrink-0">
                     <CosmeticAvatar
-                        avatarUrl={getAvatarUrl()}
+                        avatarUrl={isOwn ? getAvatarUrl() : otherProfile?.avatar_url ?? ""}
                         initials={initials}
                         equippedCosmetics={equipped}
                         size="xl"
@@ -461,19 +477,65 @@ export default function AvatarPage({
                       />
                     </div>
                     {!isOwn && viewedId && (
-                      <Button className="mt-4 gap-2" onClick={() => navigate(`/messages?with=${viewedId}`)}>
-                        <MessageCircle className="h-4 w-4" />
-                        Message
-                      </Button>
+                      <div className="mt-4 flex flex-col items-center gap-2">
+                        <Button className="gap-2" onClick={() => navigate(`/messages?with=${viewedId}`)}>
+                          <MessageCircle className="h-4 w-4" />
+                          Message
+                        </Button>
+                        {/* Developers can remove someone's account (typing DELETE, as for your own) */}
+                        {profile?.is_developer && otherProfile && (
+                          <>
+                            <Button variant="destructive" size="sm" className="gap-2" onClick={() => setDeleteUserOpen(true)}>
+                              <Trash2 className="h-4 w-4" />
+                              Delete account
+                            </Button>
+                            <DeleteUserDialog
+                              open={deleteUserOpen}
+                              onOpenChange={setDeleteUserOpen}
+                              userId={viewedId}
+                              userName={userName}
+                              onDeleted={() => {
+                                toast({ title: "Account deleted", description: `${userName}'s account was deleted.` });
+                                removeContact(viewedId);
+                                // Back to Messages, where Back still leads to the dashboard it was opened from:
+                                // the Messages page before this profile, else Messages in this profile's place
+                                if ((location.state as { fromMessages?: boolean } | null)?.fromMessages) navigate(-1);
+                                else navigate("/messages", { replace: true });
+                              }}
+                            />
+                          </>
+                        )}
+                      </div>
                     )}
                     </div>
+                </div>
+                {/* What the panel beside the profile shows */}
+                <div className="mt-4 grid grid-cols-3 gap-2 border-t pt-4">
+                  {([
+                    { key: "cosmetics", label: "Cosmetics", icon: Sparkles },
+                    { key: "map", label: "Map", icon: MapIcon },
+                    { key: "achievements", label: "Achievements", icon: Trophy },
+                  ] as const).map(({ key, label, icon: Icon }) => (
+                    <Button
+                      key={key}
+                      size="sm"
+                      variant={view === key ? "default" : "outline"}
+                      className="min-w-0 gap-1.5 px-2"
+                      onClick={() => setView(key)}
+                      aria-pressed={view === key}
+                    >
+                      <Icon className="h-4 w-4 shrink-0" />
+                      <span className="truncate">{label}</span>
+                    </Button>
+                  ))}
                 </div>
               </CardContent>
             </Card>
           </div>
 
-          {/* Owned cosmetics, then their scouting map and achievements */}
+          {/* Owned cosmetics, their scouting map, or their achievements */}
           <div className="flex-1 min-w-0 space-y-4">
+            {view === "cosmetics" && (
             <Tabs value={category} onValueChange={(value) => setCategory(value as typeof category)}>
               <TabsList className="w-full">
                 <TabsTrigger value="hats" className="flex-1">
@@ -485,16 +547,10 @@ export default function AvatarPage({
                 <TabsTrigger value="themes" className="flex-1">
                   Themes
                 </TabsTrigger>
-                <div className="mx-1 h-5 w-px shrink-0 bg-border" aria-hidden="true" />
-                <TabsTrigger value="map" className="flex-1">
-                  Map
-                </TabsTrigger>
-                <TabsTrigger value="achievements" className="flex-1">
-                  Achievements
-                </TabsTrigger>
               </TabsList>
             </Tabs>
-            {category === "map" ? (
+            )}
+            {view === "map" ? (
               <Card>
                 <CardContent>
                   {scoutedEvents === null ? (
@@ -530,7 +586,7 @@ export default function AvatarPage({
                   )}
                 </CardContent>
               </Card>
-            ) : category === "achievements" ? (
+            ) : view === "achievements" ? (
               <AchievementsGrid achievements={achievements} />
             ) : loading ? (
               <p className="text-muted-foreground text-center">Loading...</p>

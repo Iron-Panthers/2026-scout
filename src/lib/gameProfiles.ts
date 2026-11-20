@@ -27,6 +27,25 @@ export async function getGameProfile(userId: string): Promise<GameProfile | null
   return data as GameProfile;
 }
 
+/** The cosmetics part of a game profile: what someone owns and has on. */
+export type PublicCosmetics = Pick<GameProfile, "owned_cosmetics" | "equipped_cosmetics" | "event_cosmetic_sources">;
+
+/**
+ * Another user's cosmetics, for viewing their profile (the rest of their game profile is
+ * private). Null if they have none yet or it couldn't be loaded.
+ */
+export async function getPublicCosmetics(userId: string): Promise<PublicCosmetics | null> {
+  const { data, error } = await supabase.rpc("get_public_cosmetics", { p_user: userId });
+  if (error) {
+    console.error("[gameProfiles] getPublicCosmetics error:", error);
+    return null;
+  }
+  const row = (data as PublicCosmetics[] | null)?.[0];
+  return row
+    ? { owned_cosmetics: row.owned_cosmetics ?? [], equipped_cosmetics: row.equipped_cosmetics ?? {}, event_cosmetic_sources: row.event_cosmetic_sources ?? {} }
+    : null;
+}
+
 /**
  * Create a fresh game profile for a user with 0 points and no unlocked games.
  */

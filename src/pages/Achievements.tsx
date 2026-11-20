@@ -9,11 +9,16 @@ import { useAchievements } from "@/hooks/useAchievements";
 import { getAchievementHolderCounts, type AchievementHolderCounts, type AchievementProgress } from "@/lib/achievements";
 import { getPublicProfile, type PublicProfile } from "@/lib/profiles";
 
-/** "12 of 87 scouters (14%)"; "<1%" for a few holders among many. */
-function holdersLabel(holders: number, scouters: number): string {
-  if (holders === 0) return `0 of ${scouters.toLocaleString()} scouters`;
+/** "12 earned". */
+function holdersLabel(holders: number): string {
+  return `${holders.toLocaleString()} earned`;
+}
+
+/** The share of scouters who have it: "14%", "<1%" for a few holders among many. */
+function rarityLabel(holders: number, scouters: number): string {
+  if (holders === 0) return "0%";
   const percent = (holders / scouters) * 100;
-  return `${holders.toLocaleString()} of ${scouters.toLocaleString()} scouters (${percent < 1 ? "<1" : Math.round(percent)}%)`;
+  return `${percent < 1 ? "<1" : Math.round(percent)}%`;
 }
 
 /**
@@ -131,10 +136,19 @@ export function AchievementsGrid({ achievements }: { achievements: AchievementPr
                 )}
                 {holderCounts && holderCounts.scouters > 0 && (
                   <p className="mt-1 text-xs text-muted-foreground">
-                    {holdersLabel(holderCounts.holders.get(achievement.id) ?? 0, holderCounts.scouters)}
+                    {holdersLabel(holderCounts.holders.get(achievement.id) ?? 0)}
                   </p>
                 )}
               </div>
+              {/* How rare it is: the share of scouters who have it */}
+              {holderCounts && holderCounts.scouters > 0 && (
+                <div className="shrink-0 text-right">
+                  <p className="text-xs text-muted-foreground">Rarity</p>
+                  <p className="font-semibold tabular-nums">
+                    {rarityLabel(holderCounts.holders.get(achievement.id) ?? 0, holderCounts.scouters)}
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
           );
