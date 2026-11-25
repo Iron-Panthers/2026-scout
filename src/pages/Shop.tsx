@@ -39,8 +39,11 @@ import {
   SEASONAL_ITEM_COLOR,
   activeSeasonalEvents,
   seasonalEventDates,
+  seasonalEventDayCount,
   seasonalEventName,
+  SEASONAL_LOGIN_RECORDED_EVENT,
 } from "@/config/seasonalEvents";
+import { getSeasonalLoginDays } from "@/lib/seasonalLogins";
 import { getCompetitionEventName, getEventCurrencyLogo, getEventCurrencyName } from "@/config/eventCurrency";
 import CosmeticAvatar from "@/components/CosmeticAvatar";
 import { ThemeBackgroundToggle } from "@/components/ThemeBackgroundToggle";
@@ -130,7 +133,14 @@ function CosmeticCard({ item, owned, equipped, canAfford, eventName, eventCode, 
             >
               Owned
             </Button>
-          ) : awarded ? null : (
+          ) : awarded ? (
+            // Not given yet: an item for signing on every day of the event
+            item.attendanceReward ? (
+              <Button size="sm" variant="outline" disabled className="w-full text-xs mt-auto disabled:opacity-100 text-muted-foreground">
+                Sign on every day
+              </Button>
+            ) : null
+          ) : (
             <Button
               size="sm"
               className="w-full text-xs gap-1"
@@ -180,6 +190,8 @@ export default function Shop({
   const [playingGame, setPlayingGame] = useState<GameDefinition | null>(null);
   const [crateOpen, setCrateOpen] = useState(false);
   const [crateTierIndex, setCrateTierIndex] = useState(0);
+  // Days signed on during each seasonal event with a sign-on-every-day reward
+  const [seasonalDays, setSeasonalDays] = useState<Record<string, number>>({});
 
   // The game just bought, so its card plays the unlock animation.
   const [justUnlockedGameId, setJustUnlockedGameId] = useState<string | null>(null);
@@ -297,6 +309,29 @@ export default function Shop({
   const themes = COSMETICS.filter((c) => c.category === "theme" && !isLimitedCosmetic(c)).sort(rarityCompare);
   // Seasonal events on right now, each with its own tab
   const seasonalEvents = activeSeasonalEvents();
+  const attendanceEventIds = seasonalEvents
+    .filter((event) => COSMETICS.some((c) => c.seasonalEvent === event.id && c.attendanceReward))
+    .map((event) => event.id)
+    .join(",");
+
+  // Days signed on for those events, kept up to date as today's visit is recorded
+  useEffect(() => {
+    if (!user?.id || !attendanceEventIds) return;
+    const userId = user.id;
+    let cancelled = false;
+    const load = () =>
+      Promise.all(attendanceEventIds.split(",").map(async (id) => [id, await getSeasonalLoginDays(userId, id)] as const)).then(
+        (entries) => {
+          if (!cancelled) setSeasonalDays(Object.fromEntries(entries));
+        }
+      );
+    void load();
+    window.addEventListener(SEASONAL_LOGIN_RECORDED_EVENT, load);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(SEASONAL_LOGIN_RECORDED_EVENT, load);
+    };
+  }, [user?.id, attendanceEventIds]);
   // Only the running competition event's own items
   const eventItems = COSMETICS
     .filter((c) => c.currency === "event" && c.competitionEvent === activeEvent?.event_code)
@@ -476,9 +511,20 @@ export default function Shop({
                 const items = COSMETICS.filter((c) => c.seasonalEvent === event.id).sort(rarityCompare);
                 return (
                   <TabsContent key={event.id} value={`seasonal:${event.id}`} className="mt-4 space-y-4">
-                    <div className="rounded-lg border border-border/50 bg-accent/30 px-4 py-3">
-                      <p className="text-xs text-muted-foreground">Seasonal Event · {seasonalEventDates(event)}</p>
-                      <p className="font-semibold">{event.name}</p>
+                    <div className="flex items-center justify-between gap-3 rounded-lg border border-border/50 bg-accent/30 px-4 py-3">
+                      <div>
+                        <p className="text-xs text-muted-foreground">Seasonal Event · {seasonalEventDates(event)}</p>
+                        <p className="font-semibold">{event.name}</p>
+                      </div>
+                      {/* Progress toward its sign-on-every-day reward */}
+                      {seasonalDays[event.id] !== undefined && (
+                        <div className="text-right">
+                          <p className="text-xs text-muted-foreground">Days signed on</p>
+                          <p className="font-semibold tabular-nums">
+                            {Math.min(seasonalDays[event.id], seasonalEventDayCount(event))}/{seasonalEventDayCount(event)}
+                          </p>
+                        </div>
+                      )}
                     </div>
                     {items.length === 0 ? (
                       <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">

@@ -7,10 +7,21 @@ import { COSMETICS, type CosmeticDefinition } from "@/config/cosmetics";
 import {
   COSMETICS_GRANTED_EVENT,
   SEASONAL_ITEM_COLOR,
+  SEASONAL_LOGIN_RECORDED_EVENT,
   activeSeasonalEvents,
+  seasonalEventDayCount,
   type SeasonalEvent,
 } from "@/config/seasonalEvents";
 import { grantCosmetics } from "@/lib/shopService";
+import { recordSeasonalLogin } from "@/lib/seasonalLogins";
+
+/** An award to show: the items an event just gave, with the popup's title and message. */
+interface Award {
+  event: SeasonalEvent;
+  items: CosmeticDefinition[];
+  title: string;
+  message: string;
+}
 
 const CATEGORY_LABEL: Record<CosmeticDefinition["category"], string> = { hat: "Hat", decoration: "Decoration", theme: "Theme" };
 /** Time between one item's reveal and the next's, and how long a reveal takes. */
@@ -77,8 +88,15 @@ export default function SeasonalEventAwards() {
   const { user } = useAuth();
   const { toast } = useToast();
   const userId = user?.id;
-  // The event being celebrated and the items it just awarded; revealing once they continue
-  const [award, setAward] = useState<{ event: SeasonalEvent; items: CosmeticDefinition[] } | null>(null);
+  // Awards waiting to be shown (an event's welcome, its perfect-attendance reward), first one
+  // open; its items reveal once they continue
+  const [awards, setAwards] = useState<Award[]>([]);
+  const award = awards[0] ?? null;
+  const closeAward = () => {
+    setRevealing(false);
+    setRevealDone(false);
+    setAwards((current) => current.slice(1));
+  };
   const [revealing, setRevealing] = useState(false);
   const [revealDone, setRevealDone] = useState(false);
 
@@ -90,18 +108,37 @@ export default function SeasonalEventAwards() {
       running = true;
       try {
         for (const event of activeSeasonalEvents()) {
-          const items = COSMETICS.filter((item) => item.seasonalEvent === event.id);
-          if (items.length === 0) continue;
-          const given = await grantCosmetics(userId, items.map((item) => item.id));
-          if (given.length === 0) continue;
-          const givenItems = items.filter((item) => given.includes(item.id));
+          const eventItems = COSMETICS.filter((item) => item.seasonalEvent === event.id);
+
+          // Everyone gets these on their first visit during it
+          const items = eventItems.filter((item) => !item.attendanceReward);
+          const given = items.length > 0 ? await grantCosmetics(userId, items.map((item) => item.id)) : [];
+          if (given.length > 0) {
+            const givenItems = items.filter((item) => given.includes(item.id));
+            window.dispatchEvent(new Event(COSMETICS_GRANTED_EVENT));
+            if (event.welcome) {
+              const welcome = { event, items: givenItems, ...event.welcome };
+              setAwards((current) => [...current, welcome]);
+            } else {
+              toast({ title: `${event.name}!`, description: `You got ${givenItems.map((item) => item.name).join(", ")} for joining in.` });
+            }
+          }
+
+          // These once they've opened the app on every day of it (today counts)
+          const attendanceItems = eventItems.filter((item) => item.attendanceReward);
+          if (attendanceItems.length === 0) continue;
+          const days = await recordSeasonalLogin(userId, event.id);
+          window.dispatchEvent(new Event(SEASONAL_LOGIN_RECORDED_EVENT));
+          if (days === null || days < seasonalEventDayCount(event)) continue;
+          const earned = await grantCosmetics(userId, attendanceItems.map((item) => item.id));
+          if (earned.length === 0) continue;
+          const earnedItems = attendanceItems.filter((item) => earned.includes(item.id));
           window.dispatchEvent(new Event(COSMETICS_GRANTED_EVENT));
-          if (event.welcome) {
-            setRevealing(false);
-            setRevealDone(false);
-            setAward({ event, items: givenItems });
+          if (event.attendance) {
+            const reward = { event, items: earnedItems, ...event.attendance };
+            setAwards((current) => [...current, reward]);
           } else {
-            toast({ title: `${event.name}!`, description: `You got ${givenItems.map((item) => item.name).join(", ")} for joining in.` });
+            toast({ title: "Perfect attendance!", description: `You got ${earnedItems.map((item) => item.name).join(", ")}.` });
           }
         }
       } finally {
@@ -120,11 +157,11 @@ export default function SeasonalEventAwards() {
     return () => window.clearTimeout(timer);
   }, [revealing, award]);
 
-  if (!award?.event.welcome) return null;
-  const { title, message } = award.event.welcome;
+  if (!award) return null;
+  const { title, message } = award;
 
   return (
-    <Dialog open onOpenChange={(open) => !open && setAward(null)}>
+    <Dialog open onOpenChange={(open) => !open && closeAward()}>
       <DialogContent className="seasonal-reward sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-center text-2xl">{title}</DialogTitle>
@@ -149,7 +186,7 @@ export default function SeasonalEventAwards() {
               className="w-full sm:w-40"
               style={{ animation: revealDone ? "seasonal-reward-fade-up 300ms ease-out both" : undefined }}
               disabled={!revealDone}
-              onClick={() => setAward(null)}
+              onClick={closeAward}
             >
               Awesome!
             </Button>

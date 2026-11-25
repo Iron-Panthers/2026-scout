@@ -32,6 +32,11 @@ export interface CosmeticDefinition {
    */
   seasonalEvent?: string;
   /**
+   * For seasonal event items: given only to people who open the app on every day of the
+   * event (and then right away), instead of on their first visit.
+   */
+  attendanceReward?: boolean;
+  /**
    * For event-currency items: the `event_code` of the competition event that sells them
    * (src/config/eventCurrency.ts). Each event's Shop tab only shows its own items.
    */
@@ -973,6 +978,31 @@ export const COSMETICS: CosmeticDefinition[] = [
     rarity: "ultra-rare",
     themeValue: "pumpkin_bots",
     seasonalEvent: "halloween_2026",
+  },
+
+  // Thanksgiving 2026 (seasonal event): the turkey for opening the app during it, and the
+  // theme for opening it on all 5 days
+  {
+    id: "decoration_turkey",
+    name: "Turkey",
+    description: "Gobble",
+    category: "decoration",
+    emoji: "🦃",
+    cost: 0,
+    rarity: "rare",
+    seasonalEvent: "thanksgiving_2026",
+  },
+  {
+    id: "theme_team_appreciate",
+    name: "Team Appreciate",
+    description: "2 4 6 8! Who do we appreciate?",
+    category: "theme",
+    url: "/shop/theme_team_appreciate.png",
+    cost: 0,
+    rarity: "ultra-rare",
+    themeValue: "team_appreciate",
+    seasonalEvent: "thanksgiving_2026",
+    attendanceReward: true,
   },
 ];
 

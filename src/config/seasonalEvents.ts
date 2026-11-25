@@ -17,6 +17,11 @@ export interface SeasonalEvent {
   endDate: string;
   /** The popup shown when someone is first awarded the event's items, before revealing them. */
   welcome?: { title: string; message: string };
+  /**
+   * The popup for its attendance rewards (items with `attendanceReward`), given to people who
+   * open the app on every day of the event.
+   */
+  attendance?: { title: string; message: string };
 }
 
 export const SEASONAL_EVENTS: SeasonalEvent[] = [
@@ -31,6 +36,21 @@ export const SEASONAL_EVENTS: SeasonalEvent[] = [
       message: "Thank you for signing on on this spooky holiday. Enjoy some free items!",
     },
   },
+  {
+    id: "thanksgiving_2026",
+    name: "Thanksgiving 2026",
+    tabLabel: "Thanksgiving",
+    startDate: "2026-11-25",
+    endDate: "2026-11-29",
+    welcome: {
+      title: "Happy Thanksgiving!",
+      message: "Thanks for signing on this Thanksgiving! Here's a turkey. Sign on every day through Nov 29 to earn a special theme.",
+    },
+    attendance: {
+      title: "Perfect attendance!",
+      message: "You signed on all 5 days of Thanksgiving 2026. Thanks for being part of the team!",
+    },
+  },
 ];
 
 /** Border and background color of seasonal event item cards, whatever their rarity (red-500). */
@@ -41,7 +61,7 @@ export const seasonalEventName = (id: string | undefined) =>
   id ? SEASONAL_EVENTS.find((event) => event.id === id)?.name : undefined;
 
 /** Today in the device's time zone, as "YYYY-MM-DD". */
-function localDateKey(date: Date): string {
+export function localDateKey(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
@@ -49,6 +69,15 @@ export const isSeasonalEventActive = (event: SeasonalEvent, now = new Date()) =>
   const today = localDateKey(now);
   return event.startDate <= today && today <= event.endDate;
 };
+
+/** How many days the event runs (start and end both count). */
+export function seasonalEventDayCount(event: SeasonalEvent): number {
+  const toDay = (key: string) => {
+    const [year, month, day] = key.split("-").map(Number);
+    return Date.UTC(year, month - 1, day) / 86_400_000;
+  };
+  return toDay(event.endDate) - toDay(event.startDate) + 1;
+}
 
 export const activeSeasonalEvents = (now = new Date()) => SEASONAL_EVENTS.filter((event) => isSeasonalEventActive(event, now));
 
@@ -60,6 +89,9 @@ export function seasonalEventDates(event: SeasonalEvent): string {
   };
   return `${format(event.startDate)} – ${format(event.endDate)}`;
 }
+
+/** Sent on `window` once today's seasonal event visit is recorded, so an open Shop can update its day count. */
+export const SEASONAL_LOGIN_RECORDED_EVENT = "seasonal-login-recorded";
 
 /** Sent on `window` when items are awarded, so an open Shop can refresh what's owned. */
 export const COSMETICS_GRANTED_EVENT = "cosmetics-granted";

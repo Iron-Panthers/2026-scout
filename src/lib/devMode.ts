@@ -69,6 +69,8 @@ interface DevData {
   sandboxFrcdleSpins?: DevFrcdleSpin[];
   /** Achievements earned in the sandbox (id → when), kept apart from the account's real ones. */
   sandboxAchievements?: Record<string, string>;
+  /** Days the app was opened during each seasonal event (event id → "YYYY-MM-DD" days), kept apart from the account's. */
+  sandboxSeasonalLogins?: Record<string, string[]>;
   teams: Array<{ team_number: number; nickname: string }>;
   gameProfile: GameProfile;
   scoutingSubmissions: Array<{
@@ -395,6 +397,26 @@ export function buyDevFrcdleSpin(
   data.gameProfile = { ...data.gameProfile, points: data.gameProfile.points - cost, updated_at: new Date().toISOString() };
   saveDevData(userId, data);
   return { spin, points: data.gameProfile.points };
+}
+
+// ---------------------------------------------------------------------------
+// Seasonal event logins (sandbox stand-in for record_seasonal_login)
+// ---------------------------------------------------------------------------
+
+/** Records `day` for a seasonal event in the sandbox; how many days it has for the event. */
+export function recordDevSeasonalLogin(userId: string, eventId: string, day: string): number {
+  const data = getDevData(userId);
+  const logins = { ...(data.sandboxSeasonalLogins ?? {}) };
+  const days = new Set(logins[eventId] ?? []);
+  days.add(day);
+  logins[eventId] = [...days];
+  data.sandboxSeasonalLogins = logins;
+  saveDevData(userId, data);
+  return days.size;
+}
+
+export function getDevSeasonalLoginDays(userId: string, eventId: string): number {
+  return (getDevData(userId).sandboxSeasonalLogins?.[eventId] ?? []).length;
 }
 
 // ---------------------------------------------------------------------------
