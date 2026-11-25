@@ -30,7 +30,9 @@ export type AchievementIcon =
   | "eye"
   | "trending"
   | "radio"
-  | "message";
+  | "message"
+  | "cards"
+  | "skull";
 
 export interface AchievementDefinition {
   id: string;
@@ -121,6 +123,7 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     goal: 1,
     secret: true,
   },
+  { id: "rip", name: "RIP", description: "Lose 10,000 points on bets", icon: "skull", measure: unlocked("rip"), goal: 1 },
   // FRCdle
   { id: "mythic", name: "Mythic", description: "Get a Mythic roll in FRCdle", icon: "sparkles", measure: unlocked("mythic"), goal: 1, secret: true },
   {
@@ -150,8 +153,19 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
     goal: 1,
     secret: true,
   },
+  { id: "frcdle_xp_1k", name: "Roller", description: "Earn 1,000 total xP in FRCdle", icon: "dice", measure: unlocked("frcdle_xp_1k"), goal: 1 },
+  { id: "frcdle_xp_10k", name: "Spinner", description: "Earn 10,000 total xP in FRCdle", icon: "dice", measure: unlocked("frcdle_xp_10k"), goal: 1 },
+  { id: "frcdle_xp_100k", name: "Gambler", description: "Earn 100,000 total xP in FRCdle", icon: "dice", measure: unlocked("frcdle_xp_100k"), goal: 1 },
   // Shop
   { id: "collector", name: "Collector", description: "Own every cosmetic item", icon: "shirt", measure: unlocked("collector"), goal: 1 },
+  {
+    id: "mad_collector",
+    name: "Mad collector",
+    description: "Collect every card in the 2026 Madtown Throwdown pack",
+    icon: "cards",
+    measure: unlocked("mad_collector"),
+    goal: 1,
+  },
 ];
 
 export type UnlockableAchievement =
@@ -165,7 +179,12 @@ export type UnlockableAchievement =
   | "frcdle_5026"
   | "theres_nothing"
   | "full_roll"
-  | "collector";
+  | "collector"
+  | "rip"
+  | "frcdle_xp_1k"
+  | "frcdle_xp_10k"
+  | "frcdle_xp_100k"
+  | "mad_collector";
 
 /**
  * Points each achievement pays (once, when it's earned). The database pays them from its
@@ -173,7 +192,8 @@ export type UnlockableAchievement =
  * supabase/migrations/20261027030_match_achievement_points_to_app.sql,
  * supabase/migrations/20261027050_add_live_picklist_achievements.sql,
  * supabase/migrations/20261102010_add_yapper_achievement.sql and
- * supabase/migrations/20261105040_add_theres_nothing_achievement.sql).
+ * supabase/migrations/20261105040_add_theres_nothing_achievement.sql and
+ * supabase/migrations/20261124050_add_tcg_frcdle_betting_achievements.sql).
  */
 export const ACHIEVEMENT_POINTS: Record<string, number> = {
   first_match: 10,
@@ -199,6 +219,11 @@ export const ACHIEVEMENT_POINTS: Record<string, number> = {
   theres_nothing: 1500,
   full_roll: 200000,
   collector: 1500,
+  rip: 500,
+  frcdle_xp_1k: 100,
+  frcdle_xp_10k: 1000,
+  frcdle_xp_100k: 5000,
+  mad_collector: 3000,
 };
 
 import { ACHIEVEMENT_UNLOCKED_EVENT } from "@/lib/achievementEvents";

@@ -48,6 +48,7 @@ import { useSettings } from "@/contexts/SettingsContext";
 import { GameCard } from "@/components/GameCard";
 import { GamePlayer } from "@/components/GamePlayer";
 import { CrateOpeningAnimation, CrateVisual } from "@/components/CrateOpeningAnimation";
+import { TcgShopTab } from "@/components/tcg/TcgShopTab";
 import { useToast } from "@/hooks/use-toast";
 import { useRandomSubtitle } from "@/hooks/useRandomSubtitle";
 import { SHOP_SUBTITLES } from "@/config/headerSubtitles";
@@ -409,6 +410,9 @@ export default function Shop({
                 <TabsTrigger value="crates" className="flex-1 gap-1.5">
                   Crates
                 </TabsTrigger>
+                <TabsTrigger value="tcg" className="flex-1 gap-1.5">
+                  TCG
+                </TabsTrigger>
                 <TabsTrigger value="games" className="flex-1 gap-1.5">
                   Games
                 </TabsTrigger>
@@ -435,6 +439,15 @@ export default function Shop({
                   onNextTier={() => setCrateTierIndex((i) => (i + 1) % CRATE_TIERS.length)}
                   onOpenCrate={() => setCrateOpen(true)}
                 />
+              </TabsContent>
+              <TabsContent value="tcg" className="mt-4">
+                {user?.id && (
+                  <TcgShopTab
+                    userId={user.id}
+                    points={points}
+                    onPointsChange={(next) => setGameProfile((prev) => (prev ? { ...prev, points: next } : prev))}
+                  />
+                )}
               </TabsContent>
               <TabsContent value="games" className="mt-4">
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">

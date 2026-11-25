@@ -69,6 +69,8 @@ interface DevData {
   sandboxFrcdleSpins?: DevFrcdleSpin[];
   /** Achievements earned in the sandbox (id → when), kept apart from the account's real ones. */
   sandboxAchievements?: Record<string, string>;
+  /** TCG cards pulled in the sandbox (card id → copies), kept apart from the account's real binder. */
+  sandboxTcgCards?: Record<string, number>;
   teams: Array<{ team_number: number; nickname: string }>;
   gameProfile: GameProfile;
   scoutingSubmissions: Array<{
@@ -395,6 +397,41 @@ export function buyDevFrcdleSpin(
   data.gameProfile = { ...data.gameProfile, points: data.gameProfile.points - cost, updated_at: new Date().toISOString() };
   saveDevData(userId, data);
   return { spin, points: data.gameProfile.points };
+}
+
+// ---------------------------------------------------------------------------
+// TCG (sandbox stand-in for open_tcg_pack and the binder)
+// ---------------------------------------------------------------------------
+
+/** The sandbox's card binder: copies of each card, by card id. */
+export function getDevTcgBinder(userId: string): Record<string, number> {
+  return getDevData(userId).sandboxTcgCards ?? {};
+}
+
+/**
+ * A sandbox pack: paid from the sandbox's points, with the cards (already rolled) added to the
+ * sandbox binder. Whether each pull is the binder's first copy, in order; an error when it
+ * can't afford it.
+ */
+export function openDevTcgPack(
+  userId: string,
+  cost: number,
+  cardIds: string[]
+): { points: number; isNew: boolean[] } | { error: string } {
+  const data = getDevData(userId);
+  if (data.gameProfile.points < cost) {
+    return { error: `Not enough points. You need ${cost} but have ${data.gameProfile.points}.` };
+  }
+  const binder = { ...(data.sandboxTcgCards ?? {}) };
+  const isNew = cardIds.map((id) => {
+    const first = !binder[id];
+    binder[id] = (binder[id] ?? 0) + 1;
+    return first;
+  });
+  data.sandboxTcgCards = binder;
+  data.gameProfile = { ...data.gameProfile, points: data.gameProfile.points - cost, updated_at: new Date().toISOString() };
+  saveDevData(userId, data);
+  return { points: data.gameProfile.points, isNew };
 }
 
 // ---------------------------------------------------------------------------

@@ -9,11 +9,13 @@ import {
   Globe,
   HelpCircle,
   House,
+  Layers,
   ListChecks,
   MapPin,
   MessageCircle,
   Radio,
   Shirt,
+  Skull,
   Sparkles,
   Star,
   TrendingUp,
@@ -43,6 +45,8 @@ const ICONS: Record<AchievementIconName, LucideIcon> = {
   trending: TrendingUp,
   radio: Radio,
   message: MessageCircle,
+  cards: Layers,
+  skull: Skull,
 };
 
 /** An achievement's badge: coloured when earned, greyed out when not. */

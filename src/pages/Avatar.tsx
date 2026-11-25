@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Calendar, Camera, Mail, Map as MapIcon, MessageCircle, Pencil, Save, ShoppingBag, Sparkles, Trash2, Trophy, X } from "lucide-react";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { ArrowLeft, BookOpen, Calendar, Camera, Mail, Map as MapIcon, MessageCircle, Pencil, Save, ShoppingBag, Sparkles, Trash2, Trophy, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -23,6 +23,7 @@ import { ThemeBackgroundToggle } from "@/components/ThemeBackgroundToggle";
 import { SEASONAL_ITEM_COLOR, seasonalEventName } from "@/config/seasonalEvents";
 import CosmeticAvatar from "@/components/CosmeticAvatar";
 import { DeleteUserDialog } from "@/components/DeleteUserDialog";
+import { CardBinder } from "@/components/tcg/CardBinder";
 import { useToast } from "@/hooks/use-toast";
 import { useRandomSubtitle } from "@/hooks/useRandomSubtitle";
 import { AVATAR_SUBTITLES } from "@/config/headerSubtitles";
@@ -54,7 +55,11 @@ export default function AvatarPage({
   const [gameProfile, setGameProfile] = useState<PublicCosmetics | null>(null);
   const [loading, setLoading] = useState(true);
   // What the panel beside the profile shows (chosen with the buttons under it), and which cosmetics
-  const [view, setView] = useState<"cosmetics" | "map" | "achievements">("cosmetics");
+  // ?view=binder (from the Shop's TCG tab) opens on the card binder
+  const [searchParams] = useSearchParams();
+  const [view, setView] = useState<"cosmetics" | "map" | "achievements" | "binder">(() =>
+    searchParams.get("view") === "binder" ? "binder" : "cosmetics"
+  );
   const [category, setCategory] = useState<"hats" | "decorations" | "themes">("hats");
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -510,11 +515,12 @@ export default function AvatarPage({
                     </div>
                 </div>
                 {/* What the panel beside the profile shows */}
-                <div className="mt-4 grid grid-cols-3 gap-2 border-t pt-4">
+                <div className="mt-4 grid grid-cols-2 gap-2 border-t pt-4">
                   {([
                     { key: "cosmetics", label: "Cosmetics", icon: Sparkles },
                     { key: "map", label: "Map", icon: MapIcon },
                     { key: "achievements", label: "Achievements", icon: Trophy },
+                    { key: "binder", label: "Card Binder", icon: BookOpen },
                   ] as const).map(({ key, label, icon: Icon }) => (
                     <Button
                       key={key}
@@ -588,6 +594,8 @@ export default function AvatarPage({
               </Card>
             ) : view === "achievements" ? (
               <AchievementsGrid achievements={achievements} />
+            ) : view === "binder" ? (
+              viewedId ? <CardBinder userId={viewedId} isOwn={isOwn} /> : null
             ) : loading ? (
               <p className="text-muted-foreground text-center">Loading...</p>
             ) : category === "hats" ? (

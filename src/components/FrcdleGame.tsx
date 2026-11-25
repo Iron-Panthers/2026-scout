@@ -196,6 +196,13 @@ function rollSnapshotTeams(spinNumber: string, snapshot: Map<number, SnapshotTea
 }
 
 /** Combined xP of a roll's teams, before clamping. */
+/** Lifetime xP needed for each FRCdle xP achievement (Roller, Spinner, Gambler). */
+const FRCDLE_XP_ACHIEVEMENTS = [
+  [1_000, "frcdle_xp_1k"],
+  [10_000, "frcdle_xp_10k"],
+  [100_000, "frcdle_xp_100k"],
+] as const;
+
 function rollXp(teams: Pick<FoundTeam, "teamNumber" | "xp" | "count">[]): number {
   return teams.reduce((total, team) => total + team.xp * xpMultiplier(team.teamNumber) * team.count, 0);
 }
@@ -1014,6 +1021,15 @@ export function FrcdleGame({ onPointsChange }: { onPointsChange?: (points: numbe
     if (rollAchievements.nothing) void unlockAchievement(user?.id, "theres_nothing");
     if (rollAchievements.everyTeam) void unlockAchievement(user?.id, "full_roll");
   }, [rollAchievements, user?.id]);
+
+  // Lifetime xP milestones, once today's roll (if counted) has finished revealing
+  const xpSettled = savedRolls !== null && !isRevealingTeams && !isResolvingTeams;
+  useEffect(() => {
+    if (!xpSettled) return;
+    for (const [goal, id] of FRCDLE_XP_ACHIEVEMENTS) {
+      if (lifetimeXp >= goal) void unlockAchievement(user?.id, id);
+    }
+  }, [xpSettled, lifetimeXp, user?.id]);
 
   if (showHistory) {
     return <HistoryPage rolls={historyRolls} onBack={() => setShowHistory(false)} />;

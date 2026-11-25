@@ -14,6 +14,9 @@ import { useDevMode } from "@/contexts/DevModeContext";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { getActiveEvent, isEventWithinWindow } from "@/lib/matches";
 import { unlockAchievement } from "@/lib/achievements";
+
+/** Points lost on bets for the "RIP" achievement. */
+const RIP_POINTS_LOST = 10_000;
 import { getGameProfile } from "@/lib/gameProfiles";
 import { getBulkMatchOdds, getUserBets, blendOddsRedPct, settleMatchBets } from "@/lib/betting";
 import { getMatchLabel, wasUpset } from "@/lib/match13";
@@ -792,6 +795,12 @@ export default function Betting({
       return (bet.alliance === "red" ? redChance : 1 - redChance) < 0.2;
     });
     if (calledUpset) void unlockAchievement(user.id, "upset");
+
+    // RIP: lost 10,000 points (not event currency) on bets that lost
+    const pointsLost = userBets
+      .filter((bet) => bet.status === "lost" && (bet.currency ?? "points") === "points")
+      .reduce((total, bet) => total + bet.amount, 0);
+    if (pointsLost >= RIP_POINTS_LOST) void unlockAchievement(user.id, "rip");
 
     if (!activeEvent) { setLoading(false); return; }
 
